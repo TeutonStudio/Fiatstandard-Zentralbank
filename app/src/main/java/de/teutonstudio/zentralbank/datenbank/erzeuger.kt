@@ -1,0 +1,54 @@
+package de.teutonstudio.zentralbank.datenbank
+
+import android.content.Context
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.Database
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+
+@Database(
+    entities = [
+        SpielDaten::class,
+        SpielerDaten::class,
+        BauteilDaten::class,
+        KontrolleDaten::class,
+        RundeDaten::class,
+        HandelsDaten::class,
+        AnleiheDaten::class,
+        VertragsDaten::class,
+    ],
+    version = 1,
+    exportSchema = false
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun gameDao(): GameDao
+    abstract fun playerDao(): PlayerDao
+    abstract fun buildDAO(): BuildDao
+    abstract fun controlDao(): ControlDao
+    abstract fun roundDao(): RoundDao
+    abstract fun tradeDao(): TradeDao
+    abstract fun creditDao(): CreditDao
+    abstract fun contractDao(): ContractDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun erhalteDatenbank(context: Context): Flow<AppDatabase> = flow {
+            if (INSTANCE == null) {
+                INSTANCE = Room.databaseBuilder(
+                    context,
+                    AppDatabase::class.java,
+                    "zentralbankspeicher"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+            }
+            emit(INSTANCE!!)
+        }.flowOn(Dispatchers.IO)
+    }
+}
