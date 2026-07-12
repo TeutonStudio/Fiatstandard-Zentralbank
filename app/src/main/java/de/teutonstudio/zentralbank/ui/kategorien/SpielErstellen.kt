@@ -20,6 +20,7 @@ import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
+import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.definiereBauteile
 import de.teutonstudio.zentralbank.ui.eingabe.definiereLeitzinsatzZiele
 import de.teutonstudio.zentralbank.ui.eingabe.definiereSpieler
@@ -28,8 +29,9 @@ import de.teutonstudio.zentralbank.ui.eingabe.definiereWarenkorb
 @Composable
 fun SpielErstellen(
     nachAbbruch: () -> Unit,
+    erstelleSpiel: (daten: Spiel) -> Unit,
+    nachAbschluß: () -> Unit,
     seite: MutableIntState = remember { mutableIntStateOf(1) },
-    nachAbschluß: (daten: Spiel) -> Unit
 ) {
     val spieler = remember { mutableStateMapOf(
         "Spieler 1" to 100.toZahlungsmittel(),
@@ -45,13 +47,17 @@ fun SpielErstellen(
             bauteileProSpieler.add(it,Bauteil.entries.associateWith { 0 }.toMutableMap())
         } }
     }
-    SteuerContainer(
+    Titel(
         beiZurück = { seite.intValue -= 1 },
-        darfWeiter = spielerGültig,
-        beiWeiter = { seite.intValue += 1 },
+        beiWeiter = { if (spielerGültig.value) { seite.intValue += 1 } else null },
+        anleitung = remember { mutableStateOf(false) }
     ) {
         val spielerNamen = spieler.keys.toList()
         val abschlussSeite = 4 + spielerNamen.size
+        val ausgabe = spielerNamen.mapIndexed { idx, name ->
+            val bauteile = bauteileProSpieler[idx].toMutableMap()
+            Spieler(name, bauteile) to (spieler[name] ?: Zahlungsmittel())
+        }.toMap()
         when (seite.intValue) {
             0 -> { nachAbbruch() }
             1 -> { definiereSpieler(spielerGültig,spieler) }
@@ -64,19 +70,16 @@ fun SpielErstellen(
                 definiereBauteile(fürWenn,bauteileProSpieler.getOrElse(idx) { Bauteil.entries.associateWith { -1 }.toMutableMap() })
             }
             abschlussSeite -> {
-                val ausgabe = spielerNamen.mapIndexed { idx, name ->
-                    val bauteile = bauteileProSpieler[idx].toMutableMap()
-                    Spieler(name, bauteile) to (spieler[name] ?: Zahlungsmittel())
-                }.toMap()
-
-                nachAbschluß(Spiel(
+                val daten = Spiel(
                     zentralbankZiele[0],
                     ausgabe,
                     warenkorb.toMap(),
                     zentralbankZiele[1],
                     zentralbankZiele[2],
                     zentralbankZiele[3]
-                ))
+                )
+                erstelleSpiel(daten)
+                nachAbschluß()
             }
         }
     }
@@ -90,6 +93,6 @@ private fun SpielErstellenPreview() {
     val seite = remember { mutableIntStateOf(4) }
     val spielData = remember { mutableStateOf(Pair(emptyMap<String, Zahlungsmittel>(),emptyMap<Rohstoffe,Int>())) }
     Column() {
-        SpielErstellen({},seite) { }
+        SpielErstellen({},{},{},seite)
     }
 }

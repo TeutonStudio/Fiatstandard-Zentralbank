@@ -23,22 +23,23 @@ import de.teutonstudio.zentralbank.datenbank.SpielDaten
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
+import de.teutonstudio.zentralbank.ui.eingabe.Titel
 
 @Composable
 fun SpielLaden(
     beiAbbruch: () -> Unit,
-    speicher: Map<SpielDaten, Pair<Int, List<String>>>,
     beiLöschen: (SpielDaten) -> Unit = {},
     beiLaden: (SpielDaten) -> Unit,
+    nachLaden: () -> Unit,
+    speicher: Map<SpielDaten, Pair<Int, List<String>>>,
 ) {
     var spielstand by remember { mutableStateOf<SpielDaten?>(null) }
     val valideAuswahl = remember { derivedStateOf { spielstand != null } }
-    SteuerContainer(
-        hatLöschen = remember { derivedStateOf { spielstand != null } },
-        beiLöschen = { beiLöschen(spielstand!!) },
+    Titel(
+        beiLöschen = { if (valideAuswahl.value) { beiLöschen(spielstand!!) } else null },
         beiZurück = beiAbbruch,
-        darfWeiter = valideAuswahl,
-        beiWeiter = { spielstand?.let { beiLaden(it) } },
+        beiWeiter = { if (valideAuswahl.value) { spielstand?.let { beiLaden(it); nachLaden() } } else null },
+        anleitung = remember { mutableStateOf(false) }
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
@@ -68,6 +69,6 @@ fun SpielLaden(
 fun LoadGamePreview() {
     val spiel = remember { TestSpiel }
     Column() {
-        SpielLaden({},mapOf(),{}) {}
+        SpielLaden({},{},{},{},mapOf())
     }
 }

@@ -29,6 +29,7 @@ import de.teutonstudio.zentralbank.ui.ModiPad10
 import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.TextCard
 import de.teutonstudio.zentralbank.ui.eingabe.ImageCard
+import de.teutonstudio.zentralbank.ui.eingabe.Titel
 
 @OptIn(ExperimentalGridApi::class)
 @Composable
@@ -41,15 +42,17 @@ fun Spielmenü(
     beiAnleihe: () -> Unit,
     beiNächsteRunde: () -> Unit,
 ) {
-    GridByOrientation() { idx: Int, modifier -> when(idx) {
-        0 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.saldo, beiKlick = beiVermogenSaldo)
-        1 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.debt, beiKlick = beiSchuldenSaldo)
-        2 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.market, beiKlick = beiMarktSaldo)
-        3 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.foreign, beiKlick = beiAuslandSaldo)
-        4 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.handel, beiKlick = beiHandel)
-        5 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.anleihe, beiKlick = beiAnleihe)
-        6 -> TextCard("nächste Runde", modifier(null), fillMaxWidth = true,beiKlick=beiNächsteRunde)
-    } }
+    Titel() {
+        GridByOrientation() { idx: Int, modifier -> when(idx) {
+            0 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.saldo, beiKlick = beiVermogenSaldo)
+            1 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.debt, beiKlick = beiSchuldenSaldo)
+            2 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.market, beiKlick = beiMarktSaldo)
+            3 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.foreign, beiKlick = beiAuslandSaldo)
+            4 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.handel, beiKlick = beiHandel)
+            5 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.anleihe, beiKlick = beiAnleihe)
+            6 -> TextCard("nächste Runde", modifier(null), fillMaxWidth = true,beiKlick=beiNächsteRunde)
+        } }
+    }
 }
 
 @Preview(

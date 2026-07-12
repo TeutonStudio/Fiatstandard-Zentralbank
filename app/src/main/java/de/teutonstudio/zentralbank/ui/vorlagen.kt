@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.FlowRow
@@ -11,11 +12,15 @@ import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Grid
 import androidx.compose.foundation.layout.GridConfigurationScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Card
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -69,7 +74,7 @@ fun TextCard(text: String, modifier: Modifier = Modifier, fontSize: TextUnit = 2
 //    } ?: painterResource(R.drawable.empty)
 //}
 
-private fun Configuration.isLandscape(): Boolean = orientation == Configuration.ORIENTATION_LANDSCAPE
+public fun Configuration.isLandscape(): Boolean = orientation == Configuration.ORIENTATION_LANDSCAPE
 /*private fun isLandscape(configuration: Configuration): Boolean {
     return configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 }*/
@@ -196,23 +201,21 @@ fun ColumnOrRowByOrientation(vararg contents: @Composable () -> Unit) {
     }
 }
 
-@Composable
-fun Titel(beiKlick: () -> Unit, inhalt: @Composable () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val configuration = LocalConfiguration.current
-        val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-        Column(verticalArrangement = Arrangement.Top) {
+/*@Composable
+fun Titel(beiKlick: () -> Unit, inhalt: @Composable BoxScope.() -> Unit) {
+    Scaffold(
+        modifier = ModiPad5.fillMaxSize(),
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
             Card(modifier = ModiPad15.fillMaxWidth(), onClick = beiKlick) {
-                val text = if (isLandscape) "Fiatreich Zentralbank" else "FZB"
+                val text = if (LocalConfiguration.current.isLandscape()) "Fiatreich Zentralbank" else "FZB"
                 Text(text,ModiPad15.fillMaxWidth(),Color.Unspecified,null)
             }
-            Column(verticalArrangement = Arrangement.Bottom) {
-                Box(modifier = Modifier.fillMaxSize()) { inhalt() }
-            }
         }
+    ) {
+        Box(modifier = Modifier.fillMaxSize().padding(it).consumeWindowInsets(it), contentAlignment = Alignment.Center, content = inhalt)
     }
-}
+}*/
 
 fun markBy(betrag: Zahlungsmittel?): String {
     if (betrag == null) return ""

@@ -1,0 +1,720 @@
+\documentclass[11pt,a4paper,oneside,parskip=half]{scrreprt}
+
+% Sprache und Typografie
+\usepackage[ngerman]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{csquotes}
+
+% Layout
+\usepackage[a4paper,margin=2.55cm,headheight=17pt]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% Tabellen und Listen
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{framed}
+\setlist{nosep,leftmargin=*}
+\renewcommand{\arraystretch}{1.25}
+
+% Links und PDF-Metadaten
+\usepackage[hidelinks]{hyperref}
+\usepackage{bookmark}
+\hypersetup{
+  pdftitle={Der Fiatstandard - Spielanleitung},
+  pdfauthor={TeutonStudio},
+  pdfsubject={Arbeitsfassung der Regeln fuer das Brettspiel Der Fiatstandard},
+  pdfkeywords={Brettspiel, Regeln, Zentralbank, Rohstoffe, Banken, Fiatstandard}
+}
+
+% Kopf- und Fusszeilen
+\usepackage[automark]{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{Der Fiatstandard}
+\ohead{Spielanleitung}
+\cfoot{\pagemark}
+
+% Makros
+\newcommand{\DFVersion}{Arbeitsfassung 0.2}
+\newcommand{\DFStand}{Mai 2026}
+\newcommand{\begriff}[1]{\textbf{#1}}
+\newcommand{\marker}[1]{\textsf{#1}}
+\newcommand{\offen}[1]{\begin{framed}\noindent\textbf{Offen / zu entscheiden:} #1\end{framed}}
+\newcommand{\beispiel}[1]{\begin{framed}\noindent\textbf{Beispiel:} #1\end{framed}}
+\newcommand{\formline}[1]{\textbf{#1}\enspace\hrulefill}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\pagenumbering{gobble}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.8cm}
+  {\Huge\bfseries Der Fiatstandard\\[0.35em]}
+  {\Large Spielanleitung\\[2.0em]}
+
+  \rule{0.78\textwidth}{0.7pt}\\[1.5em]
+  {\large Ein Brettspiel über Rohstoffe, Infrastruktur, Banken, Krieg, Anleihen und die berühmte menschliche Idee, Knappheit durch bedrucktes Papier zu verwalten.\\[1.5em]}
+  \rule{0.78\textwidth}{0.7pt}
+
+  \vfill
+  {\Large \DFVersion\\[0.5em]}
+  {\large \DFStand\\[2.5em]}
+
+  \begin{tabular}{rl}
+    Autor: & TeutonStudio \\
+    Spielerzahl: & 3 bis 7 \\
+    Spieldauer: & einige Stunden \\
+    Dokumenttyp: & Regelheft / Spielanleitung \\
+    Status: & erste ausgearbeitete Regelfassung mit offenen Tabellen \\
+  \end{tabular}
+
+  \vfill
+  {\small Diese Fassung ist ein Arbeitsdokument. Offene Regeln sind bewusst markiert und nicht heimlich als fertig verkauft, was schon mehr Ehrlichkeit ist als manche Finanzprodukte bieten.}
+\end{titlepage}
+
+\hypersetup{pageanchor=true}
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\chapter{Grundidee und Ziel des Spiels}
+
+\section{Worum es geht}
+\emph{Der Fiatstandard} ist ein strategisches Brettspiel fuer 3 bis 7 Spieler. Jeder Spieler fuehrt einen Siedler, der in einer rohstoffreichen, aber politisch fragilen Welt ueberleben, Infrastruktur aufbauen, Handel betreiben, Anleihen ausgeben und im Zweifel die Mitspieler einnehmen muss.
+
+Die Wortwahl der Spielwelt darf satirisch sein. Die Regeln selbst werden trocken formuliert. Das ist notwendig, weil niemand eine Belagerung korrekt abrechnet, wenn die Anleitung dabei dauernd Witze macht. Dafuer gibt es ja die Zentralbank.
+
+\section{Primaeres und sekundaeres Ziel}
+Jeder Siedler verfolgt zwei Ziele:
+\begin{enumerate}
+  \item \begriff{Primäres Ziel: Selbsterhalt.} Der Spieler muss zahlungsfähig bleiben, seine Versorgung sichern und verhindern, dass seine Infrastruktur zerfällt.
+  \item \begriff{Sekundäres Ziel: Einnahme der Mitspieler.} Ein Spieler kann versuchen, andere Spieler wirtschaftlich, infrastrukturell oder militärisch aus dem Spiel zu drängen.
+\end{enumerate}
+
+\section{Kein Punktesieg}
+Das Spiel hat keine klassische Punktewertung. Es endet, wenn nur noch ein Spieler übrig ist oder wenn sich alle verbleibenden Spieler auf ein Unentschieden einigen.
+
+\section{Grundsatz fuer Regelauslegung}
+Wenn eine Regel mehrere Auslegungen zulässt, gilt in dieser Arbeitsfassung folgende Reihenfolge:
+\begin{enumerate}
+  \item Die konkrete Regel im jeweiligen Kapitel hat Vorrang.
+  \item Danach gilt die App-Verwaltung fuer Preise, Anleihen, Handelszahlungen und Marktwerte.
+  \item Danach entscheidet die Spielgruppe vor der Partie und notiert die Entscheidung als Hausregel.
+\end{enumerate}
+
+\chapter{Spielmaterial und Grundbegriffe}
+
+\section{Spielmaterial}
+Das Spiel benoetigt folgendes Material:
+
+\begin{longtable}{>{\bfseries}p{0.28\textwidth}p{0.62\textwidth}}
+\toprule
+Material & Verwendung \\
+\midrule
+Wasserfelder & Dreiecksfelder ohne Rohstoffproduktion; wichtig fuer Seewege und Hafenbau. \\
+Gelaendefelder & Dreiecksfelder mit Rohstoffbezug. Jedes Gelaendefeld kann je nach Typ bestimmte Rohstoffe tragen. \\
+Zentralbank & Zentrales Element des Geldsystems. Sie emittiert die Waehrung Mark. \\
+Hauptbahnhoefe & Startgebaeude der Spieler und Kern ihrer Infrastruktur. \\
+Bahnhoefe & Spielerabhaengige Gebaeude auf Ecken. Erhoehen Ertrag angrenzender Abbaueinheiten. \\
+Grossbahnhoefe & Staerkere Bahnhoefe auf Ecken. Erhoehen Ertrag staerker und zaehlen fuer Kontrolle und Versorgung. \\
+Haefen & Spielerabhaengige Gebaeude auf geeigneten Ecken mit Wasser- und Gelaendezugang. \\
+Grosshaefen & Staerkere Haefen mit hoeherer Frachtschiffkapazitaet. \\
+Schienen & Spielerabhaengige Verbindungen auf Kanten zwischen zwei Gelaendefeldern. \\
+Geschaeftsbanken & Neutrale Gebaeude in der Farbe der Zentralbank. Sie koennen statt Abbaueinheiten auf Gelaendefelder gebaut werden. \\
+Abbaueinheiten & Neutrale Anlagen auf Gelaendefeldern. Sie erzeugen Rohstoffertrag fuer angeschlossene Spieler. \\
+Frachtschiffe & Spielerabhaengige Einheiten zur Verbindung von zwei Haefen. Jedes Frachtschiff besitzt zwei Faehnchen zur Definition von Import- und Exportrichtung. \\
+Panzer & Spielerabhaengige Kriegseinheiten. Sie erscheinen nur waehrend eines Krieges auf dem Spielfeld. \\
+Kriegsschiffe & Spielerabhaengige Kriegseinheiten. Sie erscheinen nur waehrend eines Krieges auf dem Spielfeld. \\
+Ereigniskarten & Karten in den Kategorien 1 bis 6. Die Kategorie ergibt sich durch einen Wuerfelwurf. \\
+Rohstoffkarten & Karten fuer Oel, Stahl, Ziegel und Nahrung. \\
+Waehrungsscheine & Scheine der Waehrung Mark. \\
+Anleihenkarten & Ausfuellbare Vorlagen fuer Anleihen zwischen Spielern oder gegenueber Geschaeftsbanken. \\
+App & Verwaltet Anleihen, Rohstoffhandel, Anleihenhandel, Zahlungen, Marktwert und Auslandshandelskosten. \\
+\bottomrule
+\end{longtable}
+
+\section{Geld und Waehrung}
+In diesem Spiel wird zwischen \begriff{Geld} und \begriff{Waehrung} unterschieden.
+
+\begriff{Geld} bezeichnet den wirtschaftlichen Anspruch, also die tatsaechliche Zahlungs- und Tauschfaehigkeit eines Spielers. \begriff{Waehrung} ist nur die Recheneinheit, in der Geld gemessen und uebertragen wird. Im Spiel heisst diese Waehrung \begriff{Mark}. Minuten sind schliesslich auch nicht die Zeit selbst, obwohl manche Sitzungen den Gegenbeweis antreten.
+
+\section{Zentrale Begriffe}
+\begin{description}
+  \item[Warenkorb] Vor Runde 0 von den Spielern festgelegte Zusammenstellung von Rohstoffen. Aus seiner Preisentwicklung wird die Preisinflation berechnet.
+  \item[Preisinflation] Veraenderung des Warenkorbpreises. Sie bestimmt, ob der Leitzinssatz nach einer vollen Runde erhoeht oder verringert wird.
+  \item[Leitzinssatz] Zinssatz fuer Anleihen, die nicht von Spielern gekauft werden, sondern ueber kontrollierte Geschaeftsbanken laufen.
+  \item[Sondervermoegen] Der Nennbetrag einer Anleihe, die eine Geschaeftsbank kauft. Der Begriff ist moralisch flexibel, wie es sich gehoert.
+  \item[Unvermoegen] Der gerundete Zinsbetrag einer Geschaeftsbank-Anleihe nach der Formel: Sondervermoegen mal Zinssatz in Prozent.
+  \item[Marktwert] Von der App bestimmter Wert eines Spielers. Gebaute Anlagen werden eingetragen und fliessen in die Berechnung ein.
+  \item[Ueberschuldung] Zustand, in dem die Summe der Sondervermoegen aus eigenen Geschaeftsbank-Anleihen den Marktwert des Spielers uebersteigt.
+  \item[Verzettelung] Zustand, in dem ein Spieler weniger Geschaeftsbanken kontrolliert, als er Anleihen ueber das Bankensystem verkauft hat.
+  \item[Schuldenstrich] Sanierungsereignis bei gleichzeitiger Ueberschuldung und Verzettelung: Schulden verschwinden, aber Infrastruktur wird schwer beschaedigt.
+  \item[Zahlungsunfaehigkeit] Ausscheiden eines Spielers, wenn eine Rueckzahlung faellig wird und weder Zahlung noch ausreichende Neuaufnahme moeglich ist.
+\end{description}
+
+\chapter{Spielfeld und Aufbau der Welt}
+
+\section{Dreiecksraster}
+Das Spielfeld besteht aus einem Dreiecksraster. Jedes Dreieck ist entweder ein Wasserfeld oder ein Gelaendefeld. Gelaendefelder koennen Rohstoffe tragen. Wasserfelder dienen vor allem der Trennung von Landmassen und der Bedeutung von Haefen, Grosshaefen und Frachtschiffen.
+
+Es gibt keine Hexfelder, die in sechs Dreiecke zerlegt werden. Das Dreieck ist die Grundeinheit des Spielfelds. Die Zivilisation beginnt klein, geometrisch unbequem und mit erstaunlich viel Verwaltungsaufwand.
+
+\section{Ecken und Kanten}
+\begin{itemize}
+  \item \begriff{Ecken} sind Punkte, an denen bis zu sechs Dreiecksfelder zusammentreffen. Auf Ecken koennen Hauptbahnhoefe, Bahnhoefe, Grossbahnhoefe, Haefen und Grosshaefen stehen.
+  \item \begriff{Kanten} liegen zwischen zwei Dreiecksfeldern. Schienen werden auf Kanten gebaut, an denen zwei Gelaendefelder zusammentreffen.
+\end{itemize}
+
+\section{Hafenstandorte}
+Ein Hafen oder Grosshafen darf auf einer Ecke gebaut werden, wenn an dieser Ecke mindestens zwei Wasserfelder und mindestens zwei Gelaendefelder angrenzen.
+
+\section{Runde 0: Platzierung der Hauptbahnhoefe}
+Vor der ersten normalen Spielrunde findet Runde 0 statt. In dieser Runde platzieren die Spieler ihre Hauptbahnhoefe.
+
+Jede bebaute Ecke muss mindestens drei Kanten Abstand zur naechsten bebauten Ecke haben. Fuer die Startplatzierung bedeutet das: Kein Hauptbahnhof darf zu nah an einem anderen Hauptbahnhof stehen.
+
+\offen{Es ist noch festzulegen, ob der Drei-Kanten-Abstand nur in Runde 0 gilt oder spaeter fuer alle Gebaeude auf Ecken.}
+
+\section{Rohstoffzuordnung der Gelaendefelder}
+Die Rohstoffzuordnung der Gelaendefelder ist noch offen. Fest steht bisher nur: Gelaendefelder bilden die Grundlage fuer Abbaueinheiten und Geschaeftsbanken.
+
+\offen{Festlegen, welche Gelaendetypen Oel, Stahl, Ziegel und Nahrung erlauben. Moegliche Varianten: feste Gelaendetypen, zufaellige Rohstoffmarker, mehrere Rohstoffe pro Feldtyp oder App-generierte Karte.}
+
+\chapter{Rohstoffe, Waehrung und Preise}
+
+\section{Rohstoffe}
+In der aktuellen Fassung gibt es vier Rohstoffe:
+\begin{description}
+  \item[Oel] Wird je Runde von Bahnhoefen und Haefen verbraucht. Panzer und Kriegsschiffe verbrauchen Oel, wenn sie eingesetzt werden.
+  \item[Stahl] Wird voraussichtlich fuer Infrastruktur, Schienen, Schiffe und Kriegsmaterial benoetigt.
+  \item[Ziegel] Wird voraussichtlich fuer Gebaeude und Ausbau verwendet.
+  \item[Nahrung] Wird je Runde von Bahnhoefen und Haefen verbraucht und kann fuer Versorgung und Krieg relevant sein.
+\end{description}
+
+\offen{Die genauen Baukosten der Gebaeude und Einheiten sind noch nicht festgelegt.}
+
+\section{Die Mark}
+Die Mark ist die von der Zentralbank emittierte Waehrung. Rohstoffe duerfen nicht direkt gegen Rohstoffe getauscht werden. Jeder Rohstoffhandel laeuft ueber die Mark.
+
+Diese Regel ist zentral: Die Spieler handeln nicht \enquote{Oel gegen Stahl}, sondern verkaufen Oel gegen Mark und kaufen Stahl gegen Mark. Damit entstehen Preise. Ohne Preise gibt es keine Preisinflation, und ohne Preisinflation waere die Zentralbank nur ein huebscher Pappkreis mit Selbstbewusstsein.
+
+\section{Preisbildung}
+Preise entstehen durch Handel zwischen Spielern. Sobald Preise vorhanden sind, werden auch Import- und Exportgeschaefte des Auslandshandels in die Preisbildung einbezogen.
+
+Die App berechnet aus den Handelsdaten:
+\begin{itemize}
+  \item aktuelle Rohstoffpreise,
+  \item Preisentwicklung des Warenkorbs,
+  \item Preisinflation,
+  \item Marktwert der Spieler,
+  \item Auslandshandelskosten, insbesondere Importaufschlag und Exportabschlag.
+\end{itemize}
+
+\section{Der Warenkorb}
+Der Warenkorb wird vor Runde 0 von den Spielern festgelegt. Er funktioniert aehnlich wie der Spielplan: Er ist Teil der Partievorbereitung und bestimmt, woran Preisinflation gemessen wird.
+
+\offen{Festlegen, ob der Standard-Warenkorb nach Anzahl der Rohstofffelder im Spielfeld berechnet wird oder ob die Spieler ihn frei zusammenstellen.}
+
+\chapter{Gebaeude, Infrastruktur und Einheiten}
+
+\section{Gebaeudetypen}
+Das Spiel unterscheidet zwischen spielerabhaengigen Gebaeuden, neutralen Anlagen und Kriegseinheiten.
+
+\begin{longtable}{>{\bfseries}p{0.25\textwidth}p{0.17\textwidth}p{0.48\textwidth}}
+\toprule
+Element & Ort & Funktion \\
+\midrule
+Hauptbahnhof & Ecke & Start- und Kerngebaeude eines Spielers. Von ihm aus wird Infrastruktur gedacht und Kriegskosten werden gemessen. \\
+Bahnhof & Ecke & Erhoeht Ertrag angrenzender Abbaueinheiten auf 2, wenn die Voraussetzungen erfuellt sind. Verbraucht je Runde Oel und Nahrung. \\
+Grossbahnhof & Ecke & Erhoeht Ertrag angrenzender Abbaueinheiten auf 3. Verbraucht je Runde Oel und Nahrung. \\
+Hafen & Ecke & Ermoeglicht Seeanschluss und Auslandshandel. Hat Kapazitaet fuer 1 Frachtschiff. Verbraucht je Runde Oel und Nahrung. \\
+Grosshafen & Ecke & Staerkerer Hafen mit Kapazitaet fuer 2 Frachtschiffe. Verbraucht je Runde Oel und Nahrung. \\
+Schiene & Kante & Verbindung auf einer Kante zwischen zwei Gelaendefeldern. Ermoeglicht Ertrag 1 an angrenzenden Abbaueinheiten. \\
+Abbaueinheit & Gelaendefeld & Neutrale Rohstoffanlage. Ertraege gehen an angeschlossene Spieler, nicht an einen festen Besitzer. \\
+Geschaeftsbank & Gelaendefeld & Neutrales Bankgebaeude in Zentralbankfarbe. Kann statt einer Abbaueinheit gebaut werden und wird durch angrenzende Infrastruktur genutzt. \\
+Frachtschiff & Seeweg & Verbindet zwei Haefen. Import- und Exportrichtung werden durch zwei Faehnchen markiert. \\
+Panzer & Krieg & Kriegseinheit gegen Landziele. Befindet sich nur waehrend eines Krieges auf dem Spielfeld. \\
+Kriegsschiff & Krieg & Kriegseinheit gegen Haefen und Seewege. Befindet sich nur waehrend eines Krieges auf dem Spielfeld. \\
+\bottomrule
+\end{longtable}
+
+\section{Bauen}
+Ein Spieler darf waehrend seiner Bau- und Handelsphase so lange bauen, bis ihm Rohstoffe oder Mark fuer weitere Rohstoffe ausgehen.
+
+\section{Fixkosten}
+Bahnhoefe und Haefen verbrauchen je Runde Oel und Nahrung. Diese Fixkosten werden in der Phase \enquote{Fixkosten} des Spielerzugs bezahlt.
+
+\offen{Die exakte Hoehe der Fixkosten fuer Bahnhof, Grossbahnhof, Hafen und Grosshafen muss noch als Tabelle festgelegt werden.}
+
+\section{Baukosten}
+Die Baukosten sind noch nicht final. Fuer die fertige Anleitung wird eine zentrale Baukostentabelle benoetigt.
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{>{\bfseries}lXXXX}
+\toprule
+Bauwerk / Einheit & Oel & Stahl & Ziegel & Nahrung \\
+\midrule
+Bahnhof & offen & offen & offen & offen \\
+Grossbahnhof & offen & offen & offen & offen \\
+Hafen & offen & offen & offen & offen \\
+Grosshafen & offen & offen & offen & offen \\
+Schiene & offen & offen & offen & offen \\
+Abbaueinheit Oel & offen & offen & offen & offen \\
+Abbaueinheit Stahl & offen & offen & offen & offen \\
+Abbaueinheit Ziegel & offen & offen & offen & offen \\
+Abbaueinheit Nahrung & offen & offen & offen & offen \\
+Geschaeftsbank & offen & offen & offen & offen \\
+Frachtschiff & offen & offen & offen & offen \\
+Panzer & offen & offen & offen & offen \\
+Kriegsschiff & offen & offen & offen & offen \\
+\bottomrule
+\end{tabularx}
+\caption{Vorlaeufige Baukostentabelle}
+\end{table}
+
+\chapter{Eigentum, Kontrolle und neutrale Anlagen}
+
+\section{Grundsatz}
+Abbaueinheiten und Geschaeftsbanken gehoeren keinem Spieler dauerhaft. Sie werden genutzt, kontrolliert oder verlassen. Das ist ein kleiner, aber wichtiger Unterschied, den Menschen ueblicherweise erst beachten, nachdem etwas brennt.
+
+\section{Ertrag aus Abbaueinheiten}
+Eine Abbaueinheit steht auf einem Gelaendefeld. Spieler erhalten Ertrag, wenn sie an dieses Feld angeschlossen sind.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.34\textwidth}X}
+\toprule
+Anschluss am Feld & Ertrag \\
+\midrule
+Eigene Schiene an einer Kante des Feldes & 1 Rohstoff \\
+Eigener Bahnhof an einer Ecke des Feldes & 2 Rohstoffe \\
+Eigener Grossbahnhof an einer Ecke des Feldes & 3 Rohstoffe \\
+Kein angeschlossener Spieler & kein Ertrag; die Anlage gilt als verlassen \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+Ist mehr als ein Spieler angeschlossen, erhaelt jeder Spieler den Ertrag nach seiner besten eigenen Anschlussart, sofern die konkrete Rohstoff- und Versorgungsregel dies nicht einschraenkt.
+
+\offen{Bestaetigen, ob mehrere Spieler gleichzeitig aus derselben Abbaueinheit Ertrag erhalten duerfen oder ob die staerkste Anschlussart Vorrang hat.}
+
+\section{Verlassene Anlagen}
+Eine Abbaueinheit wird verlassen, wenn kein Spieler mehr ueber eine Kante oder Ecke an ihrem Feld angeschlossen ist. Eine verlassene Anlage produziert fuer niemanden.
+
+Ein anderer Spieler kann eine verlassene Anlage nutzen, sobald er die noetige angrenzende Infrastruktur errichtet.
+
+\section{Geschaeftsbanken}
+Geschaeftsbanken werden wie neutrale Anlagen behandelt. Ein Spieler kann eine Geschaeftsbank nutzen, wenn er ueber eine Kante oder Ecke an deren Feld angeschlossen ist.
+
+Fuer Anleihen ueber das Bankensystem zaehlt eine Geschaeftsbank als vom Spieler kontrolliert, solange diese Anschlussbedingung erfuellt ist.
+
+\offen{Festlegen, ob eine Geschaeftsbank von mehreren Spielern gleichzeitig kontrolliert werden kann oder ob bei Mehrfachanschluss eine Vorrangregel gilt.}
+
+\chapter{Bankensystem, Anleihen und Geldpolitik}
+
+\section{Arten von Anleihen}
+Ein Spieler kann freiwillig Anleihen verkaufen. Es gibt zwei Arten:
+\begin{enumerate}
+  \item \begriff{Spieler-Anleihe.} Ein anderer Spieler kauft die Anleihe. Laufzeit, Zinssatz und Preis sind frei verhandelbar.
+  \item \begriff{Geschaeftsbank-Anleihe.} Keine Spielerpartei kauft die Anleihe; stattdessen wird sie ueber eine kontrollierte Geschaeftsbank verkauft. Laufzeit und Zinssatz folgen festen Regeln.
+\end{enumerate}
+
+\section{Geschaeftsbank-Anleihen}
+Bei einer Geschaeftsbank-Anleihe waehlt der Spieler eine Laufzeit:
+\begin{itemize}
+  \item kurzfristig: 3 Runden,
+  \item mittelfristig: 5 Runden,
+  \item langfristig: 10 Runden.
+\end{itemize}
+
+Der Zinssatz entspricht dem aktuellen Leitzinssatz. Der Betrag der Anleihe heisst Sondervermoegen. Der gerundete Zinsbetrag aus Sondervermoegen mal Zinssatz in Prozent heisst Unvermoegen.
+
+Nach Ablauf der Laufzeit muss der Spieler das Sondervermoegen an den Anleihenhalter zurueckzahlen.
+
+\offen{Klaeren, ob das Unvermoegen zusaetzlich zum Sondervermoegen am Ende der Laufzeit gezahlt wird, laufend faellig ist oder nur als Kennwert fuer Ueberschuldung dient.}
+
+\section{Grenze fuer Sondervermoegen}
+Eine Geschaeftsbank darf Anleihen nur bis zu einer Grenze kaufen. Als Arbeitsregel gilt:
+
+\begin{quote}
+Das Sondervermoegen, das ueber eine Geschaeftsbank aufgenommen wird, darf den Marktwert des Spielers geteilt durch 10 nicht uebersteigen.
+\end{quote}
+
+Die groesste Bankmacht kann diese Grenze erhoehen.
+
+\offen{Festlegen, ob die Grenze \enquote{Marktwert / 10} pro kontrollierter Geschaeftsbank, pro einzelner Anleihe oder fuer alle Geschaeftsbank-Anleihen zusammen gilt.}
+
+\section{Rueckkauf von Anleihen}
+Ein Spieler kann eigene Anleihen jederzeit zurueckkaufen.
+
+\begin{itemize}
+  \item Bei Geschaeftsbank-Anleihen erfolgt der Rueckkauf zum urspruenglichen Betrag.
+  \item Bei Spieler-Anleihen wird der Rueckkaufpreis zwischen den beteiligten Spielern ausgehandelt.
+\end{itemize}
+
+\section{Leitzins und Inflation}
+Nach jeder vollen Runde, also nachdem jeder Spieler einmal an der Reihe war, wird die Preisentwicklung des Warenkorbs betrachtet. Aus ihr ergibt sich, ob der Leitzinssatz erhoeht oder verringert wird.
+
+\offen{Das genaue Inflationszielgebiet und die Hoehe der Zinsaenderung muessen festgelegt werden. In frueheren Notizen war ein Zielgebiet von 2 bis 3 Prozent und eine Aenderung um einen Prozentpunkt denkbar.}
+
+\section{Ueberschuldung, Verzettelung und Schuldenstrich}
+Ein Spieler ist \begriff{ueberschuldet}, wenn die Summe der Sondervermoegen seiner Geschaeftsbank-Anleihen seinen Marktwert uebersteigt.
+
+Ein Spieler ist \begriff{verzettelt}, wenn er weniger Geschaeftsbanken kontrolliert, als er Anleihen ueber das Bankensystem verkauft hat.
+
+Ist ein Spieler gleichzeitig ueberschuldet und verzettelt, erfolgt ein \begriff{Schuldenstrich}:
+\begin{itemize}
+  \item Alle Schulden des Spielers entfallen.
+  \item Alle Bahnhoefe und Haefen des Spielers werden entfernt.
+  \item Alle Grossbahnhoefe werden zu Bahnhoefen herabgestuft.
+  \item Alle Grosshaefen werden zu Haefen herabgestuft.
+\end{itemize}
+
+\section{Kriegsmoratorium fuer Schuldenstriche}
+Waehrend eines Krieges wird kein Schuldenstrich durchgefuehrt. Nach Friedensvertraegen wird ein waehrend des Krieges ausgesetzter Schuldenstrich nicht nachgeholt.
+
+\section{Zahlungsunfaehigkeit}
+Ein Spieler scheidet aus, wenn eine Anleihe rueckzahlungsnotwendig wird und er den faelligen Betrag weder zahlen noch ausreichend neu aufnehmen kann. Das kann insbesondere eintreten, wenn sein Marktwert gesunken ist und nicht genug Liquiditaet beschafft werden kann.
+
+\chapter{Spielvorbereitung und Beginn des Spiels}
+
+\section{Vorbereitung}
+Vor der Partie werden folgende Schritte ausgefuehrt:
+\begin{enumerate}
+  \item Spielfeld aus Wasser- und Gelaendefeldern aufbauen.
+  \item Rohstoffzuordnung der Gelaendefelder festlegen.
+  \item Warenkorb festlegen.
+  \item App fuer die Partie vorbereiten.
+  \item Startmaterial an die Spieler ausgeben.
+  \item Runde 0 fuer die Hauptbahnhoefe durchfuehren.
+\end{enumerate}
+
+\section{Startmaterial}
+Jeder Spieler beginnt mit:
+\begin{itemize}
+  \item 1 Hauptbahnhof,
+  \item 9 Schienen,
+  \item 3 Abbaueinheiten,
+  \item 100 Mark.
+\end{itemize}
+
+\section{Runde 0}
+In Runde 0 setzen die Spieler reihum ihre Hauptbahnhoefe. Der Abstand zwischen bebauten Ecken muss mindestens drei Kanten betragen.
+
+\offen{Festlegen, ob die 9 Startschienen und 3 Start-Abbaueinheiten ebenfalls in Runde 0 platziert werden oder erst waehrend der ersten normalen Spielzuege.}
+
+\chapter{Ablauf einer Spielrunde}
+
+\section{Runde und Zug}
+Eine Spielrunde besteht daraus, dass jeder Spieler einmal an der Reihe ist. Nachdem alle Spieler ihren Zug abgeschlossen haben, wird der Leitzinssatz anhand der Preisinflation angepasst.
+
+\section{Spielerzug}
+Ein Spielerzug besteht aus folgenden Phasen:
+\begin{enumerate}
+  \item \begriff{Ertraege erhalten.} Der Spieler erhaelt Rohstoffe aus angeschlossenen Abbaueinheiten.
+  \item \begriff{Fixkosten zahlen.} Der Spieler zahlt Mark- und Rohstoffkosten fuer laufende Infrastruktur, insbesondere Oel und Nahrung fuer Bahnhoefe und Haefen.
+  \item \begriff{Ereignis wuerfeln und ausfuehren.} Der Spieler wuerfelt mit einem Wuerfel und zieht eine Ereigniskarte der entsprechenden Kategorie.
+  \item \begriff{Bauen und handeln.} Der Spieler darf Rohstoffe ueber Mark handeln, Gebaeude bauen, Anleihen verkaufen, Anleihen kaufen und eigene Anleihen zurueckkaufen.
+\end{enumerate}
+
+\section{Ereigniswurf}
+Jeder Spieler wuerfelt in seinem Zug mit einem Wuerfel fuer ein Ereignis. Die Augenzahl bestimmt die Kategorie:
+
+\begin{center}
+\begin{tabular}{>{\bfseries}c l}
+\toprule
+Wurf & Ereignisstaerke \\
+\midrule
+1 & mild \\
+2 & leicht \\
+3 & angespannt \\
+4 & ernst \\
+5 & schwer \\
+6 & katastrophal \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\offen{Die Begriffe der Kategorien und die konkreten Ereigniskarten sind noch Arbeitsnamen und koennen ersetzt werden.}
+
+\section{Bau- und Handelsfreiheit}
+In der Bau- und Handelsphase gibt es keine feste Aktionspunktgrenze. Ein Spieler darf weiter bauen und handeln, bis ihm Rohstoffe, Mark oder handelbare Moeglichkeiten ausgehen.
+
+\chapter{Handel, Ausland und Seewege}
+
+\section{Handel zwischen Spielern}
+Rohstoffe werden ausschliesslich ueber die Mark gehandelt. Die App verwaltet Rohstoffhandel, Anleihenhandel und die daraus folgenden Zahlungen.
+
+\section{Auslandshandel}
+Der Auslandshandel wird ueber die App abgewickelt. Die Anzahl und Qualitaet der Haefen beeinflusst Importaufschlaege und Exportabschlaege.
+
+Mehr Hafeninfrastruktur verbessert damit die Bedingungen fuer Auslandshandel. Weniger Hafeninfrastruktur macht Handel mit dem Ausland teurer oder weniger attraktiv. So entsteht Aussenhandelspolitik, nur mit weniger Pressekonferenzen und vermutlich klareren Regeln.
+
+\section{Haefen und Frachtschiffe}
+Schienen koennen Inseln nicht direkt mit dem Hauptbahnhof verbinden. Fuer getrennte Landmassen werden zwei Haefen und ein Frachtschiff benoetigt.
+
+Ein Frachtschiff verbindet zwei Haefen. Es besitzt zwei Faehnchen, die an die jeweiligen Haefen gesteckt werden. Die Faehnchen definieren Import- und Exportrichtung dieses Schiffes.
+
+\section{Kapazitaet}
+\begin{center}
+\begin{tabular}{>{\bfseries}l c}
+\toprule
+Gebaeude & Frachtschiffkapazitaet \\
+\midrule
+Hafen & 1 Frachtschiff \\
+Grosshafen & 2 Frachtschiffe \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Verbindungspflicht}
+Haefen muessen an die Infrastruktur des Spielers angebunden sein. Auf Inseln kann diese Anbindung ueber Seewege erfolgen.
+
+\offen{Praezisieren, ob ein Hafen nur dann aktiv ist, wenn er ueber Schienen oder Frachtschiffe mit dem Hauptbahnhof verbunden ist, oder ob eine lokale Verbindung genuegt.}
+
+\chapter{Ereigniskarten und Krisen}
+
+\section{Grundregel}
+Wenn ein Spieler an der Reihe ist, wuerfelt er ein Ereignis und zieht eine Karte aus der entsprechenden Kategorie. Ereignisse koennen Rohstoffe, Preise, Zinsen, Marktwerte, Krieg, Auslandshandel oder Schulden betreffen.
+
+\section{Kategorien}
+Die Ereigniskarten werden in sechs Kategorien sortiert. Der Wuerfelwurf bestimmt die Kategorie. Kategorie 1 ist mild, Kategorie 6 ist katastrophal.
+
+\section{Moegliche Ereignisarten}
+Folgende Ereignisarten passen zur aktuellen Spielidee:
+\begin{itemize}
+  \item Inflationsschub,
+  \item Deflationsdruck,
+  \item Bankenkrise,
+  \item Oelschock,
+  \item Nahrungsknappheit,
+  \item Rohstoffboom,
+  \item Hafensperre,
+  \item Kriegsmobilisierung,
+  \item Infrastrukturverschleiss,
+  \item Auslandsnachfrage,
+  \item Sanktionen,
+  \item Zentralbankintervention.
+\end{itemize}
+
+\section{Wirkung von Ereignissen}
+Ereignisse duerfen tendenziell Schulden, Zinssaetze, Rohstoffpreise, Marktwerte und Handelskosten direkt beeinflussen. Die konkrete Reichweite ist noch offen.
+
+\offen{Festlegen, ob Ereignisse immer alle Spieler betreffen, nur den aktiven Spieler, bestimmte Regionen, bestimmte Rohstoffe oder bestimmte Infrastrukturtypen.}
+
+\chapter{Krieg, Belagerung und Infrastrukturverlust}
+
+\section{Kriegserklaerung}
+Ein Krieg beginnt durch eine Kriegserklaerung. Dabei wird festgehalten, welche Spieler beteiligt sind, welches Ziel angegriffen wird und welche Kriegseinheiten eingesetzt werden.
+
+\section{Kriegseinheiten}
+Es gibt zwei Kriegseinheiten:
+\begin{description}
+  \item[Panzer] Werden zur Belagerung von Bahnhoefen, Grossbahnhoefen, Haefen und Grosshaefen eingesetzt.
+  \item[Kriegsschiffe] Werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
+\end{description}
+
+Panzer und Kriegsschiffe befinden sich nur waehrend eines Krieges auf dem Spielfeld.
+
+\section{Oelverbrauch im Krieg}
+Kriegseinheiten verbrauchen Oel nach Bewegungsmenge.
+
+\begin{itemize}
+  \item Bei Panzern bestimmt die Bewegung vom Hauptbahnhof zum Kriegspunkt den Oelverbrauch.
+  \item Bei Kriegsschiffen bestimmt die Bewegung vom naechsten Hafen zum Kriegspunkt den Oelverbrauch.
+\end{itemize}
+
+\offen{Die genaue Oelformel pro Bewegungsschritt muss noch festgelegt werden.}
+
+\section{Blockade und Belagerung}
+Haefen koennen durch Kriegsschiffe blockiert werden. Bahnhoefe, Grossbahnhoefe, Haefen und Grosshaefen koennen durch Panzer belagert werden.
+
+Belagerte Bahnhoefe bringen keinen Ertrag.
+
+Der Belagerungsfortschritt wird angehalten, wenn der Verteidiger genuegend Truppen zur Verteidigung aufbringen kann.
+
+\offen{Die genaue benoetigte Truppenmenge fuer Verteidigung und die Dauer der Belagerung sind noch zu definieren. Als fruehere Arbeitsidee standen 3 Runden fuer Bahnhoefe und 5 Runden fuer Grossbahnhoefe im Raum.}
+
+\section{Folgen erfolgreicher Belagerung}
+Nach erfolgreicher Belagerung werden Bahnhof, Grossbahnhof, Hafen oder Grosshafen zu einer zerstoerten neutralen Variante.
+
+Danach werden alle Schienenlinien abgerissen, die keine Verbindung ueber einen unzerstoerten Bahnhof zum Hauptbahnhof haben.
+
+\section{Friedensvertrag}
+Ein Krieg endet durch Friedensvertrag oder durch Ausscheiden einer Kriegspartei. Waehrend des Krieges ausgesetzte Schuldenstriche werden nach dem Frieden nicht nachgeholt.
+
+\chapter{Spielende und Ausscheiden}
+
+\section{Ausscheiden}
+Ein Spieler scheidet aus, wenn er zahlungsunfaehig wird oder wenn seine Spielfaehigkeit durch Krieg und Infrastrukturverlust nicht mehr besteht.
+
+Zahlungsunfaehigkeit tritt ein, wenn eine Rueckzahlung faellig ist und der Spieler weder zahlen noch ausreichend neues Sondervermoegen aufnehmen kann.
+
+\section{Spielende}
+Das Spiel endet auf eine von zwei Arten:
+\begin{enumerate}
+  \item Nur noch ein Spieler ist uebrig. Dieser Spieler gewinnt.
+  \item Die verbleibenden Spieler einigen sich auf ein Unentschieden.
+\end{enumerate}
+
+\section{Keine Endwertung}
+Es gibt keine Endwertung nach Vermoegen, Rohstoffen, Schulden oder Infrastruktur. Der Spielausgang wird nicht ueber Siegpunkte bestimmt.
+
+\section{Groesste Bankmacht}
+Die groesste Bankmacht ist ein Sonderstatus. Sie erlaubt einem Spieler, bei Geschaeftsbanken hoehere Sondervermoegen aufzunehmen als nach der normalen Grenze Marktwert geteilt durch 10.
+
+\offen{Festlegen, wie groesste Bankmacht bestimmt wird und wie stark sie die Sondervermoegensgrenze erhoeht.}
+
+\chapter{Mögliche Spieltaktiken}
+
+\section{Rohstoffkontrolle}
+Ein Spieler kann versuchen, bestimmte Rohstoffe ueber Abbaueinheiten und angrenzende Infrastruktur zu kontrollieren. Besonders wirksam ist dies bei Oel und Nahrung, weil beide fuer laufende Kosten und Krieg relevant sind.
+
+\section{Hafen- und Auslandstaktik}
+Wer viele Haefen und Grosshaefen kontrolliert, kann Importaufschlaege und Exportabschlaege verbessern. Das macht Auslandshandel attraktiver und kann Inseln wirtschaftlich anbinden.
+
+\section{Banktaktik}
+Geschaeftsbanken erlauben die Aufnahme von Sondervermoegen zum Leitzinssatz. Wer viele Geschaeftsbanken kontrolliert, kann sich staerker finanzieren. Diese Strategie ist maechtig, bis sie ploetzlich Buchhaltung mit Truemmern wird.
+
+\section{Schuldenhebel}
+Verschuldung kann ein legitimer Beschleuniger sein. Sie erlaubt fruehen Ausbau, Kriegsvorbereitung oder Hafenexpansion. Gleichzeitig drohen Ueberschuldung, Verzettelung, Schuldenstrich und Zahlungsunfaehigkeit.
+
+\section{Kriegstaktik}
+Krieg kann je nach Spielsituation stark oder riskant sein. Er kann Infrastruktur ausschalten, Ertraege stoppen und Schienenlinien zerreissen. Gleichzeitig verbraucht Krieg Oel und bindet Ressourcen.
+
+Ein Vorteil des Krieges ist, dass waehrenddessen kein Schuldenstrich durchgefuehrt wird. Nach Friedensvertraegen wird der ausgesetzte Schuldenstrich nicht nachgeholt. Das macht Krieg zu einer moeglichen, aber gefaehrlichen Flucht aus der Bilanz.
+
+\section{Waehrungsrisiko}
+Sparen in der Waehrung Mark kann bei Inflationswellen unangenehm sein. Wer zu viel Mark haelt und zu wenig reale Versorgung besitzt, kann auf dem Papier reich und auf dem Brett hungrig sein. Wieder ein Problem, das die Menschheit wirklich haette kommen sehen koennen.
+
+\chapter{Offene Regelfragen fuer die naechste Fassung}
+
+Dieses Kapitel sammelt alle Punkte, die fuer eine vollstaendige Fassung noch entschieden werden muessen.
+
+\section{Spielfeld und Rohstoffe}
+\begin{itemize}
+  \item Welche Gelaendetypen erlauben Oel, Stahl, Ziegel und Nahrung?
+  \item Wird der Warenkorb frei gewaehlt oder aus der Anzahl der Rohstofffelder gebildet?
+  \item Gilt der Drei-Kanten-Abstand nur in Runde 0 oder dauerhaft fuer alle Eckgebaeude?
+\end{itemize}
+
+\section{Baukosten und Fixkosten}
+\begin{itemize}
+  \item Baukosten fuer alle Gebaeude, Einheiten und neutralen Anlagen festlegen.
+  \item Oel- und Nahrungskosten pro Runde fuer Bahnhof, Grossbahnhof, Hafen und Grosshafen festlegen.
+  \item Oelverbrauch von Panzern und Kriegsschiffen pro Bewegungsschritt festlegen.
+\end{itemize}
+
+\section{Bankensystem}
+\begin{itemize}
+  \item Genau klaeren, wie das Unvermoegen faellig wird.
+  \item Grenze Marktwert / 10 fuer Sondervermoegen praezisieren.
+  \item Bestimmen, ob Geschaeftsbanken mehrfach kontrolliert werden koennen.
+  \item Groesste Bankmacht definieren.
+\end{itemize}
+
+\section{Krieg}
+\begin{itemize}
+  \item Belagerungsdauer je Zieltyp festlegen.
+  \item Verteidigungsformel festlegen.
+  \item Blockadewirkung von Kriegsschiffen praezisieren.
+\end{itemize}
+
+\section{Ereigniskarten}
+\begin{itemize}
+  \item Ereigniskategorien final benennen.
+  \item Ereigniskarten je Kategorie schreiben.
+  \item Wirkungsbereich festlegen: aktiver Spieler, alle Spieler, Region, Rohstoff oder Infrastrukturtyp.
+\end{itemize}
+
+\appendix
+
+\chapter{Kurzreferenz}
+
+\section{Spielerzug}
+\begin{enumerate}
+  \item Ertraege erhalten.
+  \item Fixkosten zahlen.
+  \item Ereignis wuerfeln und ausfuehren.
+  \item Bauen und handeln.
+\end{enumerate}
+
+\section{Rundenende}
+Nachdem jeder Spieler einmal an der Reihe war:
+\begin{enumerate}
+  \item Warenkorbpreise pruefen.
+  \item Preisinflation berechnen.
+  \item Leitzinssatz erhoehen oder verringern.
+\end{enumerate}
+
+\section{Ertrag aus Abbaueinheiten}
+\begin{center}
+\begin{tabular}{>{\bfseries}l c}
+\toprule
+Anschluss & Ertrag \\
+\midrule
+Schiene an Kante & 1 \\
+Bahnhof an Ecke & 2 \\
+Grossbahnhof an Ecke & 3 \\
+Kein Anschluss & 0 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\chapter{Vordruck: Anleihe}
+
+\begin{framed}
+\noindent\formline{Anleiheschuldner}\\[1.2em]
+\formline{Anleihenhalter}\\[1.2em]
+\formline{Art der Anleihe: Spieler-Anleihe / Geschaeftsbank-Anleihe}\\[1.2em]
+\formline{Sondervermoegen / Betrag in Mark}\\[1.2em]
+\formline{Zinssatz}\\[1.2em]
+\formline{Unvermoegen}\\[1.2em]
+\formline{Laufzeit: 3 / 5 / 10 Runden / frei verhandelt}\\[1.2em]
+\formline{Faellig in Runde}\\[1.2em]
+\formline{Rueckkaufregel / Sonderabrede}\\[2.2em]
+\formline{Unterschrift Schuldner}\\[1.2em]
+\formline{Unterschrift Halter}
+\end{framed}
+
+\chapter{Vordruck: Kriegserklaerung}
+
+\begin{framed}
+\noindent\formline{Angreifer}\\[1.2em]
+\formline{Verteidiger}\\[1.2em]
+\formline{Kriegsziel / Zielgebaeude}\\[1.2em]
+\formline{Eingesetzte Panzer}\\[1.2em]
+\formline{Eingesetzte Kriegsschiffe}\\[1.2em]
+\formline{Startpunkt der Bewegung}\\[1.2em]
+\formline{Oelverbrauch}\\[1.2em]
+\formline{Beginn in Runde}\\[1.2em]
+\formline{Besondere Bedingungen}\\[2.2em]
+\formline{Unterschrift Angreifer}
+\end{framed}
+
+\chapter{Vordruck: Friedensvertrag}
+
+\begin{framed}
+\noindent\formline{Kriegsparteien}\\[1.2em]
+\formline{Ende des Krieges in Runde}\\[1.2em]
+\formline{Rueckgabe / Zerstoerung / Neutralisierung von Gebaeuden}\\[2.2em]
+\formline{Zahlungen in Mark}\\[1.2em]
+\formline{Rohstofflieferungen}\\[1.2em]
+\formline{Anleihen oder Schuldabreden}\\[1.2em]
+\formline{Besondere Bedingungen}\\[2.2em]
+\formline{Unterschrift Partei 1}\\[1.2em]
+\formline{Unterschrift Partei 2}\\[1.2em]
+\formline{Weitere Unterschriften}
+\end{framed}
+
+\end{document}

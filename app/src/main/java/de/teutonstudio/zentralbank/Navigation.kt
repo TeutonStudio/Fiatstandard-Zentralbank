@@ -7,15 +7,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.czboracle.ui.composables.AnleihenRegister
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
-import de.teutonstudio.zentralbank.ui.Titel
 import de.teutonstudio.zentralbank.ui.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
+import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.bearbeiteRunde
 import de.teutonstudio.zentralbank.ui.kategorien.SpielLaden
 import de.teutonstudio.zentralbank.ui.kategorien.Hauptmenü
@@ -24,6 +25,7 @@ import de.teutonstudio.zentralbank.ui.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.ui.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.ui.kategorien.zeigeMarktplatz
 
+private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
 
 sealed class Screen(val route: String) {
     object StartScreen: Screen(route = "main_screen")
@@ -48,59 +50,49 @@ fun Navigation(viewModel: GameViewModel) {
     val context = LocalContext.current
     val navController = rememberNavController()
 
-    val hauptMenü = { navController.navigate(route = Screen.StartScreen.route) }
-    val spielMenü = { navController.navigate(route = Screen.Game.route) }
-
     NavHost(
         navController = navController,
         startDestination = Screen.StartScreen.route
     ) {
         composable(route = Screen.StartScreen.route) {
-            Titel(hauptMenü) { Hauptmenü(
-                beiNeu = { navController.navigate(route = Screen.NewGame.route) },
-                beiLade = { navController.navigate(route = Screen.LoadGame.route) }
-            ) }
+            Hauptmenü(
+                Screen.NewGame.navigiere(navController),
+                Screen.LoadGame.navigiere(navController)
+            )
         }
 
         composable(route = Screen.NewGame.route) {
-            Titel(hauptMenü) {
-                SpielErstellen({ navController.navigate(route = Screen.StartScreen.route) }) {
-                    viewModel.erstelleSpiel(it)
-                    spielMenü()
-                }
-            }
+            SpielErstellen(
+                Screen.StartScreen.navigiere(navController),
+                viewModel.erstelleSpiel,
+                Screen.Game.navigiere(navController)
+            )
         }
 
         composable(route = Screen.LoadGame.route) {
-            Titel(hauptMenü) {
-                SpielLaden(hauptMenü, viewModel.spielSpeicher.collectAsState().value,{ viewModel.vernichteSpiel(it) }) {
-                    viewModel.ladeSpiel(it)
-                    spielMenü()
-                }
-            }
+            SpielLaden(
+                Screen.StartScreen.navigiere(navController),
+                viewModel.vernichteSpiel,
+                viewModel.ladeSpiel,
+                Screen.Game.navigiere(navController),
+                viewModel.spielSpeicher.collectAsState().value
+            )
         }
 
         composable(route = Screen.Game.route) {
-            Titel(hauptMenü) {
-                SteuerContainer(
-                    hatZurückWeiter = false,
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Spielmenü(
-                            beiVermogenSaldo = { navController.navigate(route = Screen.PlayerSaldo.route) },
-                            beiSchuldenSaldo = { navController.navigate(route = Screen.DebtSaldo.route) },
-                            beiMarktSaldo = { navController.navigate(route = Screen.MarketSaldo.route) },
-                            beiAuslandSaldo = { navController.navigate(route = Screen.ForeignSaldo.route) },
-                            beiHandel = { navController.navigate(route = Screen.NewTrade.route) },
-                            beiAnleihe = { navController.navigate(route = Screen.NewCredit.route) },
-                        ) { navController.navigate(route = Screen.EditRound.route) }
-                    }
-                }
-            }
+            Spielmenü(
+                { navController.navigate(route = Screen.PlayerSaldo.route) },
+                { navController.navigate(route = Screen.DebtSaldo.route) },
+                { navController.navigate(route = Screen.MarketSaldo.route) },
+                { navController.navigate(route = Screen.ForeignSaldo.route) },
+                { navController.navigate(route = Screen.NewTrade.route) },
+                { navController.navigate(route = Screen.NewCredit.route) },
+                { navController.navigate(route = Screen.EditRound.route) }
+            )
         }
 
-        composable(route = Screen.EditRound.route) {
-            Titel(spielMenü) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        composable(route = Screen.EditRound.route) { // TODO
+            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 bearbeiteRunde(
                     viewModel.aktuelleDaten.first.spielID,
                     viewModel.aktuellesSpiel,
@@ -109,8 +101,8 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         var ausgewähltesBauwerk: Bauteil
-        composable(route = Screen.PlayerSaldo.route) {
-            Titel(spielMenü) {
+        composable(route = Screen.PlayerSaldo.route) { // TODO
+            Titel(Screen.Game.navigiere(navController)) {
                 zeigeSpieler(viewModel.aktuellesSpiel, {
                     navController.navigate(route = "new_build")
                     ausgewähltesBauwerk = it
@@ -135,14 +127,14 @@ fun Navigation(viewModel: GameViewModel) {
             }
         }
 
-        composable(route = Screen.DebtSaldo.route) {
-            Titel(spielMenü) {
+        composable(route = Screen.DebtSaldo.route) { // TODO
+            Titel(Screen.Game.navigiere(navController)) {
                 AnleihenRegister(viewModel.aktuellesSpiel, emptyMap(),emptyList(),  {},{})
             }
         }
 
         composable(route = Screen.MarketSaldo.route) {
-            Titel(spielMenü) {
+            Titel(Screen.Game.navigiere(navController)) {
                 zeigeMarktplatz(viewModel.aktuellesSpiel) { /*inputTrade: HandelsDaten ->
                     viewModel.neuerHandel(inputTrade.copy(runde = viewModel.aktuelleRunde))
                     println(inputTrade)
@@ -152,13 +144,13 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.ForeignSaldo.route) {
-            Titel(spielMenü) {
+            Titel(Screen.Game.navigiere(navController)) {
                 zeigeAussenhandel(viewModel.aktuellesSpiel)
             }
         }
 
         composable(route = Screen.NewTrade.route) {
-            Titel(spielMenü) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
 /*                CreateTrade(viewModel.playerList.collectAsState().value.map { it.playerName }, viewModel.currentRound, viewModel.marketPrices) { trade ->
                     viewModel.newTrade(trade)
                     navController.navigate(route = Screen.Game.route)
@@ -181,7 +173,7 @@ fun Navigation(viewModel: GameViewModel) {
 //        }
 
         composable(route = Screen.NewCredit.route) {
-            Titel(spielMenü) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
 /*                CreateAnleihe(viewModel.playerList.collectAsState().value.map { it.playerName }, viewModel.currentRound) { credit ->
                     viewModel.newCredit(credit)
                     navController.navigate(route = Screen.Game.route)
@@ -198,7 +190,7 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.NewBuild.route) {
-            Titel(spielMenü) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
 /*                EditBuild(viewModel.currentRound, viewModel.playerList.collectAsState().value, ausgewähltesBauwerk) { build ->
                     viewModel.newBuild(build)
                     navController.navigate(route = "player_saldo")

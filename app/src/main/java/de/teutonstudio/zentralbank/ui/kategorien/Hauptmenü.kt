@@ -8,8 +8,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import de.teutonstudio.zentralbank.R
+import de.teutonstudio.zentralbank.Screen
 import de.teutonstudio.zentralbank.ui.RowOrColumnByOrientation
 import de.teutonstudio.zentralbank.ui.eingabe.ImageCard
+import de.teutonstudio.zentralbank.ui.eingabe.Titel
 
 
 /*
@@ -27,13 +29,11 @@ fun SpielCard(text: String, picture: Int, beiKlick: () -> Unit ) {
 
 @Composable
 fun Hauptmenü(beiNeu: () -> Unit, beiLade: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        RowOrColumnByOrientation(
-            {},
-            { ImageCard(bild_index = R.drawable.newgameicon, bild_label = "Neues Spiel", beiKlick = beiNeu ) },
-            { ImageCard(bild_index = R.drawable.loadgameicon, bild_label = "Spiel Laden", beiKlick = beiLade ) },
-        )
-    }
+    Titel { RowOrColumnByOrientation(
+        {},
+        { ImageCard(bild_index = R.drawable.newgameicon, bild_label = "Neues Spiel", beiKlick = beiNeu ) },
+        { ImageCard(bild_index = R.drawable.loadgameicon, bild_label = "Spiel Laden", beiKlick = beiLade ) },
+    ) }
 }
 
 

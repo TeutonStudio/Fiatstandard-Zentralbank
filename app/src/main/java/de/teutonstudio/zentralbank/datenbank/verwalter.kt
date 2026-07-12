@@ -74,7 +74,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         return _spielDatenListe.value.map { it.key to it.value.erhalteRelevantes() }.toMap()
     }
 
-    fun erstelleSpiel(spiel: Spiel) {
+    public  val erstelleSpiel = { it: Spiel -> erstelleSpiel(it)}
+    private fun erstelleSpiel(spiel: Spiel) {
         viewModelScope.launch {
             val daten = spiel.zuSpeicherDaten()
             val gameID = withContext(Dispatchers.IO) { DAO.insertSpielSatz(daten) }
@@ -89,11 +90,13 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    fun vernichteSpiel(daten: SpielDaten) {
+    public val vernichteSpiel = { it: SpielDaten -> vernichteSpiel(it) }
+    private fun vernichteSpiel(daten: SpielDaten) {
         TODO()
     }
 
-    fun ladeSpiel(daten: SpielDaten) {
+    public val ladeSpiel = { it: SpielDaten -> ladeSpiel(it) }
+    private fun ladeSpiel(daten: SpielDaten) {
         viewModelScope.launch(Dispatchers.IO) {
             datenbankBereit.await()
             ladeSpielDaten(daten)
