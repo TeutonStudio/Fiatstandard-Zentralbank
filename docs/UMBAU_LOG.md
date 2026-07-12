@@ -25,6 +25,7 @@ Offene Punkte:
 - Adaptertests für Geld-, Marktpreis-, Spieler- und Bauteilabbildung ergänzt.
 - `GameState` um Warenkorb und Leitzins in Basispunkten erweitert.
 - JSON-Rundlauf-Test für `GameState` ergänzt, damit das Domain-Modell als spätere Event-Log-/Savegame-Basis serialisierbar bleibt.
+- `GameViewModel` exponiert zusätzlich `domainState: StateFlow<GameState?>`; bestehendes `aktuellesSpiel` und neuer Domain-State werden beim Erstellen/Laden gemeinsam aktualisiert.
 
 Offene Punkte:
 

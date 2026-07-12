@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 
+import de.teutonstudio.zentralbank.domain.GameState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -41,12 +42,20 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     private val _spielDatenListe = MutableStateFlow<Map<SpielDaten,List<SpeicherDaten>>>(emptyMap())
     private val _spielSpeicher = MutableStateFlow<Map<SpielDaten,Pair<Int,List<String>>>>(emptyMap())
+    private val _domainState = MutableStateFlow<GameState?>(null)
 
     val spielDatenListe: StateFlow<Map<SpielDaten,List<SpeicherDaten>>> = _spielDatenListe.asStateFlow()
     val spielSpeicher: StateFlow<Map<SpielDaten,Pair<Int,List<String>>>> = _spielSpeicher.asStateFlow()
+    val domainState: StateFlow<GameState?> = _domainState.asStateFlow()
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
     lateinit var aktuellesSpiel: Spiel
+
+    private fun setzeAktuellesSpiel(spiel: Spiel, daten: Pair<SpielDaten,List<SpeicherDaten>>) {
+        aktuellesSpiel = spiel
+        aktuelleDaten = daten
+        _domainState.value = spiel.zuDomainGameState()
+    }
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -80,8 +89,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             val daten = spiel.zuSpeicherDaten()
             val gameID = withContext(Dispatchers.IO) { DAO.insertSpielSatz(daten) }
             if (gameID != (-1).toLong()) {
-                aktuellesSpiel = spiel
-                aktuelleDaten = daten
+                setzeAktuellesSpiel(spiel, daten)
 
                 _spielSpeicher.update {
                     it + (daten.first to Pair(spiel.aktuelleRunde,spiel.spielerStringListe))
@@ -105,10 +113,12 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private suspend fun ladeAktuellesSpielNeu() { ladeSpielDaten(aktuelleDaten.first) }
 
     private suspend fun ladeSpielDaten(daten: SpielDaten) {
-        if (daten.spielID == (-1).toLong()) { aktuellesSpiel = TestSpiel; return }
+        if (daten.spielID == (-1).toLong()) {
+            setzeAktuellesSpiel(TestSpiel, TestSpiel.zuSpeicherDaten())
+            return
+        }
         val alles = _spielDatenListe.value[daten].orEmpty()
-        aktuellesSpiel = alles.zuSpiel(daten)
-        aktuelleDaten = daten to alles
+        setzeAktuellesSpiel(alles.zuSpiel(daten), daten to alles)
     }
 
     private fun List<SpeicherDaten>.zuSpiel(daten: SpielDaten): Spiel {
