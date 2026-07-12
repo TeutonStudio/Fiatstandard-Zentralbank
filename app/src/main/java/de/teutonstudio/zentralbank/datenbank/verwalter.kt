@@ -9,11 +9,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 
 import de.teutonstudio.zentralbank.domain.GameState
+import de.teutonstudio.zentralbank.domain.engine.GameEngine
+import de.teutonstudio.zentralbank.domain.events.GameEvent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -43,10 +48,13 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private val _spielDatenListe = MutableStateFlow<Map<SpielDaten,List<SpeicherDaten>>>(emptyMap())
     private val _spielSpeicher = MutableStateFlow<Map<SpielDaten,Pair<Int,List<String>>>>(emptyMap())
     private val _domainState = MutableStateFlow<GameState?>(null)
+    private val _domainFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private var gameEngine: GameEngine? = null
 
     val spielDatenListe: StateFlow<Map<SpielDaten,List<SpeicherDaten>>> = _spielDatenListe.asStateFlow()
     val spielSpeicher: StateFlow<Map<SpielDaten,Pair<Int,List<String>>>> = _spielSpeicher.asStateFlow()
     val domainState: StateFlow<GameState?> = _domainState.asStateFlow()
+    val domainFehler: SharedFlow<String> = _domainFehler.asSharedFlow()
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
     lateinit var aktuellesSpiel: Spiel
@@ -54,7 +62,23 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private fun setzeAktuellesSpiel(spiel: Spiel, daten: Pair<SpielDaten,List<SpeicherDaten>>) {
         aktuellesSpiel = spiel
         aktuelleDaten = daten
-        _domainState.value = spiel.zuDomainGameState()
+        val startzustand = spiel.zuDomainGameState()
+        gameEngine = GameEngine(startzustand)
+        _domainState.value = startzustand
+    }
+
+    fun onEvent(event: GameEvent) {
+        val engine = gameEngine
+        if (engine == null) {
+            _domainFehler.tryEmit("Kein Spiel geladen.")
+            return
+        }
+
+        engine.apply(event)
+            .onSuccess { state -> _domainState.value = state }
+            .onFailure { throwable ->
+                _domainFehler.tryEmit(throwable.message ?: "Domain-Event wurde abgelehnt.")
+            }
     }
 
     init {

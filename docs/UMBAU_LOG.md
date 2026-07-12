@@ -84,3 +84,14 @@ Offene Punkte:
 Offene Punkte:
 
 - Kein Regelfragen-Blocker für Etappe 3.
+
+## Etappe 4 - ViewModel/MVI-Anbindung
+
+- `GameViewModel` initialisiert beim Laden/Erstellen eines Spiels eine `GameEngine` aus dem gemappten `GameState`.
+- `GameViewModel.onEvent(GameEvent)` als zentrale Domain-Event-Einstiegsstelle ergänzt.
+- Erfolgreiche Domain-Events aktualisieren `domainState`; abgelehnte Events werden über `domainFehler` als `SharedFlow<String>` gemeldet.
+- Bestehende `aktuellesSpiel`-UI bleibt unverändert lauffähig, während Screens schrittweise auf `domainState` und Events umgehängt werden.
+
+Offene Punkte:
+
+- Bestehende Composables lesen größtenteils noch aus `aktuellesSpiel`; das Umhängen auf State-Hoisting und `onEvent` folgt schrittweise.
