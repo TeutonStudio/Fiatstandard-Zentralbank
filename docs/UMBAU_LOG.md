@@ -20,8 +20,11 @@ Offene Punkte:
 - Serialisierbaren Geldtyp `Geld` eingeführt: kleinste gespeicherte und berechnete Einheit ist Cent, also `100L == 1 Mark`.
 - Erste serialisierbare Domain-Typen ergänzt: `SpielerId`, `KontoId`, `Rohstoff`, `RohstoffMenge`, `Spieler`, `Anleihe`, `GameState`.
 - Domain-Tests für Cent-basierte Geldrechnung ergänzt.
+- Android-freie Bauteiltypen (`BauteilTyp`, `BauteilArt`) mit Kosten, Ertrag und Verbrauch ergänzt.
+- App-seitigen Adapter vom bestehenden `Spiel` in den neuen `GameState` ergänzt, damit die neue Domain-Struktur gegen reale Bestandsdaten getestet werden kann.
+- Adaptertests für Geld-, Marktpreis-, Spieler- und Bauteilabbildung ergänzt.
 
 Offene Punkte:
 
 - Bestehende App-Modelle verwenden noch `Zahlungsmittel`; die Migration auf `Geld` erfolgt schrittweise.
-- Bestehende App-UI nutzt weiterhin `Rohstoffe` mit Compose-`Color`; die Domain nutzt bereits einen Android-freien `Rohstoff`-Typ.
+- Bestehende App-UI nutzt weiterhin `Rohstoffe` mit Compose-`Color`; die Domain nutzt bereits Android-freie `Rohstoff`- und `BauteilTyp`-Typen.

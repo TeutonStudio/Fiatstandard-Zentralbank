@@ -46,7 +46,7 @@ data class Spieler(
     val rohstoffe: Map<Rohstoff, Int> = emptyMap(),
     val geldkonto: Geld = Geld.NULL,
     val anleihen: List<AnleiheId> = emptyList(),
-    val territorien: Set<String> = emptySet(),
+    val bauteile: Map<BauteilTyp, Int> = emptyMap(),
 )
 
 @JvmInline
