@@ -64,7 +64,11 @@ Offene Punkte:
 - Tests verankern verfügbare/gesperrte Schritte, Pflichtschritt-Gates und Spielerwechsel beim Zugende.
 - Fachliche Events werden gegen `ZugAutomat.schritte()` gegated und bei phasenfremder Nutzung abgelehnt.
 - Reducer prüft fuer gegatete Events den aktiven Spieler anhand des primaeren Event-Spielers.
+- Situativ entfallende Pflichtschritte umgesetzt:
+  - `ROHSTOFF_EINNAHMEN` bleibt immer manuell, da der Ertrag vom physischen Spielfeld kommt.
+  - `ROHSTOFF_AUSGABEN` ist automatisch erledigt, wenn der aktive Spieler keine verbrauchenden Bauteile/Regionen hat.
+  - `FINANZ_AUSGABEN` ist automatisch erledigt, wenn keine eigene Anleihe bei Bank oder anderen Spielern liegt.
 
 Offene Punkte:
 
-- Situativ entfallende Pflichtschritte sind noch nicht modelliert; Regelfrage steht in `unklarheiten.md`.
+- Schuldenstrich und das Überspringen der normalen Aktionsphase nach Schuldenstrich sind noch nicht modelliert.

@@ -49,8 +49,9 @@ data class SchrittInfo(
 object ZugAutomat {
     fun schritte(state: GameState): List<SchrittInfo> {
         val zug = state.zugStatus ?: return emptyList()
+        val automatischErledigt = automatischErledigteSchritte(state)
         return SchrittTyp.entries.map { schritt ->
-            if (schritt in zug.erledigteSchritte) {
+            if (schritt in zug.erledigteSchritte || schritt in automatischErledigt) {
                 SchrittInfo(schritt, SchrittZustand.ERLEDIGT)
             } else if (istInPhaseVerfuegbar(zug.phase, schritt)) {
                 SchrittInfo(schritt, SchrittZustand.VERFUEGBAR)
@@ -66,7 +67,8 @@ object ZugAutomat {
 
     fun kannPhaseAbschliessen(state: GameState): Boolean {
         val zug = state.zugStatus ?: return false
-        return pflichtschritte(zug.phase).all { it in zug.erledigteSchritte }
+        val erledigt = zug.erledigteSchritte + automatischErledigteSchritte(state)
+        return pflichtschritte(zug.phase).all { it in erledigt }
     }
 
     fun kannZugBeenden(state: GameState): Boolean {
@@ -101,5 +103,36 @@ object ZugAutomat {
         phase == Phase.Ausgaben && schritt == SchrittTyp.ROHSTOFF_EINNAHMEN -> "Einnahmen-Phase ist abgeschlossen."
         phase == Phase.Ausgaben -> "Erst verfuegbar in der Aktions-Phase."
         else -> "Nur in einer frueheren Phase verfuegbar."
+    }
+
+    private fun automatischErledigteSchritte(state: GameState): Set<SchrittTyp> {
+        val zug = state.zugStatus ?: return emptySet()
+        val spieler = state.spieler.firstOrNull { it.id == zug.spieler } ?: return emptySet()
+        val erledigt = mutableSetOf<SchrittTyp>()
+
+        if (spieler.bauteile.entries.none { (bauteil, menge) ->
+                menge > 0 && bauteil.verbrauch.isNotEmpty()
+            }
+        ) {
+            erledigt += SchrittTyp.ROHSTOFF_AUSGABEN
+        }
+
+        val fremdgehalteneEigeneAnleihen = state.anleihen.values.any { anleihe ->
+            anleihe.emittent == zug.spieler && state.anleiheBesitzer(anleihe.id) != null &&
+                state.anleiheBesitzer(anleihe.id) != de.teutonstudio.zentralbank.domain.KontoId.Spieler(zug.spieler)
+        }
+        if (!fremdgehalteneEigeneAnleihen) {
+            erledigt += SchrittTyp.FINANZ_AUSGABEN
+        }
+
+        return erledigt
+    }
+
+    private fun GameState.anleiheBesitzer(
+        anleihe: de.teutonstudio.zentralbank.domain.AnleiheId,
+    ): de.teutonstudio.zentralbank.domain.KontoId? {
+        if (anleihe in bankAnleihen) return de.teutonstudio.zentralbank.domain.KontoId.Bank
+        return spieler.firstOrNull { anleihe in it.anleihen }
+            ?.let { de.teutonstudio.zentralbank.domain.KontoId.Spieler(it.id) }
     }
 }
