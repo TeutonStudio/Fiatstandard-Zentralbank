@@ -23,6 +23,8 @@ Offene Punkte:
 - Android-freie Bauteiltypen (`BauteilTyp`, `BauteilArt`) mit Kosten, Ertrag und Verbrauch ergänzt.
 - App-seitigen Adapter vom bestehenden `Spiel` in den neuen `GameState` ergänzt, damit die neue Domain-Struktur gegen reale Bestandsdaten getestet werden kann.
 - Adaptertests für Geld-, Marktpreis-, Spieler- und Bauteilabbildung ergänzt.
+- `GameState` um Warenkorb und Leitzins in Basispunkten erweitert.
+- JSON-Rundlauf-Test für `GameState` ergänzt, damit das Domain-Modell als spätere Event-Log-/Savegame-Basis serialisierbar bleibt.
 
 Offene Punkte:
 

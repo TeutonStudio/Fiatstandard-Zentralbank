@@ -1,15 +1,19 @@
 package de.teutonstudio.zentralbank.datenbank
 
 import de.teutonstudio.zentralbank.domain.AnleiheId
+import de.teutonstudio.zentralbank.domain.Basispunkte
 import de.teutonstudio.zentralbank.domain.BauteilTyp
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.Geld
 import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.SpielerId
+import kotlin.math.roundToInt
 import de.teutonstudio.zentralbank.domain.Anleihe as DomainAnleihe
 import de.teutonstudio.zentralbank.domain.Spieler as DomainSpieler
 
 fun Zahlungsmittel.zuDomainGeld(): Geld = Geld.mark(toIntOderNull().toLong())
+
+fun Float.zuBasispunkte(): Basispunkte = Basispunkte((this * Basispunkte.BASISPUNKTE_PRO_PROZENT).roundToInt())
 
 fun Rohstoffe.zuDomainRohstoff(): Rohstoff = when (this) {
     Rohstoffe.NAHRUNG -> Rohstoff.NAHRUNG
@@ -74,6 +78,9 @@ fun Spiel.zuDomainGameState(): GameState {
             )
         },
         bankkonto = Geld.NULL,
+        warenkorb = warenkorb
+            .mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
+            .filterValues { it != 0 },
         anleihen = anleihen.mapNotNull { anzeige ->
             val id = anleiheIds[anzeige] ?: return@mapNotNull null
             val emittentId = spielerIds.entries
@@ -91,6 +98,7 @@ fun Spiel.zuDomainGameState(): GameState {
         marktpreise = aktuelleMarktpreise
             .mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
             .mapValues { (_, preis) -> preis.zuDomainGeld() },
+        leitzins = nächsterZinssatz.zuBasispunkte(),
         rundenzähler = aktuelleRunde,
         aktiverSpieler = spielerListe.firstOrNull()?.let { spielerIds.getValue(it) },
     )
