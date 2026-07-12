@@ -46,6 +46,13 @@ object Reducer {
 
 private fun GameState.pruefeZugGate(event: GameEvent) {
     val zug = zugStatus ?: return
+    val faelligerSchuldenstrich = faelligerSchuldenstrichSpieler()
+    if (faelligerSchuldenstrich != null) {
+        require(event is GameEvent.Schuldenstrich && event.spieler == faelligerSchuldenstrich) {
+            "Zuerst muss der faellige Schuldenstrich fuer ${faelligerSchuldenstrich.wert} gebucht werden."
+        }
+        return
+    }
     val schritt = event.schrittTyp() ?: return
     val info = ZugAutomat.schritte(this).first { it.typ == schritt }
     require(info.zustand == SchrittZustand.VERFUEGBAR) {
@@ -120,8 +127,12 @@ private fun GameState.phaseAbschliessen(event: GameEvent.PhaseAbgeschlossen): Ga
 private fun GameState.zugBeenden(): GameState {
     val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
     require(ZugAutomat.kannZugBeenden(this)) { "Zug kann erst in der Aktions-Phase beendet werden." }
-    return aktualisiereUeberschuldung(zug.spieler)
-        .naechsterZug(zug.spieler)
+    val nachPruefung = aktualisiereUeberschuldung(zug.spieler)
+    return if (nachPruefung.istSchuldenstrichFaellig(zug.spieler)) {
+        nachPruefung
+    } else {
+        nachPruefung.naechsterZug(zug.spieler)
+    }
 }
 
 private fun GameState.naechsterZug(aktuellerSpieler: SpielerId): GameState {
@@ -220,6 +231,14 @@ private fun GameState.aktualisiereUeberschuldung(spielerId: SpielerId): GameStat
     return copy(
         ueberschuldungen = ueberschuldungen.filterNot { it.spieler == spielerId } + listOfNotNull(neuerStatus),
     )
+}
+
+private fun GameState.faelligerSchuldenstrichSpieler(): SpielerId? {
+    return ueberschuldungen.firstOrNull { it.schuldenstrichFaellig }?.spieler
+}
+
+private fun GameState.istSchuldenstrichFaellig(spielerId: SpielerId): Boolean {
+    return ueberschuldungen.any { it.spieler == spielerId && it.schuldenstrichFaellig }
 }
 
 private fun GameState.bankgehalteneSchuldensumme(spielerId: SpielerId): Geld {

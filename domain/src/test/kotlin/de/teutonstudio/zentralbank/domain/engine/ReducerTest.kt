@@ -313,7 +313,7 @@ class ReducerTest {
         val warnung = state.ueberschuldungen.single()
         assertEquals(3, warnung.friedlicheUeberschuldeteZuege)
         assertEquals(Geld.mark(110), warnung.schuldensumme)
-        assertEquals(Geld.mark(5), warnung.marktwert)
+        assertEquals(Geld.mark(7), warnung.marktwert)
         assertTrue(warnung.warnungAktiv)
         assertFalse(warnung.schuldenstrichFaellig)
 
@@ -323,6 +323,41 @@ class ReducerTest {
         assertEquals(4, faellig.friedlicheUeberschuldeteZuege)
         assertTrue(faellig.warnungAktiv)
         assertTrue(faellig.schuldenstrichFaellig)
+        assertEquals(annaId, state.aktiverSpieler)
+        assertEquals(Phase.Aktionen, state.zugStatus?.phase)
+    }
+
+    @Test
+    fun faelligerAutomatischerSchuldenstrichBlockiertBisZurBahnwegEingabe() {
+        val faellig = (1..4).fold(ueberschuldeterAnnaZug()) { state, _ ->
+            annaZugBeenden(state)
+        }
+
+        val handel = Reducer.reduce(
+            faellig,
+            GameEvent.RohstoffHandel(
+                kaeufer = annaId,
+                verkaeufer = berndId,
+                rohstoff = Rohstoff.HOLZ,
+                menge = 1,
+                preis = Geld.mark(1),
+            ),
+        )
+
+        assertTrue(handel.isFailure)
+
+        val nachSchuldenstrich = Reducer.reduce(
+            faellig,
+            GameEvent.Schuldenstrich(annaId, entfernteBahnwege = 1),
+        ).getOrThrow()
+
+        val anna = nachSchuldenstrich.spieler.first { it.id == annaId }
+        assertTrue(nachSchuldenstrich.ueberschuldungen.isEmpty())
+        assertTrue(nachSchuldenstrich.bankAnleihen.isEmpty())
+        assertTrue(nachSchuldenstrich.anleihen.isEmpty())
+        assertEquals(null, anna.bauteile[BauteilTyp.EISENBAHNLINIE])
+        assertEquals(berndId, nachSchuldenstrich.aktiverSpieler)
+        assertEquals(Phase.Einnahmen, nachSchuldenstrich.zugStatus?.phase)
     }
 
     @Test
@@ -333,7 +368,10 @@ class ReducerTest {
                 Spieler(
                     id = annaId,
                     name = "Anna",
-                    bauteile = mapOf(BauteilTyp.BAHNHOF to 1),
+                    bauteile = mapOf(
+                        BauteilTyp.BAHNHOF to 1,
+                        BauteilTyp.EISENBAHNLINIE to 1,
+                    ),
                 ),
                 Spieler(
                     id = berndId,
@@ -433,7 +471,10 @@ class ReducerTest {
                 Spieler(
                     id = annaId,
                     name = "Anna",
-                    bauteile = mapOf(BauteilTyp.BAHNHOF to 1),
+                    bauteile = mapOf(
+                        BauteilTyp.BAHNHOF to 1,
+                        BauteilTyp.EISENBAHNLINIE to 1,
+                    ),
                 ),
                 Spieler(
                     id = berndId,

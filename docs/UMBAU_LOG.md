@@ -78,7 +78,9 @@ Offene Punkte:
 - Marktwert wird aus Einheiten/Bauwerken über vorhandene Marktpreise berechnet; Rohstoffe ohne Preis gehen mit 0 ein.
 - Friedliche Überschuldungsserien werden bei aktiver Kriegsbeteiligung unterbrochen, ab dem dritten betroffenen Zug gewarnt und nach mehr als drei betroffenen Zügen als schuldenstrichfällig markiert.
 - Reducer-Tests verankern Warn-/Fälligkeitsstatus, Bankanleihen-Filter und Kriegsunterbrechung.
+- Ein automatisch fälliger Schuldenstrich hält den Spieler am Zugende in der Aktionsphase und blockiert weitere Events, bis der Schuldenstrich mit der im Dialog eingegebenen Bahnweg-Anzahl gebucht wurde.
+- Reducer-Tests verankern den blockierenden Eingabezustand und die anschließende automatische Zugweitergabe nach dem Schuldenstrich.
 
 Offene Punkte:
 
-- Die automatische Ausführung des fälligen Schuldenstrichs benötigt noch die geklärte Bahnweg-Anzahl aus `unklarheiten.md`.
+- Kein Regelfragen-Blocker für Etappe 3.
