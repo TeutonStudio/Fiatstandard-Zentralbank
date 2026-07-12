@@ -18,11 +18,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.czboracle.ui.composables.AnleihenRegister
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.zug.Phase
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.ui.ausgabe.zeigeSpieler
+import de.teutonstudio.zentralbank.ui.domain.zuZugAnzeige
 import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
 import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.bearbeiteRunde
@@ -34,17 +33,6 @@ import de.teutonstudio.zentralbank.ui.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.ui.kategorien.zeigeMarktplatz
 
 private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
-
-private fun GameState.zugText(): String {
-    val zug = zugStatus ?: return "nächste Runde"
-    val spielerName = spieler.firstOrNull { it.id == zug.spieler }?.name ?: zug.spieler.wert
-    val phase = when (zug.phase) {
-        Phase.Einnahmen -> "Einnahmen"
-        Phase.Ausgaben -> "Ausgaben"
-        Phase.Aktionen -> "Aktionen"
-    }
-    return "$spielerName: $phase"
-}
 
 sealed class Screen(val route: String) {
     object StartScreen: Screen(route = "main_screen")
@@ -119,7 +107,7 @@ fun Navigation(viewModel: GameViewModel) {
                 { navController.navigate(route = Screen.NewTrade.route) },
                 { navController.navigate(route = Screen.NewCredit.route) },
                 { navController.navigate(route = Screen.EditRound.route) },
-                zugText = domainState?.zugText() ?: "nächste Runde",
+                zugText = domainState?.zuZugAnzeige()?.text ?: "nächste Runde",
             )
         }
 
