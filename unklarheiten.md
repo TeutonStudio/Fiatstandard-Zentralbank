@@ -1,12 +1,9 @@
 # Unklarheiten
 
-## Etappe 3 - Automatischer Schuldenstrich
+## Etappe 3 - Automatischer Schuldenstrich: Bahnwege
 
-- Frage: Wie soll die automatische Ausloesung nach mehr als drei friedlichen Ueberschuldungsrunden exakt ausgewertet werden?
-  - Kontext: Der manuelle Schuldenstrich aus dem Finanz-Schulden-Dialog ist umgesetzt. Fuer die automatische Regel fehlen im aktuellen Domain-State noch Verlauf und Bewertungsdetails.
+- Frage: Wie soll bei einem automatisch faelligen Schuldenstrich die Anzahl der abzubauenden Bahnwege bestimmt werden?
+  - Kontext: Die Ueberschuldungsserie wird jetzt am Ende des eigenen Zuges bewertet und als schuldenstrichfaellig markiert. Der eigentliche Schuldenstrich braucht aber weiterhin `entfernteBahnwege`, weil das Domain-Modell kein konkretes Streckennetz kennt.
   - Benoetigte Antwort:
-    - Wann wird die Ueberschuldung geprueft: am Ende jeder vollstaendigen Runde, am Anfang des Spielerzuges oder beim Finanz-Ausgaben-Schritt des betroffenen Spielers?
-    - Wie wird die Schuldensumme mit Zinsen berechnet: Nennwert plus nur aktuell faellige Zinsen, plus naechste Zinszahlung oder plus alle bis Laufzeitende noch offenen Zinsen?
-    - Was zaehlt zum Marktwert: nur Bauwerke/Einheiten ueber Rohstoffkosten, oder auch aktuelle Rohstofflager und Geldkonto?
-    - Welche Preise gelten als "vorherige Runde", wenn noch keine Vor-Runde existiert?
-    - Bedeutet "im Frieden" keine aktive Kriegslage waehrend aller drei Runden, oder reicht Frieden im Pruefmoment?
+    - Soll die App beim fälligen automatischen Schuldenstrich erneut einen Dialog zur Eingabe der entfernten Bahnwege öffnen?
+    - Oder soll die Domain automatisch einen Ersatzwert verwenden, z. B. 0, alle Eisenbahnlinien oder eine andere feste Regel?

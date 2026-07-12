@@ -73,7 +73,12 @@ Offene Punkte:
 - Bankgehaltene eigene Anleihen werden gelöscht; von anderen Spielern gehaltene eigene Anleihen werden durch frisches Geld zum Nennwert ausgezahlt und anschließend gelöscht.
 - Nach einem Schuldenstrich wird der aktuelle Zug direkt zum nächsten Spieler weitergeschaltet.
 - Reducer-Tests verankern Auszahlung, Bauteilabbau, Anleihenlöschung, Zugübersprung und Ablehnung im Krieg.
+- `UeberschuldungsStatus` ergänzt und am Ende des eigenen Zuges aktualisiert.
+- Überschuldung zählt nur bankgehaltene eigene Anleihen, inklusive Nennwert und aller Laufzeit-Zinsen.
+- Marktwert wird aus Einheiten/Bauwerken über vorhandene Marktpreise berechnet; Rohstoffe ohne Preis gehen mit 0 ein.
+- Friedliche Überschuldungsserien werden bei aktiver Kriegsbeteiligung unterbrochen, ab dem dritten betroffenen Zug gewarnt und nach mehr als drei betroffenen Zügen als schuldenstrichfällig markiert.
+- Reducer-Tests verankern Warn-/Fälligkeitsstatus, Bankanleihen-Filter und Kriegsunterbrechung.
 
 Offene Punkte:
 
-- Automatischer Schuldenstrich nach mehr als drei friedlichen Überschuldungsrunden benötigt noch die geklärten Auswertungsregeln aus `unklarheiten.md`.
+- Die automatische Ausführung des fälligen Schuldenstrichs benötigt noch die geklärte Bahnweg-Anzahl aus `unklarheiten.md`.

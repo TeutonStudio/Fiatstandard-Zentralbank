@@ -16,6 +16,7 @@ import de.teutonstudio.zentralbank.domain.zug.Phase
 import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
 import de.teutonstudio.zentralbank.domain.zug.ZugStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -302,6 +303,80 @@ class ReducerTest {
     }
 
     @Test
+    fun zugendeZaehltFriedlicheUeberschuldungUndMarkiertWarnungUndFaelligkeit() {
+        var state = ueberschuldeterAnnaZug()
+
+        repeat(3) {
+            state = annaZugBeenden(state)
+        }
+
+        val warnung = state.ueberschuldungen.single()
+        assertEquals(3, warnung.friedlicheUeberschuldeteZuege)
+        assertEquals(Geld.mark(110), warnung.schuldensumme)
+        assertEquals(Geld.mark(5), warnung.marktwert)
+        assertTrue(warnung.warnungAktiv)
+        assertFalse(warnung.schuldenstrichFaellig)
+
+        state = annaZugBeenden(state)
+
+        val faellig = state.ueberschuldungen.single()
+        assertEquals(4, faellig.friedlicheUeberschuldeteZuege)
+        assertTrue(faellig.warnungAktiv)
+        assertTrue(faellig.schuldenstrichFaellig)
+    }
+
+    @Test
+    fun ueberschuldungZaehltNurBankgehalteneAnleihen() {
+        val anleihe = AnleiheId("spieler-anleihe")
+        val state = GameState(
+            spieler = listOf(
+                Spieler(
+                    id = annaId,
+                    name = "Anna",
+                    bauteile = mapOf(BauteilTyp.BAHNHOF to 1),
+                ),
+                Spieler(
+                    id = berndId,
+                    name = "Bernd",
+                    anleihen = listOf(anleihe),
+                ),
+            ),
+            anleihen = mapOf(
+                anleihe to Anleihe(
+                    id = anleihe,
+                    emittent = annaId,
+                    nennwert = Geld.mark(100),
+                    zinsBasispunkte = 1_000,
+                    laufzeitRunden = 1,
+                ),
+            ),
+            marktpreise = mapOf(
+                Rohstoff.HOLZ to Geld.mark(1),
+                Rohstoff.ZIEGEL to Geld.mark(1),
+                Rohstoff.STAHL to Geld.mark(1),
+            ),
+            aktiverSpieler = annaId,
+            zugStatus = ZugStatus(annaId, Phase.Aktionen),
+        )
+
+        val nachZugende = Reducer.reduce(state, GameEvent.ZugBeendet).getOrThrow()
+
+        assertTrue(nachZugende.ueberschuldungen.isEmpty())
+    }
+
+    @Test
+    fun kriegUnterbrichtFriedlicheUeberschuldungsserie() {
+        val einmalUeberschuldet = annaZugBeenden(ueberschuldeterAnnaZug())
+        val imKrieg = einmalUeberschuldet.copy(
+            konflikte = setOf(Konflikt(annaId, berndId)),
+        )
+
+        val nachZugende = annaZugBeenden(imKrieg)
+
+        assertTrue(nachZugende.ueberschuldungen.isEmpty())
+    }
+
+    @Test
     fun schrittPhaseUndZugendeWechselnAktivenSpieler() {
         val nachSchritt = Reducer.reduce(
             startState().copy(
@@ -349,5 +424,49 @@ class ReducerTest {
         )
 
         assertTrue(result.isFailure)
+    }
+
+    private fun ueberschuldeterAnnaZug(): GameState {
+        val anleihe = AnleiheId("bank-anleihe")
+        return GameState(
+            spieler = listOf(
+                Spieler(
+                    id = annaId,
+                    name = "Anna",
+                    bauteile = mapOf(BauteilTyp.BAHNHOF to 1),
+                ),
+                Spieler(
+                    id = berndId,
+                    name = "Bernd",
+                ),
+            ),
+            bankAnleihen = listOf(anleihe),
+            anleihen = mapOf(
+                anleihe to Anleihe(
+                    id = anleihe,
+                    emittent = annaId,
+                    nennwert = Geld.mark(100),
+                    zinsBasispunkte = 1_000,
+                    laufzeitRunden = 1,
+                ),
+            ),
+            marktpreise = mapOf(
+                Rohstoff.HOLZ to Geld.mark(1),
+                Rohstoff.ZIEGEL to Geld.mark(1),
+                Rohstoff.STAHL to Geld.mark(1),
+            ),
+            aktiverSpieler = annaId,
+            zugStatus = ZugStatus(annaId, Phase.Aktionen),
+        )
+    }
+
+    private fun annaZugBeenden(state: GameState): GameState {
+        return Reducer.reduce(
+            state.copy(
+                aktiverSpieler = annaId,
+                zugStatus = ZugStatus(annaId, Phase.Aktionen),
+            ),
+            GameEvent.ZugBeendet,
+        ).getOrThrow()
     }
 }

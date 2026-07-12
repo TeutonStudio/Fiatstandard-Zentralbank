@@ -1,6 +1,7 @@
 package de.teutonstudio.zentralbank.domain.engine
 
 import de.teutonstudio.zentralbank.domain.AnleiheId
+import de.teutonstudio.zentralbank.domain.Anleihe
 import de.teutonstudio.zentralbank.domain.BauteilTyp
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.Geld
@@ -10,6 +11,7 @@ import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.Schuldenstrich
 import de.teutonstudio.zentralbank.domain.Spieler
 import de.teutonstudio.zentralbank.domain.SpielerId
+import de.teutonstudio.zentralbank.domain.UeberschuldungsStatus
 import de.teutonstudio.zentralbank.domain.events.GameEvent
 import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
 import de.teutonstudio.zentralbank.domain.zug.Phase
@@ -118,7 +120,8 @@ private fun GameState.phaseAbschliessen(event: GameEvent.PhaseAbgeschlossen): Ga
 private fun GameState.zugBeenden(): GameState {
     val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
     require(ZugAutomat.kannZugBeenden(this)) { "Zug kann erst in der Aktions-Phase beendet werden." }
-    return naechsterZug(zug.spieler)
+    return aktualisiereUeberschuldung(zug.spieler)
+        .naechsterZug(zug.spieler)
 }
 
 private fun GameState.naechsterZug(aktuellerSpieler: SpielerId): GameState {
@@ -183,12 +186,72 @@ private fun GameState.bucheSchuldenstrich(event: GameEvent.Schuldenstrich): Game
         ),
     )
 
+    val ohneUeberschuldung = neuerState.copy(
+        ueberschuldungen = neuerState.ueberschuldungen.filterNot { it.spieler == event.spieler },
+    )
     return if (zugStatus?.spieler == event.spieler) {
-        neuerState.naechsterZug(event.spieler)
+        ohneUeberschuldung.naechsterZug(event.spieler)
     } else {
-        neuerState
+        ohneUeberschuldung
     }
 }
+
+private fun GameState.aktualisiereUeberschuldung(spielerId: SpielerId): GameState {
+    val schuldensumme = bankgehalteneSchuldensumme(spielerId)
+    val marktwert = marktwert(spielerId)
+    val istImFrieden = konflikte.none { it.spielerA == spielerId || it.spielerB == spielerId }
+    val istUeberschuldet = istImFrieden && schuldensumme > marktwert && schuldensumme > Geld.NULL
+    val bestehend = ueberschuldungen.firstOrNull { it.spieler == spielerId }
+    val neuerStatus = if (istUeberschuldet) {
+        val neueSerie = (bestehend?.friedlicheUeberschuldeteZuege ?: 0) + 1
+        UeberschuldungsStatus(
+            spieler = spielerId,
+            friedlicheUeberschuldeteZuege = neueSerie,
+            letztePruefungRunde = rundenzähler,
+            schuldensumme = schuldensumme,
+            marktwert = marktwert,
+            warnungAktiv = neueSerie >= UEBERSCHULDUNG_WARNUNG_AB_ZUEGEN,
+            schuldenstrichFaellig = neueSerie > UEBERSCHULDUNG_WARNUNG_AB_ZUEGEN,
+        )
+    } else {
+        null
+    }
+
+    return copy(
+        ueberschuldungen = ueberschuldungen.filterNot { it.spieler == spielerId } + listOfNotNull(neuerStatus),
+    )
+}
+
+private fun GameState.bankgehalteneSchuldensumme(spielerId: SpielerId): Geld {
+    return anleihen.values
+        .filter { anleihe -> anleihe.emittent == spielerId && anleihe.id in bankAnleihen }
+        .fold(Geld.NULL) { summe, anleihe -> summe + anleihe.offeneSchuldMitZinsen() }
+}
+
+private fun Anleihe.offeneSchuldMitZinsen(): Geld {
+    return nennwert + zinszahlung() * laufzeitRunden
+}
+
+private fun Anleihe.zinszahlung(): Geld {
+    return Geld.cent(nennwert.cent * zinsBasispunkte / 10_000L)
+}
+
+private fun GameState.marktwert(spielerId: SpielerId): Geld {
+    val spieler = spieler.firstOrNull { it.id == spielerId }
+        ?: error("Unbekannter Spieler: ${spielerId.wert}")
+    return spieler.bauteile.entries.fold(Geld.NULL) { summe, (bauteil, menge) ->
+        summe + bauteil.marktwert(marktpreise) * menge
+    }
+}
+
+private fun BauteilTyp.marktwert(marktpreise: Map<Rohstoff, Geld>): Geld {
+    return kosten.entries.fold(Geld.NULL) { summe, (rohstoff, menge) ->
+        val preis = marktpreise[rohstoff] ?: Geld.NULL
+        summe + preis * menge
+    }
+}
+
+private const val UEBERSCHULDUNG_WARNUNG_AB_ZUEGEN = 3
 
 private fun Map<BauteilTyp, Int>.nachSchuldenstrich(entfernteBahnwege: Int): Map<BauteilTyp, Int> {
     val neu = toMutableMap()

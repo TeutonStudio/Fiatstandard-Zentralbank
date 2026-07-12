@@ -77,6 +77,7 @@ data class GameState(
     val anleihen: Map<AnleiheId, Anleihe> = emptyMap(),
     val konflikte: Set<Konflikt> = emptySet(),
     val schuldenstriche: List<Schuldenstrich> = emptyList(),
+    val ueberschuldungen: List<UeberschuldungsStatus> = emptyList(),
     val marktpreise: Map<Rohstoff, Geld> = emptyMap(),
     val leitzins: Basispunkte = Basispunkte.NULL,
     val rundenzähler: Int = 0,
