@@ -46,8 +46,11 @@ Offene Punkte:
 - `GameState` um `bankAnleihen` erweitert, damit Anleihenbesitz bei Bank/Nicht-Spieler-Konten abbildbar ist.
 - Reducer-Logik für `AnleiheGekauft`, `AnleiheVerkauft` und `AnleiheFaellig` ergänzt.
 - Tests verankern summenneutralen Anleihenverkauf und Entfernung fälliger Anleihen aus Portfolios und offenem Bestand.
+- `GameState` um einfache `Konflikt`-Menge erweitert.
+- Reducer-Logik für `Expansion`, `KriegErklaert` und `KriegBeendet` ergänzt.
+- Tests verankern Rohstoffverbrauch bei Expansion und Kriegserklärung/-ende.
 
 Offene Punkte:
 
-- Expansion-, Krieg- und Zugphasen-Events sind definiert, aber noch nicht reducer-seitig implementiert.
+- Zugphasen-Events sind definiert, aber noch nicht reducer-seitig implementiert.
 - Aktive-Spieler-/Phasenprüfung folgt mit dem Zustandsautomaten in Etappe 3.

@@ -33,6 +33,7 @@ class GameStateSerializationTest {
                     laufzeitRunden = 4,
                 ),
             ),
+            konflikte = emptySet(),
             marktpreise = mapOf(Rohstoff.HOLZ to Geld.mark(5)),
             leitzins = Basispunkte(250),
             rundenzähler = 3,

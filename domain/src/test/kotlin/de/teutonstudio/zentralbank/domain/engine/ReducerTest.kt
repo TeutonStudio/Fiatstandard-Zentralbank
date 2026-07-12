@@ -8,6 +8,7 @@ import de.teutonstudio.zentralbank.domain.Spieler
 import de.teutonstudio.zentralbank.domain.SpielerId
 import de.teutonstudio.zentralbank.domain.Anleihe
 import de.teutonstudio.zentralbank.domain.AnleiheId
+import de.teutonstudio.zentralbank.domain.BauteilTyp
 import de.teutonstudio.zentralbank.domain.events.GameEvent
 import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
 import org.junit.Assert.assertEquals
@@ -24,7 +25,7 @@ class ReducerTest {
             Spieler(
                 id = annaId,
                 name = "Anna",
-                rohstoffe = mapOf(Rohstoff.HOLZ to 2),
+                rohstoffe = mapOf(Rohstoff.HOLZ to 2, Rohstoff.STAHL to 1),
                 geldkonto = Geld.mark(10),
                 anleihen = listOf(anleiheId),
             ),
@@ -163,5 +164,44 @@ class ReducerTest {
         assertEquals(Geld.mark(2), state.spieler.first { it.id == annaId }.geldkonto)
         assertEquals(Geld.mark(13), state.spieler.first { it.id == berndId }.geldkonto)
         assertEquals(0, state.anleihen.values.count { it.id == anleiheId })
+    }
+
+    @Test
+    fun expansionVerbrauchtRohstoffeUndErhoehtBauteilbestand() {
+        val state = Reducer.reduce(
+            startState(),
+            GameEvent.Expansion(
+                spieler = annaId,
+                bauteil = BauteilTyp.EISENBAHNLINIE,
+            ),
+        ).getOrThrow()
+
+        val anna = state.spieler.first { it.id == annaId }
+        assertEquals(1, anna.rohstoffe[Rohstoff.HOLZ])
+        assertEquals(null, anna.rohstoffe[Rohstoff.STAHL])
+        assertEquals(1, anna.bauteile[BauteilTyp.EISENBAHNLINIE])
+    }
+
+    @Test
+    fun kriegErklaertUndBeendetKonflikt() {
+        val imKrieg = Reducer.reduce(
+            startState(),
+            GameEvent.KriegErklaert(
+                aggressor = annaId,
+                verteidiger = berndId,
+            ),
+        ).getOrThrow()
+
+        assertEquals(1, imKrieg.konflikte.size)
+
+        val frieden = Reducer.reduce(
+            imKrieg,
+            GameEvent.KriegBeendet(
+                spielerA = berndId,
+                spielerB = annaId,
+            ),
+        ).getOrThrow()
+
+        assertEquals(0, frieden.konflikte.size)
     }
 }

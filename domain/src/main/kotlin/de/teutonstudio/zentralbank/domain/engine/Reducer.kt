@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.domain.engine
 import de.teutonstudio.zentralbank.domain.AnleiheId
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.Geld
+import de.teutonstudio.zentralbank.domain.Konflikt
 import de.teutonstudio.zentralbank.domain.KontoId
 import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.Spieler
@@ -20,15 +21,44 @@ object Reducer {
                 is GameEvent.AnleiheGekauft -> state.bucheAnleiheGekauft(event)
                 is GameEvent.AnleiheVerkauft -> state.bucheAnleiheVerkauft(event)
                 is GameEvent.AnleiheFaellig -> state.bucheAnleiheFaellig(event)
-                is GameEvent.Expansion,
-                is GameEvent.KriegErklaert,
-                is GameEvent.KriegBeendet,
+                is GameEvent.Expansion -> state.bucheExpansion(event)
+                is GameEvent.KriegErklaert -> state.bucheKriegErklaert(event)
+                is GameEvent.KriegBeendet -> state.bucheKriegBeendet(event)
                 is GameEvent.SchrittAbgeschlossen,
                 is GameEvent.PhaseAbgeschlossen,
                 GameEvent.ZugBeendet -> error("Event ${event::class.simpleName} ist noch nicht implementiert.")
             }
         }
     }
+}
+
+private fun GameState.bucheExpansion(event: GameEvent.Expansion): GameState {
+    val nachKosten = bucheRohstoffe(
+        spieler = event.spieler,
+        mengen = event.bauteil.kosten,
+        faktor = -1,
+    )
+    return nachKosten.updateSpieler(event.spieler) { spieler ->
+        spieler.copy(
+            bauteile = spieler.bauteile + (event.bauteil to (spieler.bauteile.getOrDefault(event.bauteil, 0) + 1)),
+        )
+    }
+}
+
+private fun GameState.bucheKriegErklaert(event: GameEvent.KriegErklaert): GameState {
+    require(event.aggressor != event.verteidiger) { "Ein Spieler kann sich nicht selbst Krieg erklaeren." }
+    require(spieler.any { it.id == event.aggressor }) { "Unbekannter Spieler: ${event.aggressor.wert}" }
+    require(spieler.any { it.id == event.verteidiger }) { "Unbekannter Spieler: ${event.verteidiger.wert}" }
+    require(konflikte.none { it.betrifft(event.aggressor, event.verteidiger) }) {
+        "Zwischen diesen Spielern besteht bereits Krieg."
+    }
+    return copy(konflikte = konflikte + Konflikt(event.aggressor, event.verteidiger))
+}
+
+private fun GameState.bucheKriegBeendet(event: GameEvent.KriegBeendet): GameState {
+    val konflikt = konflikte.firstOrNull { it.betrifft(event.spielerA, event.spielerB) }
+        ?: error("Zwischen diesen Spielern besteht kein Krieg.")
+    return copy(konflikte = konflikte - konflikt)
 }
 
 private fun GameState.bucheAnleiheGekauft(event: GameEvent.AnleiheGekauft): GameState {
