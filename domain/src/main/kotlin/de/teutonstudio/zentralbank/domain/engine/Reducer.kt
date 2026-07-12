@@ -1,11 +1,13 @@
 package de.teutonstudio.zentralbank.domain.engine
 
 import de.teutonstudio.zentralbank.domain.AnleiheId
+import de.teutonstudio.zentralbank.domain.BauteilTyp
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.Geld
 import de.teutonstudio.zentralbank.domain.Konflikt
 import de.teutonstudio.zentralbank.domain.KontoId
 import de.teutonstudio.zentralbank.domain.Rohstoff
+import de.teutonstudio.zentralbank.domain.Schuldenstrich
 import de.teutonstudio.zentralbank.domain.Spieler
 import de.teutonstudio.zentralbank.domain.SpielerId
 import de.teutonstudio.zentralbank.domain.events.GameEvent
@@ -31,6 +33,7 @@ object Reducer {
                 is GameEvent.Expansion -> state.bucheExpansion(event)
                 is GameEvent.KriegErklaert -> state.bucheKriegErklaert(event)
                 is GameEvent.KriegBeendet -> state.bucheKriegBeendet(event)
+                is GameEvent.Schuldenstrich -> state.bucheSchuldenstrich(event)
                 is GameEvent.SchrittAbgeschlossen -> state.schrittAbschliessen(event)
                 is GameEvent.PhaseAbgeschlossen -> state.phaseAbschliessen(event)
                 GameEvent.ZugBeendet -> state.zugBeenden()
@@ -68,6 +71,7 @@ private fun GameEvent.schrittTyp(): SchrittTyp? = when (this) {
     is GameEvent.Expansion -> SchrittTyp.EXPANSION
     is GameEvent.KriegErklaert -> SchrittTyp.KRIEG
     is GameEvent.KriegBeendet -> SchrittTyp.KRIEG
+    is GameEvent.Schuldenstrich -> SchrittTyp.FINANZ_AUSGABEN
     is GameEvent.SchrittAbgeschlossen,
     is GameEvent.PhaseAbgeschlossen,
     GameEvent.ZugBeendet -> null
@@ -86,6 +90,7 @@ private fun GameEvent.primaererSpieler(): SpielerId? = when (this) {
     is GameEvent.Expansion -> spieler
     is GameEvent.KriegErklaert -> aggressor
     is GameEvent.KriegBeendet -> spielerA
+    is GameEvent.Schuldenstrich -> spieler
     is GameEvent.AnleiheFaellig,
     is GameEvent.SchrittAbgeschlossen,
     is GameEvent.PhaseAbgeschlossen,
@@ -113,7 +118,11 @@ private fun GameState.phaseAbschliessen(event: GameEvent.PhaseAbgeschlossen): Ga
 private fun GameState.zugBeenden(): GameState {
     val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
     require(ZugAutomat.kannZugBeenden(this)) { "Zug kann erst in der Aktions-Phase beendet werden." }
-    val aktuellerIndex = spieler.indexOfFirst { it.id == zug.spieler }
+    return naechsterZug(zug.spieler)
+}
+
+private fun GameState.naechsterZug(aktuellerSpieler: SpielerId): GameState {
+    val aktuellerIndex = spieler.indexOfFirst { it.id == aktuellerSpieler }
     require(aktuellerIndex >= 0) { "Aktiver Spieler ist unbekannt." }
     val naechsterSpieler = spieler[(aktuellerIndex + 1) % spieler.size]
     val neueRunde = if (aktuellerIndex == spieler.lastIndex) rundenzähler + 1 else rundenzähler
@@ -122,6 +131,88 @@ private fun GameState.zugBeenden(): GameState {
         rundenzähler = neueRunde,
         zugStatus = ZugStatus(naechsterSpieler.id, Phase.Einnahmen),
     )
+}
+
+private fun GameState.bucheSchuldenstrich(event: GameEvent.Schuldenstrich): GameState {
+    require(event.entfernteBahnwege >= 0) { "Entfernte Bahnwege duerfen nicht negativ sein." }
+    val schuldner = spieler.firstOrNull { it.id == event.spieler }
+        ?: error("Unbekannter Spieler: ${event.spieler.wert}")
+    require(konflikte.none { it.spielerA == event.spieler || it.spielerB == event.spieler }) {
+        "Schuldenstrich ist im Krieg nicht direkt verfuegbar."
+    }
+    val eigeneAnleihen = anleihen.values.filter { it.emittent == event.spieler }
+    require(eigeneAnleihen.isNotEmpty()) { "Schuldenstrich benoetigt offene eigene Anleihen." }
+    val vorhandeneBahnwege = schuldner.bauteile.getOrDefault(BauteilTyp.EISENBAHNLINIE, 0)
+    require(event.entfernteBahnwege <= vorhandeneBahnwege) {
+        "Mehr Bahnwege entfernt als vorhanden."
+    }
+
+    var ausgezahlterBetrag = Geld.NULL
+    var neuerState = this
+    val geloeschteAnleihen = eigeneAnleihen.map { it.id }
+    eigeneAnleihen.forEach { anleihe ->
+        val besitzer = anleiheBesitzer(anleihe.id)
+        if (besitzer is KontoId.Spieler && besitzer.id != event.spieler) {
+            ausgezahlterBetrag += anleihe.nennwert
+            neuerState = neuerState.kontoAendern(besitzer, anleihe.nennwert)
+        }
+    }
+
+    neuerState = neuerState.copy(
+        bankAnleihen = neuerState.bankAnleihen - geloeschteAnleihen.toSet(),
+        anleihen = neuerState.anleihen - geloeschteAnleihen.toSet(),
+        spieler = neuerState.spieler.map { spieler ->
+            val ohneAnleihen = spieler.copy(anleihen = spieler.anleihen - geloeschteAnleihen.toSet())
+            if (spieler.id == event.spieler) {
+                ohneAnleihen.copy(
+                    bauteile = spieler.bauteile.nachSchuldenstrich(event.entfernteBahnwege),
+                )
+            } else {
+                ohneAnleihen
+            }
+        },
+    )
+
+    neuerState = neuerState.copy(
+        schuldenstriche = neuerState.schuldenstriche + Schuldenstrich(
+            spieler = event.spieler,
+            runde = rundenzähler,
+            ausgezahlterBetrag = ausgezahlterBetrag,
+            geloeschteAnleihen = geloeschteAnleihen,
+            entfernteBahnwege = event.entfernteBahnwege,
+        ),
+    )
+
+    return if (zugStatus?.spieler == event.spieler) {
+        neuerState.naechsterZug(event.spieler)
+    } else {
+        neuerState
+    }
+}
+
+private fun Map<BauteilTyp, Int>.nachSchuldenstrich(entfernteBahnwege: Int): Map<BauteilTyp, Int> {
+    val neu = toMutableMap()
+    neu.remove(BauteilTyp.BAHNHOF)
+    neu.remove(BauteilTyp.HAFEN)
+
+    val grossbahnhoefe = neu.remove(BauteilTyp.GROSSBAHNHOF) ?: 0
+    if (grossbahnhoefe > 0) {
+        neu[BauteilTyp.BAHNHOF] = neu.getOrDefault(BauteilTyp.BAHNHOF, 0) + grossbahnhoefe
+    }
+
+    val grosshaefen = neu.remove(BauteilTyp.GROSSHAFEN) ?: 0
+    if (grosshaefen > 0) {
+        neu[BauteilTyp.HAFEN] = neu.getOrDefault(BauteilTyp.HAFEN, 0) + grosshaefen
+    }
+
+    val bahnwege = neu.getOrDefault(BauteilTyp.EISENBAHNLINIE, 0) - entfernteBahnwege
+    if (bahnwege > 0) {
+        neu[BauteilTyp.EISENBAHNLINIE] = bahnwege
+    } else {
+        neu.remove(BauteilTyp.EISENBAHNLINIE)
+    }
+
+    return neu.filterValues { it > 0 }
 }
 
 private fun GameState.bucheExpansion(event: GameEvent.Expansion): GameState {

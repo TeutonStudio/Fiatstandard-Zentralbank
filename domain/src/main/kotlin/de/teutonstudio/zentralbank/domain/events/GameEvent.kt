@@ -81,6 +81,12 @@ sealed interface GameEvent {
     ) : GameEvent
 
     @Serializable
+    data class Schuldenstrich(
+        val spieler: SpielerId,
+        val entfernteBahnwege: Int,
+    ) : GameEvent
+
+    @Serializable
     data class SchrittAbgeschlossen(
         val schritt: SchrittTyp,
     ) : GameEvent

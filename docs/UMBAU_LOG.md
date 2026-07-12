@@ -68,7 +68,12 @@ Offene Punkte:
   - `ROHSTOFF_EINNAHMEN` bleibt immer manuell, da der Ertrag vom physischen Spielfeld kommt.
   - `ROHSTOFF_AUSGABEN` ist automatisch erledigt, wenn der aktive Spieler keine verbrauchenden Bauteile/Regionen hat.
   - `FINANZ_AUSGABEN` ist automatisch erledigt, wenn keine eigene Anleihe bei Bank oder anderen Spielern liegt.
+- `Schuldenstrich` als Finanz-Ausgaben-Event ergänzt.
+- Schuldenstrich baut normale Bahnhöfe/Häfen ab, stuft Großbahnhöfe/Großhäfen zu normalen Gebäuden zurück und entfernt die vom Nutzer angegebene Anzahl Eisenbahnlinien.
+- Bankgehaltene eigene Anleihen werden gelöscht; von anderen Spielern gehaltene eigene Anleihen werden durch frisches Geld zum Nennwert ausgezahlt und anschließend gelöscht.
+- Nach einem Schuldenstrich wird der aktuelle Zug direkt zum nächsten Spieler weitergeschaltet.
+- Reducer-Tests verankern Auszahlung, Bauteilabbau, Anleihenlöschung, Zugübersprung und Ablehnung im Krieg.
 
 Offene Punkte:
 
-- Schuldenstrich und das Überspringen der normalen Aktionsphase nach Schuldenstrich sind noch nicht modelliert.
+- Automatischer Schuldenstrich nach mehr als drei friedlichen Überschuldungsrunden benötigt noch die geklärten Auswertungsregeln aus `unklarheiten.md`.

@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.domain.engine
 
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.Geld
+import de.teutonstudio.zentralbank.domain.Konflikt
 import de.teutonstudio.zentralbank.domain.KontoId
 import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.Spieler
@@ -207,6 +208,97 @@ class ReducerTest {
         ).getOrThrow()
 
         assertEquals(0, frieden.konflikte.size)
+    }
+
+    @Test
+    fun schuldenstrichBautAbZahltSpieleranleihenFrischAusUndUeberspringtAktionen() {
+        val bankAnleihe = AnleiheId("anna-bank")
+        val spielerAnleihe = AnleiheId("anna-player")
+        val start = GameState(
+            spieler = listOf(
+                Spieler(
+                    id = annaId,
+                    name = "Anna",
+                    geldkonto = Geld.mark(1),
+                    bauteile = mapOf(
+                        BauteilTyp.BAHNHOF to 2,
+                        BauteilTyp.HAFEN to 1,
+                        BauteilTyp.GROSSBAHNHOF to 1,
+                        BauteilTyp.GROSSHAFEN to 1,
+                        BauteilTyp.EISENBAHNLINIE to 5,
+                    ),
+                ),
+                Spieler(
+                    id = berndId,
+                    name = "Bernd",
+                    geldkonto = Geld.mark(5),
+                    anleihen = listOf(spielerAnleihe),
+                ),
+            ),
+            bankAnleihen = listOf(bankAnleihe),
+            anleihen = mapOf(
+                bankAnleihe to Anleihe(
+                    id = bankAnleihe,
+                    emittent = annaId,
+                    nennwert = Geld.mark(7),
+                    zinsBasispunkte = 500,
+                    laufzeitRunden = 4,
+                ),
+                spielerAnleihe to Anleihe(
+                    id = spielerAnleihe,
+                    emittent = annaId,
+                    nennwert = Geld.mark(8),
+                    zinsBasispunkte = 500,
+                    laufzeitRunden = 4,
+                ),
+            ),
+            aktiverSpieler = annaId,
+            zugStatus = ZugStatus(
+                spieler = annaId,
+                phase = Phase.Ausgaben,
+                erledigteSchritte = setOf(SchrittTyp.ROHSTOFF_AUSGABEN),
+            ),
+        )
+
+        val state = Reducer.reduce(
+            start,
+            GameEvent.Schuldenstrich(annaId, entfernteBahnwege = 3),
+        ).getOrThrow()
+
+        val anna = state.spieler.first { it.id == annaId }
+        val bernd = state.spieler.first { it.id == berndId }
+        assertEquals(null, anna.bauteile[BauteilTyp.GROSSBAHNHOF])
+        assertEquals(null, anna.bauteile[BauteilTyp.GROSSHAFEN])
+        assertEquals(1, anna.bauteile[BauteilTyp.BAHNHOF])
+        assertEquals(1, anna.bauteile[BauteilTyp.HAFEN])
+        assertEquals(2, anna.bauteile[BauteilTyp.EISENBAHNLINIE])
+        assertEquals(Geld.mark(13), bernd.geldkonto)
+        assertTrue(state.bankAnleihen.isEmpty())
+        assertTrue(state.anleihen.isEmpty())
+        assertTrue(state.spieler.all { it.anleihen.isEmpty() })
+        assertEquals(1, state.schuldenstriche.size)
+        assertEquals(Geld.mark(8), state.schuldenstriche.single().ausgezahlterBetrag)
+        assertEquals(berndId, state.aktiverSpieler)
+        assertEquals(Phase.Einnahmen, state.zugStatus?.phase)
+    }
+
+    @Test
+    fun schuldenstrichImKriegWirdAbgelehnt() {
+        val result = Reducer.reduce(
+            startState().copy(
+                bankAnleihen = listOf(anleiheId),
+                konflikte = setOf(Konflikt(annaId, berndId)),
+                aktiverSpieler = annaId,
+                zugStatus = ZugStatus(
+                    spieler = annaId,
+                    phase = Phase.Ausgaben,
+                    erledigteSchritte = setOf(SchrittTyp.ROHSTOFF_AUSGABEN),
+                ),
+            ),
+            GameEvent.Schuldenstrich(annaId, entfernteBahnwege = 0),
+        )
+
+        assertTrue(result.isFailure)
     }
 
     @Test

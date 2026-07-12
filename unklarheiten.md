@@ -1,11 +1,12 @@
 # Unklarheiten
 
-## Etappe 3 - Schuldenstrich
+## Etappe 3 - Automatischer Schuldenstrich
 
-- Frage: Wie soll der `Schuldenstrich` regeltechnisch modelliert werden?
-  - Kontext: Die beantwortete Pflichtschritt-Regel sagt: Wenn der Spieler Finanz-Ausgaben nicht decken und auch nicht per Handel stopfen kann, entsteht entweder der Schuldenstrich oder eine Kriegserklärung. Nach einem Schuldenstrich wird die normale Spieleraktivität übersprungen.
+- Frage: Wie soll die automatische Ausloesung nach mehr als drei friedlichen Ueberschuldungsrunden exakt ausgewertet werden?
+  - Kontext: Der manuelle Schuldenstrich aus dem Finanz-Schulden-Dialog ist umgesetzt. Fuer die automatische Regel fehlen im aktuellen Domain-State noch Verlauf und Bewertungsdetails.
   - Benoetigte Antwort:
-    - Wann genau entsteht der Schuldenstrich: automatisch bei bestaetigtem Finanzloch, oder durch aktive Auswahl des Spielers?
-    - Welche Daten muss der State speichern: nur `SpielerId`, Betrag, Runde, betroffene Glaeubiger/Anleihen?
-    - Was passiert mit offenen Schulden/Anleihen beim Schuldenstrich: werden sie geloescht, gestundet, auf Bank gebucht oder bleiben sie bestehen?
-    - Wie lange wird die Aktions-Phase uebersprungen: nur im aktuellen Zug oder auch in Folgezügen bis zu einer Bedingung?
+    - Wann wird die Ueberschuldung geprueft: am Ende jeder vollstaendigen Runde, am Anfang des Spielerzuges oder beim Finanz-Ausgaben-Schritt des betroffenen Spielers?
+    - Wie wird die Schuldensumme mit Zinsen berechnet: Nennwert plus nur aktuell faellige Zinsen, plus naechste Zinszahlung oder plus alle bis Laufzeitende noch offenen Zinsen?
+    - Was zaehlt zum Marktwert: nur Bauwerke/Einheiten ueber Rohstoffkosten, oder auch aktuelle Rohstofflager und Geldkonto?
+    - Welche Preise gelten als "vorherige Runde", wenn noch keine Vor-Runde existiert?
+    - Bedeutet "im Frieden" keine aktive Kriegslage waehrend aller drei Runden, oder reicht Frieden im Pruefmoment?
