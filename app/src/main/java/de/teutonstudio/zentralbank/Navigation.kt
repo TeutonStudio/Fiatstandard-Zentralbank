@@ -21,7 +21,6 @@ import com.example.czboracle.ui.composables.AnleihenRegister
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.ui.ausgabe.zeigeSpieler
-import de.teutonstudio.zentralbank.ui.domain.zuZugAnzeige
 import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
 import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.bearbeiteRunde
@@ -98,7 +97,7 @@ fun Navigation(viewModel: GameViewModel) {
             }
 
         composable(route = Screen.Game.route) {
-            val domainState = viewModel.domainState.collectAsState().value
+            val domainUiState = viewModel.domainUiState.collectAsState().value
             Spielmenü(
                 { navController.navigate(route = Screen.PlayerSaldo.route) },
                 { navController.navigate(route = Screen.DebtSaldo.route) },
@@ -107,7 +106,7 @@ fun Navigation(viewModel: GameViewModel) {
                 { navController.navigate(route = Screen.NewTrade.route) },
                 { navController.navigate(route = Screen.NewCredit.route) },
                 { navController.navigate(route = Screen.EditRound.route) },
-                zugText = domainState?.zuZugAnzeige()?.text ?: "nächste Runde",
+                zugText = domainUiState?.zug?.text ?: "nächste Runde",
             )
         }
 

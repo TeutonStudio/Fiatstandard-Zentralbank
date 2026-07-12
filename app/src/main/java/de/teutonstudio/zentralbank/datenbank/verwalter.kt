@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.engine.GameEngine
 import de.teutonstudio.zentralbank.domain.events.GameEvent
+import de.teutonstudio.zentralbank.ui.domain.GameUiState
+import de.teutonstudio.zentralbank.ui.domain.zuGameUiState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -48,12 +50,14 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private val _spielDatenListe = MutableStateFlow<Map<SpielDaten,List<SpeicherDaten>>>(emptyMap())
     private val _spielSpeicher = MutableStateFlow<Map<SpielDaten,Pair<Int,List<String>>>>(emptyMap())
     private val _domainState = MutableStateFlow<GameState?>(null)
+    private val _domainUiState = MutableStateFlow<GameUiState?>(null)
     private val _domainFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private var gameEngine: GameEngine? = null
 
     val spielDatenListe: StateFlow<Map<SpielDaten,List<SpeicherDaten>>> = _spielDatenListe.asStateFlow()
     val spielSpeicher: StateFlow<Map<SpielDaten,Pair<Int,List<String>>>> = _spielSpeicher.asStateFlow()
     val domainState: StateFlow<GameState?> = _domainState.asStateFlow()
+    val domainUiState: StateFlow<GameUiState?> = _domainUiState.asStateFlow()
     val domainFehler: SharedFlow<String> = _domainFehler.asSharedFlow()
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
@@ -64,7 +68,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         aktuelleDaten = daten
         val startzustand = spiel.zuDomainGameState()
         gameEngine = GameEngine(startzustand)
-        _domainState.value = startzustand
+        aktualisiereDomainState(startzustand)
     }
 
     fun onEvent(event: GameEvent) {
@@ -75,10 +79,15 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
 
         engine.apply(event)
-            .onSuccess { state -> _domainState.value = state }
+            .onSuccess { state -> aktualisiereDomainState(state) }
             .onFailure { throwable ->
                 _domainFehler.tryEmit(throwable.message ?: "Domain-Event wurde abgelehnt.")
             }
+    }
+
+    private fun aktualisiereDomainState(state: GameState) {
+        _domainState.value = state
+        _domainUiState.value = state.zuGameUiState()
     }
 
     init {

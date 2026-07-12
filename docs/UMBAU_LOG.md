@@ -94,6 +94,7 @@ Offene Punkte:
 - Das Spielmenü liest den aktuellen Spieler und die Phase aus `domainState` und zeigt sie im bestehenden unteren Textfeld an.
 - App-seitiger `ZugAnzeige`-Mapper ergänzt, damit Domain-State-Formatierung nicht direkt in `Navigation` liegt; Test für Spieler-/Phasenanzeige ergänzt.
 - App-seitiger `SpielerAnzeige`-Mapper ergänzt, der Domain-Spieler für künftige state-hoisted Spielerlisten verdichtet; Test für Geld-, Anleihe- und Bauteilaggregation ergänzt.
+- `GameUiState` fasst abgeleitete Zug- und Spieleranzeigen zusammen; `GameViewModel` exponiert ihn als `domainUiState` parallel zum rohen `domainState`.
 - Bestehende `aktuellesSpiel`-UI bleibt unverändert lauffähig, während Screens schrittweise auf `domainState` und Events umgehängt werden.
 
 Offene Punkte:
