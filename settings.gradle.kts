@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "CZB"
 include(":app")
+include(":domain")
