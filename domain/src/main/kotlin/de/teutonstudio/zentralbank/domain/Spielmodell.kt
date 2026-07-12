@@ -1,6 +1,8 @@
 package de.teutonstudio.zentralbank.domain
 
 import kotlinx.serialization.Serializable
+import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.domain.zug.ZugStatus
 
 @JvmInline
 @Serializable
@@ -78,4 +80,5 @@ data class GameState(
     val leitzins: Basispunkte = Basispunkte.NULL,
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
+    val zugStatus: ZugStatus? = aktiverSpieler?.let { ZugStatus(it, Phase.Einnahmen) },
 )

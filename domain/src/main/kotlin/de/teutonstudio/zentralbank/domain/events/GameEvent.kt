@@ -6,6 +6,8 @@ import de.teutonstudio.zentralbank.domain.Geld
 import de.teutonstudio.zentralbank.domain.KontoId
 import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.SpielerId
+import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -80,12 +82,12 @@ sealed interface GameEvent {
 
     @Serializable
     data class SchrittAbgeschlossen(
-        val schritt: String,
+        val schritt: SchrittTyp,
     ) : GameEvent
 
     @Serializable
     data class PhaseAbgeschlossen(
-        val phase: String,
+        val phase: Phase,
     ) : GameEvent
 
     @Serializable

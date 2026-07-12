@@ -54,3 +54,15 @@ Offene Punkte:
 
 - Zugphasen-Events sind definiert, aber noch nicht reducer-seitig implementiert.
 - Aktive-Spieler-/Phasenprüfung folgt mit dem Zustandsautomaten in Etappe 3.
+
+## Etappe 3 - Zugautomat
+
+- Domain-Typen für `SchrittTyp`, `Phase`, `ZugStatus`, `SchrittZustand` und `SchrittInfo` ergänzt.
+- `GameState` trägt nun optionalen `zugStatus`, standardmäßig für den aktiven Spieler in der Einnahmen-Phase.
+- `ZugAutomat.schritte`, `kannPhaseAbschliessen`, `kannZugBeenden` und Phasenübergang ergänzt.
+- Reducer verarbeitet `SchrittAbgeschlossen`, `PhaseAbgeschlossen` und `ZugBeendet`.
+- Tests verankern verfügbare/gesperrte Schritte, Pflichtschritt-Gates und Spielerwechsel beim Zugende.
+
+Offene Punkte:
+
+- Fachliche Events werden als nächster Schritt gegen `ZugAutomat.schritte()` gegated.

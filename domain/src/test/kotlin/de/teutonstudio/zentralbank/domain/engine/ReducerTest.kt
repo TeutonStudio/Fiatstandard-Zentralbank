@@ -11,6 +11,8 @@ import de.teutonstudio.zentralbank.domain.AnleiheId
 import de.teutonstudio.zentralbank.domain.BauteilTyp
 import de.teutonstudio.zentralbank.domain.events.GameEvent
 import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
+import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -203,5 +205,33 @@ class ReducerTest {
         ).getOrThrow()
 
         assertEquals(0, frieden.konflikte.size)
+    }
+
+    @Test
+    fun schrittPhaseUndZugendeWechselnAktivenSpieler() {
+        val nachSchritt = Reducer.reduce(
+            startState(),
+            GameEvent.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_EINNAHMEN),
+        ).getOrThrow()
+
+        val ausgaben = Reducer.reduce(
+            nachSchritt,
+            GameEvent.PhaseAbgeschlossen(Phase.Einnahmen),
+        ).getOrThrow()
+
+        val ausgabenFertig = listOf(
+            GameEvent.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_AUSGABEN),
+            GameEvent.SchrittAbgeschlossen(SchrittTyp.FINANZ_AUSGABEN),
+        ).fold(ausgaben) { state, event -> Reducer.reduce(state, event).getOrThrow() }
+
+        val aktionen = Reducer.reduce(
+            ausgabenFertig,
+            GameEvent.PhaseAbgeschlossen(Phase.Ausgaben),
+        ).getOrThrow()
+
+        val naechsterSpieler = Reducer.reduce(aktionen, GameEvent.ZugBeendet).getOrThrow()
+
+        assertEquals(berndId, naechsterSpieler.aktiverSpieler)
+        assertEquals(Phase.Einnahmen, naechsterSpieler.zugStatus?.phase)
     }
 }

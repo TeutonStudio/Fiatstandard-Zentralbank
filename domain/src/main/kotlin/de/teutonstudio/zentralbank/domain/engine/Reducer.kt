@@ -9,6 +9,10 @@ import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.Spieler
 import de.teutonstudio.zentralbank.domain.SpielerId
 import de.teutonstudio.zentralbank.domain.events.GameEvent
+import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.domain.zug.SchrittZustand
+import de.teutonstudio.zentralbank.domain.zug.ZugAutomat
+import de.teutonstudio.zentralbank.domain.zug.ZugStatus
 
 object Reducer {
     fun reduce(state: GameState, event: GameEvent): Result<GameState> {
@@ -24,12 +28,44 @@ object Reducer {
                 is GameEvent.Expansion -> state.bucheExpansion(event)
                 is GameEvent.KriegErklaert -> state.bucheKriegErklaert(event)
                 is GameEvent.KriegBeendet -> state.bucheKriegBeendet(event)
-                is GameEvent.SchrittAbgeschlossen,
-                is GameEvent.PhaseAbgeschlossen,
-                GameEvent.ZugBeendet -> error("Event ${event::class.simpleName} ist noch nicht implementiert.")
+                is GameEvent.SchrittAbgeschlossen -> state.schrittAbschliessen(event)
+                is GameEvent.PhaseAbgeschlossen -> state.phaseAbschliessen(event)
+                GameEvent.ZugBeendet -> state.zugBeenden()
             }
         }
     }
+}
+
+private fun GameState.schrittAbschliessen(event: GameEvent.SchrittAbgeschlossen): GameState {
+    val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
+    val info = ZugAutomat.schritte(this).first { it.typ == event.schritt }
+    require(info.zustand == SchrittZustand.VERFUEGBAR || info.zustand == SchrittZustand.ERLEDIGT) {
+        info.begruendung ?: "Schritt ist nicht verfuegbar."
+    }
+    return copy(zugStatus = zug.copy(erledigteSchritte = zug.erledigteSchritte + event.schritt))
+}
+
+private fun GameState.phaseAbschliessen(event: GameEvent.PhaseAbgeschlossen): GameState {
+    val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
+    require(zug.phase == event.phase) { "Falsche Phase: aktueller Zug ist in ${zug.phase}." }
+    require(ZugAutomat.kannPhaseAbschliessen(this)) { "Nicht alle Pflichtschritte der Phase sind erledigt." }
+    val naechstePhase = ZugAutomat.naechstePhase(zug.phase)
+        ?: error("Aktions-Phase wird mit ZugBeendet abgeschlossen.")
+    return copy(zugStatus = ZugStatus(zug.spieler, naechstePhase))
+}
+
+private fun GameState.zugBeenden(): GameState {
+    val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
+    require(ZugAutomat.kannZugBeenden(this)) { "Zug kann erst in der Aktions-Phase beendet werden." }
+    val aktuellerIndex = spieler.indexOfFirst { it.id == zug.spieler }
+    require(aktuellerIndex >= 0) { "Aktiver Spieler ist unbekannt." }
+    val naechsterSpieler = spieler[(aktuellerIndex + 1) % spieler.size]
+    val neueRunde = if (aktuellerIndex == spieler.lastIndex) rundenzähler + 1 else rundenzähler
+    return copy(
+        aktiverSpieler = naechsterSpieler.id,
+        rundenzähler = neueRunde,
+        zugStatus = ZugStatus(naechsterSpieler.id, Phase.Einnahmen),
+    )
 }
 
 private fun GameState.bucheExpansion(event: GameEvent.Expansion): GameState {
