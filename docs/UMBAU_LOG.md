@@ -90,6 +90,7 @@ Offene Punkte:
 - `GameViewModel` initialisiert beim Laden/Erstellen eines Spiels eine `GameEngine` aus dem gemappten `GameState`.
 - `GameViewModel.onEvent(GameEvent)` als zentrale Domain-Event-Einstiegsstelle ergänzt.
 - Erfolgreiche Domain-Events aktualisieren `domainState`; abgelehnte Events werden über `domainFehler` als `SharedFlow<String>` gemeldet.
+- `Navigation` sammelt `domainFehler` und zeigt Reducer-/Domain-Fehler über einen globalen Material-`SnackbarHost`.
 - Bestehende `aktuellesSpiel`-UI bleibt unverändert lauffähig, während Screens schrittweise auf `domainState` und Events umgehängt werden.
 
 Offene Punkte:

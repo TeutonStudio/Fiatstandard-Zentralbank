@@ -2,8 +2,14 @@ package de.teutonstudio.zentralbank
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,35 +55,46 @@ sealed class Screen(val route: String) {
 fun Navigation(viewModel: GameViewModel) {
     val context = LocalContext.current
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    NavHost(
-        navController = navController,
-        startDestination = Screen.StartScreen.route
-    ) {
-        composable(route = Screen.StartScreen.route) {
-            Hauptmenü(
-                Screen.NewGame.navigiere(navController),
-                Screen.LoadGame.navigiere(navController)
-            )
+    LaunchedEffect(viewModel) {
+        viewModel.domainFehler.collect { meldung ->
+            snackbarHostState.showSnackbar(meldung)
         }
+    }
 
-        composable(route = Screen.NewGame.route) {
-            SpielErstellen(
-                Screen.StartScreen.navigiere(navController),
-                viewModel.erstelleSpiel,
-                Screen.Game.navigiere(navController)
-            )
-        }
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { innenabstand ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.StartScreen.route,
+            modifier = Modifier.padding(innenabstand),
+        ) {
+            composable(route = Screen.StartScreen.route) {
+                Hauptmenü(
+                    Screen.NewGame.navigiere(navController),
+                    Screen.LoadGame.navigiere(navController)
+                )
+            }
 
-        composable(route = Screen.LoadGame.route) {
-            SpielLaden(
-                Screen.StartScreen.navigiere(navController),
-                viewModel.vernichteSpiel,
-                viewModel.ladeSpiel,
-                Screen.Game.navigiere(navController),
-                viewModel.spielSpeicher.collectAsState().value
-            )
-        }
+            composable(route = Screen.NewGame.route) {
+                SpielErstellen(
+                    Screen.StartScreen.navigiere(navController),
+                    viewModel.erstelleSpiel,
+                    Screen.Game.navigiere(navController)
+                )
+            }
+
+            composable(route = Screen.LoadGame.route) {
+                SpielLaden(
+                    Screen.StartScreen.navigiere(navController),
+                    viewModel.vernichteSpiel,
+                    viewModel.ladeSpiel,
+                    Screen.Game.navigiere(navController),
+                    viewModel.spielSpeicher.collectAsState().value
+                )
+            }
 
         composable(route = Screen.Game.route) {
             Spielmenü(
@@ -198,4 +215,5 @@ fun Navigation(viewModel: GameViewModel) {
             } }
         }
     }
+}
 }
