@@ -13,6 +13,7 @@ import de.teutonstudio.zentralbank.domain.events.GameEvent
 import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
 import de.teutonstudio.zentralbank.domain.zug.Phase
 import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
+import de.teutonstudio.zentralbank.domain.zug.ZugStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,6 +49,7 @@ class ReducerTest {
                 laufzeitRunden = 4,
             ),
         ),
+        zugStatus = null,
     )
 
     @Test
@@ -210,7 +212,10 @@ class ReducerTest {
     @Test
     fun schrittPhaseUndZugendeWechselnAktivenSpieler() {
         val nachSchritt = Reducer.reduce(
-            startState(),
+            startState().copy(
+                aktiverSpieler = annaId,
+                zugStatus = ZugStatus(annaId, Phase.Einnahmen),
+            ),
             GameEvent.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_EINNAHMEN),
         ).getOrThrow()
 
@@ -233,5 +238,24 @@ class ReducerTest {
 
         assertEquals(berndId, naechsterSpieler.aktiverSpieler)
         assertEquals(Phase.Einnahmen, naechsterSpieler.zugStatus?.phase)
+    }
+
+    @Test
+    fun phasenfremderSchrittWirdAbgelehnt() {
+        val result = Reducer.reduce(
+            startState().copy(
+                aktiverSpieler = annaId,
+                zugStatus = ZugStatus(annaId, Phase.Einnahmen),
+            ),
+            GameEvent.RohstoffHandel(
+                kaeufer = annaId,
+                verkaeufer = berndId,
+                rohstoff = Rohstoff.HOLZ,
+                menge = 1,
+                preis = Geld.mark(1),
+            ),
+        )
+
+        assertTrue(result.isFailure)
     }
 }

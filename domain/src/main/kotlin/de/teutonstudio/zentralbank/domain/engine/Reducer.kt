@@ -9,7 +9,9 @@ import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.Spieler
 import de.teutonstudio.zentralbank.domain.SpielerId
 import de.teutonstudio.zentralbank.domain.events.GameEvent
+import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
 import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
 import de.teutonstudio.zentralbank.domain.zug.SchrittZustand
 import de.teutonstudio.zentralbank.domain.zug.ZugAutomat
 import de.teutonstudio.zentralbank.domain.zug.ZugStatus
@@ -17,6 +19,7 @@ import de.teutonstudio.zentralbank.domain.zug.ZugStatus
 object Reducer {
     fun reduce(state: GameState, event: GameEvent): Result<GameState> {
         return runCatching {
+            state.pruefeZugGate(event)
             when (event) {
                 is GameEvent.RohstoffEinnahme -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = 1)
                 is GameEvent.RohstoffAusgabe -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = -1)
@@ -34,6 +37,59 @@ object Reducer {
             }
         }
     }
+}
+
+private fun GameState.pruefeZugGate(event: GameEvent) {
+    val zug = zugStatus ?: return
+    val schritt = event.schrittTyp() ?: return
+    val info = ZugAutomat.schritte(this).first { it.typ == schritt }
+    require(info.zustand == SchrittZustand.VERFUEGBAR) {
+        info.begruendung ?: "Schritt $schritt ist nicht verfuegbar."
+    }
+    event.primaererSpieler()?.let { spieler ->
+        require(spieler == zug.spieler) {
+            "Nur der aktive Spieler ${zug.spieler.wert} darf diesen Schritt ausfuehren."
+        }
+    }
+}
+
+private fun GameEvent.schrittTyp(): SchrittTyp? = when (this) {
+    is GameEvent.RohstoffEinnahme -> SchrittTyp.ROHSTOFF_EINNAHMEN
+    is GameEvent.RohstoffAusgabe -> SchrittTyp.ROHSTOFF_AUSGABEN
+    is GameEvent.Transaktion -> when (grund) {
+        TransaktionsGrund.ROHSTOFFHANDEL -> SchrittTyp.ROHSTOFF_HANDEL
+        TransaktionsGrund.ANLEIHENHANDEL -> SchrittTyp.ANLEIHEN_HANDEL
+        else -> SchrittTyp.FINANZ_AUSGABEN
+    }
+    is GameEvent.AnleiheGekauft -> SchrittTyp.ANLEIHEN_HANDEL
+    is GameEvent.AnleiheVerkauft -> SchrittTyp.ANLEIHEN_HANDEL
+    is GameEvent.AnleiheFaellig -> SchrittTyp.ANLEIHEN_HANDEL
+    is GameEvent.RohstoffHandel -> SchrittTyp.ROHSTOFF_HANDEL
+    is GameEvent.Expansion -> SchrittTyp.EXPANSION
+    is GameEvent.KriegErklaert -> SchrittTyp.KRIEG
+    is GameEvent.KriegBeendet -> SchrittTyp.KRIEG
+    is GameEvent.SchrittAbgeschlossen,
+    is GameEvent.PhaseAbgeschlossen,
+    GameEvent.ZugBeendet -> null
+}
+
+private fun GameEvent.primaererSpieler(): SpielerId? = when (this) {
+    is GameEvent.RohstoffEinnahme -> spieler
+    is GameEvent.RohstoffAusgabe -> spieler
+    is GameEvent.Transaktion -> when (von) {
+        is KontoId.Spieler -> von.id
+        KontoId.Bank -> (an as? KontoId.Spieler)?.id
+    }
+    is GameEvent.AnleiheGekauft -> kaeufer
+    is GameEvent.AnleiheVerkauft -> verkaeufer
+    is GameEvent.RohstoffHandel -> kaeufer
+    is GameEvent.Expansion -> spieler
+    is GameEvent.KriegErklaert -> aggressor
+    is GameEvent.KriegBeendet -> spielerA
+    is GameEvent.AnleiheFaellig,
+    is GameEvent.SchrittAbgeschlossen,
+    is GameEvent.PhaseAbgeschlossen,
+    GameEvent.ZugBeendet -> null
 }
 
 private fun GameState.schrittAbschliessen(event: GameEvent.SchrittAbgeschlossen): GameState {

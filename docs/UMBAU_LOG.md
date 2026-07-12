@@ -62,7 +62,9 @@ Offene Punkte:
 - `ZugAutomat.schritte`, `kannPhaseAbschliessen`, `kannZugBeenden` und Phasenübergang ergänzt.
 - Reducer verarbeitet `SchrittAbgeschlossen`, `PhaseAbgeschlossen` und `ZugBeendet`.
 - Tests verankern verfügbare/gesperrte Schritte, Pflichtschritt-Gates und Spielerwechsel beim Zugende.
+- Fachliche Events werden gegen `ZugAutomat.schritte()` gegated und bei phasenfremder Nutzung abgelehnt.
+- Reducer prüft fuer gegatete Events den aktiven Spieler anhand des primaeren Event-Spielers.
 
 Offene Punkte:
 
-- Fachliche Events werden als nächster Schritt gegen `ZugAutomat.schritte()` gegated.
+- Situativ entfallende Pflichtschritte sind noch nicht modelliert; Regelfrage steht in `unklarheiten.md`.
