@@ -91,6 +91,7 @@ Offene Punkte:
 - `GameViewModel.onEvent(GameEvent)` als zentrale Domain-Event-Einstiegsstelle ergänzt.
 - Erfolgreiche Domain-Events aktualisieren `domainState`; abgelehnte Events werden über `domainFehler` als `SharedFlow<String>` gemeldet.
 - `Navigation` sammelt `domainFehler` und zeigt Reducer-/Domain-Fehler über einen globalen Material-`SnackbarHost`.
+- Das Spielmenü liest den aktuellen Spieler und die Phase aus `domainState` und zeigt sie im bestehenden unteren Textfeld an.
 - Bestehende `aktuellesSpiel`-UI bleibt unverändert lauffähig, während Screens schrittweise auf `domainState` und Events umgehängt werden.
 
 Offene Punkte:
