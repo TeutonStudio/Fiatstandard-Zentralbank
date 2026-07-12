@@ -70,6 +70,7 @@ data class Anleihe(
 data class GameState(
     val spieler: List<Spieler>,
     val bankkonto: Geld = Geld.NULL,
+    val bankAnleihen: List<AnleiheId> = emptyList(),
     val warenkorb: Map<Rohstoff, Int> = emptyMap(),
     val anleihen: Map<AnleiheId, Anleihe> = emptyMap(),
     val marktpreise: Map<Rohstoff, Geld> = emptyMap(),

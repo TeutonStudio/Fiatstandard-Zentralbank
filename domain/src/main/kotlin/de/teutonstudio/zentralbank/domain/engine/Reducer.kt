@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.domain.engine
 
+import de.teutonstudio.zentralbank.domain.AnleiheId
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.Geld
 import de.teutonstudio.zentralbank.domain.KontoId
@@ -16,9 +17,9 @@ object Reducer {
                 is GameEvent.RohstoffAusgabe -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = -1)
                 is GameEvent.Transaktion -> state.bucheTransaktion(event.von, event.an, event.betrag)
                 is GameEvent.RohstoffHandel -> state.bucheRohstoffHandel(event)
-                is GameEvent.AnleiheGekauft,
-                is GameEvent.AnleiheVerkauft,
-                is GameEvent.AnleiheFaellig,
+                is GameEvent.AnleiheGekauft -> state.bucheAnleiheGekauft(event)
+                is GameEvent.AnleiheVerkauft -> state.bucheAnleiheVerkauft(event)
+                is GameEvent.AnleiheFaellig -> state.bucheAnleiheFaellig(event)
                 is GameEvent.Expansion,
                 is GameEvent.KriegErklaert,
                 is GameEvent.KriegBeendet,
@@ -28,6 +29,50 @@ object Reducer {
             }
         }
     }
+}
+
+private fun GameState.bucheAnleiheGekauft(event: GameEvent.AnleiheGekauft): GameState {
+    require(event.preis > Geld.NULL) { "Anleihepreis muss positiv sein." }
+    require(event.anleihe in anleihen.keys) { "Unbekannte Anleihe: ${event.anleihe.wert}" }
+
+    return bucheTransaktion(
+        von = KontoId.Spieler(event.kaeufer),
+        an = event.verkaeufer,
+        betrag = event.preis,
+    ).verschiebeAnleihe(
+        anleihe = event.anleihe,
+        von = event.verkaeufer,
+        an = KontoId.Spieler(event.kaeufer),
+    )
+}
+
+private fun GameState.bucheAnleiheVerkauft(event: GameEvent.AnleiheVerkauft): GameState {
+    require(event.preis > Geld.NULL) { "Anleihepreis muss positiv sein." }
+    require(event.anleihe in anleihen.keys) { "Unbekannte Anleihe: ${event.anleihe.wert}" }
+
+    return bucheTransaktion(
+        von = event.kaeufer,
+        an = KontoId.Spieler(event.verkaeufer),
+        betrag = event.preis,
+    ).verschiebeAnleihe(
+        anleihe = event.anleihe,
+        von = KontoId.Spieler(event.verkaeufer),
+        an = event.kaeufer,
+    )
+}
+
+private fun GameState.bucheAnleiheFaellig(event: GameEvent.AnleiheFaellig): GameState {
+    val anleihe = anleihen[event.anleihe]
+        ?: error("Unbekannte Anleihe: ${event.anleihe.wert}")
+    val besitzer = anleiheBesitzer(event.anleihe)
+        ?: error("Anleihe ${event.anleihe.wert} hat keinen Besitzer.")
+
+    return bucheTransaktion(
+        von = KontoId.Spieler(anleihe.emittent),
+        an = besitzer,
+        betrag = anleihe.nennwert,
+    ).entferneAnleihe(event.anleihe)
+        .let { state -> state.copy(anleihen = state.anleihen - event.anleihe) }
 }
 
 private fun GameState.bucheRohstoffHandel(event: GameEvent.RohstoffHandel): GameState {
@@ -73,6 +118,61 @@ private fun GameState.bucheRohstoffe(
             }
         }
         alt.copy(rohstoffe = neu.toMap())
+    }
+}
+
+private fun GameState.verschiebeAnleihe(
+    anleihe: AnleiheId,
+    von: KontoId,
+    an: KontoId,
+): GameState {
+    require(von != an) { "Anleihe-Sender und Empfaenger muessen verschieden sein." }
+    val ohne = entferneAnleiheVonKonto(anleihe, von)
+    return ohne.fuegeAnleiheZuKonto(anleihe, an)
+}
+
+private fun GameState.anleiheBesitzer(
+    anleihe: AnleiheId,
+): KontoId? {
+    if (anleihe in bankAnleihen) return KontoId.Bank
+    return spieler.firstOrNull { anleihe in it.anleihen }?.let { KontoId.Spieler(it.id) }
+}
+
+private fun GameState.entferneAnleihe(
+    anleihe: AnleiheId,
+): GameState {
+    return copy(
+        bankAnleihen = bankAnleihen - anleihe,
+        spieler = spieler.map { spieler -> spieler.copy(anleihen = spieler.anleihen - anleihe) },
+    )
+}
+
+private fun GameState.entferneAnleiheVonKonto(
+    anleihe: AnleiheId,
+    konto: KontoId,
+): GameState {
+    return when (konto) {
+        KontoId.Bank -> {
+            require(anleihe in bankAnleihen) { "Bank besitzt Anleihe ${anleihe.wert} nicht." }
+            copy(bankAnleihen = bankAnleihen - anleihe)
+        }
+        is KontoId.Spieler -> updateSpieler(konto.id) { spieler ->
+            require(anleihe in spieler.anleihen) { "${spieler.name} besitzt Anleihe ${anleihe.wert} nicht." }
+            spieler.copy(anleihen = spieler.anleihen - anleihe)
+        }
+    }
+}
+
+private fun GameState.fuegeAnleiheZuKonto(
+    anleihe: AnleiheId,
+    konto: KontoId,
+): GameState {
+    require(anleiheBesitzer(anleihe) == null) { "Anleihe ${anleihe.wert} hat bereits einen Besitzer." }
+    return when (konto) {
+        KontoId.Bank -> copy(bankAnleihen = bankAnleihen + anleihe)
+        is KontoId.Spieler -> updateSpieler(konto.id) { spieler ->
+            spieler.copy(anleihen = spieler.anleihen + anleihe)
+        }
     }
 }
 

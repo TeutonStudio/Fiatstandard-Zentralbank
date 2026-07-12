@@ -22,6 +22,7 @@ class GameStateSerializationTest {
                 ),
             ),
             bankkonto = Geld.mark(100),
+            bankAnleihen = emptyList(),
             warenkorb = mapOf(Rohstoff.HOLZ to 3),
             anleihen = mapOf(
                 anleiheId to Anleihe(

@@ -43,8 +43,11 @@ Offene Punkte:
 - Reducer lehnt negative Rohstoffbestände, Unterdeckung und nicht-positive Beträge/Mengen ab.
 - Summenneutralität von `Transaktion` und `RohstoffHandel` durch Tests verankert.
 - `GameEngine` mit Event-Log, `apply`, `undo` und `redo` ergänzt.
+- `GameState` um `bankAnleihen` erweitert, damit Anleihenbesitz bei Bank/Nicht-Spieler-Konten abbildbar ist.
+- Reducer-Logik für `AnleiheGekauft`, `AnleiheVerkauft` und `AnleiheFaellig` ergänzt.
+- Tests verankern summenneutralen Anleihenverkauf und Entfernung fälliger Anleihen aus Portfolios und offenem Bestand.
 
 Offene Punkte:
 
-- Anleihe-, Expansion-, Krieg- und Zugphasen-Events sind definiert, aber noch nicht reducer-seitig implementiert.
+- Expansion-, Krieg- und Zugphasen-Events sind definiert, aber noch nicht reducer-seitig implementiert.
 - Aktive-Spieler-/Phasenprüfung folgt mit dem Zustandsautomaten in Etappe 3.

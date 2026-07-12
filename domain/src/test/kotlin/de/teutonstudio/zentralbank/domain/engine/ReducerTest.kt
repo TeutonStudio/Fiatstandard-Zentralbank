@@ -6,6 +6,8 @@ import de.teutonstudio.zentralbank.domain.KontoId
 import de.teutonstudio.zentralbank.domain.Rohstoff
 import de.teutonstudio.zentralbank.domain.Spieler
 import de.teutonstudio.zentralbank.domain.SpielerId
+import de.teutonstudio.zentralbank.domain.Anleihe
+import de.teutonstudio.zentralbank.domain.AnleiheId
 import de.teutonstudio.zentralbank.domain.events.GameEvent
 import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
 import org.junit.Assert.assertEquals
@@ -15,6 +17,7 @@ import org.junit.Test
 class ReducerTest {
     private val annaId = SpielerId("Anna")
     private val berndId = SpielerId("Bernd")
+    private val anleiheId = AnleiheId("anna-1")
 
     private fun startState(): GameState = GameState(
         spieler = listOf(
@@ -23,6 +26,7 @@ class ReducerTest {
                 name = "Anna",
                 rohstoffe = mapOf(Rohstoff.HOLZ to 2),
                 geldkonto = Geld.mark(10),
+                anleihen = listOf(anleiheId),
             ),
             Spieler(
                 id = berndId,
@@ -32,6 +36,15 @@ class ReducerTest {
             ),
         ),
         bankkonto = Geld.mark(100),
+        anleihen = mapOf(
+            anleiheId to Anleihe(
+                id = anleiheId,
+                emittent = annaId,
+                nennwert = Geld.mark(8),
+                zinsBasispunkte = 500,
+                laufzeitRunden = 4,
+            ),
+        ),
     )
 
     @Test
@@ -106,5 +119,49 @@ class ReducerTest {
         assertEquals(1, state.spieler.first { it.id == berndId }.rohstoffe[Rohstoff.HOLZ])
         assertEquals(Geld.mark(12), state.spieler.first { it.id == annaId }.geldkonto)
         assertEquals(Geld.mark(3), state.spieler.first { it.id == berndId }.geldkonto)
+    }
+
+    @Test
+    fun anleiheVerkauftVerschiebtAnleiheUndGeldSummenneutral() {
+        val start = startState()
+        val state = Reducer.reduce(
+            start,
+            GameEvent.AnleiheVerkauft(
+                anleihe = anleiheId,
+                verkaeufer = annaId,
+                kaeufer = KontoId.Spieler(berndId),
+                preis = Geld.mark(4),
+            ),
+        ).getOrThrow()
+
+        assertEquals(start.geldsumme(), state.geldsumme())
+        assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
+        assertTrue(anleiheId in state.spieler.first { it.id == berndId }.anleihen)
+        assertEquals(Geld.mark(14), state.spieler.first { it.id == annaId }.geldkonto)
+        assertEquals(Geld.mark(1), state.spieler.first { it.id == berndId }.geldkonto)
+    }
+
+    @Test
+    fun anleiheFaelligZahltNennwertUndEntferntAnleihe() {
+        val start = startState().copy(
+            spieler = startState().spieler.map { spieler ->
+                when (spieler.id) {
+                    annaId -> spieler.copy(anleihen = emptyList())
+                    berndId -> spieler.copy(anleihen = listOf(anleiheId))
+                    else -> spieler
+                }
+            },
+        )
+        val state = Reducer.reduce(
+            start,
+            GameEvent.AnleiheFaellig(anleiheId),
+        ).getOrThrow()
+
+        assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
+        assertTrue(anleiheId !in state.spieler.first { it.id == berndId }.anleihen)
+        assertEquals(start.geldsumme(), state.geldsumme())
+        assertEquals(Geld.mark(2), state.spieler.first { it.id == annaId }.geldkonto)
+        assertEquals(Geld.mark(13), state.spieler.first { it.id == berndId }.geldkonto)
+        assertEquals(0, state.anleihen.values.count { it.id == anleiheId })
     }
 }

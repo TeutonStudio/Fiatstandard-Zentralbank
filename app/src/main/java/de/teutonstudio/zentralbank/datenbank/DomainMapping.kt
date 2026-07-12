@@ -64,6 +64,7 @@ fun Spiel.zuDomainGameState(): GameState {
     val anleihenNachBesitzer = anleihen
         .groupBy { it.aktuellerBesitzer.name }
         .mapValues { (_, werte) -> werte.mapNotNull { anleiheIds[it] } }
+    val spielerNamen = spielerIds.keys.map { it.name }.toSet()
 
     return GameState(
         spieler = spielerListe.map { spieler ->
@@ -78,6 +79,10 @@ fun Spiel.zuDomainGameState(): GameState {
             )
         },
         bankkonto = Geld.NULL,
+        bankAnleihen = anleihenNachBesitzer
+            .filterKeys { besitzer -> besitzer !in spielerNamen }
+            .values
+            .flatten(),
         warenkorb = warenkorb
             .mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
             .filterValues { it != 0 },
