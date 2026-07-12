@@ -31,3 +31,20 @@ Offene Punkte:
 
 - Bestehende App-Modelle verwenden noch `Zahlungsmittel`; die Migration auf `Geld` erfolgt schrittweise.
 - Bestehende App-UI nutzt weiterhin `Rohstoffe` mit Compose-`Color`; die Domain nutzt bereits Android-freie `Rohstoff`- und `BauteilTyp`-Typen.
+
+## Etappe 2 - Events, Reducer und Engine
+
+- `GameEvent` als serialisierbares sealed Interface angelegt, inklusive Rohstoffbuchungen, Geldtransaktion, Rohstoffhandel, Anleihe-, Expansion-, Kriegs- und Zugereignissen.
+- Erste Reducer-Scheibe implementiert:
+  - `RohstoffEinnahme`
+  - `RohstoffAusgabe`
+  - `Transaktion`
+  - `RohstoffHandel`
+- Reducer lehnt negative Rohstoffbestände, Unterdeckung und nicht-positive Beträge/Mengen ab.
+- Summenneutralität von `Transaktion` und `RohstoffHandel` durch Tests verankert.
+- `GameEngine` mit Event-Log, `apply`, `undo` und `redo` ergänzt.
+
+Offene Punkte:
+
+- Anleihe-, Expansion-, Krieg- und Zugphasen-Events sind definiert, aber noch nicht reducer-seitig implementiert.
+- Aktive-Spieler-/Phasenprüfung folgt mit dem Zustandsautomaten in Etappe 3.
