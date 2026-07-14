@@ -525,17 +525,12 @@ fun zeigeSpielerDaten(
         ) {
             VerticalGrid(
                 columns = SimpleGridCells.Fixed(2),
-                modifier = Modifier
-                    .padding(5.dp)
-                    .width(280.dp)
+                modifier = Modifier.padding(5.dp).width(280.dp)
             ) {
                 Text(
                     text = siedlerName,
                     fontSize = 20.sp,
-                    modifier = Modifier
-                        .span(2)
-                        .padding(5.dp)
-                        .offset((-25).dp, 0.dp),
+                    modifier = Modifier.span(2).padding(5.dp).offset((-25).dp, 0.dp),
                     textAlign = TextAlign.Center
                 )
 
@@ -587,7 +582,7 @@ fun zeigeSpielerDaten(
                         )
                     } else {
                         belegteBauteile.take(5).forEach { (bauteil, anzahl) ->
-                            RightText(text = "$bauteil: ")
+                            RightText(text = "${bauteil.str}: ")
                             LeftText(text = "$anzahl stk")
                         }
 
