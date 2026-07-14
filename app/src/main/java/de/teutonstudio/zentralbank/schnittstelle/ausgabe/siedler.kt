@@ -612,7 +612,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
     var geschaeftspartnerFilter by remember(ablauf) { mutableStateOf<String?>(null) }
     var rohstoffFilter by remember(ablauf) { mutableStateOf<String?>(null) }
     var minRundeEingabe by remember(ablauf) {
-        mutableStateOf(ablauf.minOfOrNull { eintrag -> eintrag.runde }?.toString() ?: "0")
+        mutableStateOf("0")
     }
     var geschaeftspartnerMenueOffen by remember { mutableStateOf(false) }
     var rohstoffMenueOffen by remember { mutableStateOf(false) }
@@ -628,8 +628,10 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
             eintrag.geschaeftspartner == geschaeftspartnerFilter) &&
             (rohstoffFilter == null || eintrag.rohstoffOderVorgang == rohstoffFilter)
     }
-    val gefilterterAblauf = nachSachfilter.filter { eintrag -> eintrag.runde >= minRunde }
-    val maximaleRunde = ablauf.maxOfOrNull { eintrag -> eintrag.runde }
+    val gefilterterAblauf = nachSachfilter.filter { eintrag ->
+        if (minRunde == 0) eintrag.runde >= 0 else eintrag.runde > minRunde
+    }
+    val maximaleRunde = nachSachfilter.maxOfOrNull { eintrag -> eintrag.runde }
     val minRundenSaldo = nachSachfilter
         .filter { eintrag -> eintrag.runde <= minRunde }
         .fold(Zahlungsmittel()) { summe, eintrag -> summe + eintrag.preis }
@@ -637,11 +639,21 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
         .groupBy { eintrag -> eintrag.runde }
         .toMutableMap()
         .apply {
-            if (maximaleRunde != null && minRunde <= maximaleRunde) {
+            if (minRunde > 0 && maximaleRunde != null && minRunde <= maximaleRunde) {
                 putIfAbsent(minRunde, emptyList())
             }
         }
         .toSortedMap(reverseOrder())
+    val sichtbareRunden = rundenGruppen.keys
+    val alleRundenEingeklappt = sichtbareRunden.isNotEmpty() &&
+        sichtbareRunden.all(eingeklappteRunden::contains)
+    val beiRundenKlick = {
+        eingeklappteRunden = if (alleRundenEingeklappt) {
+            emptySet()
+        } else {
+            sichtbareRunden.toSet()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -686,15 +698,8 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
             )
             rundenGruppen.forEach { (runde, zeilen) ->
                     val istEingeklappt = runde in eingeklappteRunden
-                    val beiRundenKlick = {
-                        eingeklappteRunden = if (istEingeklappt) {
-                            eingeklappteRunden - runde
-                        } else {
-                            eingeklappteRunden + runde
-                        }
-                    }
                     if (istEingeklappt) {
-                        val saldo = if (runde == minRunde) {
+                        val saldo = if (minRunde > 0 && runde == minRunde) {
                             minRundenSaldo
                         } else {
                             zeilen.fold(Zahlungsmittel()) { summe, zeile -> summe + zeile.preis }
@@ -709,7 +714,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                             istKompakt = true,
                         )
                     } else {
-                        if (runde == minRunde) {
+                        if (minRunde > 0 && runde == minRunde) {
                             SpielerAblaufTabellenzeile(
                                 runde = runde.toString(),
                                 geschaeftspartner = "kumulativ",

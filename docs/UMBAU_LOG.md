@@ -115,7 +115,7 @@ Offene Punkte:
 - Der Anleihenablauf verwendet die Spalten Runde, Zahlungsempfänger und Betrag. Bei Emissionen erhält der Herausgeber das Geld, bei Handel der bisherige Halter und bei Zins/Rückzahlung der in der jeweiligen Runde aktuelle Halter.
 - Der Spielerablauf zeigt Rohstoffhandel mit Runde, Geschäftspartner, Rohstoff einschließlich Anzahl und vorzeichenbehaftetem Preis.
 - Anleihekäufe, Anleiheverkäufe und erhaltene Zinszahlungen erscheinen als eigene Ablaufzeilen.
-- Ein Tipp auf eine Rundenzelle klappt ausschließlich die Zeilen dieser Runde ein oder aus; die Gruppenzeile bleibt zum erneuten Aufklappen sichtbar.
+- Ein Tipp auf eine Rundenzelle klappt alle sichtbaren Runden gemeinsam ein oder wieder aus; die kompakten Gruppenzeilen bleiben zum Aufklappen sichtbar.
 - In der globalen Schuldenansicht ersetzt die kumulierte Kurve `Zinsgewinne` die globalen Zinsschulden. Sie zählt nur Zinszahlungen an die Geschäftsbank; Zahlungen an andere Spieler sind kein Bankgewinn.
 
 ## Zugausgaben und Anleihenhandel
@@ -131,9 +131,11 @@ Offene Punkte:
 - Anleihen- und Spielerabläufe ersetzen nicht mehr die zweite Cardseite, sondern öffnen in einem eigenen scrollbaren Dialog mit Schließen-„×“ rechts oben. Die Cards zeigen dauerhaft ihre normale Vorderseite.
 - Der Spielerablauf ist absteigend nach Runde sortiert und auf Runde, Geschäftspartner, Rohstoff/Vorgang sowie Preis verdichtet. Partner und Rohstoff/Vorgang sind über die Kopfzeile filterbar, Rohstoffmengen stehen direkt beim Rohstoff und eingeklappte Runden zeigen ihren gefilterten Saldo.
 - Der Anleihenablauf verwendet ebenfalls ein schmaleres Dialogfenster und zeigt zukünftige Runden zuerst. Ein Schalter wechselt die Empfängerspalte zum Buchungssatz „Zahlungspflichtiger an Zahlungsempfänger“; der Ablauf enthält stets alle geplanten Zahlungen bis zur Tilgung.
-- Eingeklappte Ablaufzeilen sind kompakter. Der Spielerablauf besitzt `minRunde`; die Startzeile zeigt den kumulierten Saldo zum Ende dieser Runde, eine Untergrenze oberhalb aller Daten lässt die Tabelle leer.
+- Eingeklappte Ablaufzeilen sind kompakter. `minRunde` startet mit 0 und zeigt dann keine Saldozeile. Bei einer positiven Untergrenze ersetzt genau eine kumulierte Saldozeile die Einzelbuchungen dieser Runde; eine Untergrenze oberhalb aller Daten lässt die Tabelle leer.
 - Eine Anleihelaufzeit umfasst die Zinsrunden nach der Emission; die Tilgung folgt in einer eigenen Runde. Bernds in Runde 2 emittierte Fünf-Runden-Anleihe wird deshalb in Runde 8 getilgt. Handel nach der Fälligkeit wird abgelehnt.
 - Der Handelsdialog verwendet eine kategorisierte Handelsgut-Auswahl für Rohstoffe und die vom gewählten Verkäufer gehaltenen, noch handelbaren Anleihen. Letzter Marktpreis und relative Vertragsabweichung werden mit Vorzeichenfarbe angezeigt.
 - Der Anleihedialog zeigt den aus Zinsbetrag und Nennwert berechneten Prozentzins sowie die relative Abweichung zum Leitzins; positive, negative und neutrale Abweichungen erscheinen grün, rot beziehungsweise grau.
-- Der Marktplatz ergänzt die Graph-Tabs `Handelsdifferenz` und `Preisinflationswarenkorb`. Die Handelsdifferenz zeigt je auswählbarem Rohstoff die kumulierte Stückdifferenz eines exklusiv gewählten Spielers. Der bei Spielbeginn festgelegte Preisinflationswarenkorb bleibt von späteren Änderungen des normalen Warenkorbs unberührt.
-- Die Bauwerk-Legende ist in Land, Ecken und Linien gegliedert. Unter der Rundenauswahl zeigen kompakte Spielerkarten den aktiven Spieler und die verbleibenden Züge bis zur nächsten Marktpreisberechnung.
+- Der Marktplatz ergänzt den Graph-Tab `Handelsdifferenz`. Er zeigt je auswählbarem Rohstoff die kumulierte Stückdifferenz eines exklusiv gewählten Spielers als vertikale Balken; auch die übrigen Stückdiagramme verwenden Balken statt Kurven.
+- Der bei Spielbeginn festgelegte Preisinflationswarenkorb bleibt von späteren Änderungen des normalen Warenkorbs unberührt und erscheint als zweite Kurve im bestehenden Warenkorb-Graphen.
+- Die Bauwerk-Legende ist in Land, Ecken und Linien gegliedert. In der Spielmenü-Karte mit Runde und Leitzins zeigen kompakte Spielerkarten den aktiven Spieler und die verbleibenden Züge bis zur nächsten Marktpreisberechnung.
+- Spielgebundene Navigationsziele prüfen den geladenen Spielzustand. Stellt Android nach einem Prozessneustart eine Spielroute ohne initialisiertes Spiel wieder her, führt die Navigation sicher ins Hauptmenü zurück, statt auf ein uninitialisiertes `lateinit`-Feld zuzugreifen.

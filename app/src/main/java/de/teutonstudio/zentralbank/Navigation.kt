@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
+import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.domain.zug.Phase
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AusgabenDialog
@@ -33,6 +34,25 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
 
 private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
+
+@Composable
+private fun MitAktuellemSpiel(
+    viewModel: GameViewModel,
+    navController: NavHostController,
+    inhalt: @Composable (Spiel) -> Unit,
+) {
+    val spiel = viewModel.aktuellesSpielOderNull
+    if (spiel == null) {
+        LaunchedEffect(navController) {
+            navController.navigate(Screen.StartScreen.route) {
+                popUpTo(Screen.StartScreen.route) { inclusive = false }
+                launchSingleTop = true
+            }
+        }
+    } else {
+        inhalt(spiel)
+    }
+}
 
 sealed class Screen(val route: String) {
     object StartScreen: Screen(route = "main_screen")
@@ -94,110 +114,124 @@ fun Navigation(viewModel: GameViewModel) {
             }
 
         composable(route = Screen.Game.route) {
-            val domainUiState = viewModel.domainUiState.collectAsState().value
-            val domainState = viewModel.domainState.collectAsState().value
-            Spielmenü(
-                { navController.navigate(route = Screen.PlayerSaldo.route) },
-                { navController.navigate(route = Screen.DebtSaldo.route) },
-                { navController.navigate(route = Screen.MarketSaldo.route) },
-                { navController.navigate(route = Screen.ForeignSaldo.route) },
-                { navController.navigate(route = Screen.NewTrade.route) },
-                { navController.navigate(route = Screen.NewCredit.route) },
-                viewModel::naechsterZugabschnitt,
-                zugText = domainUiState?.zug?.text ?: "Kein Zug aktiv",
-            )
-            val zugStatus = domainState?.zugStatus
-            if (zugStatus?.phase == Phase.Ausgaben) {
-                AusgabenDialog(
-                    plan = viewModel.aktuellesSpiel.erhalteAusgabenplan(
-                        spielerName = zugStatus.spieler.wert,
-                        runde = domainState.rundenzähler,
-                    ),
-                    onClose = viewModel::naechsterZugabschnitt,
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                val domainUiState = viewModel.domainUiState.collectAsState().value
+                val domainState = viewModel.domainState.collectAsState().value
+                Spielmenü(
+                    { navController.navigate(route = Screen.PlayerSaldo.route) },
+                    { navController.navigate(route = Screen.DebtSaldo.route) },
+                    { navController.navigate(route = Screen.MarketSaldo.route) },
+                    { navController.navigate(route = Screen.ForeignSaldo.route) },
+                    { navController.navigate(route = Screen.NewTrade.route) },
+                    { navController.navigate(route = Screen.NewCredit.route) },
+                    viewModel::naechsterZugabschnitt,
+                    spiel = spiel,
+                    aktiverSpielerName = domainState?.zugStatus?.spieler?.wert,
+                    zugText = domainUiState?.zug?.text ?: "Kein Zug aktiv",
                 )
+                val zugStatus = domainState?.zugStatus
+                if (zugStatus?.phase == Phase.Ausgaben) {
+                    AusgabenDialog(
+                        plan = spiel.erhalteAusgabenplan(
+                            spielerName = zugStatus.spieler.wert,
+                            runde = domainState.rundenzähler,
+                        ),
+                        onClose = viewModel::naechsterZugabschnitt,
+                    )
+                }
             }
         }
 
         var ausgewähltesBauwerk: Bauteil
         composable(route = Screen.PlayerSaldo.route) { // TODO
-            Titel(Screen.Game.navigiere(navController)) {
-                zeigeSpieler(viewModel.aktuellesSpiel, {
-                    navController.navigate(route = "new_build")
-                    ausgewähltesBauwerk = it
-                }, { spieler, bauteil, wahr ->
-                }, { (aggressor,verteidiger) ->
-                    viewModel.declareWar(aggressor,verteidiger)
-                }, { (aggressor,verteidiger) ->
-                    if (aggressor.second >= verteidiger.second) { // Sieg
-                        viewModel.declareMilitary(aggressor.first,aggressor.second)
-                    } else { // Niederlage
-                        viewModel.declareMilitary(verteidiger.first,verteidiger.second)
-                    }
-                }, { (aggressor,verteidiger) ->
-                    viewModel.declarePeace(aggressor,verteidiger)
-                } )
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                Titel(Screen.Game.navigiere(navController)) {
+                    zeigeSpieler(spiel, {
+                        navController.navigate(route = "new_build")
+                        ausgewähltesBauwerk = it
+                    }, { spieler, bauteil, wahr ->
+                    }, { (aggressor,verteidiger) ->
+                        viewModel.declareWar(aggressor,verteidiger)
+                    }, { (aggressor,verteidiger) ->
+                        if (aggressor.second >= verteidiger.second) { // Sieg
+                            viewModel.declareMilitary(aggressor.first,aggressor.second)
+                        } else { // Niederlage
+                            viewModel.declareMilitary(verteidiger.first,verteidiger.second)
+                        }
+                    }, { (aggressor,verteidiger) ->
+                        viewModel.declarePeace(aggressor,verteidiger)
+                    } )
+                }
             }
         }
 
         composable(route = Screen.DebtSaldo.route) { // TODO
-            val domainState = viewModel.domainState.collectAsState().value
-            Titel(Screen.Game.navigiere(navController)) {
-                AnleihenRegister(
-                    spiel = viewModel.aktuellesSpiel,
-                    spielerBauSaldo = emptyMap(),
-                    runden = emptyList(),
-                    onDelete = {},
-                    onNew = {},
-                    aktiverSpielerName = domainState?.zugStatus?.spieler?.wert,
-                )
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                Titel(Screen.Game.navigiere(navController)) {
+                    AnleihenRegister(
+                        spiel = spiel,
+                        spielerBauSaldo = emptyMap(),
+                        runden = emptyList(),
+                        onDelete = {},
+                        onNew = {},
+                    )
+                }
             }
         }
 
         composable(route = Screen.MarketSaldo.route) {
-            Titel(Screen.Game.navigiere(navController)) {
-                zeigeMarktplatz(
-                    spiel = viewModel.aktuellesSpiel,
-                    onWarenkorbAendern = viewModel::aktualisiereWarenkorb,
-                )
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                Titel(Screen.Game.navigiere(navController)) {
+                    zeigeMarktplatz(
+                        spiel = spiel,
+                        onWarenkorbAendern = viewModel::aktualisiereWarenkorb,
+                    )
+                }
             }
         }
 
         composable(route = Screen.ForeignSaldo.route) {
-            Titel(Screen.Game.navigiere(navController)) {
-                zeigeAussenhandel(viewModel.aktuellesSpiel)
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                Titel(Screen.Game.navigiere(navController)) {
+                    zeigeAussenhandel(spiel)
+                }
             }
         }
 
         composable(route = Screen.NewTrade.route) {
-            HandelDialog(
-                spiel = viewModel.aktuellesSpiel,
-                onDismiss = { navController.popBackStack() },
-                onCreateRohstoff = { handel ->
-                    if (viewModel.erfasseRohstoffhandel(handel)) {
-                        navController.popBackStack()
-                    }
-                },
-                onCreateAnleihe = { handel ->
-                    if (viewModel.erfasseAnleihenhandel(handel)) {
-                        navController.popBackStack()
-                    }
-                },
-            )
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                HandelDialog(
+                    spiel = spiel,
+                    onDismiss = { navController.popBackStack() },
+                    onCreateRohstoff = { handel ->
+                        if (viewModel.erfasseRohstoffhandel(handel)) {
+                            navController.popBackStack()
+                        }
+                    },
+                    onCreateAnleihe = { handel ->
+                        if (viewModel.erfasseAnleihenhandel(handel)) {
+                            navController.popBackStack()
+                        }
+                    },
+                )
+            }
         }
 
         composable(route = Screen.NewCredit.route) {
-            AnleiheDialog(
-                spiel = viewModel.aktuellesSpiel,
-                aktuellerSpielerName = viewModel.domainState.collectAsState().value
-                    ?.zugStatus?.spieler?.wert
-                    ?: viewModel.aktuellesSpiel.spielerStringListe.firstOrNull().orEmpty(),
-                onDismiss = { navController.popBackStack() },
-                onCreate = { handel ->
-                    if (viewModel.erfasseAnleihenhandel(handel)) {
-                        navController.popBackStack()
-                    }
-                },
-            )
+            MitAktuellemSpiel(viewModel, navController) { spiel ->
+                AnleiheDialog(
+                    spiel = spiel,
+                    aktuellerSpielerName = viewModel.domainState.collectAsState().value
+                        ?.zugStatus?.spieler?.wert
+                        ?: spiel.spielerStringListe.firstOrNull().orEmpty(),
+                    onDismiss = { navController.popBackStack() },
+                    onCreate = { handel ->
+                        if (viewModel.erfasseAnleihenhandel(handel)) {
+                            navController.popBackStack()
+                        }
+                    },
+                )
+            }
         }
 
         composable(route = Screen.NewBuild.route) {

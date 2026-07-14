@@ -60,6 +60,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
     lateinit var aktuellesSpiel: Spiel
+    val aktuellesSpielOderNull: Spiel?
+        get() = if (::aktuellesSpiel.isInitialized) aktuellesSpiel else null
 
     private fun setzeAktuellesSpiel(spiel: Spiel, daten: Pair<SpielDaten,List<SpeicherDaten>>) {
         aktuellesSpiel = spiel

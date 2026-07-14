@@ -2,16 +2,29 @@ package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import de.teutonstudio.zentralbank.R
+import de.teutonstudio.zentralbank.datenbank.Spiel
+import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.schnittstelle.GridByOrientation
-import de.teutonstudio.zentralbank.schnittstelle.TextCard
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.ImageCard
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
+import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 
 @OptIn(ExperimentalGridApi::class)
 @Composable
@@ -23,6 +36,8 @@ fun Spielmenü(
     beiHandel: () -> Unit,
     beiAnleihe: () -> Unit,
     beiNaechstemZugabschnitt: () -> Unit,
+    spiel: Spiel,
+    aktiverSpielerName: String?,
     zugText: String = "Kein Zug aktiv",
 ) {
     Titel(anleitung = remember { mutableStateOf(true) }) {
@@ -33,13 +48,79 @@ fun Spielmenü(
             3 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.foreign, beiKlick = beiAuslandSaldo)
             4 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.handel, beiKlick = beiHandel)
             5 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.anleihe, beiKlick = beiAnleihe)
-            6 -> TextCard(
-                zugText,
-                modifier(null),
-                fillMaxWidth = true,
+            6 -> ZugStatusKarte(
+                spiel = spiel,
+                aktiverSpielerName = aktiverSpielerName,
+                zugText = zugText,
+                modifier = modifier(null),
                 beiKlick = beiNaechstemZugabschnitt,
             )
         } }
+    }
+}
+
+@Composable
+private fun ZugStatusKarte(
+    spiel: Spiel,
+    aktiverSpielerName: String?,
+    zugText: String,
+    modifier: Modifier,
+    beiKlick: () -> Unit,
+) {
+    val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
+    val aktiverIndex = spiel.spielerListe.indexOfFirst { spieler ->
+        spieler.name == aktiverSpielerName
+    }
+    val verbleibendeZuege = if (aktiverIndex >= 0) {
+        spiel.spielerListe.size - aktiverIndex
+    } else {
+        spiel.spielerListe.size
+    }
+
+    Card(
+        modifier = modifier,
+        onClick = beiKlick,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = zugText,
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = 22.sp,
+                textAlign = TextAlign.Center,
+            )
+            if (spiel.spielerListe.isNotEmpty()) {
+                Text(
+                    text = "$verbleibendeZuege Züge bis zu den neu berechneten Marktpreisen",
+                    modifier = Modifier.padding(top = 5.dp),
+                    fontSize = 11.sp,
+                )
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    spiel.spielerListe.forEachIndexed { index, spieler ->
+                        val istAktiv = index == aktiverIndex
+                        Card(
+                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (istAktiv) {
+                                    spielerFarben.getValue(spieler)
+                                } else {
+                                    Color(0xFFE1E1E1)
+                                },
+                            ),
+                        ) {
+                            Text(
+                                text = spieler.name,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                                fontSize = if (istAktiv) 11.sp else 9.sp,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -49,6 +130,6 @@ fun Spielmenü(
 @Composable
 private fun SpielmenüPreview() {
     Column() {
-        Spielmenü({},{},{},{},{},{},{})
+        Spielmenü({},{},{},{},{},{},{}, TestSpiel, TestSpiel.spielerListe.first().name)
     }
 }

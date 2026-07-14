@@ -162,7 +162,6 @@ fun Header(
     selectedRelevance: String,
     selectedDuration: String,
     showManagementView: Boolean,
-    aktiverSpielerName: String?,
     onChosePlayer: (String) -> Unit,
     onChoseRound: (Int) -> Unit,
     onChoseRelevance: (String) -> Unit,
@@ -213,7 +212,6 @@ fun Header(
             selectedRelevance = selectedRelevance,
             selectedDuration = selectedDuration,
             showManagementView = showManagementView,
-            aktiverSpielerName = aktiverSpielerName,
             onChosePlayer = onChosePlayer,
             onChoseRound = onChoseRound,
             onChoseRelevance = onChoseRelevance,
@@ -594,7 +592,6 @@ private fun HeaderControls(
     selectedRelevance: String,
     selectedDuration: String,
     showManagementView: Boolean,
-    aktiverSpielerName: String?,
     onChosePlayer: (String) -> Unit,
     onChoseRound: (Int) -> Unit,
     onChoseRelevance: (String) -> Unit,
@@ -661,54 +658,6 @@ private fun HeaderControls(
             }
         }
         }
-        ZugFortschrittZeile(
-            spiel = spiel,
-            aktiverSpielerName = aktiverSpielerName,
-        )
-    }
-}
-
-@Composable
-private fun ZugFortschrittZeile(
-    spiel: Spiel,
-    aktiverSpielerName: String?,
-) {
-    val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
-    val aktiverIndex = spiel.spielerListe.indexOfFirst { spieler ->
-        spieler.name == aktiverSpielerName
-    }.takeIf { index -> index >= 0 } ?: 0
-    val verbleibendeZuege = (spiel.spielerListe.size - aktiverIndex).coerceAtLeast(0)
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = "$verbleibendeZuege Züge bis zu den neu berechneten Marktpreisen",
-            fontSize = 11.sp,
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            spiel.spielerListe.forEachIndexed { index, spieler ->
-                val istAktiv = index == aktiverIndex
-                Card(
-                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (istAktiv) {
-                            spielerFarben.getValue(spieler)
-                        } else {
-                            Color(0xFFE1E1E1)
-                        },
-                    ),
-                ) {
-                    Text(
-                        text = spieler.name,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                        fontSize = if (istAktiv) 11.sp else 9.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -762,7 +711,6 @@ fun AnleihenRegister(
     runden: List<Runde>,
     onDelete: (AnleiheAnzeige) -> Unit = {},
     onNew: (Anleihe) -> Unit = {},
-    aktiverSpielerName: String? = null,
 ) {
     var eingabeSpieler by remember(spiel.spielerStringListe) { mutableStateOf(GLOBAL_PLAYER) }
     var eingabeRunde by remember(spiel.aktuelleRunde) {
@@ -787,7 +735,6 @@ fun AnleihenRegister(
             selectedRelevance = eingabeRelevanz,
             selectedDuration = eingabeLaufzeit,
             showManagementView = zeigeVerwaltung,
-            aktiverSpielerName = aktiverSpielerName,
             onChosePlayer = {
                 eingabeSpieler = it
                 geoeffneteAnleihe = null

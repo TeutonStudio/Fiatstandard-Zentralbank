@@ -39,15 +39,19 @@ import com.patrykandpatrick.vico.compose.cartesian.Zoom
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
+import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
+import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer.LineProvider.Companion.series
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
@@ -77,7 +81,11 @@ private enum class MarktpreisKategorie(val titel: String) {
     BAUWERKE("Alle Bauwerke"),
     WARENKORB("Warenkorb"),
     HANDELSDIFFERENZ("Handelsdifferenz"),
-    PREISINFLATIONSKORB("Preisinflationswarenkorb"),
+}
+
+private enum class WarenkorbReihe {
+    WARENKORB,
+    PREISINFLATIONSKORB,
 }
 
 private val warenkorbMarktfarbe = Color(0xFF75658A)
@@ -85,12 +93,16 @@ private val preisinflationswarenkorbFarbe = Color(0xFF4D7A70)
 
 private fun List<Map<Rohstoffe, Zahlungsmittel>>.zuWarenkorbpreisen(
     warenkorb: Map<Rohstoffe, Int>,
-    kategorie: MarktpreisKategorie,
-): List<Map<MarktpreisKategorie, Zahlungsmittel>> = map { preise ->
+    preisinflationswarenkorb: Map<Rohstoffe, Int>,
+): List<Map<WarenkorbReihe, Zahlungsmittel>> = map { preise ->
     mapOf(
-        kategorie to warenkorb.entries.summeGeld { (rohstoff, anzahl) ->
+        WarenkorbReihe.WARENKORB to warenkorb.entries.summeGeld { (rohstoff, anzahl) ->
             (preise[rohstoff] ?: Zahlungsmittel()) * anzahl
-        }
+        },
+        WarenkorbReihe.PREISINFLATIONSKORB to
+            preisinflationswarenkorb.entries.summeGeld { (rohstoff, anzahl) ->
+                (preise[rohstoff] ?: Zahlungsmittel()) * anzahl
+            },
     )
 }
 
@@ -116,7 +128,7 @@ private fun List<Map<Rohstoffe, Int>>.zuStueckChart(
     rohstoffe: List<Rohstoffe>,
 ): CartesianChartModel = remember(this, rohstoffe) {
     CartesianChartModel(
-        LineCartesianLayerModel.build {
+        ColumnCartesianLayerModel.build {
             rohstoffe.forEach { rohstoff ->
                 series(
                     x = indices.toList(),
@@ -165,19 +177,15 @@ fun zeigeMarktplatz(
                         Handelslinie.entries.toList(),
                     ).flatten()
                 }
-                val warenkorbpreise = remember(spiel.marktpreise, spiel.warenkorb) {
-                    spiel.marktpreise.zuWarenkorbpreisen(
-                        warenkorb = spiel.warenkorb,
-                        kategorie = MarktpreisKategorie.WARENKORB,
-                    )
-                }
-                val preisinflationswarenkorbpreise = remember(
+                val warenkorbReihen = WarenkorbReihe.entries.toList()
+                val warenkorbpreise = remember(
                     spiel.marktpreise,
+                    spiel.warenkorb,
                     spiel.preisinflationswarenkorb,
                 ) {
                     spiel.marktpreise.zuWarenkorbpreisen(
-                        warenkorb = spiel.preisinflationswarenkorb,
-                        kategorie = MarktpreisKategorie.PREISINFLATIONSKORB,
+                        warenkorb = spiel.warenkorb,
+                        preisinflationswarenkorb = spiel.preisinflationswarenkorb,
                     )
                 }
                 val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
@@ -220,15 +228,12 @@ fun zeigeMarktplatz(
                             id = "warenkorb",
                             bezeichnung = "Warenkorb",
                             farbe = warenkorbMarktfarbe,
-                        )
-                    )
-
-                    MarktpreisKategorie.PREISINFLATIONSKORB -> listOf(
+                        ),
                         DiagrammLegendenEintrag(
                             id = "preisinflationswarenkorb",
                             bezeichnung = "Preisinflationswarenkorb",
                             farbe = preisinflationswarenkorbFarbe,
-                        )
+                        ),
                     )
                 }
 
@@ -250,13 +255,8 @@ fun zeigeMarktplatz(
                         )
 
                         MarktpreisKategorie.WARENKORB -> warenkorbpreise.toChart(
-                            listOf(MarktpreisKategorie.WARENKORB)
+                            sichtbareIndizes.map(warenkorbReihen::get)
                         )
-
-                        MarktpreisKategorie.PREISINFLATIONSKORB ->
-                            preisinflationswarenkorbpreise.toChart(
-                                listOf(MarktpreisKategorie.PREISINFLATIONSKORB)
-                            )
 
                         MarktpreisKategorie.HANDELSDIFFERENZ -> ausgewaehlterSpieler
                             ?.let { spieler ->
@@ -305,29 +305,50 @@ fun zeigeMarktplatz(
                                 modifier = ModiPad5,
                             )
                         } else {
-                            CartesianChartHost(
-                                modifier = bilanzModifier,
-                                chart = rememberCartesianChart(
-                                    rememberLineCartesianLayer(
-                                        lineProvider = series(*linien.toTypedArray())
+                            if (marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ) {
+                                CartesianChartHost(
+                                    modifier = bilanzModifier,
+                                    chart = rememberCartesianChart(
+                                        rememberColumnCartesianLayer(
+                                            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
+                                                sichtbareLegende.map { eintrag ->
+                                                    rememberLineComponent(
+                                                        fill = Fill(eintrag.farbe),
+                                                        thickness = 8.dp,
+                                                    )
+                                                }
+                                            )
+                                        ),
+                                        endAxis = VerticalAxis.rememberEnd(
+                                            valueFormatter = stueckAchsenFormatter,
+                                        ),
+                                        bottomAxis = HorizontalAxis.rememberBottom(),
                                     ),
-                                    endAxis = VerticalAxis.rememberEnd(
-                                        valueFormatter = if (
-                                            marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ
-                                        ) {
-                                            stueckAchsenFormatter
-                                        } else {
-                                            markAchsenFormatter
-                                        },
-                                    ),
-                                    bottomAxis = HorizontalAxis.rememberBottom(),
-                                ),
-                                model = chartModel,
-                                scrollState = rememberVicoScrollState(),
-                                zoomState = rememberVicoZoomState(
-                                    initialZoom = remember { Zoom.Content }
+                                    model = chartModel,
+                                    scrollState = rememberVicoScrollState(),
+                                    zoomState = rememberVicoZoomState(
+                                        initialZoom = remember { Zoom.Content }
+                                    )
                                 )
-                            )
+                            } else {
+                                CartesianChartHost(
+                                    modifier = bilanzModifier,
+                                    chart = rememberCartesianChart(
+                                        rememberLineCartesianLayer(
+                                            lineProvider = series(*linien.toTypedArray())
+                                        ),
+                                        endAxis = VerticalAxis.rememberEnd(
+                                            valueFormatter = markAchsenFormatter,
+                                        ),
+                                        bottomAxis = HorizontalAxis.rememberBottom(),
+                                    ),
+                                    model = chartModel,
+                                    scrollState = rememberVicoScrollState(),
+                                    zoomState = rememberVicoZoomState(
+                                        initialZoom = remember { Zoom.Content }
+                                    )
+                                )
+                            }
                         }
 
                         if (marktpreisKategorie == MarktpreisKategorie.BAUWERKE) {
@@ -352,26 +373,38 @@ fun zeigeMarktplatz(
                                 eintraege = legende,
                                 status = legendenStatus,
                                 beiKlick = if (marktpreisKategorie == MarktpreisKategorie.WARENKORB) {
-                                    { _ -> warenkorbDialogOffen = true }
+                                    { eintrag ->
+                                        if (eintrag.id == "warenkorb") {
+                                            warenkorbDialogOffen = true
+                                        } else {
+                                            legendenStatus.umschalten(eintrag.id)
+                                        }
+                                    }
                                 } else {
                                     null
                                 },
                                 beiLangemKlick = if (marktpreisKategorie == MarktpreisKategorie.WARENKORB) {
-                                    { _ -> warenkorbDialogOffen = true }
+                                    { eintrag ->
+                                        if (eintrag.id == "warenkorb") {
+                                            warenkorbDialogOffen = true
+                                        } else {
+                                            legendenStatus.nurAnzeigen(eintrag.id)
+                                        }
+                                    }
                                 } else {
                                     null
                                 },
                                 klickBeschreibung = if (
                                     marktpreisKategorie == MarktpreisKategorie.WARENKORB
                                 ) {
-                                    "Warenkorb bearbeiten"
+                                    "Warenkorb bearbeiten oder Datenreihe umschalten"
                                 } else {
                                     "Datenreihe ein- oder ausblenden"
                                 },
                                 langerKlickBeschreibung = if (
                                     marktpreisKategorie == MarktpreisKategorie.WARENKORB
                                 ) {
-                                    "Warenkorb bearbeiten"
+                                    "Warenkorb bearbeiten oder Datenreihe einzeln anzeigen"
                                 } else {
                                     "Nur diese Datenreihe anzeigen"
                                 },
