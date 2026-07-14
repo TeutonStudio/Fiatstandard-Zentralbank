@@ -338,19 +338,6 @@ data class Handelsregister(
         if (runde in emittiert..emittiert+it.laufzeit+1) (emittiert to it) to erhalteRelevanteAnleihenhandel(it) else null
     } }.filterNotNull().toMap()
 
-    private fun MutableMap<String, Zahlungsmittel>.addiere(
-        spieler: String,
-        betrag: Zahlungsmittel
-    ) {
-        this[spieler] = (this[spieler] ?: Zahlungsmittel()) + betrag
-    }
-
-    private fun MutableMap<String, Zahlungsmittel>.subtrahiere(
-        spieler: String,
-        betrag: Zahlungsmittel
-    ) {
-        this[spieler] = (this[spieler] ?: Zahlungsmittel()) - betrag
-    }
     public fun erhalteMarktpreisRelevante(): List<Set<RohstoffHandel>> = einträge.map { it.filterIsInstance<RohstoffHandel>().toSet() }
     private fun erhalteSpielerRelevante(): List<Set<Anleihenhandel>> = einträge.map { it.filterIsInstance<Anleihenhandel>().toSet() }
     public fun erhalteRelevanteAnleihenhandel(anleihe: Anleihe): Map<Int, Anleihenhandel> = erhalteSpielerRelevante().flatMapIndexed { runde, handel -> handel.map { runde to it } }.groupBy { it.second.anleihe }[anleihe]?.toMap() ?: emptyMap()

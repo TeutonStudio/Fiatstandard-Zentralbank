@@ -96,14 +96,6 @@ fun List<Spieler>.bauSaldoZurRunde(runde: Int): Map<String, Map<out Bauteil, Int
     }
 }
 
-private fun nonZeroPoints(values: List<Int>): Pair<List<Int>, List<Int>> {
-    val points = values.mapIndexedNotNull { index, value ->
-        if (value == 0) null else index + 1 to value
-    }
-
-    return points.map { it.first } to points.map { it.second }
-}
-
 private fun Color.abgedunkelt(anteil: Float): Color = Color(
     red = red * (1f - anteil),
     green = green * (1f - anteil),
