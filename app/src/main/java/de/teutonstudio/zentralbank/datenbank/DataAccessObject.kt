@@ -104,9 +104,9 @@ interface PlayerDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(spieler: List<SpielerDaten>): List<Long>
-    
+
     suspend fun insertAllBySpiel(spieler: List<SpielerDaten>,spielID: Long): List<Long> = insertAll(spieler.map { it.copy(spielID = spielID) })
-    
+
     @Update
     suspend fun update(spieler: SpielerDaten)
 
@@ -137,9 +137,9 @@ interface BuildDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(bauteile: List<BauteilDaten>): List<Long>
-    
+
     suspend fun insertAllBySpiel(bauteile: List<BauteilDaten>, spielID: Long): List<Long> = insertAll(bauteile.map { it.copy(spielID = spielID) })
-    
+
     @Update
     suspend fun update(bauteil: BauteilDaten)
 
@@ -150,29 +150,29 @@ interface BuildDao {
     suspend fun getById(bauwerkID: Int): BauteilDaten?
 
     @Query("""
-        SELECT * FROM BuildData 
-        WHERE spielID = :spielID 
+        SELECT * FROM BuildData
+        WHERE spielID = :spielID
         ORDER BY runde ASC, bauwerkID ASC
     """)
     suspend fun getBySpiel(spielID: Int): List<BauteilDaten>
 
     @Query("""
-        SELECT * FROM BuildData 
-        WHERE spielID = :spielID 
+        SELECT * FROM BuildData
+        WHERE spielID = :spielID
         ORDER BY runde ASC, bauwerkID ASC
     """)
     fun observeBySpiel(spielID: Long): Flow<List<BauteilDaten>>
 
     @Query("""
-        SELECT * FROM BuildData 
+        SELECT * FROM BuildData
         WHERE spielID = :spielID AND runde = :runde
         ORDER BY bauwerkID ASC
     """)
     suspend fun getByRunde(spielID: Int, runde: Int): List<BauteilDaten>
 
     @Query("""
-        SELECT * FROM BuildData 
-        WHERE spielID = :spielID AND erbauer = :spieler 
+        SELECT * FROM BuildData
+        WHERE spielID = :spielID AND erbauer = :spieler
         ORDER BY runde ASC, bauwerkID ASC
     """)
     suspend fun getBySpieler(spielID: Int, spieler: String): List<BauteilDaten>
@@ -289,43 +289,43 @@ interface RoundDao {
     suspend fun getById(rundeID: Int): RundeDaten?
 
     @Query("""
-        SELECT * FROM RoundData 
-        WHERE spielID = :spielID 
+        SELECT * FROM RoundData
+        WHERE spielID = :spielID
         ORDER BY `index` ASC
     """)
     suspend fun getBySpiel(spielID: Int): List<RundeDaten>
 
     @Query("""
-        SELECT COALESCE(MAX(`index`), 0) 
-        FROM RoundData 
+        SELECT COALESCE(MAX(`index`), 0)
+        FROM RoundData
         WHERE spielID = :spielID
     """)
     fun observeMaxIndexBySpiel(spielID: Int): Flow<Int>
 
     @Query("""
-        SELECT * FROM RoundData 
-        WHERE spielID = :spielID 
+        SELECT * FROM RoundData
+        WHERE spielID = :spielID
         ORDER BY `index` ASC
     """)
     fun observeBySpiel(spielID: Long): Flow<List<RundeDaten>>
 
     @Query("""
-        SELECT * FROM RoundData 
-        WHERE spielID = :spielID AND `index` = :index 
+        SELECT * FROM RoundData
+        WHERE spielID = :spielID AND `index` = :index
         LIMIT 1
     """)
     suspend fun getByIndex(spielID: Int, index: Int): RundeDaten?
 
     @Query("""
-        SELECT * FROM RoundData 
-        WHERE spielID = :spielID 
-        ORDER BY `index` DESC 
+        SELECT * FROM RoundData
+        WHERE spielID = :spielID
+        ORDER BY `index` DESC
         LIMIT 1
     """)
     suspend fun getLetzteRunde(spielID: Int): RundeDaten?
 
     @Query("""
-        SELECT COUNT(*) FROM RoundData 
+        SELECT COUNT(*) FROM RoundData
         WHERE spielID = :spielID
     """)
     suspend fun countBySpiel(spielID: Int): Int
@@ -358,21 +358,21 @@ interface TradeDao {
     suspend fun getById(handelID: Int): HandelsDaten?
 
     @Query("""
-        SELECT * FROM TradeData 
-        WHERE spielID = :spielID 
+        SELECT * FROM TradeData
+        WHERE spielID = :spielID
         ORDER BY runde ASC, handelID ASC
     """)
     suspend fun getBySpiel(spielID: Int): List<HandelsDaten>
 
     @Query("""
-        SELECT * FROM TradeData 
-        WHERE spielID = :spielID 
+        SELECT * FROM TradeData
+        WHERE spielID = :spielID
         ORDER BY runde ASC, handelID ASC
     """)
     fun observeBySpiel(spielID: Long): Flow<List<HandelsDaten>>
 
     @Query("""
-        SELECT * FROM TradeData 
+        SELECT * FROM TradeData
         WHERE spielID = :spielID AND runde = :runde
         ORDER BY handelID ASC
     """)
@@ -390,8 +390,8 @@ interface TradeDao {
     suspend fun getByRunde(spielID: Int, rundeID: Int): List<HandelsDaten>
 
     @Query("""
-        SELECT * FROM TradeData 
-        WHERE spielID = :spielID 
+        SELECT * FROM TradeData
+        WHERE spielID = :spielID
         AND (besitzer = :spieler OR erwerber = :spieler)
         ORDER BY runde ASC, handelID ASC
     """)
@@ -412,7 +412,7 @@ interface TradeDao {
     suspend fun getBySpieler(spielID: Int, spielerID: Int): List<HandelsDaten>
 
     @Query("""
-        SELECT * FROM TradeData 
+        SELECT * FROM TradeData
         WHERE spielID = :spielID AND rohstoff = :rohstoff
         ORDER BY runde ASC, handelID ASC
     """)
@@ -446,21 +446,21 @@ interface CreditDao {
     suspend fun getById(anleiheID: Int): AnleiheDaten?
 
     @Query("""
-        SELECT * FROM CreditData 
-        WHERE spielID = :spielID 
+        SELECT * FROM CreditData
+        WHERE spielID = :spielID
         ORDER BY anleiheID ASC
     """)
     suspend fun getBySpiel(spielID: Int): List<AnleiheDaten>
 
     @Query("""
-        SELECT * FROM CreditData 
-        WHERE spielID = :spielID 
+        SELECT * FROM CreditData
+        WHERE spielID = :spielID
         ORDER BY anleiheID ASC
     """)
     fun observeBySpiel(spielID: Long): Flow<List<AnleiheDaten>>
 
     @Query("""
-        SELECT * FROM CreditData 
+        SELECT * FROM CreditData
         WHERE spielID = :spielID AND emittiert = :spieler
         ORDER BY anleiheID ASC
     """)
@@ -478,7 +478,7 @@ interface CreditDao {
     suspend fun getByEmittiertSpieler(spielID: Int, spielerID: Int): List<AnleiheDaten>
 
     @Query("""
-        SELECT * FROM CreditData 
+        SELECT * FROM CreditData
         WHERE spielID = :spielID AND emittent = :emittent
         ORDER BY anleiheID ASC
     """)
@@ -496,8 +496,8 @@ interface CreditDao {
     suspend fun getByEmittentId(spielID: Int, emittentID: Int): List<AnleiheDaten>
 
     @Query("""
-        UPDATE CreditData 
-        SET handel = :handel 
+        UPDATE CreditData
+        SET handel = :handel
         WHERE anleiheID = :anleiheID
     """)
     suspend fun updateHandel(anleiheID: Int, handel: String)
@@ -530,29 +530,29 @@ interface ContractDao {
     suspend fun getById(vertragID: Int): VertragsDaten?
 
     @Query("""
-        SELECT * FROM ContractData 
-        WHERE spielID = :spielID 
+        SELECT * FROM ContractData
+        WHERE spielID = :spielID
         ORDER BY runde ASC, vertragID ASC
     """)
     suspend fun getBySpiel(spielID: Int): List<VertragsDaten>
 
     @Query("""
-        SELECT * FROM ContractData 
-        WHERE spielID = :spielID 
+        SELECT * FROM ContractData
+        WHERE spielID = :spielID
         ORDER BY runde ASC, vertragID ASC
     """)
     fun observeBySpiel(spielID: Long): Flow<List<VertragsDaten>>
 
     @Query("""
-        SELECT * FROM ContractData 
-        WHERE spielID = :spielID AND runde = :rundeID 
+        SELECT * FROM ContractData
+        WHERE spielID = :spielID AND runde = :rundeID
         ORDER BY vertragID ASC
     """)
     suspend fun getByRunde(spielID: Int, rundeID: Int): List<VertragsDaten>
 
     @Query("""
-        SELECT * FROM ContractData 
-        WHERE spielID = :spielID 
+        SELECT * FROM ContractData
+        WHERE spielID = :spielID
         AND (vertragsannehmer = :spieler OR vertragsanbieter = :spieler)
         ORDER BY runde ASC, vertragID ASC
     """)
@@ -573,7 +573,7 @@ interface ContractDao {
     suspend fun getBySpieler(spielID: Int, spielerID: Int): List<VertragsDaten>
 
     @Query("""
-        SELECT * FROM ContractData 
+        SELECT * FROM ContractData
         WHERE spielID = :spielID AND vertragsart = :vertragsart
         ORDER BY runde ASC, vertragID ASC
     """)
