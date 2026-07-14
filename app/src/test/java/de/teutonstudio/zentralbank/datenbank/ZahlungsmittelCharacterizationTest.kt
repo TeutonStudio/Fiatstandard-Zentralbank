@@ -52,7 +52,10 @@ class ZahlungsmittelCharacterizationTest {
     @Test
     fun testSpielHaeltBekannteBasisdaten() {
         assertEquals(17, TestSpiel.aktuelleRunde)
-        assertEquals(listOf("Anna", "Bernd", "Clara", "David", "Eva"), TestSpiel.spielerStringListe)
+        assertEquals(
+            listOf("Anna", "Bernd", "Clara", "David", "Eva", "Franz", "Georg"),
+            TestSpiel.spielerStringListe,
+        )
         assertTrue(TestSpiel.marktpreise.isNotEmpty())
     }
 }

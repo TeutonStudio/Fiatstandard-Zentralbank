@@ -74,28 +74,7 @@ import de.teutonstudio.zentralbank.ui.ModiPad10
 import de.teutonstudio.zentralbank.ui.ModiPad15
 import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.RightText
-
-
-private val siedlerPastellfarben = listOf(
-    Color(0xFFFFD6A5), // Pfirsich / Orange
-    Color(0xFFFDFFB6), // Gelb
-    Color(0xFFCAFFBF), // Grün
-    Color(0xFF9BF6FF), // Türkis
-    Color(0xFFA0C4FF), // Blau
-    Color(0xFFBDB2FF), // Violett
-    Color(0xFFFFC6FF), // Rosa
-)
-
-private fun erhalteSiedlerFarben(
-    spielerListe: List<Spieler>
-): Map<Spieler, Color> =
-    spielerListe
-        .mapIndexed { index, spieler ->
-            spieler to siedlerPastellfarben.getOrElse(index) {
-                Color.LightGray
-            }
-        }
-        .toMap()
+import de.teutonstudio.zentralbank.ui.erhalteSpielerFarben
 
 @Composable
 fun SpielerBilanz(
@@ -107,7 +86,7 @@ fun SpielerBilanz(
     if (isBilanzExpanded.value) {
         Card(modifier = ModiPad5.clickable { isBilanzExpanded.value = !isBilanzExpanded.value }) {
             //val spielerNamen = spielerListe.map { it.erhalteNamen() }
-            val spielerFarben = erhalteSiedlerFarben(spielerListe)
+            val spielerFarben = erhalteSpielerFarben(spielerListe)
 
             val scrollState = rememberVicoScrollState()
             val zoomState = rememberVicoZoomState(initialZoom = remember { Zoom.Content })
@@ -235,7 +214,7 @@ fun zeigeSpieler(
     onDeclareMilitary: (Pair<Pair<String, Int>, Pair<String, Int>>) -> Unit,
     onDeclarePeace: (Pair<String, String>) -> Unit,
 ) {
-    val siedlerFarben = erhalteSiedlerFarben(spiel.spielerListe)
+    val siedlerFarben = erhalteSpielerFarben(spiel.spielerListe)
     val marktpreise = spiel.marktpreise
 
     var isWarExpanded by remember { mutableStateOf(false) }

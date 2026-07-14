@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -39,11 +40,19 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProdu
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.columnSeries
 import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
+import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.Insets
+import com.patrykandpatrick.vico.compose.common.LegendItem
+import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
+import com.patrykandpatrick.vico.compose.common.component.TextComponent
+import com.patrykandpatrick.vico.compose.common.rememberHorizontalLegend
 import de.teutonstudio.zentralbank.datenbank.Anleihe
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
 import de.teutonstudio.zentralbank.datenbank.Anleihenhandel
@@ -63,6 +72,7 @@ import de.teutonstudio.zentralbank.ui.LeftText
 import de.teutonstudio.zentralbank.ui.ModiPad15
 import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.RightText
+import de.teutonstudio.zentralbank.ui.erhalteSpielerFarben
 import kotlin.math.abs
 
 private const val GLOBAL_PLAYER = "Global"
@@ -95,6 +105,13 @@ private fun nonZeroPoints(values: List<Int>): Pair<List<Int>, List<Int>> {
 
     return points.map { it.first } to points.map { it.second }
 }
+
+private fun Color.abgedunkelt(anteil: Float): Color = Color(
+    red = red * (1f - anteil),
+    green = green * (1f - anteil),
+    blue = blue * (1f - anteil),
+    alpha = alpha,
+)
 
 fun fiatWoodoo(
     liste: List<Int>,
@@ -233,6 +250,22 @@ private fun BalanceChart(
 
     val runden = List(spiel.aktuelleRunde) { it }
     val modelProducer = remember { CartesianChartModelProducer() }
+    val spieler = spiel.spielerListe.firstOrNull { it.name == ausgewählterSpieler }
+    val spielerFarbe = erhalteSpielerFarben(spiel.spielerListe)[spieler] ?: Color.LightGray
+    val serien = listOf(
+        "Barvermögen" to spielerFarbe,
+        "Marktwert" to spielerFarbe.abgedunkelt(0.2f),
+        "Verbindlichkeiten" to spielerFarbe.abgedunkelt(0.45f),
+    )
+    val legendIcon = ShapeComponent(margins = Insets(0.5.dp))
+    val legendText = TextComponent(
+        padding = Insets(
+            start = 5.dp,
+            top = 0.dp,
+            end = 10.dp,
+            bottom = 0.dp,
+        )
+    )
 
     LaunchedEffect(runden, spiel) {
         modelProducer.runTransaction {
@@ -249,23 +282,40 @@ private fun BalanceChart(
             CartesianChartHost(
                 modifier = ModiPad5,
                 chart = rememberCartesianChart(
-                    rememberLineCartesianLayer(),
+                    rememberLineCartesianLayer(
+                        lineProvider = LineCartesianLayer.LineProvider.series(
+                            serien.map { (_, farbe) ->
+                                LineCartesianLayer.rememberLine(
+                                    fill = remember(farbe) {
+                                        LineCartesianLayer.LineFill.single(Fill(farbe))
+                                    }
+                                )
+                            }
+                        )
+                    ),
                     startAxis = VerticalAxis.rememberStart(),
                     bottomAxis = HorizontalAxis.rememberBottom(),
+                    legend = rememberHorizontalLegend(
+                        items = {
+                            serien.forEach { (label, farbe) ->
+                                add(
+                                    LegendItem(
+                                        icon = legendIcon.copy(Fill(farbe)),
+                                        labelComponent = legendText,
+                                        label = label,
+                                    )
+                                )
+                            }
+                        },
+                        iconSize = 8.dp,
+                        padding = Insets(8.dp),
+                    ),
                 ),
                 modelProducer = modelProducer,
                 scrollState = rememberVicoScrollState(),
                 zoomState = rememberVicoZoomState(
                     initialZoom = Zoom.Content,
                 ),
-            )
-
-            SimpleLegend(
-                labels = listOf(
-                    "Barvermögen",
-                    "Marktwert",
-                    "Unvermögen",
-                )
             )
         }
     }
@@ -480,6 +530,7 @@ private fun HeaderControls(
                 liste = relevanceStrings,
                 modifierChoseLegende = modifierChoseLegende,
                 modifierChoseLabel = modifierChoseLabel,
+                centerValue = true,
                 beiAuswahl = onChoseRelevance,
             )
         }
@@ -510,13 +561,22 @@ private fun HeaderDropdownCard(
     liste: Iterable<String>,
     modifierChoseLegende: Modifier,
     modifierChoseLabel: Modifier,
+    centerValue: Boolean = false,
     beiAuswahl: (String) -> Unit,
 ) {
     var ausgeklappt by remember { mutableStateOf(false) }
     Card(modifier = ModiPad5, onClick = { ausgeklappt = !ausgeklappt }) {
         Column(modifier = ModiPad15) {
             Text(text = title, modifier = modifierChoseLegende)
-            Text(text = value, fontSize = 25.sp, modifier = modifierChoseLabel)
+            Text(
+                text = value,
+                fontSize = 25.sp,
+                modifier = if (centerValue) {
+                    modifierChoseLabel.align(Alignment.CenterHorizontally)
+                } else {
+                    modifierChoseLabel
+                },
+            )
         }
         DropdownMenu(expanded = ausgeklappt, onDismissRequest = { ausgeklappt = false }) {
             liste.forEach { DropdownMenuItem(text = { Text(text = it) }, onClick = {
