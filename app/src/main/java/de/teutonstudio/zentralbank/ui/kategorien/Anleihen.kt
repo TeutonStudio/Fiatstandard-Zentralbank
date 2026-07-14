@@ -398,11 +398,6 @@ private fun ManagementChart(
 ) {
     val currentRound = selectedRound ?: aktuelleRunde
 
-    if (currentRound == null) {
-        EmptyInfoCard("Keine Runde vorhanden.")
-        return
-    }
-
     if (selectedPlayer == GLOBAL_PLAYER) {
         EmptyInfoCard("Für die Verwaltungsansicht bitte einen Spieler wählen.")
         return

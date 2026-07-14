@@ -71,8 +71,7 @@ fun bauteilIcon(bauteil: Bauteil): Painter {
         Wirtschaftsregionen.SRAFINNERIE -> painterResource(R.drawable.empty) // TODO
         Wirtschaftsregionen.STAHLFABRIK -> painterResource(R.drawable.empty) // TODO
         Wirtschaftsregionen.VIEHHOF -> painterResource(R.drawable.empty) // TODO
-        else -> null
-    } ?: painterResource(R.drawable.empty)
+    }
 }
 
 @Composable
