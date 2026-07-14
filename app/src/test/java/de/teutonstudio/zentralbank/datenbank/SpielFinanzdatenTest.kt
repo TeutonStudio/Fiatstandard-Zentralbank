@@ -320,6 +320,87 @@ class SpielFinanzdatenTest {
         assertEquals(1, spiel.aussenhandelsbilanzStueckGesamt[2])
     }
 
+    @Test
+    fun hoheWarenkorbpreisinflationErhoehtLeitzinsBeimRundenwechsel() {
+        val spiel = inflationsSpielMitReferenzpreis()
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = anna,
+                erwerber = bernd,
+                betrag = 110.toZahlungsmittel(),
+                anzahl = 1,
+                rohstoff = Rohstoffe.HOLZ,
+            )
+        )
+
+        spiel.beginneNaechsteRunde()
+
+        assertEquals(4f, spiel.aktuellerLeitzinssatz, 0.001f)
+        assertEquals(4f, spiel.leitzinssatz(2) ?: Float.NaN, 0.001f)
+    }
+
+    @Test
+    fun fallenderWarenkorbpreisSenktLeitzinsBeimRundenwechsel() {
+        val spiel = inflationsSpielMitReferenzpreis()
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = anna,
+                erwerber = bernd,
+                betrag = 90.toZahlungsmittel(),
+                anzahl = 1,
+                rohstoff = Rohstoffe.HOLZ,
+            )
+        )
+
+        spiel.beginneNaechsteRunde()
+
+        assertEquals(0f, spiel.aktuellerLeitzinssatz, 0.001f)
+    }
+
+    @Test
+    fun warenkorbinflationAmZielLaesstLeitzinsUnveraendert() {
+        val spiel = inflationsSpielMitReferenzpreis()
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = anna,
+                erwerber = bernd,
+                betrag = 102.toZahlungsmittel(),
+                anzahl = 1,
+                rohstoff = Rohstoffe.HOLZ,
+            )
+        )
+
+        spiel.beginneNaechsteRunde()
+
+        assertEquals(2f, spiel.aktuellerLeitzinssatz, 0.001f)
+    }
+
+    private fun inflationsSpielMitReferenzpreis(): Spiel {
+        val spiel = Spiel(
+            leitzinssatz = 2f,
+            spieler = mapOf(
+                anna to 1_000.toZahlungsmittel(),
+                bernd to 1_000.toZahlungsmittel(),
+            ),
+            warenkorb = mapOf(Rohstoffe.HOLZ to 1),
+            inflationsziel = 2f,
+            normaleAbweichung = 1f,
+            starkeAbweichung = 3f,
+        )
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = anna,
+                erwerber = bernd,
+                betrag = 100.toZahlungsmittel(),
+                anzahl = 1,
+                rohstoff = Rohstoffe.HOLZ,
+            )
+        )
+        spiel.beginneNaechsteRunde()
+        assertEquals(2f, spiel.aktuellerLeitzinssatz, 0.001f)
+        return spiel
+    }
+
     private fun neuesSpiel(
         vararg spieler: Pair<Spieler, Zahlungsmittel>,
     ): Spiel = Spiel(

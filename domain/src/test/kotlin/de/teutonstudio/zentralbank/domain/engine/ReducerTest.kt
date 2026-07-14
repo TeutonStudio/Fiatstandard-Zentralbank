@@ -471,6 +471,40 @@ class ReducerTest {
     }
 
     @Test
+    fun neueRundeBeginntErstNachdemJederSpielerEinmalAmZugWar() {
+        val claraId = SpielerId("Clara")
+        var state = GameState(
+            spieler = listOf(
+                Spieler(annaId, "Anna"),
+                Spieler(berndId, "Bernd"),
+                Spieler(claraId, "Clara"),
+            ),
+            rundenzähler = 2,
+            aktiverSpieler = annaId,
+            zugStatus = ZugStatus(annaId, Phase.Aktionen),
+        )
+
+        state = Reducer.reduce(state, GameEvent.ZugBeendet).getOrThrow()
+        assertEquals(berndId, state.aktiverSpieler)
+        assertEquals(2, state.rundenzähler)
+
+        state = Reducer.reduce(
+            state.copy(zugStatus = ZugStatus(berndId, Phase.Aktionen)),
+            GameEvent.ZugBeendet,
+        ).getOrThrow()
+        assertEquals(claraId, state.aktiverSpieler)
+        assertEquals(2, state.rundenzähler)
+
+        state = Reducer.reduce(
+            state.copy(zugStatus = ZugStatus(claraId, Phase.Aktionen)),
+            GameEvent.ZugBeendet,
+        ).getOrThrow()
+        assertEquals(annaId, state.aktiverSpieler)
+        assertEquals(3, state.rundenzähler)
+        assertEquals(Phase.Einnahmen, state.zugStatus?.phase)
+    }
+
+    @Test
     fun phasenfremderSchrittWirdAbgelehnt() {
         val result = Reducer.reduce(
             startState().copy(

@@ -103,8 +103,8 @@ fun Spiel.zuDomainGameState(): GameState {
         marktpreise = aktuelleMarktpreise
             .mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
             .mapValues { (_, preis) -> preis.zuDomainGeld() },
-        leitzins = nächsterZinssatz.zuBasispunkte(),
-        rundenzähler = aktuelleRunde,
+        leitzins = aktuellerLeitzinssatz.zuBasispunkte(),
+        rundenzähler = (aktuelleRunde - 1).coerceAtLeast(0),
         aktiverSpieler = spielerListe.firstOrNull()?.let { spielerIds.getValue(it) },
     )
 }

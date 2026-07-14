@@ -100,3 +100,12 @@ Offene Punkte:
 Offene Punkte:
 
 - Bestehende Composables lesen größtenteils noch aus `aktuellesSpiel`; das Umhängen auf State-Hoisting und `onEvent` folgt schrittweise.
+
+## Zug- und Rundenübergang
+
+- Der zentrale Menüknopf schließt Einnahmen und Ausgaben ab und beendet anschließend den Zug des aktiven Spielers.
+- Nach einem Zug wird in fester Reihenfolge zum nächsten Spieler gewechselt; erst nach dem letzten Spieler steigt der Rundenzähler und der erste Spieler beginnt wieder.
+- Der alte Rundenwechsel-Dialog mit manueller Spieler-, Runden- und Leitzinswahl wurde entfernt.
+- Eine vollständige Runde wird automatisch als `RundeDaten` gespeichert.
+- Der Leitzins der neuen Runde wird aus der Warenkorbpreisinflation bestimmt: oberhalb des Zielbereichs steigt er, unterhalb sinkt er; ohne belastbaren vorherigen Warenkorbpreis bleibt er unverändert.
+- Die Spielanzeige nennt aktuelle Runde, aktuellen Leitzins, aktiven Spieler und die als Nächstes abschließbare Phase.

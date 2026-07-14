@@ -91,18 +91,15 @@ fun wähleLaufzeit(
 @Composable
 fun definiereAnleihe(
     spielerListe: List<Spieler>,
-    aktuelleRunde: Int,
     onCreate: (anleihe: Anleihenhandel) -> Unit
 ) {
     val eingabeSondervermogen = remember { mutableIntStateOf(0) }
     val eingabeUnvermogen = remember { mutableIntStateOf(0) }
-    val eingabeRunde = remember { mutableIntStateOf(aktuelleRunde) }
     val eingabeLaufzeit = remember { mutableIntStateOf(5) }
     val eingabeEmittent = remember { mutableStateOf("Emittent")}
     val eingabeErwerber = remember { mutableStateOf("Erwerber")}
     Card(modifier = Modifier.width(400.dp),) {
         Column  {
-            val showCredit = remember { mutableStateOf(false) }
             Row( verticalAlignment = Alignment.CenterVertically ) {
                 Image(painter = painterResource(id = R.drawable.anleihe), contentDescription = null, modifier = Modifier.clickable {
                     onCreate(Anleihenhandel(
@@ -117,7 +114,6 @@ fun definiereAnleihe(
                         eingabeSondervermogen.intValue.toZahlungsmittel(),
                     ))
                 } )
-                definiereRunde(eingabeRunde)
             }
             LazyColumn(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 item { Row(verticalAlignment = Alignment.CenterVertically) {

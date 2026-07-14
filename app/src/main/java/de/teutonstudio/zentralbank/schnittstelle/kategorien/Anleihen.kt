@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,6 +81,10 @@ import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
 import kotlin.math.abs
 
 private const val GLOBAL_PLAYER = "Global"
+private val anleiheFaelligFarbe = Color(0xFFD8C28F)
+private val anleiheOffenFarbe = Color(0xFF9EB5C7)
+private val anleiheAbgelaufenFarbe = Color(0xFFC7C7C7)
+private val anleiheHandelOhneSpielerFarbe = Color(0xFFE1E1E1)
 
 private val relevanceStrings = listOf(
     "gezahlte",
@@ -721,8 +724,12 @@ fun AnleihenRegister(
     var eingabeRelevanz by remember { mutableStateOf("alle") }
     var eingabeLaufzeit by remember { mutableStateOf("alle") }
     var zeigeVerwaltung by remember { mutableStateOf(false) }
+    var geoeffneteAnleihe by remember(spiel) { mutableStateOf<AnleiheAnzeige?>(null) }
 
     val anleihen = spiel.anleihen
+    val spielerFarben = remember(spiel.spielerListe) {
+        erhalteSpielerFarben(spiel.spielerListe).mapKeys { (spieler, _) -> spieler.name }
+    }
 
     Column(
         modifier = Modifier
@@ -737,11 +744,26 @@ fun AnleihenRegister(
             selectedRelevance = eingabeRelevanz,
             selectedDuration = eingabeLaufzeit,
             showManagementView = zeigeVerwaltung,
-            onChosePlayer = { eingabeSpieler = it },
-            onChoseRound = { eingabeRunde = it },
-            onChoseRelevance = { eingabeRelevanz = it },
-            onChoseDuration = { eingabeLaufzeit = it },
-            onChangeView = { zeigeVerwaltung = !zeigeVerwaltung },
+            onChosePlayer = {
+                eingabeSpieler = it
+                geoeffneteAnleihe = null
+            },
+            onChoseRound = {
+                eingabeRunde = it
+                geoeffneteAnleihe = null
+            },
+            onChoseRelevance = {
+                eingabeRelevanz = it
+                geoeffneteAnleihe = null
+            },
+            onChoseDuration = {
+                eingabeLaufzeit = it
+                geoeffneteAnleihe = null
+            },
+            onChangeView = {
+                zeigeVerwaltung = !zeigeVerwaltung
+                geoeffneteAnleihe = null
+            },
         ) {
             if (zeigeVerwaltung) {
                 Card(
@@ -783,11 +805,25 @@ fun AnleihenRegister(
 
                 if (filteredDebt.isEmpty()) {
                     EmptyInfoCard("Keine Anleihen für diese Auswahl.")
+                } else if (geoeffneteAnleihe in filteredDebt) {
+                    AnleiheCard(
+                        modifier = ModiPad5.fillMaxWidth(),
+                        aktuelleRunde = currentRound,
+                        eintrag = requireNotNull(geoeffneteAnleihe),
+                        spielerFarben = spielerFarben,
+                        zeigeAblauf = true,
+                        onToggle = { geoeffneteAnleihe = null },
+                        onDelete = onDelete,
+                    )
                 } else {
                     VerticalGrid(columns = SimpleGridCells.Adaptive(200.dp)) {
                         filteredDebt.forEach { eintrag -> AnleiheCard(
+                            modifier = ModiPad5,
                             aktuelleRunde = currentRound,
                             eintrag = eintrag,
+                            spielerFarben = spielerFarben,
+                            zeigeAblauf = false,
+                            onToggle = { geoeffneteAnleihe = eintrag },
                             onDelete = onDelete,
                         ) }
                     }
@@ -801,24 +837,33 @@ fun AnleihenRegister(
 @OptIn(ExperimentalGridApi::class)
 @Composable
 private fun AnleiheCard(
+    modifier: Modifier,
     aktuelleRunde: Int,
     eintrag: AnleiheAnzeige,
+    spielerFarben: Map<String, Color>,
+    zeigeAblauf: Boolean,
+    onToggle: () -> Unit,
     onDelete: (AnleiheAnzeige) -> Unit,
 ) {
-    var istAufgeklappt by remember(eintrag) { mutableStateOf(false) }
     val restlaufzeit = eintrag.faelligkeit - aktuelleRunde
     val (status, statusFarbe) = when {
         restlaufzeit < 0 -> "gezahlt" to Color(0xFFA9C2A5)
-        restlaufzeit == 0 -> "fällig" to Color(0xFFD8C28F)
-        else -> "offen" to Color(0xFF9EB5C7)
+        restlaufzeit == 0 -> "fällig" to anleiheFaelligFarbe
+        else -> "offen" to anleiheOffenFarbe
     }
 
     Card(
-        modifier = ModiPad5,
-        onClick = { istAufgeklappt = !istAufgeklappt },
+        modifier = modifier,
+        onClick = onToggle,
         colors = CardDefaults.cardColors(containerColor = statusFarbe),
     ) {
-        Column {
+        if (zeigeAblauf) {
+            AnleiheAblauf(
+                aktuelleRunde = aktuelleRunde,
+                eintrag = eintrag,
+                spielerFarben = spielerFarben,
+            )
+        } else {
             Grid({
                 repeat(2) { column(100.dp) }
                 repeat(3) { row(20.dp) }
@@ -840,7 +885,7 @@ private fun AnleiheCard(
                 RightText(text = "Status:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
                 LeftText(text = status,fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
                 Text(
-                    text = if (istAufgeklappt) "Ablauf ausblenden" else "Ablauf anzeigen",
+                    text = "Ablauf anzeigen",
                     fontSize = 12.sp,
                     modifier = Modifier.gridItem(columnSpan = 2).fillMaxWidth(),
                     textAlign = TextAlign.Center,
@@ -852,13 +897,6 @@ private fun AnleiheCard(
                     Text(text = "löschen", fontSize = 12.sp)
                 }
             }
-
-            if (istAufgeklappt) {
-                AnleiheAblauf(
-                    aktuelleRunde = aktuelleRunde,
-                    eintrag = eintrag,
-                )
-            }
         }
     }
 }
@@ -867,11 +905,12 @@ private fun AnleiheCard(
 private fun AnleiheAblauf(
     aktuelleRunde: Int,
     eintrag: AnleiheAnzeige,
+    spielerFarben: Map<String, Color>,
 ) {
     val ablauf = remember(eintrag) { eintrag.erhalteAblauf() }
     Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
         Text(
-            text = "Ablauf der Anleihe",
+            text = "Ablauf der Anleihe · Tippen für Übersicht",
             modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
             textAlign = TextAlign.Center,
         )
@@ -883,10 +922,16 @@ private fun AnleiheAblauf(
             istKopfzeile = true,
         )
         ablauf.forEach { ereignis ->
-            val hintergrund = when {
-                ereignis.runde < aktuelleRunde -> Color(0xFFC7C7C7)
-                ereignis.runde == aktuelleRunde -> Color(0xFFD8C28F)
-                else -> Color(0xFF9EB5C7)
+            val hintergrund = when (ereignis.art) {
+                AnleiheAblaufArt.EMISSION,
+                AnleiheAblaufArt.HANDEL ->
+                    spielerFarben[ereignis.an.name] ?: anleiheHandelOhneSpielerFarbe
+                AnleiheAblaufArt.ZINS,
+                AnleiheAblaufArt.RUECKKAUF -> when {
+                    ereignis.runde < aktuelleRunde -> anleiheAbgelaufenFarbe
+                    ereignis.runde == aktuelleRunde -> anleiheFaelligFarbe
+                    else -> anleiheOffenFarbe
+                }
             }
             val (aktion, beguenstigter, benachteiligter) = when (ereignis.art) {
                 AnleiheAblaufArt.EMISSION,
@@ -963,8 +1008,6 @@ private fun AnleiheTabellenZelle(
             .padding(horizontal = 3.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
         fontSize = if (istKopfzeile) 9.sp else 10.sp,
         textAlign = textAlign,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
     )
 }
 

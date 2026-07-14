@@ -259,7 +259,10 @@ open class Spiel(
         List(aktuelleRunde) { runde -> handel.erhalteAussenhandelsmengenbilanzZurRunde(runde) }
     public val aussenhandelsbilanzStueckGesamt: List<Int> get() =
         aussenhandelsbilanzStueckNachRohstoff.map { runde -> runde.values.sum() }
-    public val nächsterZinssatz: Float get() = runden.last().leitzinssatz + erhalteZinssatzSchritte()
+    public val aktuellerLeitzinssatz: Float get() = runden.last().leitzinssatz
+    public val nächsterZinssatz: Float get() =
+        aktuellerLeitzinssatz +
+            (erhalteNaechstePreisinflation()?.let(::erhalteZinssatzSchritte) ?: 0f)
     public val emittierteAnleihen: List<Set<Anleihe>> get() = List(aktuelleRunde) { handel.erhalteEmittierteAnleihen()[it].filter { a -> a.sondervermögen != Zahlungsmittel() }.toSet() }
     public val anleihen: Set<AnleiheAnzeige> get() = emittierteAnleihen.map { anleihen -> anleihen.associateWith { handel.erhalteRelevanteAnleihenhandel(it) } }.zuDarstellung(aktuelleRunde)
     public val aktuelleMarktpreise: EnumMap<Rohstoffe, Zahlungsmittel> get() = handel.erhalteMarktpreisZurRunde(aktuelleRunde-1)
@@ -326,24 +329,25 @@ open class Spiel(
     fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
         handel.erhalteHandelsverlauf(spieler)
 
-    private fun erhaltePreisWarenkorbZurRunde(runde: Int): Zahlungsmittel {
-        if (runde == 0) return Zahlungsmittel()
-        val marktpreise = handel.erhalteMarktpreisZurRunde(runde - 1)
-        return warenkorb.entries.summeGeld { (key, value) -> marktpreise[key]!! * value }
+    private fun erhaltePreisWarenkorb(
+        marktpreise: Map<Rohstoffe, Zahlungsmittel>,
+    ): Zahlungsmittel = warenkorb.entries.summeGeld { (rohstoff, menge) ->
+        marktpreise.getOrDefault(rohstoff, Zahlungsmittel()) * menge
     }
 
-    private fun erhaltePreisinflationZurRunde(runde: Int): Float {
-        if (runde == 0 || runde == 1) return 0f
-        val vorher = erhaltePreisWarenkorbZurRunde(runde - 1)
-        if (vorher == Zahlungsmittel()) return 0f
-        return prozentpunkt*erhaltePreisWarenkorbZurRunde(runde).erhaltePreisinflation(vorher)
+    private fun erhalteNaechstePreisinflation(): Float? {
+        if (aktuelleRunde <= 1) return null
+        val vorher = erhaltePreisWarenkorb(aktuelleMarktpreise)
+        if (vorher == Zahlungsmittel()) return null
+        val nachher = erhaltePreisWarenkorb(handel.erhalteNaechstenMarktpreis())
+        return prozentpunkt * nachher.erhaltePreisinflation(vorher)
     }
 
-    private fun erhalteZinssatzSchritte(runde: Int = runden.size): Float {
-        val infaltionsAbweichung = inflationsziel.first - erhaltePreisinflationZurRunde(runde)
-        if (abs(infaltionsAbweichung) < inflationsziel.second) return 0f
-        if (abs(infaltionsAbweichung) < inflationsziel.third) return sign(infaltionsAbweichung)
-        return sign(infaltionsAbweichung) * 2
+    private fun erhalteZinssatzSchritte(preisinflation: Float): Float {
+        val inflationsAbweichung = preisinflation - inflationsziel.first
+        if (abs(inflationsAbweichung) < inflationsziel.second) return 0f
+        if (abs(inflationsAbweichung) < inflationsziel.third) return sign(inflationsAbweichung)
+        return sign(inflationsAbweichung) * 2
     }
 
     public fun leitzinssatz(runde: Int): Float? = runden.find { it.index == runde }?.leitzinssatz
@@ -361,6 +365,14 @@ open class Spiel(
         handel.neueRundenDatenDefinieren(handelDaten)
         konflikt.neueRundenDatenDefinieren(konfliktDaten)
         cache.add(baueCache(cache.size))
+    }
+
+    fun beginneNaechsteRunde() {
+        neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = emptySet(),
+            konfliktDaten = emptySet(),
+        )
     }
 
     fun zuSpeicherDaten(): Pair<SpielDaten,List<SpeicherDaten>> {
@@ -497,6 +509,8 @@ data class Handelsregister(
 
     public fun erhalteRohstoffMarktpreisZurRunde(runde: Int,rohstoff: Rohstoffe): Zahlungsmittel = cache[runde][rohstoff]!!
     public fun erhalteMarktpreisZurRunde(runde: Int): EnumMap<Rohstoffe, Zahlungsmittel> = cache[runde]
+    fun erhalteNaechstenMarktpreis(): EnumMap<Rohstoffe, Zahlungsmittel> =
+        baueCache(cache.size, cache)
     public fun erhalteAussenhandelsbilanzZurRunde(
         runde: Int,
     ): EnumMap<Rohstoffe, Zahlungsmittel> = aussenhandelsbilanz[runde]

@@ -20,8 +20,8 @@ fun Spielmenü(
     beiAuslandSaldo: () -> Unit,
     beiHandel: () -> Unit,
     beiAnleihe: () -> Unit,
-    beiNächsteRunde: () -> Unit,
-    zugText: String = "nächste Runde",
+    beiNaechstemZugabschnitt: () -> Unit,
+    zugText: String = "Kein Zug aktiv",
 ) {
     Titel() {
         GridByOrientation() { idx: Int, modifier -> when(idx) {
@@ -31,7 +31,12 @@ fun Spielmenü(
             3 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.foreign, beiKlick = beiAuslandSaldo)
             4 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.handel, beiKlick = beiHandel)
             5 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.anleihe, beiKlick = beiAnleihe)
-            6 -> TextCard(zugText, modifier(null), fillMaxWidth = true,beiKlick=beiNächsteRunde)
+            6 -> TextCard(
+                zugText,
+                modifier(null),
+                fillMaxWidth = true,
+                beiKlick = beiNaechstemZugabschnitt,
+            )
         } }
     }
 }

@@ -20,7 +20,10 @@ class GameUiStateTest {
 
         val uiState = state.zuGameUiState()
 
-        assertEquals("Anna: Einnahmen", uiState.zug.text)
+        assertEquals(
+            "Runde 0 · Leitzins 0,00 %\nAnna: Einnahmen abschließen",
+            uiState.zug.text,
+        )
         assertEquals(listOf("Anna"), uiState.spieler.map { it.name })
     }
 }

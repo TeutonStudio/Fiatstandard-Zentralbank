@@ -12,7 +12,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,7 +22,6 @@ import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.RohstoffHandelDialog
-import de.teutonstudio.zentralbank.schnittstelle.eingabe.bearbeiteRunde
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.AnleihenRegister
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Hauptmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielErstellen
@@ -39,7 +37,6 @@ sealed class Screen(val route: String) {
     object NewGame: Screen(route = "new_game")
     object LoadGame: Screen(route = "load_game")
     object Game: Screen(route = "game")
-    object EditRound: Screen(route = "edit_round")
     object PlayerSaldo: Screen(route = "player_saldo")
     object DebtSaldo: Screen(route = "debt_saldo")
     object MarketSaldo: Screen(route = "market_saldo")
@@ -52,7 +49,6 @@ sealed class Screen(val route: String) {
 
 @Composable
 fun Navigation(viewModel: GameViewModel) {
-    val context = LocalContext.current
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -104,18 +100,9 @@ fun Navigation(viewModel: GameViewModel) {
                 { navController.navigate(route = Screen.ForeignSaldo.route) },
                 { navController.navigate(route = Screen.NewTrade.route) },
                 { navController.navigate(route = Screen.NewCredit.route) },
-                { navController.navigate(route = Screen.EditRound.route) },
-                zugText = domainUiState?.zug?.text ?: "nächste Runde",
+                viewModel::naechsterZugabschnitt,
+                zugText = domainUiState?.zug?.text ?: "Kein Zug aktiv",
             )
-        }
-
-        composable(route = Screen.EditRound.route) { // TODO
-            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                bearbeiteRunde(
-                    viewModel.aktuelleDaten.first.spielID,
-                    viewModel.aktuellesSpiel,
-                ) { navController.navigate(route = Screen.Game.route) }
-            } }
         }
 
         var ausgewähltesBauwerk: Bauteil

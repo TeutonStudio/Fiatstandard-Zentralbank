@@ -9,6 +9,9 @@ import androidx.lifecycle.viewModelScope
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.engine.GameEngine
 import de.teutonstudio.zentralbank.domain.events.GameEvent
+import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.domain.zug.SchrittZustand
+import de.teutonstudio.zentralbank.domain.zug.ZugAutomat
 import de.teutonstudio.zentralbank.schnittstelle.domain.GameUiState
 import de.teutonstudio.zentralbank.schnittstelle.domain.zuGameUiState
 import kotlinx.coroutines.CompletableDeferred
@@ -73,11 +76,113 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             return
         }
 
+        val vorher = engine.state
         engine.apply(event)
-            .onSuccess { state -> aktualisiereDomainState(state) }
+            .onSuccess { state -> uebernehmeEventErgebnis(vorher, state) }
             .onFailure { throwable ->
                 _domainFehler.tryEmit(throwable.message ?: "Domain-Event wurde abgelehnt.")
             }
+    }
+
+    fun naechsterZugabschnitt() {
+        val state = gameEngine?.state
+        val zug = state?.zugStatus
+        if (state == null || zug == null) {
+            _domainFehler.tryEmit("Kein Zug aktiv.")
+            return
+        }
+
+        when (zug.phase) {
+            Phase.Einnahmen,
+            Phase.Ausgaben -> {
+                val schrittEvents = ZugAutomat.schritte(state)
+                    .filter { schritt ->
+                        schritt.typ.pflicht && schritt.zustand == SchrittZustand.VERFUEGBAR
+                    }
+                    .map { schritt -> GameEvent.SchrittAbgeschlossen(schritt.typ) }
+                wendeEventsAn(schrittEvents + GameEvent.PhaseAbgeschlossen(zug.phase))
+            }
+            Phase.Aktionen -> beendeZug()
+        }
+    }
+
+    fun beendeZug() {
+        wendeEventsAn(listOf(GameEvent.ZugBeendet))
+    }
+
+    private fun wendeEventsAn(events: List<GameEvent>) {
+        val engine = gameEngine
+        if (engine == null) {
+            _domainFehler.tryEmit("Kein Spiel geladen.")
+            return
+        }
+
+        val vorher = engine.state
+        for (event in events) {
+            val ergebnis = engine.apply(event)
+            if (ergebnis.isFailure) {
+                aktualisiereDomainState(engine.state)
+                val fehler = ergebnis.exceptionOrNull()
+                _domainFehler.tryEmit(fehler?.message ?: "Zug konnte nicht fortgesetzt werden.")
+                return
+            }
+        }
+        uebernehmeEventErgebnis(vorher, engine.state)
+    }
+
+    private fun uebernehmeEventErgebnis(vorher: GameState, nachher: GameState) {
+        if (nachher.rundenzähler > vorher.rundenzähler) {
+            beginneNaechsteRunde(nachher)
+        } else {
+            aktualisiereDomainState(nachher)
+        }
+    }
+
+    private fun beginneNaechsteRunde(nachZugende: GameState) {
+        try {
+            aktuellesSpiel.beginneNaechsteRunde()
+        } catch (throwable: Throwable) {
+            _domainFehler.tryEmit(throwable.message ?: "Neue Runde konnte nicht begonnen werden.")
+            return
+        }
+
+        val spielDaten = aktuelleDaten.first
+        val rundenIndex = aktuellesSpiel.aktuelleRunde - 1
+        val rundenDaten = RundeDaten(
+            index = rundenIndex,
+            zinsatz = aktuellesSpiel.aktuellerLeitzinssatz,
+        ).copy(spielID = spielDaten.spielID)
+        val neueDatenListe = aktuelleDaten.second + rundenDaten
+        aktuelleDaten = spielDaten to neueDatenListe
+
+        val aktuelleWirtschaftsdaten = aktuellesSpiel.zuDomainGameState()
+        val synchronisiert = nachZugende.copy(
+            marktpreise = aktuelleWirtschaftsdaten.marktpreise,
+            leitzins = aktuelleWirtschaftsdaten.leitzins,
+            rundenzähler = aktuelleWirtschaftsdaten.rundenzähler,
+        )
+        gameEngine = GameEngine(synchronisiert)
+        aktualisiereDomainState(synchronisiert)
+
+        _spielSpeicher.update { spiele ->
+            spiele + (spielDaten to (rundenIndex to aktuellesSpiel.spielerStringListe))
+        }
+
+        if (spielDaten.spielID == (-1).toLong()) return
+
+        _spielDatenListe.update { spiele ->
+            spiele + (spielDaten to neueDatenListe)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                datenbankBereit.await()
+                DAO.insertRunde(rundenDaten)
+            } catch (throwable: Throwable) {
+                _domainFehler.tryEmit(
+                    throwable.message ?: "Neue Runde konnte nicht gespeichert werden."
+                )
+            }
+        }
     }
 
     fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {
@@ -117,7 +222,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
         _spielSpeicher.update { spiele ->
             val übersicht = spiele[bisherigeDaten.first]
-                ?: (aktuellesSpiel.aktuelleRunde to aktuellesSpiel.spielerStringListe)
+                ?: ((aktuellesSpiel.aktuelleRunde - 1) to aktuellesSpiel.spielerStringListe)
             (spiele - bisherigeDaten.first) + (neueSpielDaten to übersicht)
         }
 
@@ -191,7 +296,19 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val neueDatenListe = aktuelleDaten.second + datum
         aktuelleDaten = spielDaten to neueDatenListe
 
-        val domainZustand = aktuellesSpiel.zuDomainGameState()
+        val bisherigerDomainZustand = gameEngine?.state
+        val abgebildeterDomainZustand = aktuellesSpiel.zuDomainGameState()
+        val domainZustand = if (bisherigerDomainZustand == null) {
+            abgebildeterDomainZustand
+        } else {
+            abgebildeterDomainZustand.copy(
+                rundenzähler = bisherigerDomainZustand.rundenzähler,
+                aktiverSpieler = bisherigerDomainZustand.aktiverSpieler,
+                zugStatus = bisherigerDomainZustand.zugStatus,
+                schuldenstriche = bisherigerDomainZustand.schuldenstriche,
+                ueberschuldungen = bisherigerDomainZustand.ueberschuldungen,
+            )
+        }
         gameEngine = GameEngine(domainZustand)
         aktualisiereDomainState(domainZustand)
 
@@ -227,7 +344,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 _spielDatenListe.value = DAO.observeAlleNachSpiel().first()
                 _spielSpeicher.value = erhalteSpielSpeicher()
                 _spielSpeicher.update { // Testdaten
-                    it + (TestSpiel.zuSpeicherDaten().first to (TestSpiel.aktuelleRunde to TestSpiel.spielerStringListe))
+                    it + (TestSpiel.zuSpeicherDaten().first to
+                        ((TestSpiel.aktuelleRunde - 1) to TestSpiel.spielerStringListe))
                 }
 
             } catch (throwable: Throwable) {
@@ -257,7 +375,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 }
 
                 _spielSpeicher.update {
-                    it + (gespeicherteDaten.first to Pair(spiel.aktuelleRunde,spiel.spielerStringListe))
+                    it + (gespeicherteDaten.first to Pair(spiel.aktuelleRunde - 1,spiel.spielerStringListe))
                 }
             } else { println("GameID macht Probleme") }
         }
@@ -574,47 +692,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
 */
 
-
-/*    fun neueRunde(rundeDaten: RundeDaten) {
-        viewModelScope.launch(Dispatchers.IO) {
-            datenbankBereit.await()
-
-            val spielID = aktuellesSpielID()
-            val rundenNummer = aktuelleRunde + 1
-            val rundeFuerDatenbank = rundeDaten.copy(
-                SpielID = spielID,
-                runde = rundenNummer
-            )
-
-            val roundID = roundDao.insert(rundeFuerDatenbank).toInt()
-            if (roundID == -1) {
-                println("RoundID macht Probleme")
-            }
-
-            ladeAktuellesSpielNeu()
-        }
-    }*/
-
-/*    fun bearbeiteRunde(rundeDaten: RundeDaten) {
-        viewModelScope.launch(Dispatchers.IO) {
-            datenbankBereit.await()
-
-            val spielID = aktuellesSpielID()
-            val rundeFuerDatenbank = rundeDaten.copy(SpielID = spielID)
-
-            val existiert = _rundenListe.value.any {
-                it.SpielID == spielID && it.runde == rundeFuerDatenbank.runde
-            }
-
-            if (existiert) {
-                roundDao.update(rundeFuerDatenbank)
-            } else {
-                roundDao.insert(rundeFuerDatenbank)
-            }
-
-            ladeAktuellesSpielNeu()
-        }
-    }*/
 
 /*    fun fuegeSiedlerHinzu(spielerDaten: SpielerDaten) {
         viewModelScope.launch(Dispatchers.IO) {

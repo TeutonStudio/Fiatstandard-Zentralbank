@@ -18,9 +18,9 @@ class DomainMappingTest {
     fun testSpielWirdInDomainStateAbgebildet() {
         val state = TestSpiel.zuDomainGameState()
 
-        assertEquals(TestSpiel.aktuelleRunde, state.rundenzähler)
+        assertEquals(TestSpiel.aktuelleRunde - 1, state.rundenzähler)
         assertEquals(TestSpiel.spielerStringListe, state.spieler.map { it.name })
-        assertEquals(Basispunkte((TestSpiel.nächsterZinssatz * 100).toInt()), state.leitzins)
+        assertEquals(Basispunkte((TestSpiel.aktuellerLeitzinssatz * 100).toInt()), state.leitzins)
         assertTrue(state.marktpreise.keys.containsAll(Rohstoff.entries))
         assertEquals(
             setOf(

@@ -18,6 +18,9 @@ class ZugAnzeigeTest {
             zugStatus = ZugStatus(anna, Phase.Ausgaben),
         )
 
-        assertEquals("Anna: Ausgaben", state.zuZugAnzeige().text)
+        assertEquals(
+            "Runde 0 · Leitzins 0,00 %\nAnna: Ausgaben abschließen",
+            state.zuZugAnzeige().text,
+        )
     }
 }

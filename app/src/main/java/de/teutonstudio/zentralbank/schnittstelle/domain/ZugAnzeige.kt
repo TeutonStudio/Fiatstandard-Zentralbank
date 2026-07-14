@@ -8,12 +8,13 @@ data class ZugAnzeige(
 )
 
 fun GameState.zuZugAnzeige(): ZugAnzeige {
-    val zug = zugStatus ?: return ZugAnzeige("nächste Runde")
+    val kopf = "Runde $rundenzähler · Leitzins ${leitzins.zuProzentString()}"
+    val zug = zugStatus ?: return ZugAnzeige(kopf)
     val spielerName = spieler.firstOrNull { it.id == zug.spieler }?.name ?: zug.spieler.wert
-    val phase = when (zug.phase) {
-        Phase.Einnahmen -> "Einnahmen"
-        Phase.Ausgaben -> "Ausgaben"
-        Phase.Aktionen -> "Aktionen"
+    val aktion = when (zug.phase) {
+        Phase.Einnahmen -> "$spielerName: Einnahmen abschließen"
+        Phase.Ausgaben -> "$spielerName: Ausgaben abschließen"
+        Phase.Aktionen -> "Zug von $spielerName beenden"
     }
-    return ZugAnzeige("$spielerName: $phase")
+    return ZugAnzeige("$kopf\n$aktion")
 }
