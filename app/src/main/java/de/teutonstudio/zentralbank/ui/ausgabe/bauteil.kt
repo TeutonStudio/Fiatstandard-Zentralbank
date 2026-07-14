@@ -1,7 +1,6 @@
 package de.teutonstudio.zentralbank.ui.ausgabe
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,8 +22,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.cheonjaeung.compose.grid.SimpleGridCells
-import com.cheonjaeung.compose.grid.VerticalGrid
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Handelslinie
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -33,11 +29,8 @@ import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.associateWith
 import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.datenbank.zuPreis
-import de.teutonstudio.zentralbank.ui.LeftText
-import de.teutonstudio.zentralbank.ui.ModiPad15
 import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.RightText
-import de.teutonstudio.zentralbank.ui.markBy
 import java.util.EnumMap
 
 

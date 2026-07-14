@@ -1,14 +1,9 @@
 package de.teutonstudio.zentralbank.ui.kategorien
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import de.teutonstudio.zentralbank.R
-import de.teutonstudio.zentralbank.Screen
 import de.teutonstudio.zentralbank.ui.RowOrColumnByOrientation
 import de.teutonstudio.zentralbank.ui.eingabe.ImageCard
 import de.teutonstudio.zentralbank.ui.eingabe.Titel

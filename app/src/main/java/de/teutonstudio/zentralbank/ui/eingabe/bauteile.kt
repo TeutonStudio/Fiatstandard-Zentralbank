@@ -18,7 +18,6 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -26,15 +25,12 @@ import androidx.compose.ui.unit.sp
 import de.teutonstudio.zentralbank.R
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Handelslinie
-import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
 import de.teutonstudio.zentralbank.ui.ModiPad10
 import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.TextCard
 import de.teutonstudio.zentralbank.ui.ausgabe.zeigeBauteil
-import kotlinx.coroutines.NonCancellable.key
-import kotlin.Int
 
 
 @Composable

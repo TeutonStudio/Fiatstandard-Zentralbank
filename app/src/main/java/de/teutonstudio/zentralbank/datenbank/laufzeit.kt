@@ -2,8 +2,6 @@ package de.teutonstudio.zentralbank.datenbank
 
 import java.util.EnumMap
 import kotlin.collections.associateWith
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.collections.count
 import kotlin.collections.forEach
 import kotlin.collections.get

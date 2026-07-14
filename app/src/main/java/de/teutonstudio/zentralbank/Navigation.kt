@@ -21,7 +21,6 @@ import com.example.czboracle.ui.composables.AnleihenRegister
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.ui.ausgabe.zeigeSpieler
-import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
 import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.bearbeiteRunde
 import de.teutonstudio.zentralbank.ui.kategorien.SpielLaden

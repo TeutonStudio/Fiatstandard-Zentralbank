@@ -19,7 +19,6 @@ import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
-import de.teutonstudio.zentralbank.ui.eingabe.SteuerContainer
 import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.definiereBauteile
 import de.teutonstudio.zentralbank.ui.eingabe.definiereLeitzinsatzZiele

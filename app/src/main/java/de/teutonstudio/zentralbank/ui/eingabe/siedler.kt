@@ -13,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
-import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.ui.ModiPad15
 
 @Composable

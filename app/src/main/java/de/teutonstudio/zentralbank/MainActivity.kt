@@ -1,11 +1,9 @@
 package de.teutonstudio.zentralbank
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.ui.theme.CZBOracleRechnerTheme

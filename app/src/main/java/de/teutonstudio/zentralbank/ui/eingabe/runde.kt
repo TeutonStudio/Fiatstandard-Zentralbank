@@ -20,13 +20,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import de.teutonstudio.zentralbank.R
-import de.teutonstudio.zentralbank.datenbank.Handelsregister
-import de.teutonstudio.zentralbank.datenbank.Kriegsregister
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Runde
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Spieler
-import de.teutonstudio.zentralbank.datenbank.toTriple
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 
 

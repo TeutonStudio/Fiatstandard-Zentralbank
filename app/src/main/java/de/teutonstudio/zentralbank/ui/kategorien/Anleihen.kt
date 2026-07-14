@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.Grid
-import androidx.compose.foundation.layout.GridFlow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -55,7 +54,6 @@ import com.patrykandpatrick.vico.compose.common.component.TextComponent
 import com.patrykandpatrick.vico.compose.common.rememberHorizontalLegend
 import de.teutonstudio.zentralbank.datenbank.Anleihe
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
-import de.teutonstudio.zentralbank.datenbank.Anleihenhandel
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Runde
 import de.teutonstudio.zentralbank.datenbank.Spiel
