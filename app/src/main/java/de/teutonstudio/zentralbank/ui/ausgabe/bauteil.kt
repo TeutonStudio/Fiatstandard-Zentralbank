@@ -97,7 +97,7 @@ fun zeigeBauteilPreis(
         val inhalt = bauteil.kosten.filter { if (nicht_null_zeilen) true else it.value != 0 }.map { it.key to (it.value to marktpreise[it.key]!!.zuMark()) }.toMap()
         Grid({
             repeat(hAnzahl) { column(40.dp) }
-            repeat(inhalt.size) { row(40.dp) }
+            repeat(inhalt.size+1) { row(40.dp) }
             gap(5.dp)
         }, ModiPad5) {
             inhalt.forEach { (rohstoff,z) ->
@@ -108,7 +108,8 @@ fun zeigeBauteilPreis(
                         rohstoff = rohstoff, iconSize = 36.dp, fontsize = 25.sp, text = false,
                     ) }
                     if ((nicht_null_preise && anzahl != 0) || !nicht_null_preise) {
-                        RightText(text = preis, fontSize = 20.sp, modifier = ModiPad5.fillMaxSize(.9f).gridItem(columnSpan = hAnzahl-2))
+                        Text(text = " zu je ",fontSize = 20.sp, modifier = ModiPad5.gridItem(columnSpan = 2))
+                        RightText(text = preis, fontSize = 20.sp, modifier = ModiPad5.fillMaxSize(.9f).gridItem(columnSpan = hAnzahl-4))
                     } else { Box(modifier = Modifier) }
                 }
             }
@@ -119,48 +120,6 @@ fun zeigeBauteilPreis(
                 fontSize = 25.sp,
             )
         }
-
-/*        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            VerticalGrid(
-                columns = SimpleGridCells.Fixed(3),
-                horizontalArrangement = Arrangement.Center,
-                verticalArrangement = Arrangement.Center,
-                modifier = ModiPad5,
-            ) { Rohstoffe.entries.forEach { rohstoff ->
-                val anzahl = bauteil.kosten[rohstoff]
-                if (nicht_null_zeilen || anzahl != 0) {
-                    val einzelpreis = marktpreise[rohstoff] ?: Zahlungsmittel()
-
-                    RightText(
-                        text = anzahl.toString(),
-                        fontSize = 20.sp,
-                        modifier = ModiPad5,
-                    )
-                    Box(
-                        modifier = Modifier.size(36.dp),
-                        contentAlignment = Alignment.Center
-                    ) { zeigeRohstoff(
-                        rohstoff = rohstoff,
-                        iconSize = 36.dp,
-                        fontsize = 25.sp,
-                        text = false,
-                    ) }
-                    if ((nicht_null_preise && anzahl != 0) || !nicht_null_preise) {
-                        LeftText(
-                            text = markBy(einzelpreis),
-                            fontSize = 20.sp,
-                            modifier = ModiPad5,
-                        )
-                    } else { Box(modifier = Modifier) }
-            } } }
-            Text(
-                modifier = Modifier.padding(5.dp,0.dp),
-                text = "${bauteil.str.replaceFirstChar{ it.uppercase() }}: ${bauteil.kosten.zuPreis(marktpreise).zuMark()}",
-                fontSize = 25.sp,
-            )
-        }*/
     }
 }
 

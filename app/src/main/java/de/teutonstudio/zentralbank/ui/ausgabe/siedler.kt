@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -35,6 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
+import androidx.core.graphics.plus
 import com.cheonjaeung.compose.grid.SimpleGridCells
 import com.cheonjaeung.compose.grid.VerticalGrid
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -73,27 +76,26 @@ import de.teutonstudio.zentralbank.ui.ModiPad5
 import de.teutonstudio.zentralbank.ui.RightText
 
 
-private fun erhalteSiedlerFarben(spielerListe: List<Spieler>): Map<Spieler,Color> {
-    return spielerListe.associateWith {
-        if (spielerListe.indexOf(it) == 0) {
-            Color.White
-        } else if (spielerListe.indexOf(it) == 1) {
-            Color.Blue
-        } else if (spielerListe.indexOf(it) == 2) {
-            Color.Red
-        } else if (spielerListe.indexOf(it) == 3) {
-            Color.Green
-        } else if (spielerListe.indexOf(it) == 4) {
-            Color.Cyan
-        } else if (spielerListe.indexOf(it) == 5) {
-            Color.Yellow
-        } else if (spielerListe.indexOf(it) == 6) {
-            Color.Magenta
-        } else {
-            Color.Black
+private val siedlerPastellfarben = listOf(
+    Color(0xFFFFD6A5), // Pfirsich / Orange
+    Color(0xFFFDFFB6), // Gelb
+    Color(0xFFCAFFBF), // Grün
+    Color(0xFF9BF6FF), // Türkis
+    Color(0xFFA0C4FF), // Blau
+    Color(0xFFBDB2FF), // Violett
+    Color(0xFFFFC6FF), // Rosa
+)
+
+private fun erhalteSiedlerFarben(
+    spielerListe: List<Spieler>
+): Map<Spieler, Color> =
+    spielerListe
+        .mapIndexed { index, spieler ->
+            spieler to siedlerPastellfarben.getOrElse(index) {
+                Color.LightGray
+            }
         }
-    }
-}
+        .toMap()
 
 @Composable
 fun SpielerBilanz(
@@ -249,11 +251,13 @@ fun zeigeSpieler(
                 horizontalArrangement = Arrangement.Center,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Bauteil.entries.forEach { zeigeBauteilPreis(
-                    it, hAnzahl, ModiPad5,
-                    spiel.aktuelleMarktpreise, false,
-                    false,onBuild
-                ) }
+                Bauteil.entries.forEach {
+                    zeigeBauteilPreis(
+                        it, hAnzahl, ModiPad5,
+                        spiel.aktuelleMarktpreise, false,
+                        false,onBuild
+                    )
+                }
             } }
         }
     } else if (isWarExpanded) {

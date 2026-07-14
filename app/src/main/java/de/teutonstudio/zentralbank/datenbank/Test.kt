@@ -267,6 +267,8 @@ private val testSpieler = listOf(
     "Clara",
     "David",
     "Eva",
+    "Franz",
+    "Georg",
 ).map { name ->
     Spieler(name, startBau, startKontrolle)
 }
