@@ -9,9 +9,8 @@ import androidx.compose.foundation.layout.Grid
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -32,6 +31,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cheonjaeung.compose.grid.SimpleGridCells
+import com.cheonjaeung.compose.grid.VerticalGrid
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.Zoom
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
@@ -718,7 +719,11 @@ fun AnleihenRegister(
 
     val anleihen = spiel.anleihen
 
-    Column {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
         Header(
             spiel = spiel,
             spielerBauSaldo = spielerBauSaldo,
@@ -774,8 +779,8 @@ fun AnleihenRegister(
                 if (filteredDebt.isEmpty()) {
                     EmptyInfoCard("Keine Anleihen für diese Auswahl.")
                 } else {
-                    LazyVerticalGrid(columns = GridCells.Adaptive(200.dp)) {
-                        items(filteredDebt) { eintrag -> AnleiheCard(
+                    VerticalGrid(columns = SimpleGridCells.Adaptive(200.dp)) {
+                        filteredDebt.forEach { eintrag -> AnleiheCard(
                             aktuelleRunde = currentRound,
                             eintrag = eintrag,
                             onDelete = onDelete,

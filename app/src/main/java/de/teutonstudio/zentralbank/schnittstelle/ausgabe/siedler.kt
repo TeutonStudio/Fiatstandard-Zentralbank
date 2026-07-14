@@ -12,9 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -207,9 +208,14 @@ fun zeigeSpieler(
     var isPeaceExpanded by remember { mutableStateOf(false) }
 
     if (!isWarExpanded && !isMilitaryExpanded && !isPeaceExpanded) {
-        LazyColumn(horizontalAlignment = Alignment.CenterHorizontally) {
-            item { SpielerBilanz(spiel.spielerSaldo) }
-            item { VerticalGrid(
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            SpielerBilanz(spiel.spielerSaldo)
+            VerticalGrid(
                 columns = SimpleGridCells.Adaptive(225.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalArrangement = Arrangement.Center,
@@ -224,7 +230,7 @@ fun zeigeSpieler(
                         onManipulateData = { _, _, _ -> },
                     )
                 }
-            } }
+            }
         }
     } else if (isWarExpanded) {
         Card(modifier = Modifier.padding(25.dp)) {
