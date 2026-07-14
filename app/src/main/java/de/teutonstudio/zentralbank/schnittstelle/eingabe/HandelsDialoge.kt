@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.datenbank.Anleihe
@@ -35,6 +36,8 @@ import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.zuMark
+import java.util.Locale
+import kotlin.math.abs
 
 private enum class AnleiheVorgang {
     EMISSION,
@@ -60,29 +63,116 @@ private data class AnleiheAuswahl(
     }
 }
 
+private sealed interface HandelsgutAuswahl {
+    data class Rohstoff(val rohstoff: Rohstoffe) : HandelsgutAuswahl
+    data class AnleiheWert(val anleihe: AnleiheAnzeige) : HandelsgutAuswahl
+
+    fun bezeichnung(): String = when (this) {
+        is Rohstoff -> rohstoff.str
+        is AnleiheWert ->
+            "${anleihe.schuldiger.name} · ${anleihe.sondervermoegen.zuMark()} · " +
+                "fällig R${anleihe.faelligkeit}"
+    }
+}
+
+private fun relativeProzentabweichung(
+    aktuellerWert: Double?,
+    referenzwert: Double?,
+): Double? {
+    if (aktuellerWert == null || referenzwert == null || referenzwert == 0.0) return null
+    return (aktuellerWert / referenzwert - 1.0) * 100.0
+}
+
+private fun prozentText(wert: Double): String {
+    val normalisiert = if (abs(wert) < 0.05) 0.0 else wert
+    return if (normalisiert == 0.0) {
+        "0,0 %"
+    } else {
+        String.format(Locale.GERMANY, "%+.1f %%", normalisiert)
+    }
+}
+
+private fun prozentwertText(wert: Double): String =
+    String.format(Locale.GERMANY, "%.1f %%", wert)
+
 @Composable
-fun RohstoffHandelDialog(
+private fun AbweichungsText(
+    label: String,
+    abweichung: Double?,
+) {
+    val farbe = when {
+        abweichung == null || abs(abweichung) < 0.05 -> Color(0xFF6F6F6F)
+        abweichung > 0.0 -> Color(0xFF2E7D32)
+        else -> Color(0xFFB3261E)
+    }
+    Text(
+        text = "$label: ${abweichung?.let(::prozentText) ?: "–"}",
+        color = farbe,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+@Composable
+fun HandelDialog(
     spiel: Spiel,
     onDismiss: () -> Unit,
-    onCreate: (RohstoffHandel) -> Unit,
+    onCreateRohstoff: (RohstoffHandel) -> Unit,
+    onCreateAnleihe: (Anleihenhandel) -> Unit,
 ) {
     val personen = remember(spiel.spielerListe) {
-        spiel.spielerListe.map { it as JuristischePerson } + Ausland
+        spiel.spielerListe.map { it as JuristischePerson } + Geschäftsbank + Ausland
     }
     var besitzer by remember(personen) { mutableStateOf(personen.firstOrNull()) }
     var erwerber by remember(personen) {
         mutableStateOf(personen.getOrNull(1) ?: personen.firstOrNull())
     }
-    var rohstoff by remember { mutableStateOf(Rohstoffe.entries.first()) }
+    var handelsgut by remember {
+        mutableStateOf<HandelsgutAuswahl>(HandelsgutAuswahl.Rohstoff(Rohstoffe.entries.first()))
+    }
     var menge by remember { mutableStateOf("1") }
     var gesamtpreis by remember { mutableStateOf("") }
 
+    val aktuelleRunde = (spiel.aktuelleRunde - 1).coerceAtLeast(0)
+    val handelbareAnleihen = spiel.anleihen
+        .filter { eintrag ->
+            eintrag.aktuellerBesitzer == besitzer &&
+                eintrag.faelligkeit > aktuelleRunde &&
+                aktuelleRunde !in eintrag.handelsverlauf
+        }
+        .sortedWith(
+            compareBy<AnleiheAnzeige> { it.schuldiger.name }
+                .thenBy { it.faelligkeit }
+                .thenBy { it.sondervermoegen.toIntOderNull() }
+        )
     val mengeWert = menge.toIntOrNull()
     val preisWert = gesamtpreis.toIntOrNull()
+    val letzterMarktpreis = when (val auswahl = handelsgut) {
+        is HandelsgutAuswahl.Rohstoff ->
+            spiel.aktuelleMarktpreise[auswahl.rohstoff]
+                ?.takeUnless { preis -> preis.toDoubleOderNull() == 0.0 }
+        is HandelsgutAuswahl.AnleiheWert ->
+            auswahl.anleihe.handelsverlauf.maxByOrNull { (runde, _) -> runde }?.value?.preis
+    }
+    val vertragswertJeEinheit = when (handelsgut) {
+        is HandelsgutAuswahl.Rohstoff -> if (
+            preisWert != null && mengeWert != null && mengeWert > 0
+        ) {
+            preisWert.toDouble() / mengeWert
+        } else {
+            null
+        }
+        is HandelsgutAuswahl.AnleiheWert -> preisWert?.toDouble()
+    }
+    val marktpreisabweichung = relativeProzentabweichung(
+        aktuellerWert = vertragswertJeEinheit,
+        referenzwert = letzterMarktpreis?.toDoubleOderNull(),
+    )
     val fehler = when {
         besitzer == null || erwerber == null -> "Es sind keine Handelspartner vorhanden."
         besitzer == erwerber -> "Verkäufer und Erwerber müssen verschieden sein."
-        mengeWert == null || mengeWert <= 0 -> "Die Menge muss größer als 0 sein."
+        handelsgut is HandelsgutAuswahl.Rohstoff && (mengeWert == null || mengeWert <= 0) ->
+            "Die Menge muss größer als 0 sein."
         preisWert == null || preisWert <= 0 -> "Der Gesamtpreis muss größer als 0 sein."
         else -> null
     }
@@ -96,15 +186,42 @@ fun RohstoffHandelDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
             ) {
-                Text("Laufende Runde: ${(spiel.aktuelleRunde - 1).coerceAtLeast(0)}")
-                PersonenAuswahl("Verkäufer", personen, besitzer) { besitzer = it }
+                Text("Laufende Runde: $aktuelleRunde")
+                PersonenAuswahl("Verkäufer", personen, besitzer) { neuerBesitzer ->
+                    besitzer = neuerBesitzer
+                    val ausgewaehlteAnleihe = handelsgut as? HandelsgutAuswahl.AnleiheWert
+                    if (ausgewaehlteAnleihe?.anleihe?.aktuellerBesitzer != neuerBesitzer) {
+                        handelsgut = HandelsgutAuswahl.Rohstoff(Rohstoffe.entries.first())
+                    }
+                }
                 PersonenAuswahl("Erwerber", personen, erwerber) { erwerber = it }
-                RohstoffAuswahl(rohstoff) { rohstoff = it }
-                Zahlenfeld("Menge (Stk)", menge) { menge = it }
+                HandelsgutAuswahlFeld(
+                    auswahl = handelsgut,
+                    handelbareAnleihen = handelbareAnleihen,
+                    onSelect = { handelsgut = it },
+                )
+                if (handelsgut is HandelsgutAuswahl.Rohstoff) {
+                    Zahlenfeld("Menge (Stk)", menge) { menge = it }
+                }
                 Zahlenfeld("Gesamtpreis (Mark)", gesamtpreis) { gesamtpreis = it }
+                letzterMarktpreis?.let { marktpreis ->
+                    val bezug = if (handelsgut is HandelsgutAuswahl.Rohstoff) " je Stück" else ""
+                    Text(
+                        text = "Letzter Marktpreis: ${marktpreis.zuMark()}$bezug",
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    AbweichungsText(
+                        label = "Abweichung im Vertrag",
+                        abweichung = marktpreisabweichung,
+                    )
+                }
                 Text(
-                    text = "Der Handel wird in der laufenden Runde bezahlt. " +
-                        "Der daraus berechnete Rohstoffpreis gilt ab der Folgerunde.",
+                    text = if (handelsgut is HandelsgutAuswahl.Rohstoff) {
+                        "Der Handel wird in der laufenden Runde bezahlt. " +
+                            "Der daraus berechnete Rohstoffpreis gilt ab der Folgerunde."
+                    } else {
+                        "Die Anleihe wechselt mit der Zahlung in der laufenden Runde den Besitzer."
+                    },
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 fehler?.let {
@@ -120,15 +237,25 @@ fun RohstoffHandelDialog(
             Button(
                 enabled = fehler == null,
                 onClick = {
-                    onCreate(
-                        RohstoffHandel(
-                            besitzer = requireNotNull(besitzer),
-                            erwerber = requireNotNull(erwerber),
-                            betrag = requireNotNull(preisWert).toZahlungsmittel(),
-                            anzahl = requireNotNull(mengeWert),
-                            rohstoff = rohstoff,
+                    when (val auswahl = handelsgut) {
+                        is HandelsgutAuswahl.Rohstoff -> onCreateRohstoff(
+                            RohstoffHandel(
+                                besitzer = requireNotNull(besitzer),
+                                erwerber = requireNotNull(erwerber),
+                                betrag = requireNotNull(preisWert).toZahlungsmittel(),
+                                anzahl = requireNotNull(mengeWert),
+                                rohstoff = auswahl.rohstoff,
+                            )
                         )
-                    )
+                        is HandelsgutAuswahl.AnleiheWert -> onCreateAnleihe(
+                            Anleihenhandel(
+                                besitzer = requireNotNull(besitzer),
+                                erwerber = requireNotNull(erwerber),
+                                anleihe = auswahl.anleihe.anleihe,
+                                preis = requireNotNull(preisWert).toZahlungsmittel(),
+                            )
+                        )
+                    }
                 },
             ) { Text("Speichern") }
         },
@@ -204,6 +331,25 @@ fun AnleiheDialog(
     val zinsWert = zins.toIntOrNull()
     val preisWert = preis.toIntOrNull()
     val laufzeitWert = laufzeit.toIntOrNull()
+    val anleiheZinssatz = when (vorgang) {
+        AnleiheVorgang.EMISSION -> if (
+            nennwertWert != null && nennwertWert > 0 && zinsWert != null
+        ) {
+            zinsWert.toDouble() / nennwertWert * 100.0
+        } else {
+            null
+        }
+        AnleiheVorgang.VERKAUF,
+        AnleiheVorgang.RUECKKAUF -> ausgewaehlteAnleihe?.let { eintrag ->
+            val nennwert = eintrag.sondervermoegen.toDoubleOderNull()
+            if (nennwert == 0.0) null else eintrag.unvermoegen.toDoubleOderNull() / nennwert * 100.0
+        }
+    }
+    val leitzins = spiel.leitzinssatz(aktuelleRunde)?.toDouble()
+    val leitzinsabweichung = relativeProzentabweichung(
+        aktuellerWert = anleiheZinssatz,
+        referenzwert = leitzins,
+    )
     val fehler = when {
         aktuellerSpieler == null || auswahl == null -> "Der aktive Spieler ist nicht verfügbar."
         verkaeufer == null || kaeufer == null -> "Es sind keine passenden Beteiligten vorhanden."
@@ -302,6 +448,15 @@ fun AnleiheDialog(
                         ) { preis = it }
                     }
                 }
+                Text(
+                    text = "Anleihezins: ${anleiheZinssatz?.let(::prozentwertText) ?: "–"}",
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Text("Leitzins: ${leitzins?.let(::prozentwertText) ?: "–"}")
+                AbweichungsText(
+                    label = "Abweichung zum Leitzins",
+                    abweichung = leitzinsabweichung,
+                )
                 fehler?.let {
                     Text(
                         text = it,
@@ -380,9 +535,10 @@ private fun PersonenAuswahl(
 }
 
 @Composable
-private fun RohstoffAuswahl(
-    auswahl: Rohstoffe,
-    onSelect: (Rohstoffe) -> Unit,
+private fun HandelsgutAuswahlFeld(
+    auswahl: HandelsgutAuswahl,
+    handelbareAnleihen: List<AnleiheAnzeige>,
+    onSelect: (HandelsgutAuswahl) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(
@@ -394,20 +550,41 @@ private fun RohstoffAuswahl(
             onClick = { expanded = true },
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Rohstoff: ${auswahl.str}")
+            Text("Handelsgut: ${auswahl.bezeichnung()}")
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            DropdownMenuItem(
+                text = { Text("Rohstoffe", fontWeight = FontWeight.Bold) },
+                enabled = false,
+                onClick = {},
+            )
             Rohstoffe.entries.forEach { rohstoff ->
                 DropdownMenuItem(
                     text = { Text(rohstoff.str) },
                     onClick = {
-                        onSelect(rohstoff)
+                        onSelect(HandelsgutAuswahl.Rohstoff(rohstoff))
                         expanded = false
                     },
                 )
+            }
+            if (handelbareAnleihen.isNotEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("Anleihen", fontWeight = FontWeight.Bold) },
+                    enabled = false,
+                    onClick = {},
+                )
+                handelbareAnleihen.forEach { anleihe ->
+                    DropdownMenuItem(
+                        text = { Text(HandelsgutAuswahl.AnleiheWert(anleihe).bezeichnung()) },
+                        onClick = {
+                            onSelect(HandelsgutAuswahl.AnleiheWert(anleihe))
+                            expanded = false
+                        },
+                    )
+                }
             }
         }
     }

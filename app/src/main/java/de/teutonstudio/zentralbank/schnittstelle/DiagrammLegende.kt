@@ -64,6 +64,14 @@ fun rememberDiagrammLegendenStatus(
 }
 
 @Composable
+fun rememberExklusivenDiagrammLegendenStatus(
+    eintraege: List<DiagrammLegendenEintrag>,
+): DiagrammLegendenStatus {
+    val ids = eintraege.map { it.id }
+    return remember(ids) { DiagrammLegendenStatus(ids.take(1)) }
+}
+
+@Composable
 fun UmschaltbareDiagrammLegende(
     eintraege: List<DiagrammLegendenEintrag>,
     status: DiagrammLegendenStatus,

@@ -106,6 +106,8 @@ object TestSpiel : Spiel(
                 rohstoff(clara, eva, 16, 2, Rohstoffe.STAHL),
                 rohstoff(david, bernd, 10, 1, Rohstoffe.DIESEL),
                 rohstoff(bernd, anna, 7, 1, Rohstoffe.KOHLE),
+                Anleihenhandel(clara, david, anleiheBernd1, 64.toZahlungsmittel()),
+                Anleihenhandel(eva, clara, anleiheAnna1, 83.toZahlungsmittel()),
             ),
             konfliktDaten = emptySet(),
         )
@@ -134,7 +136,6 @@ object TestSpiel : Spiel(
             handelDaten = setOf(
                 rohstoff(bernd, clara, 9, 3, Rohstoffe.LEHM),
                 rohstoff(clara, anna, 18, 1, Rohstoffe.SCHWERÖL),
-                Anleihenhandel(clara, david, anleiheBernd1, 64.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
                 vertrag(bernd, eva, Vertragsart.KRIEGSERKLÄRUNG),
@@ -178,7 +179,6 @@ object TestSpiel : Spiel(
             handelDaten = setOf(
                 rohstoff(clara, bernd, 11, 2, Rohstoffe.ZIEGEL),
                 rohstoff(david, anna, 17, 1, Rohstoffe.DIESEL),
-                Anleihenhandel(eva, clara, anleiheAnna1, 83.toZahlungsmittel()),
                 Anleihenhandel(franz, georg, anleiheFranzFaellig, 50.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
@@ -197,6 +197,7 @@ object TestSpiel : Spiel(
                 rohstoff(bernd, clara, 14, 1, Rohstoffe.EISEN),
                 rohstoff(eva, david, 10, 2, Rohstoffe.NAHRUNG),
                 rohstoff(Ausland, clara, 20, 2, Rohstoffe.ROHÖL),
+                Anleihenhandel(bernd, eva, anleiheDavid1, 74.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
                 vertrag(clara, anna, Vertragsart.KRIEGSERKLÄRUNG),
@@ -211,7 +212,6 @@ object TestSpiel : Spiel(
             handelDaten = setOf(
                 rohstoff(clara, david, 22, 1, Rohstoffe.ROHÖL),
                 rohstoff(david, bernd, 13, 1, Rohstoffe.DIESEL),
-                Anleihenhandel(bernd, eva, anleiheDavid1, 74.toZahlungsmittel()),
                 Anleihenhandel(georg, bernd, anleiheGeorgOffen, 65.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
@@ -229,6 +229,7 @@ object TestSpiel : Spiel(
                 rohstoff(bernd, clara, 15, 2, Rohstoffe.KOHLE),
                 rohstoff(david, eva, 16, 2, Rohstoffe.EISEN),
                 rohstoff(eva, Ausland, 24, 3, Rohstoffe.NAHRUNG),
+                Anleihenhandel(david, bernd, anleiheEva1, 104.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
                 vertrag(clara, anna, Vertragsart.FRIEDENSERKLÄRUNG),
@@ -244,7 +245,6 @@ object TestSpiel : Spiel(
             handelDaten = setOf(
                 rohstoff(anna, david, 18, 2, Rohstoffe.STAHL),
                 rohstoff(clara, eva, 20, 1, Rohstoffe.SCHWERÖL),
-                Anleihenhandel(david, bernd, anleiheEva1, 104.toZahlungsmittel()),
             ),
             konfliktDaten = emptySet(),
         )

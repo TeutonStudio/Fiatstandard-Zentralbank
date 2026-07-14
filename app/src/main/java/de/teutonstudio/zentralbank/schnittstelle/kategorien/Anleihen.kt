@@ -162,6 +162,7 @@ fun Header(
     selectedRelevance: String,
     selectedDuration: String,
     showManagementView: Boolean,
+    aktiverSpielerName: String?,
     onChosePlayer: (String) -> Unit,
     onChoseRound: (Int) -> Unit,
     onChoseRelevance: (String) -> Unit,
@@ -212,6 +213,7 @@ fun Header(
             selectedRelevance = selectedRelevance,
             selectedDuration = selectedDuration,
             showManagementView = showManagementView,
+            aktiverSpielerName = aktiverSpielerName,
             onChosePlayer = onChosePlayer,
             onChoseRound = onChoseRound,
             onChoseRelevance = onChoseRelevance,
@@ -592,16 +594,18 @@ private fun HeaderControls(
     selectedRelevance: String,
     selectedDuration: String,
     showManagementView: Boolean,
+    aktiverSpielerName: String?,
     onChosePlayer: (String) -> Unit,
     onChoseRound: (Int) -> Unit,
     onChoseRelevance: (String) -> Unit,
     onChoseDuration: (String) -> Unit,
     onChangeView: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
         HeaderDropdownCard(
             title = "Siedler:",
             value = selectedPlayer,
@@ -621,8 +625,8 @@ private fun HeaderControls(
 
         if (showManagementView) {
             HeaderDropdownCard(
-                title = "Leitzins:",
-                value = selectedRound?.let { "${spiel.leitzinssatz(selectedRound)} %" } ?: "",
+                title = "Runde:",
+                value = selectedRound?.toString() ?: "–",
                 liste = List(spiel.aktuelleRunde) { it.toString() }.reversed(),
                 modifierChoseLegende = modifierChoseLegende,
                 modifierChoseLabel = modifierChoseLabel,
@@ -654,6 +658,55 @@ private fun HeaderControls(
                     fontSize = 25.sp,
                     modifier = modifierChoseLabel,
                 )
+            }
+        }
+        }
+        ZugFortschrittZeile(
+            spiel = spiel,
+            aktiverSpielerName = aktiverSpielerName,
+        )
+    }
+}
+
+@Composable
+private fun ZugFortschrittZeile(
+    spiel: Spiel,
+    aktiverSpielerName: String?,
+) {
+    val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
+    val aktiverIndex = spiel.spielerListe.indexOfFirst { spieler ->
+        spieler.name == aktiverSpielerName
+    }.takeIf { index -> index >= 0 } ?: 0
+    val verbleibendeZuege = (spiel.spielerListe.size - aktiverIndex).coerceAtLeast(0)
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "$verbleibendeZuege Züge bis zu den neu berechneten Marktpreisen",
+            fontSize = 11.sp,
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            spiel.spielerListe.forEachIndexed { index, spieler ->
+                val istAktiv = index == aktiverIndex
+                Card(
+                    modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (istAktiv) {
+                            spielerFarben.getValue(spieler)
+                        } else {
+                            Color(0xFFE1E1E1)
+                        },
+                    ),
+                ) {
+                    Text(
+                        text = spieler.name,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                        fontSize = if (istAktiv) 11.sp else 9.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
@@ -709,6 +762,7 @@ fun AnleihenRegister(
     runden: List<Runde>,
     onDelete: (AnleiheAnzeige) -> Unit = {},
     onNew: (Anleihe) -> Unit = {},
+    aktiverSpielerName: String? = null,
 ) {
     var eingabeSpieler by remember(spiel.spielerStringListe) { mutableStateOf(GLOBAL_PLAYER) }
     var eingabeRunde by remember(spiel.aktuelleRunde) {
@@ -733,6 +787,7 @@ fun AnleihenRegister(
             selectedRelevance = eingabeRelevanz,
             selectedDuration = eingabeLaufzeit,
             showManagementView = zeigeVerwaltung,
+            aktiverSpielerName = aktiverSpielerName,
             onChosePlayer = {
                 eingabeSpieler = it
                 geoeffneteAnleihe = null
@@ -942,6 +997,7 @@ private fun AnleiheAblauf(
                     betrag = "eingeklappt",
                     hintergrund = rundenHintergrund,
                     beiRundenKlick = beiRundenKlick,
+                    istKompakt = true,
                 )
             } else {
                 ereignisse.forEach { ereignis ->
@@ -973,6 +1029,7 @@ private fun AnleiheAblaufTabellenzeile(
     beiRundenKlick: (() -> Unit)? = null,
     buchungssatzSchalterAktiv: Boolean? = null,
     beiBuchungssatzAenderung: ((Boolean) -> Unit)? = null,
+    istKompakt: Boolean = false,
 ) {
     Row(
         modifier = Modifier
@@ -985,6 +1042,7 @@ private fun AnleiheAblaufTabellenzeile(
             modifier = Modifier.weight(0.6f),
             istKopfzeile = istKopfzeile,
             beiKlick = beiRundenKlick,
+            istKompakt = istKompakt,
         )
         if (buchungssatzSchalterAktiv != null && beiBuchungssatzAenderung != null) {
             AnleiheBuchungssatzKopfzelle(
@@ -998,6 +1056,7 @@ private fun AnleiheAblaufTabellenzeile(
                 text = zahlungsempfaenger,
                 modifier = Modifier.weight(1.4f),
                 istKopfzeile = istKopfzeile,
+                istKompakt = istKompakt,
             )
         }
         AnleiheTabellenZelle(
@@ -1005,6 +1064,7 @@ private fun AnleiheAblaufTabellenzeile(
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.End,
             istKopfzeile = istKopfzeile,
+            istKompakt = istKompakt,
         )
     }
 }
@@ -1045,14 +1105,26 @@ private fun AnleiheTabellenZelle(
     textAlign: TextAlign = TextAlign.Center,
     istKopfzeile: Boolean = false,
     beiKlick: (() -> Unit)? = null,
+    istKompakt: Boolean = false,
 ) {
     val zellenModifier = if (beiKlick == null) modifier else modifier.clickable(onClick = beiKlick)
     Text(
         text = text,
         modifier = zellenModifier
             .border(0.5.dp, Color(0xFF8D8D8D))
-            .padding(horizontal = 3.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
-        fontSize = if (istKopfzeile) 9.sp else 10.sp,
+            .padding(
+                horizontal = 3.dp,
+                vertical = when {
+                    istKopfzeile -> 5.dp
+                    istKompakt -> 1.dp
+                    else -> 4.dp
+                },
+            ),
+        fontSize = when {
+            istKopfzeile -> 9.sp
+            istKompakt -> 8.sp
+            else -> 10.sp
+        },
         textAlign = textAlign,
     )
 }

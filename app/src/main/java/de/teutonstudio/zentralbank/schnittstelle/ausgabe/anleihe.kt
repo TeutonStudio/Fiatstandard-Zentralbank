@@ -217,7 +217,7 @@ fun zeigeAnleihe(
                     )
 
                     val restRunden =
-                        anleihe.erhalteHerausgabe() + stammAnleihe.laufzeit - aktuelleRunde
+                        stammAnleihe.faelligkeitsrunde(anleihe.erhalteHerausgabe()) - aktuelleRunde
 
                     if (restRunden > 0) {
                         Text(
@@ -262,7 +262,7 @@ private fun AnleihenAblauf(
     val emission = handel.first().value
     val herausgeber = emission.besitzer
     val stammAnleihe = emission.anleihe
-    val letzteZahlungsrunde = herausgabe + stammAnleihe.laufzeit
+    val letzteZahlungsrunde = stammAnleihe.faelligkeitsrunde(herausgabe)
 
     var aktuellerGläubiger = emission.erwerber
     var nächsteZahlungsrunde = herausgabe + 1
@@ -387,18 +387,18 @@ private fun Map<Int, Anleihenhandel>.istFällig(
     aktuelleRunde: Int,
 ): Boolean {
     val herausgabe = keys.minOrNull() ?: return false
-    val laufzeit = erhalteAnleihe()?.laufzeit ?: return false
+    val anleihe = erhalteAnleihe() ?: return false
 
-    return aktuelleRunde in (herausgabe + 1)..(herausgabe + laufzeit)
+    return aktuelleRunde in (herausgabe + 1)..anleihe.faelligkeitsrunde(herausgabe)
 }
 
 private fun Map<Int, Anleihenhandel>.istAbgelaufen(
     aktuelleRunde: Int,
 ): Boolean {
     val herausgabe = keys.minOrNull() ?: return false
-    val laufzeit = erhalteAnleihe()?.laufzeit ?: return false
+    val anleihe = erhalteAnleihe() ?: return false
 
-    return aktuelleRunde > herausgabe + laufzeit
+    return aktuelleRunde > anleihe.faelligkeitsrunde(herausgabe)
 }
 
 

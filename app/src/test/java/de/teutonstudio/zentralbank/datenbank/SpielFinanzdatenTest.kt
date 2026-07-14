@@ -51,18 +51,21 @@ class SpielFinanzdatenTest {
         assertFinanzdaten(spiel, 2, 174, 80, 6, 86, 150)
 
         spiel.fügeLeereRundeHinzu()
-        assertFinanzdaten(spiel, 3, 88, 0, 0, 0, 150)
+        assertFinanzdaten(spiel, 3, 168, 80, 0, 80, 150)
+
+        spiel.fügeLeereRundeHinzu()
+        assertFinanzdaten(spiel, 4, 88, 0, 0, 0, 150)
 
         assertEquals(
-            listOf(0, 80, 80, 0),
+            listOf(0, 80, 80, 80, 0),
             spiel.globaleSchulden.map { it.toIntOderNull() },
         )
         assertEquals(
-            listOf(0, 12, 6, 0),
+            listOf(0, 12, 6, 0, 0),
             spiel.globaleZinsschulden.map { it.toIntOderNull() },
         )
         assertEquals(
-            listOf(0, 92, 86, 0),
+            listOf(0, 92, 86, 80, 0),
             spiel.globaleKombinierteSchulden.map { it.toIntOderNull() },
         )
     }
@@ -238,7 +241,7 @@ class SpielFinanzdatenTest {
             ),
             ablauf.map { it.art },
         )
-        assertEquals(listOf(1, 2, 2, 3, 3), ablauf.map { it.runde })
+        assertEquals(listOf(1, 2, 2, 3, 4), ablauf.map { it.runde })
         assertEquals(Geschäftsbank, ablauf[2].an)
         assertEquals(Geschäftsbank, ablauf[3].an)
         assertEquals(Geschäftsbank, ablauf[4].an)
@@ -257,6 +260,22 @@ class SpielFinanzdatenTest {
             ablauf.map { eintrag -> eintrag.buchungssatz },
         )
         assertEquals(anzeige.faelligkeit, ablauf.maxOf { eintrag -> eintrag.runde })
+    }
+
+    @Test
+    fun berndsFuenfRundenAnleiheWirdInRundeAchtDurchBerndGetilgt() {
+        val anleihe = TestSpiel.anleihen.single { eintrag ->
+            eintrag.schuldiger.name == "Bernd" && eintrag.sondervermoegen == 60.toZahlungsmittel()
+        }
+        val ablauf = anleihe.erhalteAblauf()
+
+        assertEquals(8, anleihe.faelligkeit)
+        assertEquals((2..8).toList(), ablauf.map { eintrag -> eintrag.runde }.distinct())
+        assertFalse(ablauf.any { eintrag -> eintrag.runde == 9 })
+        assertEquals(
+            listOf("Bernd an David"),
+            ablauf.filter { eintrag -> eintrag.runde == 8 }.map { eintrag -> eintrag.buchungssatz },
+        )
     }
 
     @Test
@@ -319,6 +338,62 @@ class SpielFinanzdatenTest {
         assertEquals(listOf(-12, -40, 2, 42), ablauf.map { eintrag -> eintrag.preis.toIntOderNull() })
         assertEquals(3, ablauf.first().anzahl)
         assertEquals("lehm", ablauf.first().rohstoffOderVorgang)
+    }
+
+    @Test
+    fun rohstoffHandelsstueckDifferenzWirdJeSpielerKumuliert() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    betrag = 12.toZahlungsmittel(),
+                    anzahl = 3,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = bernd,
+                    erwerber = anna,
+                    betrag = 5.toZahlungsmittel(),
+                    anzahl = 1,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        assertEquals(
+            listOf(0, 3, 2),
+            spiel.erhalteRohstoffHandelsstueckDifferenz(anna)
+                .map { differenz -> differenz.getValue(Rohstoffe.HOLZ) },
+        )
+        assertEquals(
+            listOf(0, -3, -2),
+            spiel.erhalteRohstoffHandelsstueckDifferenz(bernd)
+                .map { differenz -> differenz.getValue(Rohstoffe.HOLZ) },
+        )
+    }
+
+    @Test
+    fun bearbeitbarerWarenkorbAendertPreisinflationswarenkorbNicht() {
+        val spiel = neuesSpiel(anna to 100.toZahlungsmittel())
+        val preisinflationswarenkorb = spiel.preisinflationswarenkorb
+
+        spiel.aktualisiereWarenkorb(mapOf(Rohstoffe.STAHL to 4))
+
+        assertEquals(preisinflationswarenkorb, spiel.preisinflationswarenkorb)
+        assertEquals(mapOf(Rohstoffe.STAHL to 4), spiel.warenkorb)
     }
 
     @Test

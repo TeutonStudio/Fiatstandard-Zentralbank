@@ -15,7 +15,9 @@ import kotlin.math.sign
 
 private fun Spiel.baueCache(idx:Int): Zahlungsmittel {
     if (idx == 0) return Zahlungsmittel()
-    return warenkorb.entries.summeGeld { (key, value) -> marktpreise[idx][key]!! * value }
+    return preisinflationswarenkorb.entries.summeGeld { (key, value) ->
+        marktpreise[idx][key]!! * value
+    }
 }
 private fun Spieler.baueCache(idx:Int,cache:List<Map<out Bauteil,Int>>): Map<Bauteil,Int> {
     if (idx == 0) return Bauteil.entries.associateWith { (gebaut.first()[it]?:0) + (kontrolle.first()[it]?:0) }
@@ -89,14 +91,13 @@ private fun Handelsregister.baueLiquidität(idx:Int,liquidität:List<Map<Juristi
     // Zinsen und Rückkauf am Ende der Runde buchen
     erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert,anleihe,handelsZuordnung) ->
         val besitzer = handelsZuordnung.gläubiger(idx)!!
-        val fälligkeitsrunde = emittiert + anleihe.laufzeit
+        val fälligkeitsrunde = anleihe.faelligkeitsrunde(emittiert)
 
         if (anleihe.istStartguthaben()) {
             if (idx == emittiert) neu.zins(anleihe, besitzer)
         } else if (idx in (emittiert + 1) until fälligkeitsrunde) {
             neu.zins(anleihe, besitzer)
         } else if (idx == fälligkeitsrunde) {
-            neu.zins(anleihe, besitzer)
             neu.tilgt(anleihe, besitzer)
         }
     }
@@ -118,12 +119,12 @@ private fun Handelsregister.baueSchuldenstand(idx:Int): Schuldenstand {
     erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert,anleihe,_) ->
         if (anleihe.istStartguthaben()) return@forEachTriple
 
-        val fälligkeitsrunde = emittiert + anleihe.laufzeit
+        val fälligkeitsrunde = anleihe.faelligkeitsrunde(emittiert)
         if (idx in emittiert until fälligkeitsrunde) {
             val schuldiger = anleihe.schuldiger
             kapital[schuldiger] = kapital.getValue(schuldiger) + anleihe.sondervermögen
 
-            val verbleibendeZinsrunden = (fälligkeitsrunde - idx).coerceAtLeast(0)
+            val verbleibendeZinsrunden = (fälligkeitsrunde - idx - 1).coerceAtLeast(0)
             zinsen[schuldiger] = zinsen.getValue(schuldiger) +
                     anleihe.unvermögen * verbleibendeZinsrunden
         }
@@ -213,7 +214,9 @@ open class Spiel(
     private val handel: Handelsregister, // Handelsdaten während des Spiels
     private val konflikt: Kriegsregister,
 ) {
-    public var warenkorb: Map<Rohstoffe, Int> = warenkorb.filterValues { menge -> menge > 0 }
+    public val preisinflationswarenkorb: Map<Rohstoffe, Int> =
+        warenkorb.filterValues { menge -> menge > 0 }.toMap()
+    public var warenkorb: Map<Rohstoffe, Int> = preisinflationswarenkorb
         private set
 
     constructor(
@@ -338,6 +341,9 @@ open class Spiel(
                         "Eine neue Anleihe muss vom aktiven Emittenten ausgegeben werden."
                     }
                 } else {
+                    require((aktuelleRunde - 1) < bestehendeAnleihe.faelligkeit) {
+                        "Eine fällige Anleihe kann nicht mehr gehandelt werden."
+                    }
                     require(neuerHandel.besitzer == bestehendeAnleihe.aktuellerBesitzer) {
                         "Nur der aktuelle Besitzer kann diese Anleihe verkaufen."
                     }
@@ -355,6 +361,29 @@ open class Spiel(
 
     fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
         handel.erhalteHandelsverlauf(spieler)
+
+    fun erhalteRohstoffHandelsstueckDifferenz(
+        spieler: Spieler,
+    ): List<Map<Rohstoffe, Int>> {
+        val handelNachRunde = erhalteHandelsverlauf(spieler)
+            .mapNotNull { eintrag ->
+                (eintrag.handel as? RohstoffHandel)?.let { handel -> eintrag.runde to handel }
+            }
+            .groupBy({ (runde, _) -> runde }, { (_, handel) -> handel })
+        val kumuliert = Rohstoffe.entries.associateWith { 0 }.toMutableMap()
+
+        return List(aktuelleRunde) { runde ->
+            handelNachRunde[runde].orEmpty().forEach { handel ->
+                val differenz = when (spieler) {
+                    handel.besitzer -> handel.anzahl
+                    handel.erwerber -> -handel.anzahl
+                    else -> 0
+                }
+                kumuliert[handel.rohstoff] = kumuliert.getValue(handel.rohstoff) + differenz
+            }
+            kumuliert.toMap()
+        }
+    }
 
     fun erhalteSpielerAblauf(spieler: Spieler): List<SpielerAblaufEintrag> {
         val handelsZeilen = erhalteHandelsverlauf(spieler).mapNotNull { eintrag ->
@@ -476,7 +505,7 @@ open class Spiel(
 
     private fun erhaltePreisWarenkorb(
         marktpreise: Map<Rohstoffe, Zahlungsmittel>,
-    ): Zahlungsmittel = warenkorb.entries.summeGeld { (rohstoff, menge) ->
+    ): Zahlungsmittel = preisinflationswarenkorb.entries.summeGeld { (rohstoff, menge) ->
         marktpreise.getOrDefault(rohstoff, Zahlungsmittel()) * menge
     }
 
@@ -637,7 +666,11 @@ data class Handelsregister(
     }
 
     public fun erhalteRelevanteAnleihen(runde: Int): Map<Pair<Int, Anleihe>,Map<Int, Anleihenhandel>> = erhalteEmittierteAnleihen().flatMapIndexed { emittiert, anleihen -> anleihen.map {
-        if (runde in emittiert..emittiert+it.laufzeit) (emittiert to it) to erhalteRelevanteAnleihenhandel(it) else null
+        if (runde in emittiert..it.faelligkeitsrunde(emittiert)) {
+            (emittiert to it) to erhalteRelevanteAnleihenhandel(it)
+        } else {
+            null
+        }
     } }.filterNotNull().toMap()
 
     public fun erhalteMarktpreisRelevante(): List<Set<RohstoffHandel>> = einträge.map { it.filterIsInstance<RohstoffHandel>().toSet() }
@@ -811,6 +844,8 @@ class Anleihe(
     val unvermögen: Zahlungsmittel,
     val laufzeit: Int,
 ) {
+    fun faelligkeitsrunde(emittiert: Int): Int = emittiert + laufzeit + 1
+
     fun erhalteZinssatz(): Int { // unvermögen/sondervermögen*100
         return (sondervermögen.erhalteZinssatz(unvermögen) * 100).toInt()
     }

@@ -157,7 +157,7 @@ data class AnleiheAnzeige(
     )
 
     val schuldiger: JuristischePerson get() = anleihe.schuldiger
-    val faelligkeit: Int get() = emittiert + anleihe.laufzeit
+    val faelligkeit: Int get() = anleihe.faelligkeitsrunde(emittiert)
     val laufzeit: Int get() = anleihe.laufzeit
     val sondervermoegen: Zahlungsmittel get() = anleihe.sondervermögen
     val unvermoegen: Zahlungsmittel get() = anleihe.unvermögen
@@ -165,7 +165,10 @@ data class AnleiheAnzeige(
     fun erhalteAblauf(): List<AnleiheAblaufEintrag> {
         val ereignisse = mutableListOf<AnleiheAblaufEintrag>()
 
-        handelsverlauf.toSortedMap().forEach { (runde, handel) ->
+        handelsverlauf
+            .filterKeys { runde -> runde < faelligkeit }
+            .toSortedMap()
+            .forEach { (runde, handel) ->
             ereignisse += AnleiheAblaufEintrag(
                 runde = runde,
                 art = if (runde == emittiert) {
@@ -179,7 +182,7 @@ data class AnleiheAnzeige(
             )
         }
 
-        ((emittiert + 1)..faelligkeit).forEach { runde ->
+        ((emittiert + 1) until faelligkeit).forEach { runde ->
             val gläubiger = handelsverlauf.gläubiger(runde) ?: return@forEach
             ereignisse += AnleiheAblaufEintrag(
                 runde = runde,
@@ -188,15 +191,15 @@ data class AnleiheAnzeige(
                 an = gläubiger,
                 betrag = unvermoegen,
             )
-            if (runde == faelligkeit) {
-                ereignisse += AnleiheAblaufEintrag(
-                    runde = runde,
-                    art = AnleiheAblaufArt.RUECKKAUF,
-                    von = schuldiger,
-                    an = gläubiger,
-                    betrag = sondervermoegen,
-                )
-            }
+        }
+        handelsverlauf.gläubiger(faelligkeit)?.let { gläubiger ->
+            ereignisse += AnleiheAblaufEintrag(
+                runde = faelligkeit,
+                art = AnleiheAblaufArt.RUECKKAUF,
+                von = schuldiger,
+                an = gläubiger,
+                betrag = sondervermoegen,
+            )
         }
 
         return ereignisse.sortedWith(

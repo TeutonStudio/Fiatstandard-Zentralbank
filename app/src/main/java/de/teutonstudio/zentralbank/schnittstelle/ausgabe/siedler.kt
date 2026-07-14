@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -608,6 +611,9 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
     var eingeklappteRunden by remember(ablauf) { mutableStateOf(emptySet<Int>()) }
     var geschaeftspartnerFilter by remember(ablauf) { mutableStateOf<String?>(null) }
     var rohstoffFilter by remember(ablauf) { mutableStateOf<String?>(null) }
+    var minRundeEingabe by remember(ablauf) {
+        mutableStateOf(ablauf.minOfOrNull { eintrag -> eintrag.runde }?.toString() ?: "0")
+    }
     var geschaeftspartnerMenueOffen by remember { mutableStateOf(false) }
     var rohstoffMenueOffen by remember { mutableStateOf(false) }
     val geschaeftspartnerOptionen = remember(ablauf) {
@@ -616,13 +622,25 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
     val rohstoffOptionen = remember(ablauf) {
         ablauf.map { eintrag -> eintrag.rohstoffOderVorgang }.distinct().sorted()
     }
-    val gefilterterAblauf = ablauf.filter { eintrag ->
+    val minRunde = minRundeEingabe.toIntOrNull() ?: 0
+    val nachSachfilter = ablauf.filter { eintrag ->
         (geschaeftspartnerFilter == null ||
             eintrag.geschaeftspartner == geschaeftspartnerFilter) &&
             (rohstoffFilter == null || eintrag.rohstoffOderVorgang == rohstoffFilter)
     }
+    val gefilterterAblauf = nachSachfilter.filter { eintrag -> eintrag.runde >= minRunde }
+    val maximaleRunde = ablauf.maxOfOrNull { eintrag -> eintrag.runde }
+    val minRundenSaldo = nachSachfilter
+        .filter { eintrag -> eintrag.runde <= minRunde }
+        .fold(Zahlungsmittel()) { summe, eintrag -> summe + eintrag.preis }
     val rundenGruppen = gefilterterAblauf
         .groupBy { eintrag -> eintrag.runde }
+        .toMutableMap()
+        .apply {
+            if (maximaleRunde != null && minRunde <= maximaleRunde) {
+                putIfAbsent(minRunde, emptyList())
+            }
+        }
         .toSortedMap(reverseOrder())
 
     Column(
@@ -637,6 +655,17 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                 modifier = Modifier.padding(8.dp),
             )
         } else {
+            OutlinedTextField(
+                value = minRundeEingabe,
+                onValueChange = { neu ->
+                    if (neu.all(Char::isDigit)) minRundeEingabe = neu
+                },
+                label = { Text("minRunde") },
+                supportingText = { Text("Kleinste dargestellte Runde") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
+            )
             SpielerAblaufKopfzeile(
                 geschaeftspartnerFilter = geschaeftspartnerFilter,
                 geschaeftspartnerOptionen = geschaeftspartnerOptionen,
@@ -655,13 +684,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                     rohstoffMenueOffen = false
                 },
             )
-            if (gefilterterAblauf.isEmpty()) {
-                Text(
-                    text = "Keine Abläufe für diese Filter.",
-                    modifier = Modifier.padding(8.dp),
-                )
-            } else {
-                rundenGruppen.forEach { (runde, zeilen) ->
+            rundenGruppen.forEach { (runde, zeilen) ->
                     val istEingeklappt = runde in eingeklappteRunden
                     val beiRundenKlick = {
                         eingeklappteRunden = if (istEingeklappt) {
@@ -671,8 +694,10 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                         }
                     }
                     if (istEingeklappt) {
-                        val saldo = zeilen.fold(Zahlungsmittel()) { summe, zeile ->
-                            summe + zeile.preis
+                        val saldo = if (runde == minRunde) {
+                            minRundenSaldo
+                        } else {
+                            zeilen.fold(Zahlungsmittel()) { summe, zeile -> summe + zeile.preis }
                         }
                         SpielerAblaufTabellenzeile(
                             runde = runde.toString(),
@@ -681,8 +706,20 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                             preis = "Saldo: ${saldo.zuMark()}",
                             hintergrund = Color(0xFFE1E1E1),
                             beiRundenKlick = beiRundenKlick,
+                            istKompakt = true,
                         )
                     } else {
+                        if (runde == minRunde) {
+                            SpielerAblaufTabellenzeile(
+                                runde = runde.toString(),
+                                geschaeftspartner = "kumulativ",
+                                rohstoffOderVorgang = "Saldo zum Rundenende",
+                                preis = minRundenSaldo.zuMark(),
+                                hintergrund = Color(0xFFE1E1E1),
+                                beiRundenKlick = beiRundenKlick,
+                                istKompakt = true,
+                            )
+                        }
                         zeilen.forEach { eintrag ->
                             val rohstoffMitAnzahl = eintrag.anzahl?.let { anzahl ->
                                 "${eintrag.rohstoffOderVorgang} ($anzahl Stk)"
@@ -702,7 +739,6 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                         }
                     }
                 }
-            }
         }
     }
 }
@@ -716,6 +752,7 @@ private fun SpielerAblaufTabellenzeile(
     hintergrund: Color,
     istKopfzeile: Boolean = false,
     beiRundenKlick: (() -> Unit)? = null,
+    istKompakt: Boolean = false,
 ) {
     Row(
         modifier = Modifier
@@ -728,23 +765,27 @@ private fun SpielerAblaufTabellenzeile(
             modifier = Modifier.weight(0.5f),
             istKopfzeile = istKopfzeile,
             beiKlick = beiRundenKlick,
+            istKompakt = istKompakt,
         )
         TabellenZelle(
             text = geschaeftspartner,
             modifier = Modifier.weight(1.15f),
             istKopfzeile = istKopfzeile,
+            istKompakt = istKompakt,
         )
         TabellenZelle(
             text = rohstoffOderVorgang,
             modifier = Modifier.weight(1.55f),
             textAlign = TextAlign.Start,
             istKopfzeile = istKopfzeile,
+            istKompakt = istKompakt,
         )
         TabellenZelle(
             text = preis,
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.End,
             istKopfzeile = istKopfzeile,
+            istKompakt = istKompakt,
         )
     }
 }
@@ -840,14 +881,26 @@ private fun TabellenZelle(
     textAlign: TextAlign = TextAlign.Center,
     istKopfzeile: Boolean = false,
     beiKlick: (() -> Unit)? = null,
+    istKompakt: Boolean = false,
 ) {
     val zellenModifier = if (beiKlick == null) modifier else modifier.clickable(onClick = beiKlick)
     Text(
         text = text,
         modifier = zellenModifier
             .border(0.5.dp, Color(0xFF9A9A9A))
-            .padding(horizontal = 4.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
-        fontSize = if (istKopfzeile) 10.sp else 11.sp,
+            .padding(
+                horizontal = 4.dp,
+                vertical = when {
+                    istKopfzeile -> 5.dp
+                    istKompakt -> 1.dp
+                    else -> 4.dp
+                },
+            ),
+        fontSize = when {
+            istKopfzeile -> 10.sp
+            istKompakt -> 9.sp
+            else -> 11.sp
+        },
         textAlign = textAlign,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

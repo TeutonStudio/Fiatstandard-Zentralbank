@@ -23,7 +23,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AusgabenDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
-import de.teutonstudio.zentralbank.schnittstelle.eingabe.RohstoffHandelDialog
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.HandelDialog
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.AnleihenRegister
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Hauptmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielErstellen
@@ -140,8 +140,16 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.DebtSaldo.route) { // TODO
+            val domainState = viewModel.domainState.collectAsState().value
             Titel(Screen.Game.navigiere(navController)) {
-                AnleihenRegister(viewModel.aktuellesSpiel, emptyMap(),emptyList(),  {},{})
+                AnleihenRegister(
+                    spiel = viewModel.aktuellesSpiel,
+                    spielerBauSaldo = emptyMap(),
+                    runden = emptyList(),
+                    onDelete = {},
+                    onNew = {},
+                    aktiverSpielerName = domainState?.zugStatus?.spieler?.wert,
+                )
             }
         }
 
@@ -161,11 +169,16 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.NewTrade.route) {
-            RohstoffHandelDialog(
+            HandelDialog(
                 spiel = viewModel.aktuellesSpiel,
                 onDismiss = { navController.popBackStack() },
-                onCreate = { handel ->
+                onCreateRohstoff = { handel ->
                     if (viewModel.erfasseRohstoffhandel(handel)) {
+                        navController.popBackStack()
+                    }
+                },
+                onCreateAnleihe = { handel ->
+                    if (viewModel.erfasseAnleihenhandel(handel)) {
                         navController.popBackStack()
                     }
                 },
