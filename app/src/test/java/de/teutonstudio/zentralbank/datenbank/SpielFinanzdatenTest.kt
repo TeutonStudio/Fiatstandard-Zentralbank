@@ -241,6 +241,116 @@ class SpielFinanzdatenTest {
         assertEquals(Geschäftsbank, ablauf[2].an)
         assertEquals(Geschäftsbank, ablauf[3].an)
         assertEquals(Geschäftsbank, ablauf[4].an)
+        assertEquals(
+            listOf(anna, bernd, Geschäftsbank, Geschäftsbank, Geschäftsbank),
+            ablauf.map { eintrag -> eintrag.zahlungsempfaenger },
+        )
+    }
+
+    @Test
+    fun spielerAblaufEnthaeltRohstoffhandelAnleiheKaufVerkaufUndErhalteneZinsen() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = anna,
+            sondervermögen = 40.toZahlungsmittel(),
+            unvermögen = 2.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    betrag = 12.toZahlungsmittel(),
+                    anzahl = 3,
+                    rohstoff = Rohstoffe.LEHM,
+                ),
+                Anleihenhandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    anleihe = anleihe,
+                    preis = 40.toZahlungsmittel(),
+                ),
+            ),
+            konfliktDaten = emptySet(),
+        )
+        spiel.beginneNaechsteRunde()
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = bernd,
+                    erwerber = Geschäftsbank,
+                    anleihe = anleihe,
+                    preis = 42.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        val ablauf = spiel.erhalteSpielerAblauf(bernd)
+
+        assertEquals(
+            listOf(
+                SpielerAblaufArt.ROHSTOFFHANDEL,
+                SpielerAblaufArt.ANLEIHE_ERWORBEN,
+                SpielerAblaufArt.ZINS_ERHALTEN,
+                SpielerAblaufArt.ANLEIHE_VERKAUFT,
+            ),
+            ablauf.map { eintrag -> eintrag.art },
+        )
+        assertEquals(listOf(1, 1, 2, 3), ablauf.map { eintrag -> eintrag.runde })
+        assertEquals(listOf(-12, -40, 2, 42), ablauf.map { eintrag -> eintrag.preis.toIntOderNull() })
+        assertEquals(3, ablauf.first().anzahl)
+        assertEquals("lehm", ablauf.first().rohstoffOderVorgang)
+    }
+
+    @Test
+    fun zinsgewinneSummierenNurZahlungenAnGeschaeftsbank() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = anna,
+            sondervermögen = 40.toZahlungsmittel(),
+            unvermögen = 2.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    anleihe = anleihe,
+                    preis = 40.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+        spiel.beginneNaechsteRunde()
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = bernd,
+                    erwerber = Geschäftsbank,
+                    anleihe = anleihe,
+                    preis = 42.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        assertEquals(
+            listOf(0, 0, 0, 2),
+            spiel.bankZinsgewinne.map { betrag -> betrag.toIntOderNull() },
+        )
     }
 
     @Test

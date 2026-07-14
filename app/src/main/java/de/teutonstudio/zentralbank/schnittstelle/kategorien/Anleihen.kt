@@ -359,7 +359,7 @@ private fun GlobalBalanceChart(
 ) {
     val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
     val globaleSchulden = spiel.globaleSchulden.map { it.toIntOderNull() ?: 0 }
-    val globaleZinsschulden = spiel.globaleZinsschulden.map { it.toIntOderNull() ?: 0 }
+    val zinsgewinne = spiel.bankZinsgewinne.map { it.toIntOderNull() ?: 0 }
     val globaleKombinierteSchulden = spiel.globaleKombinierteSchulden.map {
         it.toIntOderNull() ?: 0
     }
@@ -383,8 +383,8 @@ private fun GlobalBalanceChart(
             farbe = Color(0xFF9A6B5A),
         ),
         DiagrammLegendenEintrag(
-            id = "global-zinsschulden",
-            bezeichnung = "Globale Zinsschulden",
+            id = "global-zinsgewinne",
+            bezeichnung = "Zinsgewinne",
             farbe = Color(0xFF8A7552),
         ),
         DiagrammLegendenEintrag(
@@ -396,7 +396,7 @@ private fun GlobalBalanceChart(
     val reihen = listOf(
         legende[0] to globalesBarvermögen,
         legende[1] to globaleSchulden,
-        legende[2] to globaleZinsschulden,
+        legende[2] to zinsgewinne,
         legende[3] to globaleKombinierteSchulden,
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
@@ -908,66 +908,76 @@ private fun AnleiheAblauf(
     spielerFarben: Map<String, Color>,
 ) {
     val ablauf = remember(eintrag) { eintrag.erhalteAblauf() }
+    var eingeklappteRunden by remember(eintrag) { mutableStateOf(emptySet<Int>()) }
+    val rundenGruppen = remember(ablauf) {
+        ablauf.groupBy { ereignis -> ereignis.runde }.toSortedMap()
+    }
     Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
         Text(
-            text = "Ablauf der Anleihe · Tippen für Übersicht",
+            text = "Ablauf der Anleihe · Runde antippen zum Ein-/Ausklappen",
             modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
             textAlign = TextAlign.Center,
         )
         AnleiheAblaufTabellenzeile(
-            aktion = "Betrag / Runde",
-            beguenstigter = "Begünstigter",
-            benachteiligter = "Benachteiligter",
+            runde = "Runde",
+            zahlungsempfaenger = "Zahlungsempfänger",
+            betrag = "Betrag",
             hintergrund = Color(0xFFE1E1E1),
             istKopfzeile = true,
         )
-        ablauf.forEach { ereignis ->
-            val hintergrund = when (ereignis.art) {
-                AnleiheAblaufArt.EMISSION,
-                AnleiheAblaufArt.HANDEL ->
-                    spielerFarben[ereignis.an.name] ?: anleiheHandelOhneSpielerFarbe
-                AnleiheAblaufArt.ZINS,
-                AnleiheAblaufArt.RUECKKAUF -> when {
-                    ereignis.runde < aktuelleRunde -> anleiheAbgelaufenFarbe
-                    ereignis.runde == aktuelleRunde -> anleiheFaelligFarbe
-                    else -> anleiheOffenFarbe
+        rundenGruppen.forEach { (runde, ereignisse) ->
+            val istEingeklappt = runde in eingeklappteRunden
+            val beiRundenKlick = {
+                eingeklappteRunden = if (istEingeklappt) {
+                    eingeklappteRunden - runde
+                } else {
+                    eingeklappteRunden + runde
                 }
             }
-            val (aktion, beguenstigter, benachteiligter) = when (ereignis.art) {
-                AnleiheAblaufArt.EMISSION,
-                AnleiheAblaufArt.HANDEL -> Triple(
-                    "R. ${ereignis.runde} · ${ereignis.art.bezeichnung} ${ereignis.betrag.zuMark()}",
-                    ereignis.von.name,
-                    ereignis.an.name,
+            if (istEingeklappt) {
+                AnleiheAblaufTabellenzeile(
+                    runde = runde.toString(),
+                    zahlungsempfaenger = "${ereignisse.size} Zahlungen",
+                    betrag = "eingeklappt",
+                    hintergrund = Color(0xFFE1E1E1),
+                    beiRundenKlick = beiRundenKlick,
                 )
-                AnleiheAblaufArt.ZINS -> Triple(
-                    "R. ${ereignis.runde} · Zins ${ereignis.betrag.zuMark()}",
-                    ereignis.an.name,
-                    ereignis.von.name,
-                )
-                AnleiheAblaufArt.RUECKKAUF -> Triple(
-                    "R. ${ereignis.runde} · Rückkauf ${ereignis.betrag.zuMark()}",
-                    ereignis.an.name,
-                    ereignis.von.name,
-                )
+            } else {
+                ereignisse.forEach { ereignis ->
+                    val zahlungsempfaenger = ereignis.zahlungsempfaenger
+                    val hintergrund = when (ereignis.art) {
+                        AnleiheAblaufArt.EMISSION,
+                        AnleiheAblaufArt.HANDEL ->
+                            spielerFarben[zahlungsempfaenger.name]
+                                ?: anleiheHandelOhneSpielerFarbe
+                        AnleiheAblaufArt.ZINS,
+                        AnleiheAblaufArt.RUECKKAUF -> when {
+                            ereignis.runde < aktuelleRunde -> anleiheAbgelaufenFarbe
+                            ereignis.runde == aktuelleRunde -> anleiheFaelligFarbe
+                            else -> anleiheOffenFarbe
+                        }
+                    }
+                    AnleiheAblaufTabellenzeile(
+                        runde = ereignis.runde.toString(),
+                        zahlungsempfaenger = zahlungsempfaenger.name,
+                        betrag = ereignis.betrag.zuMark(),
+                        hintergrund = hintergrund,
+                        beiRundenKlick = beiRundenKlick,
+                    )
+                }
             }
-            AnleiheAblaufTabellenzeile(
-                aktion = aktion,
-                beguenstigter = beguenstigter,
-                benachteiligter = benachteiligter,
-                hintergrund = hintergrund,
-            )
         }
     }
 }
 
 @Composable
 private fun AnleiheAblaufTabellenzeile(
-    aktion: String,
-    beguenstigter: String,
-    benachteiligter: String,
+    runde: String,
+    zahlungsempfaenger: String,
+    betrag: String,
     hintergrund: Color,
     istKopfzeile: Boolean = false,
+    beiRundenKlick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -976,19 +986,20 @@ private fun AnleiheAblaufTabellenzeile(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AnleiheTabellenZelle(
-            text = aktion,
-            modifier = Modifier.weight(1.55f),
-            textAlign = TextAlign.Start,
+            text = runde,
+            modifier = Modifier.weight(0.6f),
+            istKopfzeile = istKopfzeile,
+            beiKlick = beiRundenKlick,
+        )
+        AnleiheTabellenZelle(
+            text = zahlungsempfaenger,
+            modifier = Modifier.weight(1.4f),
             istKopfzeile = istKopfzeile,
         )
         AnleiheTabellenZelle(
-            text = beguenstigter,
+            text = betrag,
             modifier = Modifier.weight(1f),
-            istKopfzeile = istKopfzeile,
-        )
-        AnleiheTabellenZelle(
-            text = benachteiligter,
-            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.End,
             istKopfzeile = istKopfzeile,
         )
     }
@@ -1000,10 +1011,12 @@ private fun AnleiheTabellenZelle(
     modifier: Modifier,
     textAlign: TextAlign = TextAlign.Center,
     istKopfzeile: Boolean = false,
+    beiKlick: (() -> Unit)? = null,
 ) {
+    val zellenModifier = if (beiKlick == null) modifier else modifier.clickable(onClick = beiKlick)
     Text(
         text = text,
-        modifier = modifier
+        modifier = zellenModifier
             .border(0.5.dp, Color(0xFF8D8D8D))
             .padding(horizontal = 3.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
         fontSize = if (istKopfzeile) 9.sp else 10.sp,

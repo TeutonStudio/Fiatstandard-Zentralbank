@@ -109,3 +109,11 @@ Offene Punkte:
 - Eine vollständige Runde wird automatisch als `RundeDaten` gespeichert.
 - Der Leitzins der neuen Runde wird aus der Warenkorbpreisinflation bestimmt: oberhalb des Zielbereichs steigt er, unterhalb sinkt er; ohne belastbaren vorherigen Warenkorbpreis bleibt er unverändert.
 - Die Spielanzeige nennt aktuelle Runde, aktuellen Leitzins, aktiven Spieler und die als Nächstes abschließbare Phase.
+
+## Ablaufdarstellungen und Zinsgewinne
+
+- Der Anleihenablauf verwendet die Spalten Runde, Zahlungsempfänger und Betrag. Bei Emissionen erhält der Herausgeber das Geld, bei Handel der bisherige Halter und bei Zins/Rückzahlung der in der jeweiligen Runde aktuelle Halter.
+- Der Spielerablauf zeigt Rohstoffhandel mit Runde, Spieler, Geschäftspartner, Anzahl, Rohstoff und vorzeichenbehaftetem Preis.
+- Anleihekäufe, Anleiheverkäufe und erhaltene Zinszahlungen erscheinen als eigene Ablaufzeilen.
+- Ein Tipp auf eine Rundenzelle klappt ausschließlich die Zeilen dieser Runde ein oder aus; die Gruppenzeile bleibt zum erneuten Aufklappen sichtbar.
+- In der globalen Schuldenansicht ersetzt die kumulierte Kurve `Zinsgewinne` die globalen Zinsschulden. Sie zählt nur Zinszahlungen an die Geschäftsbank; Zahlungen an andere Spieler sind kein Bankgewinn.

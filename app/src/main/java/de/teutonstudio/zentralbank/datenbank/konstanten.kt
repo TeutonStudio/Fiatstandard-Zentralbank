@@ -221,4 +221,11 @@ data class AnleiheAblaufEintrag(
     val von: JuristischePerson,
     val an: JuristischePerson,
     val betrag: Zahlungsmittel,
-)
+) {
+    val zahlungsempfaenger: JuristischePerson get() = when (art) {
+        AnleiheAblaufArt.EMISSION,
+        AnleiheAblaufArt.HANDEL -> von
+        AnleiheAblaufArt.ZINS,
+        AnleiheAblaufArt.RUECKKAUF -> an
+    }
+}

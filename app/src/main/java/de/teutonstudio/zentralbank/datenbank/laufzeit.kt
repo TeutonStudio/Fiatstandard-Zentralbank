@@ -251,6 +251,18 @@ open class Spiel(
     public val globaleSchulden: List<Zahlungsmittel> get() = spielerSchulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleZinsschulden: List<Zahlungsmittel> get() = spielerZinsschulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleKombinierteSchulden: List<Zahlungsmittel> get() = spielerKombinierteSchulden.map { runde -> runde.values.summeGeld { it } }
+    public val bankZinsgewinne: List<Zahlungsmittel> get() {
+        val bankZinsen = anleihen
+            .flatMap { anleihe -> anleihe.erhalteAblauf() }
+            .filter { eintrag ->
+                eintrag.art == AnleiheAblaufArt.ZINS && eintrag.an == Geschäftsbank
+            }
+        return List(aktuelleRunde) { runde ->
+            bankZinsen
+                .filter { eintrag -> eintrag.runde <= runde }
+                .summeGeld { eintrag -> eintrag.betrag }
+        }
+    }
     public val aussenhandelsbilanzNachRohstoff: List<EnumMap<Rohstoffe, Zahlungsmittel>> get() =
         List(aktuelleRunde) { runde -> handel.erhalteAussenhandelsbilanzZurRunde(runde) }
     public val aussenhandelsbilanzGesamt: List<Zahlungsmittel> get() =
@@ -328,6 +340,69 @@ open class Spiel(
 
     fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
         handel.erhalteHandelsverlauf(spieler)
+
+    fun erhalteSpielerAblauf(spieler: Spieler): List<SpielerAblaufEintrag> {
+        val handelsZeilen = erhalteHandelsverlauf(spieler).mapNotNull { eintrag ->
+            val handel = eintrag.handel
+            val partner = if (handel.besitzer.name == spieler.name) {
+                handel.erwerber
+            } else {
+                handel.besitzer
+            }
+            when (handel) {
+                is RohstoffHandel -> SpielerAblaufEintrag(
+                    runde = eintrag.runde,
+                    art = SpielerAblaufArt.ROHSTOFFHANDEL,
+                    spieler = spieler.name,
+                    geschaeftspartner = partner.name,
+                    anzahl = handel.anzahl,
+                    rohstoffOderVorgang = handel.rohstoff.str,
+                    preis = eintrag.saldo,
+                )
+                is Anleihenhandel -> SpielerAblaufEintrag(
+                    runde = eintrag.runde,
+                    art = if (eintrag.istEinnahme) {
+                        SpielerAblaufArt.ANLEIHE_VERKAUFT
+                    } else {
+                        SpielerAblaufArt.ANLEIHE_ERWORBEN
+                    },
+                    spieler = spieler.name,
+                    geschaeftspartner = partner.name,
+                    anzahl = 1,
+                    rohstoffOderVorgang = if (eintrag.istEinnahme) {
+                        "Anleihe verkauft"
+                    } else {
+                        "Anleihe erworben"
+                    },
+                    preis = eintrag.saldo,
+                )
+                else -> null
+            }
+        }
+        val zinsZeilen = anleihen.flatMap { anleihe ->
+            anleihe.erhalteAblauf()
+                .filter { eintrag ->
+                    eintrag.art == AnleiheAblaufArt.ZINS &&
+                        eintrag.an.name == spieler.name &&
+                        eintrag.runde < aktuelleRunde
+                }
+                .map { eintrag ->
+                    SpielerAblaufEintrag(
+                        runde = eintrag.runde,
+                        art = SpielerAblaufArt.ZINS_ERHALTEN,
+                        spieler = spieler.name,
+                        geschaeftspartner = eintrag.von.name,
+                        anzahl = null,
+                        rohstoffOderVorgang = "Zins erhalten",
+                        preis = eintrag.betrag,
+                    )
+                }
+        }
+        return (handelsZeilen + zinsZeilen).sortedWith(
+            compareBy<SpielerAblaufEintrag> { eintrag -> eintrag.runde }
+                .thenBy { eintrag -> eintrag.art.reihenfolge }
+        )
+    }
 
     private fun erhaltePreisWarenkorb(
         marktpreise: Map<Rohstoffe, Zahlungsmittel>,
@@ -605,6 +680,23 @@ data class SpielerHandelseintrag(
     val istEinnahme: Boolean get() = saldo > Zahlungsmittel()
     val istAusgabe: Boolean get() = saldo < Zahlungsmittel()
 }
+
+enum class SpielerAblaufArt(internal val reihenfolge: Int) {
+    ROHSTOFFHANDEL(0),
+    ANLEIHE_ERWORBEN(1),
+    ANLEIHE_VERKAUFT(1),
+    ZINS_ERHALTEN(2),
+}
+
+data class SpielerAblaufEintrag(
+    val runde: Int,
+    val art: SpielerAblaufArt,
+    val spieler: String,
+    val geschaeftspartner: String,
+    val anzahl: Int?,
+    val rohstoffOderVorgang: String,
+    val preis: Zahlungsmittel,
+)
 
 data class Anleihenhandel(
     override val besitzer: JuristischePerson,

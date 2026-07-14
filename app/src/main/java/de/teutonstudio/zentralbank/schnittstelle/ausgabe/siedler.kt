@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -57,11 +58,9 @@ import de.teutonstudio.zentralbank.R
 
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.Bauteil
-import de.teutonstudio.zentralbank.datenbank.Anleihenhandel
-import de.teutonstudio.zentralbank.datenbank.RohstoffHandel
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Spieler
-import de.teutonstudio.zentralbank.datenbank.SpielerHandelseintrag
+import de.teutonstudio.zentralbank.datenbank.SpielerAblaufEintrag
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.zuMark
@@ -232,7 +231,7 @@ fun zeigeSpieler(
                         siedlerName = spieler.name,
                         siedlerFarbe = farbe,
                         siedlerBauteile = spieler.erhalteBauSaldoZurRunde(),
-                        handelsverlauf = spiel.erhalteHandelsverlauf(spieler),
+                        ablauf = spiel.erhalteSpielerAblauf(spieler),
                         istBearbeitbar = false,
                         onManipulateData = { _, _, _ -> },
                     )
@@ -501,7 +500,7 @@ fun zeigeSpielerDaten(
     siedlerName: String,
     siedlerFarbe: Color,
     siedlerBauteile: Map<out Bauteil, Int> = Bauteil.entries.associateWith { 0 },
-    handelsverlauf: List<SpielerHandelseintrag> = emptyList(),
+    ablauf: List<SpielerAblaufEintrag> = emptyList(),
     istBearbeitbar: Boolean = true,
     onManipulateData: (String, Bauteil, Boolean) -> Unit
 ) {
@@ -585,10 +584,7 @@ fun zeigeSpielerDaten(
                 }
 
                 if (isPlayerExpanded.value && !istBearbeitbar) {
-                    SpielerHandelsverlauf(
-                        siedlerName = siedlerName,
-                        handelsverlauf = handelsverlauf,
-                    )
+                    SpielerAblauf(ablauf)
                 }
             }
         }
@@ -596,93 +592,129 @@ fun zeigeSpielerDaten(
 }
 
 @Composable
-private fun SpielerHandelsverlauf(
-    siedlerName: String,
-    handelsverlauf: List<SpielerHandelseintrag>,
-) {
+private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
+    var eingeklappteRunden by remember(ablauf) { mutableStateOf(emptySet<Int>()) }
+    val rundenGruppen = remember(ablauf) { ablauf.groupBy { eintrag -> eintrag.runde }.toSortedMap() }
+
     Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
         Text(
-            text = "Handelsverlauf",
+            text = "Ablauf",
             modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
             textAlign = TextAlign.Center,
         )
-        if (handelsverlauf.isEmpty()) {
+        if (ablauf.isEmpty()) {
             Text(
-                text = "Noch kein Handel",
+                text = "Noch keine Abläufe",
                 modifier = Modifier.padding(8.dp),
             )
         } else {
-            SpielerHandelsTabellenzeile(
-                aktion = "Runde / Aktion",
-                gegenpartei = "Gegenpartei",
-                betrag = "Betrag",
-                hintergrund = Color(0xFFE1E1E1),
-                istKopfzeile = true,
-            )
-            handelsverlauf.forEach { eintrag ->
-                val istEinnahme = eintrag.istEinnahme
-                val hintergrund = if (istEinnahme) Color(0xFFD2E2CE) else Color(0xFFE8CACA)
-                val handel = eintrag.handel
-                val gegenpartei = if (handel.besitzer.name == siedlerName) {
-                    handel.erwerber.name
-                } else {
-                    handel.besitzer.name
-                }
-                val aktion = when (handel) {
-                    is RohstoffHandel -> if (istEinnahme) {
-                        "R. ${eintrag.runde} · Verkauf ${handel.anzahl} ${handel.rohstoff.str}"
-                    } else {
-                        "R. ${eintrag.runde} · Kauf ${handel.anzahl} ${handel.rohstoff.str}"
-                    }
-                    is Anleihenhandel -> if (istEinnahme) {
-                        "R. ${eintrag.runde} · Anleiheverkauf"
-                    } else {
-                        "R. ${eintrag.runde} · Anleihekauf"
-                    }
-                    else -> "R. ${eintrag.runde} · Handel"
-                }
-                val vorzeichen = if (istEinnahme) "+" else "−"
-                val absoluterBetrag = if (istEinnahme) eintrag.saldo else -eintrag.saldo
-
-                SpielerHandelsTabellenzeile(
-                    aktion = aktion,
-                    gegenpartei = gegenpartei,
-                    betrag = "$vorzeichen${absoluterBetrag.zuMark()}",
-                    hintergrund = hintergrund,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+            ) {
+                SpielerAblaufTabellenzeile(
+                    runde = "Runde",
+                    spieler = "Spieler",
+                    geschaeftspartner = "Geschäftspartner",
+                    anzahl = "Anzahl",
+                    rohstoffOderVorgang = "Rohstoff / Vorgang",
+                    preis = "Preis",
+                    hintergrund = Color(0xFFE1E1E1),
+                    istKopfzeile = true,
                 )
+                rundenGruppen.forEach { (runde, zeilen) ->
+                    val istEingeklappt = runde in eingeklappteRunden
+                    val beiRundenKlick = {
+                        eingeklappteRunden = if (istEingeklappt) {
+                            eingeklappteRunden - runde
+                        } else {
+                            eingeklappteRunden + runde
+                        }
+                    }
+                    if (istEingeklappt) {
+                        SpielerAblaufTabellenzeile(
+                            runde = runde.toString(),
+                            spieler = "${zeilen.size} Zeilen",
+                            geschaeftspartner = "eingeklappt",
+                            anzahl = "",
+                            rohstoffOderVorgang = "",
+                            preis = "",
+                            hintergrund = Color(0xFFE1E1E1),
+                            beiRundenKlick = beiRundenKlick,
+                        )
+                    } else {
+                        zeilen.forEach { eintrag ->
+                            SpielerAblaufTabellenzeile(
+                                runde = eintrag.runde.toString(),
+                                spieler = eintrag.spieler,
+                                geschaeftspartner = eintrag.geschaeftspartner,
+                                anzahl = eintrag.anzahl?.toString().orEmpty(),
+                                rohstoffOderVorgang = eintrag.rohstoffOderVorgang,
+                                preis = eintrag.preis.zuMark(),
+                                hintergrund = if (eintrag.preis < Zahlungsmittel()) {
+                                    Color(0xFFE8CACA)
+                                } else {
+                                    Color(0xFFD2E2CE)
+                                },
+                                beiRundenKlick = beiRundenKlick,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SpielerHandelsTabellenzeile(
-    aktion: String,
-    gegenpartei: String,
-    betrag: String,
+private fun SpielerAblaufTabellenzeile(
+    runde: String,
+    spieler: String,
+    geschaeftspartner: String,
+    anzahl: String,
+    rohstoffOderVorgang: String,
+    preis: String,
     hintergrund: Color,
     istKopfzeile: Boolean = false,
+    beiRundenKlick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(720.dp)
             .background(hintergrund),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TabellenZelle(
-            text = aktion,
-            modifier = Modifier.weight(1.55f),
-            textAlign = TextAlign.Start,
+            text = runde,
+            modifier = Modifier.weight(0.55f),
             istKopfzeile = istKopfzeile,
+            beiKlick = beiRundenKlick,
         )
         TabellenZelle(
-            text = gegenpartei,
+            text = spieler,
             modifier = Modifier.weight(0.9f),
             istKopfzeile = istKopfzeile,
         )
         TabellenZelle(
-            text = betrag,
-            modifier = Modifier.weight(0.8f),
+            text = geschaeftspartner,
+            modifier = Modifier.weight(0.9f),
+            istKopfzeile = istKopfzeile,
+        )
+        TabellenZelle(
+            text = anzahl,
+            modifier = Modifier.weight(0.55f),
+            istKopfzeile = istKopfzeile,
+        )
+        TabellenZelle(
+            text = rohstoffOderVorgang,
+            modifier = Modifier.weight(1.25f),
+            textAlign = TextAlign.Start,
+            istKopfzeile = istKopfzeile,
+        )
+        TabellenZelle(
+            text = preis,
+            modifier = Modifier.weight(0.85f),
             textAlign = TextAlign.End,
             istKopfzeile = istKopfzeile,
         )
@@ -695,10 +727,12 @@ private fun TabellenZelle(
     modifier: Modifier,
     textAlign: TextAlign = TextAlign.Center,
     istKopfzeile: Boolean = false,
+    beiKlick: (() -> Unit)? = null,
 ) {
+    val zellenModifier = if (beiKlick == null) modifier else modifier.clickable(onClick = beiKlick)
     Text(
         text = text,
-        modifier = modifier
+        modifier = zellenModifier
             .border(0.5.dp, Color(0xFF9A9A9A))
             .padding(horizontal = 4.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
         fontSize = if (istKopfzeile) 10.sp else 11.sp,
