@@ -1,5 +1,7 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +56,7 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Anleihe
+import de.teutonstudio.zentralbank.datenbank.AnleiheAblaufArt
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Runde
@@ -800,6 +805,7 @@ private fun AnleiheCard(
     eintrag: AnleiheAnzeige,
     onDelete: (AnleiheAnzeige) -> Unit,
 ) {
+    var istAufgeklappt by remember(eintrag) { mutableStateOf(false) }
     val restlaufzeit = eintrag.faelligkeit - aktuelleRunde
     val (status, statusFarbe) = when {
         restlaufzeit < 0 -> "gezahlt" to Color(0xFFA9C2A5)
@@ -809,32 +815,157 @@ private fun AnleiheCard(
 
     Card(
         modifier = ModiPad5,
+        onClick = { istAufgeklappt = !istAufgeklappt },
         colors = CardDefaults.cardColors(containerColor = statusFarbe),
     ) {
-        Grid({
-            repeat(2) { column(100.dp) }
-            repeat(3) { row(20.dp) }
-            rowGap(5.dp)
-            columnGap(20.dp)
-        },ModiPad15) {
-            RightText(text = "Schuldiger:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = eintrag.schuldiger.name, fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            RightText(text = "Besitzer:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = eintrag.aktuellerBesitzer.name, fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            RightText(text = "Sondervermögen:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = eintrag.sondervermoegen.zuMark(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            RightText(text = "Unvermögen:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = eintrag.unvermoegen.zuMark(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            RightText(text = "Zinssatz:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = eintrag.anleihe.erhalteZinssatz().zuZinssatz(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            RightText(text = "Fällig zu:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = eintrag.faelligkeit.toString(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            RightText(text = "Status:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-            LeftText(text = status,fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
-            Text(text = "löschen",fontSize = 12.sp,modifier = Modifier.gridItem(columnSpan = 2).fillMaxWidth().clickable { onDelete(eintrag) }, textAlign = TextAlign.Center)
+        Column {
+            Grid({
+                repeat(2) { column(100.dp) }
+                repeat(3) { row(20.dp) }
+                rowGap(5.dp)
+                columnGap(20.dp)
+            },ModiPad15) {
+                RightText(text = "Schuldiger:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = eintrag.schuldiger.name, fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                RightText(text = "Besitzer:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = eintrag.aktuellerBesitzer.name, fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                RightText(text = "Sondervermögen:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = eintrag.sondervermoegen.zuMark(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                RightText(text = "Unvermögen:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = eintrag.unvermoegen.zuMark(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                RightText(text = "Zinssatz:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = eintrag.anleihe.erhalteZinssatz().zuZinssatz(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                RightText(text = "Fällig zu:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = eintrag.faelligkeit.toString(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                RightText(text = "Status:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = status,fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                Text(
+                    text = if (istAufgeklappt) "Ablauf ausblenden" else "Ablauf anzeigen",
+                    fontSize = 12.sp,
+                    modifier = Modifier.gridItem(columnSpan = 2).fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+                TextButton(
+                    onClick = { onDelete(eintrag) },
+                    modifier = Modifier.gridItem(columnSpan = 2).fillMaxWidth(),
+                ) {
+                    Text(text = "löschen", fontSize = 12.sp)
+                }
+            }
 
+            if (istAufgeklappt) {
+                AnleiheAblauf(
+                    aktuelleRunde = aktuelleRunde,
+                    eintrag = eintrag,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun AnleiheAblauf(
+    aktuelleRunde: Int,
+    eintrag: AnleiheAnzeige,
+) {
+    val ablauf = remember(eintrag) { eintrag.erhalteAblauf() }
+    Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
+        Text(
+            text = "Ablauf der Anleihe",
+            modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
+            textAlign = TextAlign.Center,
+        )
+        AnleiheAblaufTabellenzeile(
+            aktion = "Betrag / Runde",
+            beguenstigter = "Begünstigter",
+            benachteiligter = "Benachteiligter",
+            hintergrund = Color(0xFFE1E1E1),
+            istKopfzeile = true,
+        )
+        ablauf.forEach { ereignis ->
+            val hintergrund = when {
+                ereignis.runde < aktuelleRunde -> Color(0xFFC7C7C7)
+                ereignis.runde == aktuelleRunde -> Color(0xFFD8C28F)
+                else -> Color(0xFF9EB5C7)
+            }
+            val (aktion, beguenstigter, benachteiligter) = when (ereignis.art) {
+                AnleiheAblaufArt.EMISSION,
+                AnleiheAblaufArt.HANDEL -> Triple(
+                    "R. ${ereignis.runde} · ${ereignis.art.bezeichnung} ${ereignis.betrag.zuMark()}",
+                    ereignis.von.name,
+                    ereignis.an.name,
+                )
+                AnleiheAblaufArt.ZINS -> Triple(
+                    "R. ${ereignis.runde} · Zins ${ereignis.betrag.zuMark()}",
+                    ereignis.an.name,
+                    ereignis.von.name,
+                )
+                AnleiheAblaufArt.RUECKKAUF -> Triple(
+                    "R. ${ereignis.runde} · Rückkauf ${ereignis.betrag.zuMark()}",
+                    ereignis.an.name,
+                    ereignis.von.name,
+                )
+            }
+            AnleiheAblaufTabellenzeile(
+                aktion = aktion,
+                beguenstigter = beguenstigter,
+                benachteiligter = benachteiligter,
+                hintergrund = hintergrund,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnleiheAblaufTabellenzeile(
+    aktion: String,
+    beguenstigter: String,
+    benachteiligter: String,
+    hintergrund: Color,
+    istKopfzeile: Boolean = false,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(hintergrund),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnleiheTabellenZelle(
+            text = aktion,
+            modifier = Modifier.weight(1.55f),
+            textAlign = TextAlign.Start,
+            istKopfzeile = istKopfzeile,
+        )
+        AnleiheTabellenZelle(
+            text = beguenstigter,
+            modifier = Modifier.weight(1f),
+            istKopfzeile = istKopfzeile,
+        )
+        AnleiheTabellenZelle(
+            text = benachteiligter,
+            modifier = Modifier.weight(1f),
+            istKopfzeile = istKopfzeile,
+        )
+    }
+}
+
+@Composable
+private fun AnleiheTabellenZelle(
+    text: String,
+    modifier: Modifier,
+    textAlign: TextAlign = TextAlign.Center,
+    istKopfzeile: Boolean = false,
+) {
+    Text(
+        text = text,
+        modifier = modifier
+            .border(0.5.dp, Color(0xFF8D8D8D))
+            .padding(horizontal = 3.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
+        fontSize = if (istKopfzeile) 9.sp else 10.sp,
+        textAlign = textAlign,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Preview(

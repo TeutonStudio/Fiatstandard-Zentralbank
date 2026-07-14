@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.schnittstelle.ausgabe
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,10 +57,14 @@ import de.teutonstudio.zentralbank.R
 
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.Bauteil
+import de.teutonstudio.zentralbank.datenbank.Anleihenhandel
+import de.teutonstudio.zentralbank.datenbank.RohstoffHandel
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Spieler
+import de.teutonstudio.zentralbank.datenbank.SpielerHandelseintrag
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
+import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.LeftText
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
@@ -226,6 +232,7 @@ fun zeigeSpieler(
                         siedlerName = spieler.name,
                         siedlerFarbe = farbe,
                         siedlerBauteile = spieler.erhalteBauSaldoZurRunde(),
+                        handelsverlauf = spiel.erhalteHandelsverlauf(spieler),
                         istBearbeitbar = false,
                         onManipulateData = { _, _, _ -> },
                     )
@@ -494,6 +501,7 @@ fun zeigeSpielerDaten(
     siedlerName: String,
     siedlerFarbe: Color,
     siedlerBauteile: Map<out Bauteil, Int> = Bauteil.entries.associateWith { 0 },
+    handelsverlauf: List<SpielerHandelseintrag> = emptyList(),
     istBearbeitbar: Boolean = true,
     onManipulateData: (String, Bauteil, Boolean) -> Unit
 ) {
@@ -514,66 +522,190 @@ fun zeigeSpielerDaten(
         Box(
             modifier = Modifier.background(siedlerFarbe).fillMaxSize().offset(20.dp, 0.dp)
         ) {
-            VerticalGrid(
-                columns = SimpleGridCells.Fixed(2),
-                modifier = ModiPad5.width(280.dp)
-            ) {
-                Text(
-                    text = siedlerName,
-                    fontSize = 20.sp,
-                    modifier = ModiPad5.span(2).offset((-25).dp, 0.dp),
-                    textAlign = TextAlign.Center
-                )
+            Column(modifier = Modifier.width(280.dp)) {
+                VerticalGrid(
+                    columns = SimpleGridCells.Fixed(2),
+                    modifier = ModiPad5,
+                ) {
+                    Text(
+                        text = siedlerName,
+                        fontSize = 20.sp,
+                        modifier = ModiPad5.span(2).offset((-25).dp, 0.dp),
+                        textAlign = TextAlign.Center
+                    )
 
-                if (isPlayerExpanded.value && istBearbeitbar) {
-                    Bauteil.entries.forEach { bauteil ->
-                        RightText(text = "$bauteil: ")
+                    if (isPlayerExpanded.value && istBearbeitbar) {
+                        Bauteil.entries.forEach { bauteil ->
+                            RightText(text = "$bauteil: ")
 
-                        Row {
-                            val amount = playerBauteilAmount[bauteil] ?: 0
-                            val modi = Modifier.padding(5.dp, 0.dp)
+                            Row {
+                                val amount = playerBauteilAmount[bauteil] ?: 0
+                                val modi = Modifier.padding(5.dp, 0.dp)
 
-                            LeftText(text = "$amount stk",modifier = modi)
+                                LeftText(text = "$amount stk",modifier = modi)
 
-                            Image(
-                                painter = painterResource(id = R.drawable.plus),
-                                contentDescription = null,
-                                modifier = modi.clickable {
-                                    playerBauteilAmount[bauteil] = amount + 1
-                                    onManipulateData(siedlerName, bauteil, true)
-                                }
-                            )
+                                Image(
+                                    painter = painterResource(id = R.drawable.plus),
+                                    contentDescription = null,
+                                    modifier = modi.clickable {
+                                        playerBauteilAmount[bauteil] = amount + 1
+                                        onManipulateData(siedlerName, bauteil, true)
+                                    }
+                                )
 
-                            Image(
-                                painter = painterResource(id = R.drawable.minus),
-                                contentDescription = null,
-                                alpha = 0.5f,
-                                modifier = modi.clickable {
-                                    playerBauteilAmount[bauteil] = amount - 1
-                                    onManipulateData(siedlerName, bauteil, false)
-                                }
-                            )
+                                Image(
+                                    painter = painterResource(id = R.drawable.minus),
+                                    contentDescription = null,
+                                    alpha = 0.5f,
+                                    modifier = modi.clickable {
+                                        playerBauteilAmount[bauteil] = amount - 1
+                                        onManipulateData(siedlerName, bauteil, false)
+                                    }
+                                )
+                            }
+                        }
+                    } else if (!isPlayerExpanded.value) {
+                        val belegteBauteile = Bauteil.entries
+                            .map { it to (playerBauteilAmount[it] ?: 0) }
+                            .filter { (_, anzahl) -> anzahl != 0 }
+
+                        if (belegteBauteile.isEmpty()) {
+                            Text(text = "Keine Bauteile",modifier = Modifier.span(2))
+                        } else {
+                            belegteBauteile.take(5).forEach { (bauteil, anzahl) ->
+                                RightText(text = "${bauteil.str}: ")
+                                LeftText(text = "$anzahl stk")
+                            }
+
+                            if (belegteBauteile.size > 5) {
+                                Text(text = "+ ${belegteBauteile.size - 5} weitere", modifier = Modifier.span(2))
+                            }
                         }
                     }
-                } else {
-                    val belegteBauteile = Bauteil.entries.map { it to (playerBauteilAmount[it] ?: 0) }.filter { (_, anzahl) -> anzahl != 0 }
+                }
 
-                    if (belegteBauteile.isEmpty()) {
-                        Text(text = "Keine Bauteile",modifier = Modifier.span(2))
-                    } else {
-                        belegteBauteile.take(5).forEach { (bauteil, anzahl) ->
-                            RightText(text = "${bauteil.str}: ")
-                            LeftText(text = "$anzahl stk")
-                        }
-
-                        if (belegteBauteile.size > 5) {
-                            Text(text = "+ ${belegteBauteile.size - 5} weitere", modifier = Modifier.span(2))
-                        }
-                    }
+                if (isPlayerExpanded.value && !istBearbeitbar) {
+                    SpielerHandelsverlauf(
+                        siedlerName = siedlerName,
+                        handelsverlauf = handelsverlauf,
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SpielerHandelsverlauf(
+    siedlerName: String,
+    handelsverlauf: List<SpielerHandelseintrag>,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
+        Text(
+            text = "Handelsverlauf",
+            modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
+            textAlign = TextAlign.Center,
+        )
+        if (handelsverlauf.isEmpty()) {
+            Text(
+                text = "Noch kein Handel",
+                modifier = Modifier.padding(8.dp),
+            )
+        } else {
+            SpielerHandelsTabellenzeile(
+                aktion = "Runde / Aktion",
+                gegenpartei = "Gegenpartei",
+                betrag = "Betrag",
+                hintergrund = Color(0xFFE1E1E1),
+                istKopfzeile = true,
+            )
+            handelsverlauf.forEach { eintrag ->
+                val istEinnahme = eintrag.istEinnahme
+                val hintergrund = if (istEinnahme) Color(0xFFD2E2CE) else Color(0xFFE8CACA)
+                val handel = eintrag.handel
+                val gegenpartei = if (handel.besitzer.name == siedlerName) {
+                    handel.erwerber.name
+                } else {
+                    handel.besitzer.name
+                }
+                val aktion = when (handel) {
+                    is RohstoffHandel -> if (istEinnahme) {
+                        "R. ${eintrag.runde} · Verkauf ${handel.anzahl} ${handel.rohstoff.str}"
+                    } else {
+                        "R. ${eintrag.runde} · Kauf ${handel.anzahl} ${handel.rohstoff.str}"
+                    }
+                    is Anleihenhandel -> if (istEinnahme) {
+                        "R. ${eintrag.runde} · Anleiheverkauf"
+                    } else {
+                        "R. ${eintrag.runde} · Anleihekauf"
+                    }
+                    else -> "R. ${eintrag.runde} · Handel"
+                }
+                val vorzeichen = if (istEinnahme) "+" else "−"
+                val absoluterBetrag = if (istEinnahme) eintrag.saldo else -eintrag.saldo
+
+                SpielerHandelsTabellenzeile(
+                    aktion = aktion,
+                    gegenpartei = gegenpartei,
+                    betrag = "$vorzeichen${absoluterBetrag.zuMark()}",
+                    hintergrund = hintergrund,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpielerHandelsTabellenzeile(
+    aktion: String,
+    gegenpartei: String,
+    betrag: String,
+    hintergrund: Color,
+    istKopfzeile: Boolean = false,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(hintergrund),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TabellenZelle(
+            text = aktion,
+            modifier = Modifier.weight(1.55f),
+            textAlign = TextAlign.Start,
+            istKopfzeile = istKopfzeile,
+        )
+        TabellenZelle(
+            text = gegenpartei,
+            modifier = Modifier.weight(0.9f),
+            istKopfzeile = istKopfzeile,
+        )
+        TabellenZelle(
+            text = betrag,
+            modifier = Modifier.weight(0.8f),
+            textAlign = TextAlign.End,
+            istKopfzeile = istKopfzeile,
+        )
+    }
+}
+
+@Composable
+private fun TabellenZelle(
+    text: String,
+    modifier: Modifier,
+    textAlign: TextAlign = TextAlign.Center,
+    istKopfzeile: Boolean = false,
+) {
+    Text(
+        text = text,
+        modifier = modifier
+            .border(0.5.dp, Color(0xFF9A9A9A))
+            .padding(horizontal = 4.dp, vertical = if (istKopfzeile) 5.dp else 4.dp),
+        fontSize = if (istKopfzeile) 10.sp else 11.sp,
+        textAlign = textAlign,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 

@@ -1,6 +1,8 @@
 package de.teutonstudio.zentralbank.datenbank
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpielFinanzdatenTest {
@@ -103,11 +105,142 @@ class SpielFinanzdatenTest {
 
         spiel.fügeLeereRundeHinzu()
 
-        assertEquals(30, spiel.spielerMarktwert[2].getValue(annaMitBahn).toIntOderNull())
+        assertEquals(0, spiel.spielerMarktwert[2].getValue(annaMitBahn).toIntOderNull())
         assertEquals(
-            30,
+            0,
             spiel.bauwerkMarktpreise[2].getValue(Handelslinie.LAND).toIntOderNull(),
         )
+
+        spiel.fügeLeereRundeHinzu()
+
+        assertEquals(30, spiel.spielerMarktwert[3].getValue(annaMitBahn).toIntOderNull())
+        assertEquals(
+            30,
+            spiel.bauwerkMarktpreise[3].getValue(Handelslinie.LAND).toIntOderNull(),
+        )
+    }
+
+    @Test
+    fun nachtraeglichErfassterHandelWirdSofortBezahltAberErstFolgerundeZumMarktpreis() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 50.toZahlungsmittel(),
+        )
+        spiel.fügeLeereRundeHinzu()
+
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = anna,
+                erwerber = bernd,
+                betrag = 20.toZahlungsmittel(),
+                anzahl = 2,
+                rohstoff = Rohstoffe.HOLZ,
+            )
+        )
+
+        assertEquals(120, spiel.spielerSaldo[1].getValue(anna).toIntOderNull())
+        assertEquals(30, spiel.spielerSaldo[1].getValue(bernd).toIntOderNull())
+        assertEquals(0, spiel.marktpreise[1].getValue(Rohstoffe.HOLZ).toIntOderNull())
+
+        spiel.fügeLeereRundeHinzu()
+
+        assertEquals(10, spiel.marktpreise[2].getValue(Rohstoffe.HOLZ).toIntOderNull())
+    }
+
+    @Test
+    fun spielerHandelsverlaufEnthaeltRohstoffUndAnleihenhandelChronologisch() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 50.toZahlungsmittel(),
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    betrag = 12.toZahlungsmittel(),
+                    anzahl = 3,
+                    rohstoff = Rohstoffe.LEHM,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = bernd,
+            sondervermögen = 40.toZahlungsmittel(),
+            unvermögen = 2.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = bernd,
+                    erwerber = anna,
+                    anleihe = anleihe,
+                    preis = 38.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        val verlauf = spiel.erhalteHandelsverlauf(anna)
+
+        assertEquals(listOf(1, 2), verlauf.map { it.runde })
+        assertTrue(verlauf[0].handel is RohstoffHandel)
+        assertTrue(verlauf[0].istEinnahme)
+        assertEquals(12, verlauf[0].saldo.toIntOderNull())
+        assertTrue(verlauf[1].handel is Anleihenhandel)
+        assertTrue(verlauf[1].istAusgabe)
+        assertEquals(-38, verlauf[1].saldo.toIntOderNull())
+        assertFalse(verlauf.any { it.saldo == Zahlungsmittel() })
+    }
+
+    @Test
+    fun anleiheAblaufOrdnetHandelZinsUndRueckkaufDenJeweiligenBesitzernZu() {
+        val anleihe = Anleihe(
+            schuldiger = anna,
+            sondervermögen = 80.toZahlungsmittel(),
+            unvermögen = 6.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+        val emission = Anleihenhandel(
+            besitzer = anna,
+            erwerber = bernd,
+            anleihe = anleihe,
+            preis = 75.toZahlungsmittel(),
+        )
+        val weiterverkauf = Anleihenhandel(
+            besitzer = bernd,
+            erwerber = Geschäftsbank,
+            anleihe = anleihe,
+            preis = 77.toZahlungsmittel(),
+        )
+        val anzeige = AnleiheAnzeige(
+            emittiert = 1,
+            emittent = anna,
+            aktuellerBesitzer = Geschäftsbank,
+            anleihe = anleihe,
+            handelsverlauf = mapOf(1 to emission, 2 to weiterverkauf),
+        )
+
+        val ablauf = anzeige.erhalteAblauf()
+
+        assertEquals(
+            listOf(
+                AnleiheAblaufArt.EMISSION,
+                AnleiheAblaufArt.HANDEL,
+                AnleiheAblaufArt.ZINS,
+                AnleiheAblaufArt.ZINS,
+                AnleiheAblaufArt.RUECKKAUF,
+            ),
+            ablauf.map { it.art },
+        )
+        assertEquals(listOf(1, 2, 2, 3, 3), ablauf.map { it.runde })
+        assertEquals(Geschäftsbank, ablauf[2].an)
+        assertEquals(Geschäftsbank, ablauf[3].an)
+        assertEquals(Geschäftsbank, ablauf[4].an)
     }
 
     @Test

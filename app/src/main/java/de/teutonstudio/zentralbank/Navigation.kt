@@ -21,6 +21,8 @@ import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.RohstoffHandelDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.bearbeiteRunde
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.AnleihenRegister
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Hauptmenü
@@ -159,26 +161,27 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.NewTrade.route) {
-            Titel(Screen.Game.navigiere(navController)) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {}
-            }
+            RohstoffHandelDialog(
+                spiel = viewModel.aktuellesSpiel,
+                onDismiss = { navController.popBackStack() },
+                onCreate = { handel ->
+                    if (viewModel.erfasseRohstoffhandel(handel)) {
+                        navController.popBackStack()
+                    }
+                },
+            )
         }
 
         composable(route = Screen.NewCredit.route) {
-            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-/*                CreateAnleihe(viewModel.playerList.collectAsState().value.map { it.playerName }, viewModel.currentRound) { credit ->
-                    viewModel.newCredit(credit)
-                    navController.navigate(route = Screen.Game.route)
-                }*/
-//                EditCredit(
-//                    CreditIndex = -1, viewModel.currentRound,
-//                    playerNetworthList = viewModel.playerNetworth.last()
-//                ) { inputCredit: Credit ->
-//                    viewModel.newCredit(inputCredit)
-//                    navController.navigate(route = Screen.Game.route)
-//                    // TODO
-//                }
-            } }
+            AnleiheDialog(
+                spiel = viewModel.aktuellesSpiel,
+                onDismiss = { navController.popBackStack() },
+                onCreate = { handel ->
+                    if (viewModel.emittiereAnleihe(handel)) {
+                        navController.popBackStack()
+                    }
+                },
+            )
         }
 
         composable(route = Screen.NewBuild.route) {

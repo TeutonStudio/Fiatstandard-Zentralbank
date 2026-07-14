@@ -14,15 +14,20 @@ data class AnleiheDaten(
     val sondervermogen: String,
     val unvermogen: String,
     val laufzeit: Int,
-    var handel: String, // spekulant1,preis1,Zeitpunkt1/spekulant2,preis2,Zeitpunkt2
+    var handel: String,
 ): SpeicherDaten {
     constructor(rundeDaten: RundeDaten,anleihe: Map<Int,Anleihenhandel>):this(
         spielID=-1,//rundeDaten.spielID,
         emittiert=rundeDaten.index,
-        emittent=anleihe.erhalteErste().besitzer.name,
+        emittent=anleihe.erhalteErste().anleihe.schuldiger.name,
         sondervermogen=anleihe.erhalteErste().anleihe.sondervermögen.speichereString(),
         unvermogen=anleihe.erhalteErste().anleihe.unvermögen.speichereString(),
         laufzeit=anleihe.erhalteErste().anleihe.laufzeit,
-        handel=anleihe.dropLowest().map { "${it.value.erwerber}#${it.value.preis.toIntOderNull()}#${it.key}" }.joinToString("/")
+        // Das neue Format enthält auch den Emissionshandel und beide Parteien:
+        // Besitzer#Erwerber#gespeicherterPreis#Runde|...
+        // "|" kollidiert nicht mit dem Zahlungsmittel-Format, das "/" verwendet.
+        handel=anleihe.toSortedMap().map { (runde, handel) ->
+            "${handel.besitzer.name}#${handel.erwerber.name}#${handel.preis.speichereString()}#$runde"
+        }.joinToString("|")
     )
 }

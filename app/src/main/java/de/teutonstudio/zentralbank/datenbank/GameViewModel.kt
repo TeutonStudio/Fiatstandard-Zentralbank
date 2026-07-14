@@ -139,6 +139,79 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
+    fun erfasseRohstoffhandel(handel: RohstoffHandel): Boolean =
+        erfasseHandel(
+            handel = handel,
+            speicherdatum = {
+                HandelsDaten(
+                    aktuelleRundenDaten(),
+                    handel,
+                ).copy(spielID = aktuelleDaten.first.spielID)
+            },
+            speichern = DAO::insertHandel,
+            fehlermeldung = "Handel konnte nicht gespeichert werden.",
+        )
+
+    fun emittiereAnleihe(handel: Anleihenhandel): Boolean =
+        erfasseHandel(
+            handel = handel,
+            speicherdatum = {
+                AnleiheDaten(
+                    aktuelleRundenDaten(),
+                    mapOf((aktuellesSpiel.aktuelleRunde - 1) to handel),
+                ).copy(spielID = aktuelleDaten.first.spielID)
+            },
+            speichern = DAO::insertAnleihe,
+            fehlermeldung = "Anleihe konnte nicht gespeichert werden.",
+        )
+
+    private fun aktuelleRundenDaten(): RundeDaten {
+        val runde = (aktuellesSpiel.aktuelleRunde - 1).coerceAtLeast(0)
+        return RundeDaten(
+            index = runde,
+            zinsatz = aktuellesSpiel.leitzinssatz(runde) ?: 0f,
+        )
+    }
+
+    private fun <T : SpeicherDaten> erfasseHandel(
+        handel: Handel,
+        speicherdatum: () -> T,
+        speichern: suspend (T) -> Long,
+        fehlermeldung: String,
+    ): Boolean {
+        val datum = try {
+            aktuellesSpiel.fuegeHandelZurAktuellenRundeHinzu(handel)
+            speicherdatum()
+        } catch (throwable: Throwable) {
+            _domainFehler.tryEmit(throwable.message ?: fehlermeldung)
+            return false
+        }
+
+        val spielDaten = aktuelleDaten.first
+        val neueDatenListe = aktuelleDaten.second + datum
+        aktuelleDaten = spielDaten to neueDatenListe
+
+        val domainZustand = aktuellesSpiel.zuDomainGameState()
+        gameEngine = GameEngine(domainZustand)
+        aktualisiereDomainState(domainZustand)
+
+        if (spielDaten.spielID == (-1).toLong()) return true
+
+        _spielDatenListe.update { spiele ->
+            spiele + (spielDaten to neueDatenListe)
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                datenbankBereit.await()
+                speichern(datum)
+            } catch (throwable: Throwable) {
+                _domainFehler.tryEmit(throwable.message ?: fehlermeldung)
+            }
+        }
+        return true
+    }
+
     private fun aktualisiereDomainState(state: GameState) {
         _domainState.value = state
         _domainUiState.value = state.zuGameUiState()
@@ -206,7 +279,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     private suspend fun ladeSpielDaten(daten: SpielDaten) {
         if (daten.spielID == (-1).toLong()) {
-            setzeAktuellesSpiel(TestSpiel, TestSpiel.zuSpeicherDaten())
+            val testDaten = TestSpiel.zuSpeicherDaten()
+            setzeAktuellesSpiel(testDaten.second.zuSpiel(testDaten.first), testDaten)
             return
         }
         val alles = _spielDatenListe.value[daten].orEmpty()
@@ -279,8 +353,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
 
             val handel = RohstoffHandel(
-                besitzer = spieler.find { it.name == daten.besitzer }!!,
-                erwerber = spieler.find { it.name == daten.erwerber }!!,
+                besitzer = findeJuristischePerson(daten.besitzer, spieler),
+                erwerber = findeJuristischePerson(daten.erwerber, spieler),
                 betrag = daten.preis.toZahlungsmittel(),
                 anzahl = daten.menge,
                 rohstoff = daten.rohstoff.zuRohstoffOderFehler()
@@ -295,61 +369,86 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
 
             val anleihe = Anleihe(
-                schuldiger = spieler.find { it.name == daten.emittent }!!,
+                schuldiger = findeJuristischePerson(daten.emittent, spieler),
                 sondervermögen = daten.sondervermogen.toZahlungsmittel(),
                 unvermögen = daten.unvermogen.toZahlungsmittel(),
                 laufzeit = daten.laufzeit
             )
 
-            /*
-             * Achtung:
-             * Der erste Erwerber der Anleihe wird in AnleiheDaten aktuell nicht gespeichert.
-             * Ich nehme hier Zentralbank als Standard an.
-             */
-            var aktuellerBesitzer = "Zentralbank"
-
-            val emissionsHandel = Anleihenhandel(
-                besitzer = spieler.find { it.name == daten.emittent }!!,
-                erwerber = spieler.find { it.name == aktuellerBesitzer }!!,
-                anleihe = anleihe,
-                preis = anleihe.sondervermögen
-            )
-
-            handelsEinträge[daten.emittiert] =
-                handelsEinträge[daten.emittiert] + emissionsHandel
-
-            daten.handel
-                .split("/")
+            val neuesFormat = daten.handel
+                .split("|")
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
-                .map { eintrag ->
-                    val teile = eintrag.split("#")
-                    require(teile.size == 3) {
-                        "Ungültiger Anleihe-Handelseintrag: $eintrag"
+                .map { it.split("#") }
+
+            if (neuesFormat.isNotEmpty() && neuesFormat.all { it.size == 4 }) {
+                neuesFormat
+                    .map { teile ->
+                        GespeicherterAnleihehandel(
+                            besitzer = teile[0],
+                            erwerber = teile[1],
+                            preis = teile[2].toZahlungsmittel(),
+                            runde = teile[3].toInt(),
+                        )
                     }
-
-                    val erwerber = teile[0]
-                    val preis = teile[1].toZahlungsmittel()
-                    val runde = teile[2].toInt()
-
-                    Triple(erwerber, preis, runde)
-                }
-                .sortedBy { it.third }
-                .forEach { (erwerber, preis, runde) ->
-                    require(runde in handelsEinträge.indices) {
-                        "Anleihehandel für unbekannte Runde $runde."
+                    .sortedBy { it.runde }
+                    .forEach { eintrag ->
+                        require(eintrag.runde in handelsEinträge.indices) {
+                            "Anleihehandel für unbekannte Runde ${eintrag.runde}."
+                        }
+                        handelsEinträge[eintrag.runde] = handelsEinträge[eintrag.runde] +
+                            Anleihenhandel(
+                                besitzer = findeJuristischePerson(eintrag.besitzer, spieler),
+                                erwerber = findeJuristischePerson(eintrag.erwerber, spieler),
+                                anleihe = anleihe,
+                                preis = eintrag.preis,
+                            )
                     }
-
-                    val handel = Anleihenhandel(
-                        besitzer = spieler.find { it.name == aktuellerBesitzer }!!,
-                        erwerber = spieler.find { it.name == erwerber }!!,
+            } else {
+                // Kompatibilität mit alten Datensätzen: Dort fehlen der erste
+                // Erwerber und jeweils der vorherige Besitzer.
+                var aktuellerBesitzer: JuristischePerson = Geschäftsbank
+                handelsEinträge[daten.emittiert] = handelsEinträge[daten.emittiert] +
+                    Anleihenhandel(
+                        besitzer = anleihe.schuldiger,
+                        erwerber = aktuellerBesitzer,
                         anleihe = anleihe,
-                        preis = preis
+                        preis = anleihe.sondervermögen,
                     )
 
-                    handelsEinträge[runde] = handelsEinträge[runde] + handel
-                    aktuellerBesitzer = erwerber
-                }
+                daten.handel
+                    .split("/")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .map { eintrag ->
+                        val teile = eintrag.split("#")
+                        require(teile.size == 3) {
+                            "Ungültiger Anleihe-Handelseintrag: $eintrag"
+                        }
+                        GespeicherterAnleihehandel(
+                            besitzer = aktuellerBesitzer.name,
+                            erwerber = teile[0],
+                            preis = teile[1].toIntOrNull()?.toZahlungsmittel()
+                                ?: teile[1].toZahlungsmittel(),
+                            runde = teile[2].toInt(),
+                        )
+                    }
+                    .sortedBy { it.runde }
+                    .forEach { eintrag ->
+                        require(eintrag.runde in handelsEinträge.indices) {
+                            "Anleihehandel für unbekannte Runde ${eintrag.runde}."
+                        }
+                        val erwerber = findeJuristischePerson(eintrag.erwerber, spieler)
+                        handelsEinträge[eintrag.runde] = handelsEinträge[eintrag.runde] +
+                            Anleihenhandel(
+                                besitzer = aktuellerBesitzer,
+                                erwerber = erwerber,
+                                anleihe = anleihe,
+                                preis = eintrag.preis,
+                            )
+                        aktuellerBesitzer = erwerber
+                    }
+            }
         }
 
         val vertragsEinträge = MutableList<Set<Vertrag>>(rundenAnzahl) { emptySet() }
@@ -396,6 +495,22 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
                 teile[0].zuRohstoffOderFehler() to teile[1].toInt()
             }
+    }
+
+    private data class GespeicherterAnleihehandel(
+        val besitzer: String,
+        val erwerber: String,
+        val preis: Zahlungsmittel,
+        val runde: Int,
+    )
+
+    private fun findeJuristischePerson(
+        name: String,
+        spieler: List<Spieler>,
+    ): JuristischePerson = spieler.firstOrNull { it.name == name } ?: when (name) {
+        Ausland.name, AUSLAND -> Ausland
+        Geschäftsbank.name, "Zentralbank" -> Geschäftsbank
+        else -> error("Unbekannte juristische Person: $name")
     }
 
     private fun String.zuRohstoffOderFehler(): Rohstoffe {

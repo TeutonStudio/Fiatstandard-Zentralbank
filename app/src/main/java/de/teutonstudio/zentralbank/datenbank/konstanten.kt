@@ -161,4 +161,64 @@ data class AnleiheAnzeige(
     val laufzeit: Int get() = anleihe.laufzeit
     val sondervermoegen: Zahlungsmittel get() = anleihe.sondervermögen
     val unvermoegen: Zahlungsmittel get() = anleihe.unvermögen
+
+    fun erhalteAblauf(): List<AnleiheAblaufEintrag> {
+        val ereignisse = mutableListOf<AnleiheAblaufEintrag>()
+
+        handelsverlauf.toSortedMap().forEach { (runde, handel) ->
+            ereignisse += AnleiheAblaufEintrag(
+                runde = runde,
+                art = if (runde == emittiert) {
+                    AnleiheAblaufArt.EMISSION
+                } else {
+                    AnleiheAblaufArt.HANDEL
+                },
+                von = handel.besitzer,
+                an = handel.erwerber,
+                betrag = handel.preis,
+            )
+        }
+
+        ((emittiert + 1)..faelligkeit).forEach { runde ->
+            val gläubiger = handelsverlauf.gläubiger(runde) ?: return@forEach
+            ereignisse += AnleiheAblaufEintrag(
+                runde = runde,
+                art = AnleiheAblaufArt.ZINS,
+                von = schuldiger,
+                an = gläubiger,
+                betrag = unvermoegen,
+            )
+            if (runde == faelligkeit) {
+                ereignisse += AnleiheAblaufEintrag(
+                    runde = runde,
+                    art = AnleiheAblaufArt.RUECKKAUF,
+                    von = schuldiger,
+                    an = gläubiger,
+                    betrag = sondervermoegen,
+                )
+            }
+        }
+
+        return ereignisse.sortedWith(
+            compareBy<AnleiheAblaufEintrag> { it.runde }.thenBy { it.art.reihenfolge }
+        )
+    }
 }
+
+enum class AnleiheAblaufArt(
+    val bezeichnung: String,
+    internal val reihenfolge: Int,
+) {
+    EMISSION("Emission", 0),
+    HANDEL("Anleihehandel", 0),
+    ZINS("Zinszahlung", 1),
+    RUECKKAUF("Rückkauf", 2),
+}
+
+data class AnleiheAblaufEintrag(
+    val runde: Int,
+    val art: AnleiheAblaufArt,
+    val von: JuristischePerson,
+    val an: JuristischePerson,
+    val betrag: Zahlungsmittel,
+)

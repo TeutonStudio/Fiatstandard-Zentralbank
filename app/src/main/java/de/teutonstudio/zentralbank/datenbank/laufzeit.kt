@@ -29,7 +29,10 @@ private fun Spieler.baueCache(idx:Int,cache:List<Map<out Bauteil,Int>>): Map<Bau
 private fun Handelsregister.baueCache(idx:Int,cache:List<EnumMap<Rohstoffe,Zahlungsmittel>>): EnumMap<Rohstoffe,Zahlungsmittel> {
     if (idx == 0) return Rohstoffe.associateWith { Zahlungsmittel() }
     val vorherigeMarktpreise = cache.getOrNull(idx-1) ?: emptyMap()
-    val relevante = erhalteMarktpreisRelevante().getOrNull(idx) ?: emptySet()
+    // Ein Handel wird in seiner Runde bezahlt, bestimmt den Marktpreis aber erst
+    // in der Folgerunde. So kann eine laufende Runde nachträglich erfasst werden,
+    // ohne deren bereits geltende Preise rückwirkend zu verändern.
+    val relevante = erhalteMarktpreisRelevante().getOrNull(idx - 1) ?: emptySet()
     val sortiert = relevante.groupBy { it.rohstoff }
     return Rohstoffe.associateWith {
         val menge = sortiert[it]
@@ -288,6 +291,41 @@ open class Spiel(
         List(aktuelleRunde) { runde -> cache.add(baueCache(runde)) }
     }
 
+    fun fuegeHandelZurAktuellenRundeHinzu(neuerHandel: Handel) {
+        require(neuerHandel.besitzer != neuerHandel.erwerber) {
+            "Verkäufer und Erwerber müssen verschieden sein."
+        }
+        require(neuerHandel.erhalteBetrag() > Zahlungsmittel()) {
+            "Der Handelspreis muss größer als 0 sein."
+        }
+        when (neuerHandel) {
+            is RohstoffHandel -> require(neuerHandel.anzahl > 0) {
+                "Die gehandelte Menge muss größer als 0 sein."
+            }
+            is Anleihenhandel -> {
+                require(neuerHandel.anleihe.schuldiger in spielerListe) {
+                    "Nur ein Spieler kann eine Anleihe emittieren."
+                }
+                require(neuerHandel.anleihe.sondervermögen > Zahlungsmittel()) {
+                    "Der Nennwert muss größer als 0 sein."
+                }
+                require(neuerHandel.anleihe.unvermögen >= Zahlungsmittel()) {
+                    "Der Zins darf nicht negativ sein."
+                }
+                require(neuerHandel.anleihe.laufzeit > 0) {
+                    "Die Laufzeit muss größer als 0 sein."
+                }
+            }
+        }
+
+        handel.fuegeHandelZurAktuellenRundeHinzu(neuerHandel)
+        cache.clear()
+        List(aktuelleRunde) { runde -> cache.add(baueCache(runde)) }
+    }
+
+    fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
+        handel.erhalteHandelsverlauf(spieler)
+
     private fun erhaltePreisWarenkorbZurRunde(runde: Int): Zahlungsmittel {
         if (runde == 0) return Zahlungsmittel()
         val marktpreise = handel.erhalteMarktpreisZurRunde(runde - 1)
@@ -411,17 +449,28 @@ data class Handelsregister(
     private val zinsschulden: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
     private val aussenhandelsbilanz: MutableList<EnumMap<Rohstoffe, Zahlungsmittel>> = mutableListOf()
     private val aussenhandelsmengenbilanz: MutableList<EnumMap<Rohstoffe, Int>> = mutableListOf()
-    init { List(einträge.size) {
-        cache.add(baueCache(it,cache))
-        liquidität.add(baueLiquidität(it,liquidität))
-        val schuldenstand = baueSchuldenstand(it)
-        schulden.add(schuldenstand.kapital)
-        zinsschulden.add(schuldenstand.zinsen)
-        aussenhandelsbilanz.add(baueAussenhandelsbilanz(it, aussenhandelsbilanz))
-        aussenhandelsmengenbilanz.add(
-            baueAussenhandelsmengenbilanz(it, aussenhandelsmengenbilanz)
-        )
-    } }
+    init { berechneCachesNeu() }
+
+    private fun berechneCachesNeu() {
+        cache.clear()
+        liquidität.clear()
+        schulden.clear()
+        zinsschulden.clear()
+        aussenhandelsbilanz.clear()
+        aussenhandelsmengenbilanz.clear()
+
+        List(einträge.size) {
+            cache.add(baueCache(it,cache))
+            liquidität.add(baueLiquidität(it,liquidität))
+            val schuldenstand = baueSchuldenstand(it)
+            schulden.add(schuldenstand.kapital)
+            zinsschulden.add(schuldenstand.zinsen)
+            aussenhandelsbilanz.add(baueAussenhandelsbilanz(it, aussenhandelsbilanz))
+            aussenhandelsmengenbilanz.add(
+                baueAussenhandelsmengenbilanz(it, aussenhandelsmengenbilanz)
+            )
+        }
+    }
 
     public fun bekannteSpieler(): Set<JuristischePerson> {
         return einträge.flatMap { runde -> runde.flatMap { handel -> when (handel) {
@@ -469,6 +518,32 @@ data class Handelsregister(
 
     public fun jeHandelZurRunde(runde:Int,jeHandel:(Handel) -> Unit) = einträge[runde].forEach { jeHandel(it) }
 
+    fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
+        einträge.flatMapIndexed { runde, handelsmenge ->
+            handelsmenge.mapNotNull { handel ->
+                if (handel.erhalteBetrag() == Zahlungsmittel()) return@mapNotNull null
+                when (spieler) {
+                    handel.besitzer -> SpielerHandelseintrag(
+                        runde = runde,
+                        handel = handel,
+                        saldo = handel.erhalteBetrag(),
+                    )
+                    handel.erwerber -> SpielerHandelseintrag(
+                        runde = runde,
+                        handel = handel,
+                        saldo = -handel.erhalteBetrag(),
+                    )
+                    else -> null
+                }
+            }
+        }
+
+    fun fuegeHandelZurAktuellenRundeHinzu(neuerHandel: Handel) {
+        require(einträge.isNotEmpty()) { "Es ist keine Runde vorhanden." }
+        einträge[einträge.lastIndex] = einträge.last() + neuerHandel
+        berechneCachesNeu()
+    }
+
     public fun neueRundenDatenDefinieren(neuGehandelt: Set<Handel>) {
         einträge.add(neuGehandelt)
         cache.add(baueCache(cache.size,cache))
@@ -506,6 +581,15 @@ abstract class Handel(
     open val erwerber: JuristischePerson,
 ) {
     abstract fun erhalteBetrag(): Zahlungsmittel
+}
+
+data class SpielerHandelseintrag(
+    val runde: Int,
+    val handel: Handel,
+    val saldo: Zahlungsmittel,
+) {
+    val istEinnahme: Boolean get() = saldo > Zahlungsmittel()
+    val istAusgabe: Boolean get() = saldo < Zahlungsmittel()
 }
 
 data class Anleihenhandel(

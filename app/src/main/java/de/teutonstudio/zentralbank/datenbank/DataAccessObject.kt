@@ -46,6 +46,10 @@ class ZentralbankSpeicher(
         gameDao.update(daten)
     }
 
+    public suspend fun insertHandel(daten: HandelsDaten): Long = tradeDao.insert(daten)
+
+    public suspend fun insertAnleihe(daten: AnleiheDaten): Long = creditDao.insert(daten)
+
     public fun observeDatenZuSpiel(spielID: Long): Flow<List<SpeicherDaten>> {
         val flows: List<Flow<List<SpeicherDaten>>> = listOf(
             roundDao.observeBySpiel(spielID).alsSpeicherDaten(),
