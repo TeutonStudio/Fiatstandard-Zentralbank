@@ -34,24 +34,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.BorderStroke
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class StiftZeichnung(
-    val striche: List<StiftStrich> = emptyList()
-)
-
-@Serializable
-data class StiftStrich(
-    val punkte: List<StiftPunkt>,
-    val dickeDp: Float = 3f
-)
-
-@Serializable
-data class StiftPunkt(
-    val x: Float,
-    val y: Float
-)
 
 @Composable
 fun StiftCard(
