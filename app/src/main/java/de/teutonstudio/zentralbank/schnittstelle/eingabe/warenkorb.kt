@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,7 +70,14 @@ fun definiereWarenkorb(
         ) { Rohstoffe.entries.forEach { item {
             val menge = remember { mutableIntStateOf(inhalt[it]?:0) }
             LaunchedEffect(menge.intValue) { inhalt[it] = menge.intValue }
-            definiereRohstoffMenge(it,menge)
+            Card(
+                modifier = ModiPad5,
+                colors = CardDefaults.cardColors(
+                    containerColor = it.farbe.copy(alpha = 0.32f),
+                ),
+            ) {
+                definiereRohstoffMenge(it,menge)
+            }
         } } } }
     }
 }
@@ -99,44 +107,51 @@ fun WarenkorbBearbeitenDialog(
                 ) { rohstoff ->
                     val anzahl = inhalt[rohstoff] ?: 0
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Card(
                         modifier = ModiPad5,
+                        colors = CardDefaults.cardColors(
+                            containerColor = rohstoff.farbe.copy(alpha = 0.32f),
+                        ),
                     ) {
-                        IconButton(
-                            onClick = {
-                                inhalt[rohstoff] = (anzahl - 1).coerceAtLeast(0)
-                            },
-                            enabled = anzahl > 0,
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.minus),
-                                contentDescription = "${rohstoff.str} aus dem Warenkorb entnehmen",
-                            )
-                        }
-
-                        Text(
-                            text = anzahl.toString(),
-                            modifier = Modifier.width(48.dp),
-                            textAlign = TextAlign.Center,
-                            fontSize = 20.sp,
-                        )
-
-                        IconButton(
-                            onClick = { inhalt[rohstoff] = anzahl + 1 },
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.plus),
-                                contentDescription = "${rohstoff.str} dem Warenkorb hinzufügen",
-                            )
-                        }
-
-                        zeigeRohstoff(
-                            rohstoff = rohstoff,
-                            fontsize = 20.sp,
-                            iconSize = 36.dp,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = ModiPad5,
-                        )
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    inhalt[rohstoff] = (anzahl - 1).coerceAtLeast(0)
+                                },
+                                enabled = anzahl > 0,
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.minus),
+                                    contentDescription = "${rohstoff.str} aus dem Warenkorb entnehmen",
+                                )
+                            }
+
+                            Text(
+                                text = anzahl.toString(),
+                                modifier = Modifier.width(48.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 20.sp,
+                            )
+
+                            IconButton(
+                                onClick = { inhalt[rohstoff] = anzahl + 1 },
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.plus),
+                                    contentDescription = "${rohstoff.str} dem Warenkorb hinzufügen",
+                                )
+                            }
+
+                            zeigeRohstoff(
+                                rohstoff = rohstoff,
+                                fontsize = 20.sp,
+                                iconSize = 36.dp,
+                                modifier = ModiPad5,
+                            )
+                        }
                     }
                 }
             }

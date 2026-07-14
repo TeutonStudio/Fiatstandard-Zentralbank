@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import de.teutonstudio.zentralbank.datenbank.Handelslinie
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.associateWith
+import de.teutonstudio.zentralbank.datenbank.farbe
 import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.datenbank.zuPreis
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
@@ -86,7 +88,13 @@ fun zeigeBauteilPreis(
     nicht_null_zeilen: Boolean = false,
     beiKlick: (Bauteil) -> Unit
 ) {
-    Card(modifier = modifier, onClick = { beiKlick(bauteil) }) {
+    Card(
+        modifier = modifier,
+        onClick = { beiKlick(bauteil) },
+        colors = CardDefaults.cardColors(
+            containerColor = bauteil.farbe.copy(alpha = 0.32f),
+        ),
+    ) {
         val inhalt = bauteil.kosten.filter { if (nicht_null_zeilen) true else it.value != 0 }.map { it.key to (it.value to marktpreise[it.key]!!.zuMark()) }.toMap()
         Grid({
             repeat(hAnzahl) { column(40.dp) }

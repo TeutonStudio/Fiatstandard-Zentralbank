@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -69,16 +70,18 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
 import kotlin.math.abs
 
 private const val GLOBAL_PLAYER = "Global"
 
 private val relevanceStrings = listOf(
-    "ausgelaufen",
+    "gezahlte",
     "fällige",
-    "unfällige",
-    "fällige & unfällige",
+    "offene",
+    "fällige & offene",
     "alle",
 )
 
@@ -310,12 +313,19 @@ private fun BalanceChart(
                                     LineCartesianLayer.rememberLine(
                                         fill = remember(farbe) {
                                             LineCartesianLayer.LineFill.single(Fill(farbe))
-                                        }
+                                        },
+                                        interpolator = remember {
+                                            LineCartesianLayer.Interpolator.cubic(
+                                                curvature = 0.5f,
+                                            )
+                                        },
                                     )
                                 }
                             )
                         ),
-                        startAxis = VerticalAxis.rememberStart(),
+                        startAxis = VerticalAxis.rememberStart(
+                            valueFormatter = markAchsenFormatter,
+                        ),
                         bottomAxis = HorizontalAxis.rememberBottom(),
                     ),
                     modelProducer = modelProducer,
@@ -416,12 +426,19 @@ private fun GlobalBalanceChart(
                                     LineCartesianLayer.rememberLine(
                                         fill = remember(farbe) {
                                             LineCartesianLayer.LineFill.single(Fill(farbe))
-                                        }
+                                        },
+                                        interpolator = remember {
+                                            LineCartesianLayer.Interpolator.cubic(
+                                                curvature = 0.5f,
+                                            )
+                                        },
                                     )
                                 }
                             )
                         ),
-                        startAxis = VerticalAxis.rememberStart(),
+                        startAxis = VerticalAxis.rememberStart(
+                            valueFormatter = markAchsenFormatter,
+                        ),
                         bottomAxis = HorizontalAxis.rememberBottom(),
                     ),
                     modelProducer = modelProducer,
@@ -534,7 +551,9 @@ private fun ManagementChart(
                                 }
                             )
                         ),
-                        startAxis = VerticalAxis.rememberStart(),
+                        startAxis = VerticalAxis.rememberStart(
+                            valueFormatter = stueckAchsenFormatter,
+                        ),
                         bottomAxis = HorizontalAxis.rememberBottom(
                             valueFormatter = CartesianValueFormatter { _, value, _ ->
                                 labels.getOrNull(value.toInt()) ?: ""
@@ -690,7 +709,9 @@ fun AnleihenRegister(
     onNew: (Anleihe) -> Unit = {},
 ) {
     var eingabeSpieler by remember(spiel.spielerStringListe) { mutableStateOf(GLOBAL_PLAYER) }
-    var eingabeRunde by remember { mutableIntStateOf(0) }
+    var eingabeRunde by remember(spiel.aktuelleRunde) {
+        mutableIntStateOf((spiel.aktuelleRunde - 1).coerceAtLeast(0))
+    }
     var eingabeRelevanz by remember { mutableStateOf("alle") }
     var eingabeLaufzeit by remember { mutableStateOf("alle") }
     var zeigeVerwaltung by remember { mutableStateOf(false) }
@@ -725,15 +746,14 @@ fun AnleihenRegister(
                     )
                 }
             } else {
-                val currentRound = eingabeRunde ?: runden.lastOrNull()?.index
+                val currentRound = eingabeRunde
                 val filteredDebt = anleihen
                     .filter { anleihe ->
-                        val round = currentRound ?: return@filter true
                         when (eingabeRelevanz) {
-                            "ausgelaufen" -> anleihe.faelligkeit < round
-                            "fällige" -> anleihe.faelligkeit == round
-                            "unfällige" -> anleihe.faelligkeit > round
-                            "fällige & unfällige" -> anleihe.faelligkeit >= round
+                            "gezahlte" -> anleihe.faelligkeit < currentRound
+                            "fällige" -> anleihe.faelligkeit == currentRound
+                            "offene" -> anleihe.faelligkeit > currentRound
+                            "fällige & offene" -> anleihe.faelligkeit >= currentRound
                             "alle" -> true
                             else -> true
                         }
@@ -756,7 +776,7 @@ fun AnleihenRegister(
                 } else {
                     LazyVerticalGrid(columns = GridCells.Adaptive(200.dp)) {
                         items(filteredDebt) { eintrag -> AnleiheCard(
-                            aktuelleRunde = currentRound ?: 0,
+                            aktuelleRunde = currentRound,
                             eintrag = eintrag,
                             onDelete = onDelete,
                         ) }
@@ -776,13 +796,16 @@ private fun AnleiheCard(
     onDelete: (AnleiheAnzeige) -> Unit,
 ) {
     val restlaufzeit = eintrag.faelligkeit - aktuelleRunde
-    val status = when {
-        restlaufzeit < 0 -> "ausgelaufen"
-        restlaufzeit == 0 -> "fällig"
-        else -> "offen"
+    val (status, statusFarbe) = when {
+        restlaufzeit < 0 -> "gezahlt" to Color(0xFFA9C2A5)
+        restlaufzeit == 0 -> "fällig" to Color(0xFFD8C28F)
+        else -> "offen" to Color(0xFF9EB5C7)
     }
 
-    Card(modifier = ModiPad5,) {
+    Card(
+        modifier = ModiPad5,
+        colors = CardDefaults.cardColors(containerColor = statusFarbe),
+    ) {
         Grid({
             repeat(2) { column(100.dp) }
             repeat(3) { row(20.dp) }

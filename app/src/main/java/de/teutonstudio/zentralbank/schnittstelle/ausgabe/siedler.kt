@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material3.Card
@@ -66,6 +66,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 
 @Composable
@@ -83,7 +84,9 @@ fun SpielerBilanz(
             val scrollState = rememberVicoScrollState()
             val zoomState = rememberVicoZoomState(initialZoom = remember { Zoom.Content })
 
-            val endAxis = VerticalAxis.rememberEnd()
+            val endAxis = VerticalAxis.rememberEnd(
+                valueFormatter = markAchsenFormatter,
+            )
             val bottomAxis = HorizontalAxis.rememberBottom()
 
             val serien = remember(spielerListe, spielerSaldo) {
@@ -150,7 +153,12 @@ fun SpielerBilanz(
                                                 LineCartesianLayer.LineFill.single(
                                                     Fill(farbe)
                                                 )
-                                            }
+                                            },
+                                            interpolator = remember {
+                                                LineCartesianLayer.Interpolator.cubic(
+                                                    curvature = 0.5f,
+                                                )
+                                            },
                                         )
                                     }
                                 )
@@ -171,18 +179,6 @@ fun SpielerBilanz(
                     )
                 }
 
-                LazyRow(modifier = ModiPad5) {
-                    spielerListe.forEach { item {
-                        val farbe = spielerFarben[it] ?: Color.Black
-                        zeigeSpielerDaten(
-                            siedlerName = it.name,
-                            siedlerFarbe = farbe,
-                            siedlerBauteile = it.erhalteBauSaldoZurRunde(),
-                            istBearbeitbar = false,
-                            onManipulateData = { _, _, _ -> }
-                        )
-                    } }
-                }
             }
         }
     } else {
@@ -206,26 +202,26 @@ fun zeigeSpieler(
     onDeclarePeace: (Pair<String, String>) -> Unit,
 ) {
     val siedlerFarben = erhalteSpielerFarben(spiel.spielerListe)
-    val marktpreise = spiel.marktpreise
-
     var isWarExpanded by remember { mutableStateOf(false) }
     var isMilitaryExpanded by remember { mutableStateOf(false) }
     var isPeaceExpanded by remember { mutableStateOf(false) }
 
     if (!isWarExpanded && !isMilitaryExpanded && !isPeaceExpanded) {
         LazyColumn(horizontalAlignment = Alignment.CenterHorizontally) {
-            val hAnzahl = 7
             item { SpielerBilanz(spiel.spielerSaldo) }
             item { VerticalGrid(
-                columns = SimpleGridCells.Adaptive(hAnzahl*45.dp),
+                columns = SimpleGridCells.Adaptive(225.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Bauteil.entries.forEach {
-                    zeigeBauteilPreis(
-                        it, hAnzahl, ModiPad5,
-                        spiel.aktuelleMarktpreise, false,
-                        false,onBuild
+                spiel.spielerListe.forEach { spieler ->
+                    val farbe = siedlerFarben[spieler] ?: Color.Black
+                    zeigeSpielerDaten(
+                        siedlerName = spieler.name,
+                        siedlerFarbe = farbe,
+                        siedlerBauteile = spieler.erhalteBauSaldoZurRunde(),
+                        istBearbeitbar = false,
+                        onManipulateData = { _, _, _ -> },
                     )
                 }
             } }
@@ -506,22 +502,20 @@ fun zeigeSpielerDaten(
     }
 
     Card(
-        modifier = Modifier.padding(5.dp),
+        modifier = ModiPad5,
         onClick = { isPlayerExpanded.value = !isPlayerExpanded.value }
     ) {
         Box(
-            modifier = Modifier
-                .background(siedlerFarbe)
-                .offset(20.dp, 0.dp)
+            modifier = Modifier.background(siedlerFarbe).fillMaxSize().offset(20.dp, 0.dp)
         ) {
             VerticalGrid(
                 columns = SimpleGridCells.Fixed(2),
-                modifier = Modifier.padding(5.dp).width(280.dp)
+                modifier = ModiPad5.width(280.dp)
             ) {
                 Text(
                     text = siedlerName,
                     fontSize = 20.sp,
-                    modifier = Modifier.span(2).padding(5.dp).offset((-25).dp, 0.dp),
+                    modifier = ModiPad5.span(2).offset((-25).dp, 0.dp),
                     textAlign = TextAlign.Center
                 )
 
@@ -531,46 +525,35 @@ fun zeigeSpielerDaten(
 
                         Row {
                             val amount = playerBauteilAmount[bauteil] ?: 0
+                            val modi = Modifier.padding(5.dp, 0.dp)
 
-                            LeftText(
-                                text = "$amount stk",
-                                modifier = Modifier.padding(5.dp, 0.dp)
-                            )
+                            LeftText(text = "$amount stk",modifier = modi)
 
                             Image(
                                 painter = painterResource(id = R.drawable.plus),
                                 contentDescription = null,
-                                modifier = Modifier
-                                    .padding(5.dp, 0.dp)
-                                    .clickable {
-                                        playerBauteilAmount[bauteil] = amount + 1
-                                        onManipulateData(siedlerName, bauteil, true)
-                                    }
+                                modifier = modi.clickable {
+                                    playerBauteilAmount[bauteil] = amount + 1
+                                    onManipulateData(siedlerName, bauteil, true)
+                                }
                             )
 
                             Image(
                                 painter = painterResource(id = R.drawable.minus),
                                 contentDescription = null,
                                 alpha = 0.5f,
-                                modifier = Modifier
-                                    .padding(5.dp, 0.dp)
-                                    .clickable {
-                                        playerBauteilAmount[bauteil] = amount - 1
-                                        onManipulateData(siedlerName, bauteil, false)
-                                    }
+                                modifier = modi.clickable {
+                                    playerBauteilAmount[bauteil] = amount - 1
+                                    onManipulateData(siedlerName, bauteil, false)
+                                }
                             )
                         }
                     }
                 } else {
-                    val belegteBauteile = Bauteil.entries
-                        .map { it to (playerBauteilAmount[it] ?: 0) }
-                        .filter { (_, anzahl) -> anzahl != 0 }
+                    val belegteBauteile = Bauteil.entries.map { it to (playerBauteilAmount[it] ?: 0) }.filter { (_, anzahl) -> anzahl != 0 }
 
                     if (belegteBauteile.isEmpty()) {
-                        Text(
-                            text = "Keine Bauteile",
-                            modifier = Modifier.span(2)
-                        )
+                        Text(text = "Keine Bauteile",modifier = Modifier.span(2))
                     } else {
                         belegteBauteile.take(5).forEach { (bauteil, anzahl) ->
                             RightText(text = "${bauteil.str}: ")
@@ -578,10 +561,7 @@ fun zeigeSpielerDaten(
                         }
 
                         if (belegteBauteile.size > 5) {
-                            Text(
-                                text = "+ ${belegteBauteile.size - 5} weitere",
-                                modifier = Modifier.span(2)
-                            )
+                            Text(text = "+ ${belegteBauteile.size - 5} weitere", modifier = Modifier.span(2))
                         }
                     }
                 }

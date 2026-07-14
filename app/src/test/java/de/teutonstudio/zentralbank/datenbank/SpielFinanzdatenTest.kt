@@ -65,7 +65,7 @@ class SpielFinanzdatenTest {
     }
 
     @Test
-    fun marktwertNutztBauwerksbestandUndMarktpreiseDerselbenRunde() {
+    fun marktwertNutztBauwerksbestandUndRohstoffpreiseDerVorherigenRunde() {
         val annaMitBahn = Spieler("Anna", mapOf(Handelslinie.LAND to 1))
         val spiel = neuesSpiel(
             annaMitBahn to 100.toZahlungsmittel(),
@@ -95,7 +95,96 @@ class SpielFinanzdatenTest {
             konfliktDaten = emptySet(),
         )
 
-        assertEquals(30, spiel.spielerMarktwert[1].getValue(annaMitBahn).toIntOderNull())
+        assertEquals(0, spiel.spielerMarktwert[1].getValue(annaMitBahn).toIntOderNull())
+        assertEquals(
+            0,
+            spiel.bauwerkMarktpreise[1].getValue(Handelslinie.LAND).toIntOderNull(),
+        )
+
+        spiel.fügeLeereRundeHinzu()
+
+        assertEquals(30, spiel.spielerMarktwert[2].getValue(annaMitBahn).toIntOderNull())
+        assertEquals(
+            30,
+            spiel.bauwerkMarktpreise[2].getValue(Handelslinie.LAND).toIntOderNull(),
+        )
+    }
+
+    @Test
+    fun aussenhandelVeraendertM2UndWirdNachRohstoffBilanziert() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 50.toZahlungsmittel(),
+        )
+
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = anna,
+                    erwerber = Ausland,
+                    betrag = 20.toZahlungsmittel(),
+                    anzahl = 2,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        assertEquals(170, spiel.globalesBarvermögen[1].toIntOderNull())
+        assertEquals(
+            20,
+            spiel.aussenhandelsbilanzNachRohstoff[1]
+                .getValue(Rohstoffe.HOLZ)
+                .toIntOderNull(),
+        )
+        assertEquals(20, spiel.aussenhandelsbilanzGesamt[1].toIntOderNull())
+        assertEquals(
+            2,
+            spiel.aussenhandelsbilanzStueckNachRohstoff[1]
+                .getValue(Rohstoffe.HOLZ),
+        )
+        assertEquals(2, spiel.aussenhandelsbilanzStueckGesamt[1])
+
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = Ausland,
+                    erwerber = bernd,
+                    betrag = 7.toZahlungsmittel(),
+                    anzahl = 1,
+                    rohstoff = Rohstoffe.STAHL,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        assertEquals(163, spiel.globalesBarvermögen[2].toIntOderNull())
+        assertEquals(
+            20,
+            spiel.aussenhandelsbilanzNachRohstoff[2]
+                .getValue(Rohstoffe.HOLZ)
+                .toIntOderNull(),
+        )
+        assertEquals(
+            -7,
+            spiel.aussenhandelsbilanzNachRohstoff[2]
+                .getValue(Rohstoffe.STAHL)
+                .toIntOderNull(),
+        )
+        assertEquals(13, spiel.aussenhandelsbilanzGesamt[2].toIntOderNull())
+        assertEquals(
+            2,
+            spiel.aussenhandelsbilanzStueckNachRohstoff[2]
+                .getValue(Rohstoffe.HOLZ),
+        )
+        assertEquals(
+            -1,
+            spiel.aussenhandelsbilanzStueckNachRohstoff[2]
+                .getValue(Rohstoffe.STAHL),
+        )
+        assertEquals(1, spiel.aussenhandelsbilanzStueckGesamt[2])
     }
 
     private fun neuesSpiel(

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,6 +27,7 @@ import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Handelslinie
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
+import de.teutonstudio.zentralbank.datenbank.farbe
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.TextCard
@@ -82,7 +84,13 @@ fun definiereBauteile(
                         key(fürWenn) {
                             val menge = remember { mutableIntStateOf(inhalt[it] ?: 0) }
                             LaunchedEffect(menge.intValue) { inhalt[it] = menge.intValue }
-                            definiereBauteilMenge(it, menge)
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = it.farbe.copy(alpha = 0.32f),
+                                ),
+                            ) {
+                                definiereBauteilMenge(it, menge)
+                            }
                         }
                     } }
                 } }

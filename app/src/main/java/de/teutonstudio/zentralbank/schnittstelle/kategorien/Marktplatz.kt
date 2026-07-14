@@ -1,6 +1,5 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,7 +46,6 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
-import de.teutonstudio.zentralbank.R
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
@@ -56,143 +53,22 @@ import de.teutonstudio.zentralbank.datenbank.HandelsDaten
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
+import de.teutonstudio.zentralbank.datenbank.farbe
 import de.teutonstudio.zentralbank.datenbank.summeGeld
-import de.teutonstudio.zentralbank.datenbank.toBauteilPreis
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteilPreis
-import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
-import de.teutonstudio.zentralbank.schnittstelle.markBy
+import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
-
-@Composable
-fun zeigeHafenPreis(
-    hafen: String,
-    marktpreise: List<Map<Rohstoffe, Zahlungsmittel>>,
-    beiKlick: (Pair<String,Pair<Rohstoffe, Zahlungsmittel>>) -> Unit
-) {
-    val havenList = mapOf(
-        Pair( "3 : 1 Hafen",1f + 1f/3f ),
-        Pair( "2 : 1 Hafen",1f + 1f/2f ),
-        Pair( "6 : 1 Hafen",1f + 1f/6f ),
-        Pair( "5 : 1 Hafen",1f + 1f/5f ),
-        Pair( "8 : 1 Hafen",1f + 1f/8f ),
-        Pair( "9 : 1 Hafen",1f + 1f/9f ),
-        Pair("11 : 1 Hafen",1f + 1f/11f ),
-        Pair( "1 : 1 Hafen",1f )
-    )
-    val resources = marktpreise.first().keys.toList()
-    Card(modifier = ModiPad5) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row( modifier = ModiPad5,
-                verticalAlignment = Alignment.CenterVertically ) {
-                Image(
-                    painter = painterResource(id = R.drawable.handel),
-                    contentDescription = null
-                )
-                Text(text = hafen, fontSize = 25.sp)
-            }
-            VerticalGrid(
-                columns = SimpleGridCells.Fixed(3),
-                horizontalArrangement = Arrangement.Center,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(modifier = Modifier.padding(5.dp), text = "Rohstoff")
-                Text(modifier = Modifier.padding(5.dp), text = "Handelskosten")
-                Text(modifier = Modifier.padding(5.dp), text = "Handelserlös")
-                Rohstoffe.entries.forEach {
-                    zeigeRohstoff(it,12.sp)
-                    val marktpreis = marktpreise.last()[it]!!
-                    val importPreis = (marktpreis * havenList[hafen]!!)
-                    val exportPreis = (marktpreis / havenList[hafen]!!)
-                    Text(modifier = ModiPad5.clickable {
-                        val handelsdaten = Pair(it, importPreis)
-                        beiKlick(Pair("konsumiert", handelsdaten))
-                    }, text = markBy(importPreis) )
-                    Text(modifier = ModiPad5.clickable {
-                        val handelsdaten = Pair(it, exportPreis)
-                        beiKlick(Pair("veräußert", handelsdaten))
-                    }, text = markBy(exportPreis) )
-                }
-                Rohstoffe.entries.forEach {
-                    zeigeRohstoff(it,12.sp)
-                    val marktpreis = marktpreise.last()[it]!!
-                    val importPreis = (marktpreis * havenList[hafen]!!)
-                    val exportPreis = (marktpreis / havenList[hafen]!!)
-                    Text(modifier = ModiPad5.clickable {
-                        val handelsdaten = Pair(it, importPreis)
-                        beiKlick(Pair("konsumiert", handelsdaten))
-                    }, text = markBy(importPreis) )
-                    Text(modifier = ModiPad5.clickable {
-                        val handelsdaten = Pair(it, exportPreis)
-                        beiKlick(Pair("veräußert", handelsdaten))
-                    }, text = markBy(exportPreis) )
-                }
-            }
-            Row( modifier = ModiPad5 ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-                    for (idx in 0..4) {
-                    }
-
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-
-                    for (idx in 0..4) {
-                    }
-                }
-            }
-        }
-    }
-}
 
 private enum class MarktpreisKategorie(val titel: String) {
     ROHSTOFFE("Alle Rohstoffe"),
     BAUWERKE("Alle Bauwerke"),
     WARENKORB("Warenkorb"),
 }
-
-private val rohstoffMarktfarben = mapOf(
-    Rohstoffe.NAHRUNG to Color(0xFF8A6D8F),
-    Rohstoffe.LEHM to Color(0xFFB58B5A),
-    Rohstoffe.ZIEGEL to Color(0xFFA75D5D),
-    Rohstoffe.HOLZ to Color(0xFF6F8061),
-    Rohstoffe.ROHÖL to Color(0xFF4F565D),
-    Rohstoffe.SCHWERÖL to Color(0xFF6D5A70),
-    Rohstoffe.DIESEL to Color(0xFF8A7A45),
-    Rohstoffe.KOHLE to Color(0xFF343A40),
-    Rohstoffe.STAHL to Color(0xFF718096),
-    Rohstoffe.EISEN to Color(0xFF8C6F63),
-)
-
-private val bauwerkMarktfarben = Bauteil.entries.toList().zip(
-    listOf(
-        Color(0xFF527681),
-        Color(0xFF8F6D56),
-        Color(0xFF687B55),
-        Color(0xFF946570),
-        Color(0xFF5F7392),
-        Color(0xFF88764F),
-        Color(0xFF6B6288),
-        Color(0xFF47756C),
-        Color(0xFF8A604D),
-        Color(0xFF5F784F),
-        Color(0xFF786183),
-        Color(0xFF466D87),
-        Color(0xFF8B7943),
-        Color(0xFF4D7164),
-        Color(0xFF865B63),
-        Color(0xFF666A7B),
-        Color(0xFF796149),
-    )
-).toMap()
 
 private val warenkorbMarktfarbe = Color(0xFF75658A)
 
@@ -229,19 +105,6 @@ fun zeigeMarktplatz(
     onTrade: (HandelsDaten) -> Unit = {},
     onWarenkorbAendern: (Map<Rohstoffe, Int>) -> Unit = {},
 ) {
-    val hafenListe = remember {
-        listOf(
-            "3 : 1 Hafen",
-            "2 : 1 Hafen",
-            "6 : 1 Hafen",
-            "5 : 1 Hafen",
-            "8 : 1 Hafen",
-            "9 : 1 Hafen",
-            "11 : 1 Hafen",
-            "1 : 1 Hafen"
-        )
-    }
-
     val isBilanzExpanded = remember { mutableStateOf(true) }
 
     var marktpreisKategorie by remember { mutableStateOf(MarktpreisKategorie.ROHSTOFFE) }
@@ -277,7 +140,7 @@ fun zeigeMarktplatz(
                         DiagrammLegendenEintrag(
                             id = "rohstoff:${rohstoff.name}",
                             bezeichnung = rohstoff.str,
-                            farbe = rohstoffMarktfarben.getValue(rohstoff),
+                            farbe = rohstoff.farbe,
                         )
                     }
 
@@ -285,7 +148,7 @@ fun zeigeMarktplatz(
                         DiagrammLegendenEintrag(
                             id = "bauwerk:${bauwerk.str}",
                             bezeichnung = bauwerk.str,
-                            farbe = bauwerkMarktfarben.getValue(bauwerk),
+                            farbe = bauwerk.farbe,
                         )
                     }
 
@@ -311,7 +174,7 @@ fun zeigeMarktplatz(
                             sichtbareIndizes.map(rohstoffe::get)
                         )
 
-                        MarktpreisKategorie.BAUWERKE -> spiel.marktpreise.toBauteilPreis().toChart(
+                        MarktpreisKategorie.BAUWERKE -> spiel.bauwerkMarktpreise.toChart(
                             sichtbareIndizes.map(bauwerke::get)
                         )
 
@@ -365,7 +228,9 @@ fun zeigeMarktplatz(
                                     rememberLineCartesianLayer(
                                         lineProvider = series(*linien.toTypedArray())
                                     ),
-                                    endAxis = VerticalAxis.rememberEnd(),
+                                    endAxis = VerticalAxis.rememberEnd(
+                                        valueFormatter = markAchsenFormatter,
+                                    ),
                                     bottomAxis = HorizontalAxis.rememberBottom(),
                                 ),
                                 model = chartModel,
@@ -436,7 +301,7 @@ fun zeigeMarktplatz(
                         bauteil = bauwerk,
                         hAnzahl = 7,
                         modifier = ModiPad5,
-                        marktpreise = spiel.aktuelleMarktpreise,
+                        marktpreise = spiel.aktuelleBauwerkBewertungspreise,
                         nicht_null_preise = false,
                         nicht_null_zeilen = false,
                         beiKlick = {},
@@ -538,26 +403,6 @@ fun zeigeMarktplatz(
                     }
                 }
             }
-        } else {
-/*            LazyVerticalGrid(
-                columns = GridCells.Adaptive(300.dp)
-            ) {
-                items(
-                    items = hafenListe,
-                    key = { hafen -> hafen }
-                ) { hafen ->
-                    zeigeHafenPreis(hafen, marketPrices) { aktion, rohstoff, preis ->
-                        inputResource.value = rohstoff
-                        inputPrice.floatValue = preis
-                        inputAmount.intValue = 0
-                        inputAmountText.value = ""
-                        inputPlayer.value = null
-
-                        isBuying.value = aktion == "konsumiert"
-                        isSelling.value = aktion == "veräußert"
-                    }
-                }
-            }*/
         }
     }
 
@@ -582,11 +427,5 @@ private fun PreviewMarktplatz() {
     val spiel = remember { TestSpiel }
     Column {
         zeigeMarktplatz(spiel)
-//        zeigeHafenPreis("3 : 1 Hafen",marketprices,{})
-        /*
-        zeigeWarenkorb(
-            marketprices,
-            playerSaldoTestList,
-        ) { }*/
     }
 }

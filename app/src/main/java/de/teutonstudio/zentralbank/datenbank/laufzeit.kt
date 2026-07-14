@@ -36,6 +36,49 @@ private fun Handelsregister.baueCache(idx:Int,cache:List<EnumMap<Rohstoffe,Zahlu
         if (menge == null || menge.count() == 0) vorherigeMarktpreise[it]!! else menge.summeGeld { h -> h.einzelpreis() } / menge.count()
     }
 }
+
+private fun Handelsregister.baueAussenhandelsbilanz(
+    idx: Int,
+    cache: List<EnumMap<Rohstoffe, Zahlungsmittel>>,
+): EnumMap<Rohstoffe, Zahlungsmittel> {
+    val vorherigeBilanz = cache.getOrNull(idx - 1).orEmpty()
+    val neu = Rohstoffe.associateWith { rohstoff ->
+        vorherigeBilanz[rohstoff] ?: Zahlungsmittel()
+    }
+
+    erhalteMarktpreisRelevante().getOrNull(idx).orEmpty().forEach { handel ->
+        val differenz = when {
+            handel.besitzer != Ausland && handel.erwerber == Ausland -> handel.betrag
+            handel.besitzer == Ausland && handel.erwerber != Ausland -> -handel.betrag
+            else -> Zahlungsmittel()
+        }
+        neu[handel.rohstoff] = neu.getValue(handel.rohstoff) + differenz
+    }
+
+    return neu
+}
+
+private fun Handelsregister.baueAussenhandelsmengenbilanz(
+    idx: Int,
+    cache: List<EnumMap<Rohstoffe, Int>>,
+): EnumMap<Rohstoffe, Int> {
+    val vorherigeBilanz = cache.getOrNull(idx - 1).orEmpty()
+    val neu = Rohstoffe.associateWith { rohstoff ->
+        vorherigeBilanz[rohstoff] ?: 0
+    }
+
+    erhalteMarktpreisRelevante().getOrNull(idx).orEmpty().forEach { handel ->
+        val differenz = when {
+            handel.besitzer != Ausland && handel.erwerber == Ausland -> handel.anzahl
+            handel.besitzer == Ausland && handel.erwerber != Ausland -> -handel.anzahl
+            else -> 0
+        }
+        neu[handel.rohstoff] = neu.getValue(handel.rohstoff) + differenz
+    }
+
+    return neu
+}
+
 private fun Handelsregister.baueLiquidität(idx:Int,liquidität:List<Map<JuristischePerson, Zahlungsmittel>>): Map<JuristischePerson, Zahlungsmittel> {
     val vorherigeLiquidität = liquidität.getOrNull(idx - 1) ?: emptyMap()
     val neu = bekannteSpieler().associateWith { spieler -> vorherigeLiquidität[spieler] ?: Zahlungsmittel() }.toMutableMap()
@@ -191,7 +234,12 @@ open class Spiel(
 
     public val spielerStringListe = spieler.map { it.name }
     public val spielerListe = spieler.map { it }
-    public val spielerMarktwert: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { it.erhalteBauSaldoZurRunde(idx).zuKosten() * marktpreise[idx] }}
+    public val spielerMarktwert: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx ->
+        val bewertungspreise = erhalteBauwerkBewertungspreiseZurRunde(idx)
+        spielerListe.associateWith { spieler ->
+            spieler.erhalteBauSaldoZurRunde(idx).zuKosten() * bewertungspreise
+        }
+    }
     public val spielerSaldo: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSaldoZurRunde(idx,it) } }
     public val spielerSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSchuldenZurRunde(idx,it) } }
     public val spielerZinsschulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerZinsschuldenZurRunde(idx,it) } }
@@ -200,14 +248,36 @@ open class Spiel(
     public val globaleSchulden: List<Zahlungsmittel> get() = spielerSchulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleZinsschulden: List<Zahlungsmittel> get() = spielerZinsschulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleKombinierteSchulden: List<Zahlungsmittel> get() = spielerKombinierteSchulden.map { runde -> runde.values.summeGeld { it } }
+    public val aussenhandelsbilanzNachRohstoff: List<EnumMap<Rohstoffe, Zahlungsmittel>> get() =
+        List(aktuelleRunde) { runde -> handel.erhalteAussenhandelsbilanzZurRunde(runde) }
+    public val aussenhandelsbilanzGesamt: List<Zahlungsmittel> get() =
+        aussenhandelsbilanzNachRohstoff.map { runde -> runde.values.summeGeld { it } }
+    public val aussenhandelsbilanzStueckNachRohstoff: List<EnumMap<Rohstoffe, Int>> get() =
+        List(aktuelleRunde) { runde -> handel.erhalteAussenhandelsmengenbilanzZurRunde(runde) }
+    public val aussenhandelsbilanzStueckGesamt: List<Int> get() =
+        aussenhandelsbilanzStueckNachRohstoff.map { runde -> runde.values.sum() }
     public val nächsterZinssatz: Float get() = runden.last().leitzinssatz + erhalteZinssatzSchritte()
     public val emittierteAnleihen: List<Set<Anleihe>> get() = List(aktuelleRunde) { handel.erhalteEmittierteAnleihen()[it].filter { a -> a.sondervermögen != Zahlungsmittel() }.toSet() }
     public val anleihen: Set<AnleiheAnzeige> get() = emittierteAnleihen.map { anleihen -> anleihen.associateWith { handel.erhalteRelevanteAnleihenhandel(it) } }.zuDarstellung(aktuelleRunde)
     public val aktuelleMarktpreise: EnumMap<Rohstoffe, Zahlungsmittel> get() = handel.erhalteMarktpreisZurRunde(aktuelleRunde-1)
     public val marktpreise: List<EnumMap<Rohstoffe, Zahlungsmittel>> get() = List(aktuelleRunde) { handel.erhalteMarktpreisZurRunde(it) }
+    public val bauwerkMarktpreise: List<Map<Bauteil, Zahlungsmittel>> get() = List(aktuelleRunde) { runde ->
+        val bewertungspreise = erhalteBauwerkBewertungspreiseZurRunde(runde)
+        Bauteil.entries.associateWith { bauteil -> bauteil.zuPreis(bewertungspreise) }
+    }
+    public val aktuelleBauwerkBewertungspreise: EnumMap<Rohstoffe, Zahlungsmittel> get() =
+        erhalteBauwerkBewertungspreiseZurRunde(aktuelleRunde - 1)
     public val aktuelleRunde: Int get() = runden.size
     private val cache: MutableList<Zahlungsmittel> = mutableListOf()
     init { List(aktuelleRunde) { cache.add(baueCache(it)) } }
+
+    private fun erhalteBauwerkBewertungspreiseZurRunde(
+        runde: Int,
+    ): EnumMap<Rohstoffe, Zahlungsmittel> = if (runde > 0) {
+        handel.erhalteMarktpreisZurRunde(runde - 1)
+    } else {
+        Rohstoffe.associateWith { Zahlungsmittel() }
+    }
 
     fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {
         require(neuerWarenkorb.values.all { menge -> menge >= 0 }) {
@@ -339,12 +409,18 @@ data class Handelsregister(
     private val liquidität: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
     private val schulden: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
     private val zinsschulden: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
+    private val aussenhandelsbilanz: MutableList<EnumMap<Rohstoffe, Zahlungsmittel>> = mutableListOf()
+    private val aussenhandelsmengenbilanz: MutableList<EnumMap<Rohstoffe, Int>> = mutableListOf()
     init { List(einträge.size) {
         cache.add(baueCache(it,cache))
         liquidität.add(baueLiquidität(it,liquidität))
         val schuldenstand = baueSchuldenstand(it)
         schulden.add(schuldenstand.kapital)
         zinsschulden.add(schuldenstand.zinsen)
+        aussenhandelsbilanz.add(baueAussenhandelsbilanz(it, aussenhandelsbilanz))
+        aussenhandelsmengenbilanz.add(
+            baueAussenhandelsmengenbilanz(it, aussenhandelsmengenbilanz)
+        )
     } }
 
     public fun bekannteSpieler(): Set<JuristischePerson> {
@@ -372,6 +448,12 @@ data class Handelsregister(
 
     public fun erhalteRohstoffMarktpreisZurRunde(runde: Int,rohstoff: Rohstoffe): Zahlungsmittel = cache[runde][rohstoff]!!
     public fun erhalteMarktpreisZurRunde(runde: Int): EnumMap<Rohstoffe, Zahlungsmittel> = cache[runde]
+    public fun erhalteAussenhandelsbilanzZurRunde(
+        runde: Int,
+    ): EnumMap<Rohstoffe, Zahlungsmittel> = aussenhandelsbilanz[runde]
+    public fun erhalteAussenhandelsmengenbilanzZurRunde(
+        runde: Int,
+    ): EnumMap<Rohstoffe, Int> = aussenhandelsmengenbilanz[runde]
 
     public fun erhalteSpielerSaldoZurRunde(runde: Int, spieler: Spieler): Zahlungsmittel = liquidität[runde][spieler]!!
     public fun erhalteSaldoZurRunde(runde: Int): Map<JuristischePerson,Zahlungsmittel> = liquidität[runde]
@@ -394,6 +476,15 @@ data class Handelsregister(
         val schuldenstand = baueSchuldenstand(schulden.size)
         schulden.add(schuldenstand.kapital)
         zinsschulden.add(schuldenstand.zinsen)
+        aussenhandelsbilanz.add(
+            baueAussenhandelsbilanz(aussenhandelsbilanz.size, aussenhandelsbilanz)
+        )
+        aussenhandelsmengenbilanz.add(
+            baueAussenhandelsmengenbilanz(
+                aussenhandelsmengenbilanz.size,
+                aussenhandelsmengenbilanz,
+            )
+        )
     }
 
     private inline fun <reified R,T> Iterable<Set<Handel>>.speicherMap(rundenDaten: List<RundeDaten>,transform:(RundeDaten,R) -> T): List<T> {

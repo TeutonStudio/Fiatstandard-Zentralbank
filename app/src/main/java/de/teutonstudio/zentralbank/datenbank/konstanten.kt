@@ -49,6 +49,25 @@ fun <K,V,T> Map<out Pair<K, V>,T>.forEachTriple(action: (Triple<K,V,T>) -> Unit)
 fun String.zuBauteil(): Bauteil? = Bauteil.entries.firstOrNull { it.str == this }
 fun Bauteil.Companion.fromString(str: String): Bauteil? = str.zuBauteil()
 fun Bauteil.zuPreis(marktpreis: EnumMap<Rohstoffe, Zahlungsmittel>) = kosten * marktpreis
+val Bauteil.farbe: Color get() = when (this) {
+    Handelslinie.LAND -> Color(0xFF527681)
+    Handelslinie.SEE -> Color(0xFF8F6D56)
+    Verwaltungsstandort.BAHNHOF -> Color(0xFF687B55)
+    Verwaltungsstandort.GROSSBAHNHOF -> Color(0xFF946570)
+    Verwaltungsstandort.HAFEN -> Color(0xFF5F7392)
+    Verwaltungsstandort.GROSSHAFEN -> Color(0xFF88764F)
+    Wirtschaftsregionen.GESCHÄFTSBANK -> Color(0xFF6B6288)
+    Wirtschaftsregionen.VIEHHOF -> Color(0xFF47756C)
+    Wirtschaftsregionen.ZIEGELBRENNER -> Color(0xFF8A604D)
+    Wirtschaftsregionen.LEHMINE -> Color(0xFF5F784F)
+    Wirtschaftsregionen.FÖRSTER -> Color(0xFF786183)
+    Wirtschaftsregionen.BOHRTURM -> Color(0xFF466D87)
+    Wirtschaftsregionen.RAFFINERIE -> Color(0xFF8B7943)
+    Wirtschaftsregionen.SRAFINNERIE -> Color(0xFF4D7164)
+    Wirtschaftsregionen.KOHLEMINE -> Color(0xFF865B63)
+    Wirtschaftsregionen.STAHLFABRIK -> Color(0xFF666A7B)
+    Wirtschaftsregionen.EISENMINE -> Color(0xFF796149)
+}
 fun Int.zuZinssatz(): String = "$this %"
 fun Zahlungsmittel.zuMark(): String = "${toIntOderNull()} Mark"
 fun <V> Bauteil.Companion.associateWith(valueSelector: (Bauteil) -> V): Map<Bauteil,V> = entries.associateWith(valueSelector)
@@ -112,16 +131,16 @@ enum class Wirtschaftsregionen(override val str:String, override val kosten: Enu
 }
 
 enum class Rohstoffe(val str: String, val farbe: Color) {
-    NAHRUNG("nahrung",Color.Magenta),
-    LEHM("lehm",Color.Yellow),
-    ZIEGEL("ziegel",Color.Red),
-    HOLZ("holz",Color(139, 69, 19)),
-    ROHÖL("rohöl",Color.Gray),
-    SCHWERÖL("schweröl", Color.Gray),
-    DIESEL("diesel",Color.Gray),
-    KOHLE("kohle",Color.Black),
-    STAHL("stahl",Color.White),
-    EISEN("eisen",Color.LightGray);
+    NAHRUNG("nahrung", Color(0xFF8A6D8F)),
+    LEHM("lehm", Color(0xFFB58B5A)),
+    ZIEGEL("ziegel", Color(0xFFA75D5D)),
+    HOLZ("holz", Color(0xFF6F8061)),
+    ROHÖL("rohöl", Color(0xFF4F565D)),
+    SCHWERÖL("schweröl", Color(0xFF6D5A70)),
+    DIESEL("diesel", Color(0xFF8A7A45)),
+    KOHLE("kohle", Color(0xFF343A40)),
+    STAHL("stahl", Color(0xFF718096)),
+    EISEN("eisen", Color(0xFF8C6F63));
 
     companion object
 }
