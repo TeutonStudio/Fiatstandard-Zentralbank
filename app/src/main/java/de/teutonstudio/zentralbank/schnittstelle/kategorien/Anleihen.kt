@@ -59,7 +59,6 @@ import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
-import de.teutonstudio.zentralbank.datenbank.summeGeld
 import de.teutonstudio.zentralbank.datenbank.toY
 import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.datenbank.zuZinssatz
@@ -177,7 +176,6 @@ fun Header(
                     BalanceChart(
                         spiel = spiel,
                         ausgewählterSpieler = ausgewählterSpieler,
-                        anleihen = spiel.anleihen,
                     )
                 }
             } else {
@@ -215,26 +213,26 @@ fun Header(
 private fun BalanceChart(
     spiel: Spiel,
     ausgewählterSpieler: String,
-    anleihen: Iterable<AnleiheAnzeige>,
 ) {
-    if (spiel.spielerSaldo.isEmpty() || spiel.spielerMarktwert.isEmpty() || spiel.spielerSchulden.isEmpty()) {
+    val reihenLängen = listOf(
+        spiel.spielerSaldo.size,
+        spiel.spielerMarktwert.size,
+        spiel.spielerSchulden.size,
+        spiel.spielerZinsschulden.size,
+        spiel.spielerKombinierteSchulden.size,
+    )
+    if (reihenLängen.any { länge -> länge == 0 }) {
         EmptyInfoCard("Keine Bilanzdaten vorhanden.")
         return
     }
 
-    // TODO durch Spiel irrelevant geworden
-    val sameLength = spiel.spielerSaldo.size == spiel.spielerMarktwert.size && spiel.spielerSaldo.size == spiel.spielerSchulden.size
-
-    if (!sameLength) {
+    if (reihenLängen.distinct().size != 1) {
         EmptyInfoCard("Bilanzdaten haben unterschiedliche Längen.")
         return
     }
 
     if (ausgewählterSpieler == GLOBAL_PLAYER) {
-        GlobalBalanceChart(
-            spielerSchulden = spiel.spielerSchulden,
-            anleihen = anleihen,
-        )
+        GlobalBalanceChart(spiel)
         return
     }
 
@@ -254,15 +252,27 @@ private fun BalanceChart(
             farbe = spielerFarbe.abgedunkelt(0.2f),
         ),
         DiagrammLegendenEintrag(
-            id = "bilanz-verbindlichkeiten",
-            bezeichnung = "Verbindlichkeiten",
+            id = "bilanz-schulden",
+            bezeichnung = "Schulden",
             farbe = spielerFarbe.abgedunkelt(0.45f),
+        ),
+        DiagrammLegendenEintrag(
+            id = "bilanz-zinsschulden",
+            bezeichnung = "Zinsschulden",
+            farbe = Color(0xFF8A7552),
+        ),
+        DiagrammLegendenEintrag(
+            id = "bilanz-kombinierte-schulden",
+            bezeichnung = "Kombinierte Schulden",
+            farbe = Color(0xFF8A5D65),
         ),
     )
     val reihen = listOf(
         legende[0] to spiel.spielerSaldo.toY(ausgewählterSpieler),
         legende[1] to spiel.spielerMarktwert.toY(ausgewählterSpieler),
         legende[2] to spiel.spielerSchulden.toY(ausgewählterSpieler),
+        legende[3] to spiel.spielerZinsschulden.toY(ausgewählterSpieler),
+        legende[4] to spiel.spielerKombinierteSchulden.toY(ausgewählterSpieler),
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
     val sichtbareReihen = reihen.filter { (eintrag, _) ->
@@ -326,25 +336,17 @@ private fun BalanceChart(
 
 @Composable
 private fun GlobalBalanceChart(
-    spielerSchulden: List<Map<Spieler, Zahlungsmittel>>,
-    anleihen: Iterable<AnleiheAnzeige>,
+    spiel: Spiel,
 ) {
-    val globalDebt = spielerSchulden.map { map ->
-        map.values.summeGeld { it }.toIntOderNull() ?: 0
+    val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
+    val globaleSchulden = spiel.globaleSchulden.map { it.toIntOderNull() ?: 0 }
+    val globaleZinsschulden = spiel.globaleZinsschulden.map { it.toIntOderNull() ?: 0 }
+    val globaleKombinierteSchulden = spiel.globaleKombinierteSchulden.map {
+        it.toIntOderNull() ?: 0
     }
+    val x = globalesBarvermögen.indices.toList()
 
-    val maxRoundCount = globalDebt.size
-    val globalUnvermoegen = List(maxRoundCount) { idx ->
-        val runde = idx + 1
-        anleihen
-            .filter { it.emittiert <= runde && it.faelligkeit >= runde }
-            .summeGeld { it.unvermoegen }
-            .toIntOderNull() ?: 0
-    }
-
-    val x = List(globalDebt.size) { it + 1 }
-
-    if (globalDebt.isEmpty() && globalUnvermoegen.isEmpty()) {
+    if (x.isEmpty()) {
         EmptyInfoCard("Keine globalen Bilanzwerte vorhanden.")
         return
     }
@@ -352,19 +354,31 @@ private fun GlobalBalanceChart(
     val modelProducer = remember { CartesianChartModelProducer() }
     val legende = listOf(
         DiagrammLegendenEintrag(
-            id = "global-unvermoegen",
-            bezeichnung = "globales Unvermögen",
+            id = "global-barvermoegen",
+            bezeichnung = "Globales Barvermögen (M2)",
             farbe = Color(0xFF607D8B),
         ),
         DiagrammLegendenEintrag(
-            id = "global-anleihe-unvermoegen",
-            bezeichnung = "offenes Anleihe-Unvermögen",
+            id = "global-schulden",
+            bezeichnung = "Globale Schulden",
             farbe = Color(0xFF9A6B5A),
+        ),
+        DiagrammLegendenEintrag(
+            id = "global-zinsschulden",
+            bezeichnung = "Globale Zinsschulden",
+            farbe = Color(0xFF8A7552),
+        ),
+        DiagrammLegendenEintrag(
+            id = "global-kombinierte-schulden",
+            bezeichnung = "Globale kombinierte Schulden",
+            farbe = Color(0xFF8A5D65),
         ),
     )
     val reihen = listOf(
-        legende[0] to globalDebt,
-        legende[1] to globalUnvermoegen,
+        legende[0] to globalesBarvermögen,
+        legende[1] to globaleSchulden,
+        legende[2] to globaleZinsschulden,
+        legende[3] to globaleKombinierteSchulden,
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
     val sichtbareReihen = reihen.filter { (eintrag, _) ->

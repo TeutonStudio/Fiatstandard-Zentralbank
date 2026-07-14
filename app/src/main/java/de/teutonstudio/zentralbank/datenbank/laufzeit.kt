@@ -42,48 +42,47 @@ private fun Handelsregister.baueLiquidität(idx:Int,liquidität:List<Map<Juristi
     jeHandelZurRunde(idx,{ neu.handelt(it) })
     // Zinsen und Rückkauf am Ende der Runde buchen
     erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert,anleihe,handelsZuordnung) ->
-        val rückkauf = emittiert+anleihe.laufzeit+1
-        val indexListe = (emittiert..rückkauf)
-        if (idx in indexListe) {
-            indexListe.forEach { runde ->
-                val handel = handelsZuordnung[runde]
-                val besitzer = handelsZuordnung.gläubiger(runde)!!
-                if (idx == runde) {
-                    if (emittiert == idx && handel != null) {
-                        // teil von rundenHandel
-                    } else if (runde == rückkauf) { neu.emittiert(anleihe,besitzer) } else {
-                        if (handel != null) {/* teil von rundenHandel */}
-                        neu.zins(anleihe,besitzer)
-                    }
+        val besitzer = handelsZuordnung.gläubiger(idx)!!
+        val fälligkeitsrunde = emittiert + anleihe.laufzeit
 
-                }
-            }
+        if (anleihe.istStartguthaben()) {
+            if (idx == emittiert) neu.zins(anleihe, besitzer)
+        } else if (idx in (emittiert + 1) until fälligkeitsrunde) {
+            neu.zins(anleihe, besitzer)
+        } else if (idx == fälligkeitsrunde) {
+            neu.zins(anleihe, besitzer)
+            neu.tilgt(anleihe, besitzer)
         }
     }
     return neu
 }
-private fun Handelsregister.baueVerbindlichkeiten(idx:Int): Map<JuristischePerson, Zahlungsmittel> {
-    val neu = bekannteSpieler().associateWith { Zahlungsmittel() }.toMutableMap()
-    // Zinsen und Rückkauf am Ende der Runde buchen
-    erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert,anleihe,handelsZuordnung) ->
-        val rückkauf = emittiert+anleihe.laufzeit+1
-        val indexListe = (emittiert..rückkauf)
-        if (idx in indexListe) {
-            (emittiert..rückkauf).forEach { runde ->
-                val handel = handelsZuordnung[runde]
-                val besitzer = handelsZuordnung.gläubiger(runde)!!
-                if (runde < idx) { // alles was in Zukunft noch aussteht
-                    if (emittiert == idx && handel != null) {
-                        // keine Verbindlichkeit
-                    } else if (runde == rückkauf) { neu.emittiert(anleihe,besitzer) } else {
-                        if (handel != null) {/* keine Verbindlichkeit */}
-                        neu.zinsVerbindlichkeit(anleihe,besitzer)
-                    }
-                }
-            }
+
+private data class Schuldenstand(
+    val kapital: Map<JuristischePerson, Zahlungsmittel>,
+    val zinsen: Map<JuristischePerson, Zahlungsmittel>,
+)
+
+private fun Anleihe.istStartguthaben(): Boolean =
+    sondervermögen == Zahlungsmittel() && unvermögen < Zahlungsmittel()
+
+private fun Handelsregister.baueSchuldenstand(idx:Int): Schuldenstand {
+    val kapital = bekannteSpieler().associateWith { Zahlungsmittel() }.toMutableMap()
+    val zinsen = bekannteSpieler().associateWith { Zahlungsmittel() }.toMutableMap()
+
+    erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert,anleihe,_) ->
+        if (anleihe.istStartguthaben()) return@forEachTriple
+
+        val fälligkeitsrunde = emittiert + anleihe.laufzeit
+        if (idx in emittiert until fälligkeitsrunde) {
+            val schuldiger = anleihe.schuldiger
+            kapital[schuldiger] = kapital.getValue(schuldiger) + anleihe.sondervermögen
+
+            val verbleibendeZinsrunden = (fälligkeitsrunde - idx).coerceAtLeast(0)
+            zinsen[schuldiger] = zinsen.getValue(schuldiger) +
+                    anleihe.unvermögen * verbleibendeZinsrunden
         }
     }
-    return neu
+    return Schuldenstand(kapital = kapital, zinsen = zinsen)
 }
 private fun Kriegsregister.baueCache(idx: Int ,cache: List<Map<String, KonfliktStatus>>): Map<String, KonfliktStatus> {
     val status = cache.getOrNull(idx - 1).orEmpty().mapValues { (spieler, alterStatus) ->
@@ -195,6 +194,12 @@ open class Spiel(
     public val spielerMarktwert: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { it.erhalteBauSaldoZurRunde(idx).zuKosten() * marktpreise[idx] }}
     public val spielerSaldo: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSaldoZurRunde(idx,it) } }
     public val spielerSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSchuldenZurRunde(idx,it) } }
+    public val spielerZinsschulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerZinsschuldenZurRunde(idx,it) } }
+    public val spielerKombinierteSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerKombinierteSchuldenZurRunde(idx,it) } }
+    public val globalesBarvermögen: List<Zahlungsmittel> get() = spielerSaldo.map { runde -> runde.values.summeGeld { it } }
+    public val globaleSchulden: List<Zahlungsmittel> get() = spielerSchulden.map { runde -> runde.values.summeGeld { it } }
+    public val globaleZinsschulden: List<Zahlungsmittel> get() = spielerZinsschulden.map { runde -> runde.values.summeGeld { it } }
+    public val globaleKombinierteSchulden: List<Zahlungsmittel> get() = spielerKombinierteSchulden.map { runde -> runde.values.summeGeld { it } }
     public val nächsterZinssatz: Float get() = runden.last().leitzinssatz + erhalteZinssatzSchritte()
     public val emittierteAnleihen: List<Set<Anleihe>> get() = List(aktuelleRunde) { handel.erhalteEmittierteAnleihen()[it].filter { a -> a.sondervermögen != Zahlungsmittel() }.toSet() }
     public val anleihen: Set<AnleiheAnzeige> get() = emittierteAnleihen.map { anleihen -> anleihen.associateWith { handel.erhalteRelevanteAnleihenhandel(it) } }.zuDarstellung(aktuelleRunde)
@@ -332,11 +337,14 @@ data class Handelsregister(
 
     private val cache: MutableList<EnumMap<Rohstoffe,Zahlungsmittel>> = mutableListOf()
     private val liquidität: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
-    private val verbindlichkeiten: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
+    private val schulden: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
+    private val zinsschulden: MutableList<Map<JuristischePerson, Zahlungsmittel>> = mutableListOf()
     init { List(einträge.size) {
         cache.add(baueCache(it,cache))
         liquidität.add(baueLiquidität(it,liquidität))
-        verbindlichkeiten.add(baueVerbindlichkeiten(it))
+        val schuldenstand = baueSchuldenstand(it)
+        schulden.add(schuldenstand.kapital)
+        zinsschulden.add(schuldenstand.zinsen)
     } }
 
     public fun bekannteSpieler(): Set<JuristischePerson> {
@@ -347,7 +355,7 @@ data class Handelsregister(
     }
 
     public fun erhalteRelevanteAnleihen(runde: Int): Map<Pair<Int, Anleihe>,Map<Int, Anleihenhandel>> = erhalteEmittierteAnleihen().flatMapIndexed { emittiert, anleihen -> anleihen.map {
-        if (runde in emittiert..emittiert+it.laufzeit+1) (emittiert to it) to erhalteRelevanteAnleihenhandel(it) else null
+        if (runde in emittiert..emittiert+it.laufzeit) (emittiert to it) to erhalteRelevanteAnleihenhandel(it) else null
     } }.filterNotNull().toMap()
 
     public fun erhalteMarktpreisRelevante(): List<Set<RohstoffHandel>> = einträge.map { it.filterIsInstance<RohstoffHandel>().toSet() }
@@ -368,8 +376,14 @@ data class Handelsregister(
     public fun erhalteSpielerSaldoZurRunde(runde: Int, spieler: Spieler): Zahlungsmittel = liquidität[runde][spieler]!!
     public fun erhalteSaldoZurRunde(runde: Int): Map<JuristischePerson,Zahlungsmittel> = liquidität[runde]
 
-    public fun erhalteSpielerSchuldenZurRunde(runde: Int, spieler: Spieler): Zahlungsmittel = verbindlichkeiten[runde][spieler]!!
-    public fun erhalteSchuldenZurRunde(runde: Int): Map<JuristischePerson,Zahlungsmittel> = verbindlichkeiten[runde]
+    public fun erhalteSpielerSchuldenZurRunde(runde: Int, spieler: Spieler): Zahlungsmittel = schulden[runde][spieler]!!
+    public fun erhalteSchuldenZurRunde(runde: Int): Map<JuristischePerson,Zahlungsmittel> = schulden[runde]
+
+    public fun erhalteSpielerZinsschuldenZurRunde(runde: Int, spieler: Spieler): Zahlungsmittel = zinsschulden[runde][spieler]!!
+    public fun erhalteZinsschuldenZurRunde(runde: Int): Map<JuristischePerson,Zahlungsmittel> = zinsschulden[runde]
+
+    public fun erhalteSpielerKombinierteSchuldenZurRunde(runde: Int, spieler: Spieler): Zahlungsmittel =
+        erhalteSpielerSchuldenZurRunde(runde, spieler) + erhalteSpielerZinsschuldenZurRunde(runde, spieler)
 
     public fun jeHandelZurRunde(runde:Int,jeHandel:(Handel) -> Unit) = einträge[runde].forEach { jeHandel(it) }
 
@@ -377,7 +391,9 @@ data class Handelsregister(
         einträge.add(neuGehandelt)
         cache.add(baueCache(cache.size,cache))
         liquidität.add(baueLiquidität(liquidität.size,liquidität))
-        verbindlichkeiten.add(baueVerbindlichkeiten(verbindlichkeiten.size))
+        val schuldenstand = baueSchuldenstand(schulden.size)
+        schulden.add(schuldenstand.kapital)
+        zinsschulden.add(schuldenstand.zinsen)
     }
 
     private inline fun <reified R,T> Iterable<Set<Handel>>.speicherMap(rundenDaten: List<RundeDaten>,transform:(RundeDaten,R) -> T): List<T> {

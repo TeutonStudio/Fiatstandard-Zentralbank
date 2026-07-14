@@ -10,6 +10,7 @@ operator fun Map<JuristischePerson, Zahlungsmittel>.minus(other:Map<JuristischeP
 
 fun Map<JuristischePerson, Zahlungsmittel>.handelt(handel: Handel): Map<JuristischePerson, Zahlungsmittel> = this + mapOf(handel.besitzer to handel.erhalteBetrag()) - mapOf(handel.erwerber to handel.erhalteBetrag())
 fun Map<JuristischePerson, Zahlungsmittel>.emittiert(anleihe: Anleihe, an: JuristischePerson): Map<JuristischePerson, Zahlungsmittel> = this + (anleihe.schuldiger to anleihe.sondervermögen).toMap() - mapOf(an to anleihe.sondervermögen)
+fun Map<JuristischePerson, Zahlungsmittel>.tilgt(anleihe: Anleihe, an: JuristischePerson): Map<JuristischePerson, Zahlungsmittel> = this - mapOf(anleihe.schuldiger to anleihe.sondervermögen) + mapOf(an to anleihe.sondervermögen)
 fun Map<JuristischePerson, Zahlungsmittel>.zins(anleihe: Anleihe, an: JuristischePerson): Map<JuristischePerson, Zahlungsmittel> = this + mapOf(an to anleihe.unvermögen) - mapOf(anleihe.schuldiger to anleihe.unvermögen)
 fun Map<JuristischePerson, Zahlungsmittel>.zinsVerbindlichkeit(anleihe: Anleihe, an: JuristischePerson): Map<JuristischePerson, Zahlungsmittel> = this - mapOf(an to anleihe.unvermögen) + mapOf(anleihe.schuldiger to anleihe.unvermögen)
 
@@ -20,6 +21,7 @@ private fun <K,V> MutableMap<K,V>.equal(neu:Map<K,V>) { this.clear(); neu.entrie
 
 fun MutableMap<JuristischePerson, Zahlungsmittel>.handelt(handel: Handel) { this.equal(this.toMap().handelt(handel)) }
 fun MutableMap<JuristischePerson, Zahlungsmittel>.emittiert(anleihe: Anleihe, an: JuristischePerson) { this.equal(this.toMap().emittiert(anleihe,an)) }
+fun MutableMap<JuristischePerson, Zahlungsmittel>.tilgt(anleihe: Anleihe, an: JuristischePerson) { this.equal(this.toMap().tilgt(anleihe,an)) }
 fun MutableMap<JuristischePerson, Zahlungsmittel>.zins(anleihe: Anleihe, an: JuristischePerson) { this.equal(this.toMap().zins(anleihe,an)) }
 
 inline fun <T> Iterable<T>.summeGeld(
