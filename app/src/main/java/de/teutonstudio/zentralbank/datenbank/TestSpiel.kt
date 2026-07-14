@@ -179,6 +179,7 @@ object TestSpiel : Spiel(
                 rohstoff(clara, bernd, 11, 2, Rohstoffe.ZIEGEL),
                 rohstoff(david, anna, 17, 1, Rohstoffe.DIESEL),
                 Anleihenhandel(eva, clara, anleiheAnna1, 83.toZahlungsmittel()),
+                Anleihenhandel(franz, georg, anleiheFranzFaellig, 50.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
                 vertrag(bernd, eva, Vertragsart.FRIEDENSERKLÄRUNG),
@@ -211,6 +212,7 @@ object TestSpiel : Spiel(
                 rohstoff(clara, david, 22, 1, Rohstoffe.ROHÖL),
                 rohstoff(david, bernd, 13, 1, Rohstoffe.DIESEL),
                 Anleihenhandel(bernd, eva, anleiheDavid1, 74.toZahlungsmittel()),
+                Anleihenhandel(georg, bernd, anleiheGeorgOffen, 65.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
                 vertrag(anna, clara, Vertragsart.WAFFENSTILLSTAND),
@@ -286,6 +288,8 @@ private val bernd = testSpieler[1]
 private val clara = testSpieler[2]
 private val david = testSpieler[3]
 private val eva = testSpieler[4]
+private val franz = testSpieler[5]
+private val georg = testSpieler[6]
 
 private val anleiheAnna1 = Anleihe(
     schuldiger = anna,
@@ -320,6 +324,20 @@ private val anleiheEva1 = Anleihe(
     sondervermögen = 100.toZahlungsmittel(),
     unvermögen = 8.toZahlungsmittel(),
     laufzeit = 4,
+)
+
+private val anleiheFranzFaellig = Anleihe(
+    schuldiger = franz,
+    sondervermögen = 50.toZahlungsmittel(),
+    unvermögen = 3.toZahlungsmittel(),
+    laufzeit = 4,
+)
+
+private val anleiheGeorgOffen = Anleihe(
+    schuldiger = georg,
+    sondervermögen = 65.toZahlungsmittel(),
+    unvermögen = 4.toZahlungsmittel(),
+    laufzeit = 5,
 )
 
 private fun runde(

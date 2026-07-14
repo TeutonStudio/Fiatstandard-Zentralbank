@@ -76,4 +76,13 @@ class ZahlungsmittelCharacterizationTest {
             Bauteil.entries.map { bauteil -> bauteil.farbe }.toSet().size,
         )
     }
+
+    @Test
+    fun testSpielEnthaeltInDerAktuellenRundeAlleAnleihenZustaende() {
+        val aktuelleRunde = TestSpiel.aktuelleRunde - 1
+
+        assertTrue(TestSpiel.anleihen.any { anleihe -> anleihe.faelligkeit < aktuelleRunde })
+        assertTrue(TestSpiel.anleihen.any { anleihe -> anleihe.faelligkeit == aktuelleRunde })
+        assertTrue(TestSpiel.anleihen.any { anleihe -> anleihe.faelligkeit > aktuelleRunde })
+    }
 }
