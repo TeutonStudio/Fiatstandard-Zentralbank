@@ -50,6 +50,25 @@ class ZentralbankSpeicher(
 
     public suspend fun insertAnleihe(daten: AnleiheDaten): Long = creditDao.insert(daten)
 
+    public suspend fun updateAnleiheHandel(daten: AnleiheDaten) {
+        val gespeichert = if (daten.anleiheID != 0) {
+            daten
+        } else {
+            creditDao.getBySpiel(daten.spielID.toInt())
+                .lastOrNull { kandidat ->
+                    kandidat.emittiert == daten.emittiert &&
+                        kandidat.emittent == daten.emittent &&
+                        kandidat.sondervermogen == daten.sondervermogen &&
+                        kandidat.unvermogen == daten.unvermogen &&
+                        kandidat.laufzeit == daten.laufzeit &&
+                        daten.handel.startsWith(kandidat.handel)
+                }
+                ?.copy(handel = daten.handel)
+                ?: error("Gespeicherte Anleihe konnte nicht gefunden werden.")
+        }
+        creditDao.update(gespeichert)
+    }
+
     public suspend fun insertRunde(daten: RundeDaten): Long = roundDao.insert(daten)
 
     public fun observeDatenZuSpiel(spielID: Long): Flow<List<SpeicherDaten>> {

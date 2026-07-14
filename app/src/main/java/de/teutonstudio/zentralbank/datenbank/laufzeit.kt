@@ -307,6 +307,9 @@ open class Spiel(
     }
 
     fun fuegeHandelZurAktuellenRundeHinzu(neuerHandel: Handel) {
+        val bestehendeAnleihe = (neuerHandel as? Anleihenhandel)?.let { handel ->
+            anleihen.firstOrNull { anzeige -> anzeige.anleihe === handel.anleihe }
+        }
         require(neuerHandel.besitzer != neuerHandel.erwerber) {
             "Verkäufer und Erwerber müssen verschieden sein."
         }
@@ -329,6 +332,18 @@ open class Spiel(
                 }
                 require(neuerHandel.anleihe.laufzeit > 0) {
                     "Die Laufzeit muss größer als 0 sein."
+                }
+                if (bestehendeAnleihe == null) {
+                    require(neuerHandel.besitzer == neuerHandel.anleihe.schuldiger) {
+                        "Eine neue Anleihe muss vom aktiven Emittenten ausgegeben werden."
+                    }
+                } else {
+                    require(neuerHandel.besitzer == bestehendeAnleihe.aktuellerBesitzer) {
+                        "Nur der aktuelle Besitzer kann diese Anleihe verkaufen."
+                    }
+                    require((aktuelleRunde - 1) !in bestehendeAnleihe.handelsverlauf) {
+                        "Diese Anleihe wurde in der laufenden Runde bereits gehandelt."
+                    }
                 }
             }
         }
@@ -401,6 +416,61 @@ open class Spiel(
         return (handelsZeilen + zinsZeilen).sortedWith(
             compareBy<SpielerAblaufEintrag> { eintrag -> eintrag.runde }
                 .thenBy { eintrag -> eintrag.art.reihenfolge }
+        )
+    }
+
+    fun erhalteAusgabenplan(
+        spielerName: String,
+        runde: Int = (aktuelleRunde - 1).coerceAtLeast(0),
+    ): Ausgabenplan {
+        require(runde in 0 until aktuelleRunde) { "Unbekannte Runde: $runde" }
+        val spieler = spielerListe.firstOrNull { eintrag -> eintrag.name == spielerName }
+            ?: error("Unbekannter Spieler: $spielerName")
+
+        val zahlungen = anleihen
+            .flatMap { anleihe -> anleihe.erhalteAblauf() }
+            .filter { eintrag ->
+                eintrag.runde == runde &&
+                    eintrag.von == spieler &&
+                    (eintrag.art == AnleiheAblaufArt.ZINS ||
+                        eintrag.art == AnleiheAblaufArt.RUECKKAUF)
+            }
+            .map { eintrag ->
+                AusgabenZahlung(
+                    art = eintrag.art,
+                    empfaenger = eintrag.an,
+                    betrag = eintrag.betrag,
+                )
+            }
+            .sortedWith(
+                compareBy<AusgabenZahlung> { zahlung -> zahlung.empfaenger.name }
+                    .thenBy { zahlung -> zahlung.art.reihenfolge }
+            )
+
+        val rohstoffVerwendungen = spieler.erhalteBauSaldoZurRunde(runde)
+            .filterValues { anzahl -> anzahl > 0 }
+            .flatMap { (bauteil, gebaeudeAnzahl) ->
+                bauteil.erhalteVerbrauch()
+                    .filterValues { menge -> menge > 0 }
+                    .map { (rohstoff, mengeJeGebaeude) ->
+                        AusgabenRohstoffVerwendung(
+                            bauteil = bauteil,
+                            gebaeudeAnzahl = gebaeudeAnzahl,
+                            rohstoff = rohstoff,
+                            rohstoffAnzahl = mengeJeGebaeude * gebaeudeAnzahl,
+                        )
+                    }
+            }
+            .sortedWith(
+                compareBy<AusgabenRohstoffVerwendung> { verwendung -> verwendung.bauteil.str }
+                    .thenBy { verwendung -> verwendung.rohstoff.ordinal }
+            )
+
+        return Ausgabenplan(
+            runde = runde,
+            spieler = spieler,
+            zahlungen = zahlungen,
+            rohstoffVerwendungen = rohstoffVerwendungen,
         )
     }
 
@@ -697,6 +767,32 @@ data class SpielerAblaufEintrag(
     val rohstoffOderVorgang: String,
     val preis: Zahlungsmittel,
 )
+
+data class Ausgabenplan(
+    val runde: Int,
+    val spieler: Spieler,
+    val zahlungen: List<AusgabenZahlung>,
+    val rohstoffVerwendungen: List<AusgabenRohstoffVerwendung>,
+)
+
+data class AusgabenZahlung(
+    val art: AnleiheAblaufArt,
+    val empfaenger: JuristischePerson,
+    val betrag: Zahlungsmittel,
+)
+
+data class AusgabenRohstoffVerwendung(
+    val bauteil: Bauteil,
+    val gebaeudeAnzahl: Int,
+    val rohstoff: Rohstoffe,
+    val rohstoffAnzahl: Int,
+)
+
+private fun Bauteil.erhalteVerbrauch(): Map<Rohstoffe, Int> = when (this) {
+    is Verwaltungsstandort -> verbrauch
+    is Wirtschaftsregionen -> verbrauch
+    is Handelslinie -> emptyMap()
+}
 
 data class Anleihenhandel(
     override val besitzer: JuristischePerson,

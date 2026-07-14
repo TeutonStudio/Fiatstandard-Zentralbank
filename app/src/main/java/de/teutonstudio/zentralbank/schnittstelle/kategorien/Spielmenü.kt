@@ -3,6 +3,8 @@ package de.teutonstudio.zentralbank.schnittstelle.kategorien
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import de.teutonstudio.zentralbank.R
@@ -23,7 +25,7 @@ fun Spielmenü(
     beiNaechstemZugabschnitt: () -> Unit,
     zugText: String = "Kein Zug aktiv",
 ) {
-    Titel() {
+    Titel(anleitung = remember { mutableStateOf(true) }) {
         GridByOrientation() { idx: Int, modifier -> when(idx) {
             0 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.saldo, beiKlick = beiVermogenSaldo)
             1 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.debt, beiKlick = beiSchuldenSaldo)

@@ -8,6 +8,7 @@ import org.junit.Test
 class SpielFinanzdatenTest {
     private val anna = Spieler("Anna", emptyMap())
     private val bernd = Spieler("Bernd", emptyMap())
+    private val clara = Spieler("Clara", emptyMap())
 
     @Test
     fun barvermoegenUndSchuldenFolgenDemZahlungsplanNachRunde() {
@@ -245,6 +246,17 @@ class SpielFinanzdatenTest {
             listOf(anna, bernd, Geschäftsbank, Geschäftsbank, Geschäftsbank),
             ablauf.map { eintrag -> eintrag.zahlungsempfaenger },
         )
+        assertEquals(
+            listOf(
+                "Bernd an Anna",
+                "Geschäftsbank an Bernd",
+                "Anna an Geschäftsbank",
+                "Anna an Geschäftsbank",
+                "Anna an Geschäftsbank",
+            ),
+            ablauf.map { eintrag -> eintrag.buchungssatz },
+        )
+        assertEquals(anzeige.faelligkeit, ablauf.maxOf { eintrag -> eintrag.runde })
     }
 
     @Test
@@ -354,7 +366,108 @@ class SpielFinanzdatenTest {
     }
 
     @Test
-    fun aussenhandelVeraendertM2UndWirdNachRohstoffBilanziert() {
+    fun ausgabenplanNenntZahlungsempfaengerUndRohstoffverbrauchJeGebaeude() {
+        val annaMitGebaeuden = Spieler(
+            "Anna",
+            mapOf(
+                Verwaltungsstandort.BAHNHOF to 2,
+                Wirtschaftsregionen.ZIEGELBRENNER to 1,
+            ),
+        )
+        val spiel = neuesSpiel(
+            annaMitGebaeuden to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = annaMitGebaeuden,
+            sondervermögen = 40.toZahlungsmittel(),
+            unvermögen = 3.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = annaMitGebaeuden,
+                    erwerber = bernd,
+                    anleihe = anleihe,
+                    preis = 40.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+        spiel.fügeLeereRundeHinzu()
+
+        val plan = spiel.erhalteAusgabenplan(annaMitGebaeuden.name, runde = 2)
+
+        assertEquals(listOf(bernd), plan.zahlungen.map { zahlung -> zahlung.empfaenger })
+        assertEquals(listOf(3), plan.zahlungen.map { zahlung -> zahlung.betrag.toIntOderNull() })
+        assertEquals(
+            setOf(
+                Triple(Verwaltungsstandort.BAHNHOF, Rohstoffe.NAHRUNG, 2),
+                Triple(Verwaltungsstandort.BAHNHOF, Rohstoffe.KOHLE, 2),
+                Triple(Wirtschaftsregionen.ZIEGELBRENNER, Rohstoffe.LEHM, 1),
+            ),
+            plan.rohstoffVerwendungen.map { verwendung ->
+                Triple(verwendung.bauteil, verwendung.rohstoff, verwendung.rohstoffAnzahl)
+            }.toSet(),
+        )
+    }
+
+    @Test
+    fun bestehendeAnleiheKannVomBesitzerVerkauftUndVomEmittentenZurueckgekauftWerden() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+            clara to 100.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = anna,
+            sondervermögen = 50.toZahlungsmittel(),
+            unvermögen = 2.toZahlungsmittel(),
+            laufzeit = 5,
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    anleihe = anleihe,
+                    preis = 50.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+        spiel.beginneNaechsteRunde()
+
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            Anleihenhandel(
+                besitzer = bernd,
+                erwerber = clara,
+                anleihe = anleihe,
+                preis = 52.toZahlungsmittel(),
+            )
+        )
+        assertEquals(clara, spiel.anleihen.single { it.anleihe === anleihe }.aktuellerBesitzer)
+
+        spiel.beginneNaechsteRunde()
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            Anleihenhandel(
+                besitzer = clara,
+                erwerber = anna,
+                anleihe = anleihe,
+                preis = 51.toZahlungsmittel(),
+            )
+        )
+
+        val anzeige = spiel.anleihen.single { it.anleihe === anleihe }
+        assertEquals(anna, anzeige.aktuellerBesitzer)
+        assertEquals(listOf(1, 2, 3), anzeige.handelsverlauf.keys.sorted())
+    }
+
+    @Test
+    fun aussenhandelVeraendertGlobalesSpielerBarvermoegenUndWirdNachRohstoffBilanziert() {
         val spiel = neuesSpiel(
             anna to 100.toZahlungsmittel(),
             bernd to 50.toZahlungsmittel(),

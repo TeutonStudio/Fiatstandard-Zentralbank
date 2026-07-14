@@ -49,7 +49,7 @@ fun Titel(
     beiWeiter: (() -> Unit)? = null,
     beiZurück: (() -> Unit)? = null,
     beiLöschen: (() -> Unit)? = null,
-    anleitung: State<Boolean> = remember { mutableStateOf(true) },
+    anleitung: State<Boolean> = remember { mutableStateOf(false) },
     inhalt: @Composable BoxScope.() -> Unit
 ) {
     val schriftzug = @Composable { str: String, onClick: () -> Unit -> Card(modifier = ModiPad5, onClick = onClick) { Text(text = str, modifier = ModiPad5, fontSize = 30.sp, textAlign = TextAlign.Center) } }

@@ -31,3 +31,23 @@ data class AnleiheDaten(
         }.joinToString("|")
     )
 }
+
+fun AnleiheAnzeige.speichereHandelsverlauf(): String = handelsverlauf
+    .toSortedMap()
+    .map { (runde, handel) ->
+        "${handel.besitzer.name}#${handel.erwerber.name}#${handel.preis.speichereString()}#$runde"
+    }
+    .joinToString("|")
+
+fun AnleiheDaten.passtZu(anzeige: AnleiheAnzeige): Boolean =
+    emittiert == anzeige.emittiert &&
+        emittent == anzeige.schuldiger.name &&
+        sondervermogen == anzeige.sondervermoegen.speichereString() &&
+        unvermogen == anzeige.unvermoegen.speichereString() &&
+        laufzeit == anzeige.laufzeit &&
+        (handel.istNeuesHandelsformat().not() || handel == anzeige.speichereHandelsverlauf())
+
+private fun String.istNeuesHandelsformat(): Boolean {
+    val eintraege = split("|").map(String::trim).filter(String::isNotBlank)
+    return eintraege.isNotEmpty() && eintraege.all { eintrag -> eintrag.split("#").size == 4 }
+}

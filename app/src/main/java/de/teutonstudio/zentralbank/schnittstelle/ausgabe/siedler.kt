@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -64,6 +63,7 @@ import de.teutonstudio.zentralbank.datenbank.SpielerAblaufEintrag
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.zuMark
+import de.teutonstudio.zentralbank.schnittstelle.AblaufDialog
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.LeftText
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
@@ -505,6 +505,7 @@ fun zeigeSpielerDaten(
     onManipulateData: (String, Bauteil, Boolean) -> Unit
 ) {
     val isPlayerExpanded = remember { mutableStateOf(false) }
+    var zeigeAblaufDialog by remember { mutableStateOf(false) }
 
     val playerBauteilAmount = remember(siedlerBauteile) {
         mutableStateMapOf<Bauteil, Int>().apply {
@@ -516,7 +517,13 @@ fun zeigeSpielerDaten(
 
     Card(
         modifier = ModiPad5,
-        onClick = { isPlayerExpanded.value = !isPlayerExpanded.value }
+        onClick = {
+            if (istBearbeitbar) {
+                isPlayerExpanded.value = !isPlayerExpanded.value
+            } else {
+                zeigeAblaufDialog = true
+            }
+        }
     ) {
         Box(
             modifier = Modifier.background(siedlerFarbe).fillMaxSize().offset(20.dp, 0.dp)
@@ -563,7 +570,7 @@ fun zeigeSpielerDaten(
                                 )
                             }
                         }
-                    } else if (!isPlayerExpanded.value) {
+                    } else {
                         val belegteBauteile = Bauteil.entries
                             .map { it to (playerBauteilAmount[it] ?: 0) }
                             .filter { (_, anzahl) -> anzahl != 0 }
@@ -582,11 +589,16 @@ fun zeigeSpielerDaten(
                         }
                     }
                 }
-
-                if (isPlayerExpanded.value && !istBearbeitbar) {
-                    SpielerAblauf(ablauf)
-                }
             }
+        }
+    }
+    if (zeigeAblaufDialog) {
+        AblaufDialog(
+            titel = "Spielerablauf · $siedlerName",
+            breitenAnteil = 0.78f,
+            onDismiss = { zeigeAblaufDialog = false },
+        ) {
+            SpielerAblauf(ablauf)
         }
     }
 }
@@ -594,35 +606,61 @@ fun zeigeSpielerDaten(
 @Composable
 private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
     var eingeklappteRunden by remember(ablauf) { mutableStateOf(emptySet<Int>()) }
-    val rundenGruppen = remember(ablauf) { ablauf.groupBy { eintrag -> eintrag.runde }.toSortedMap() }
+    var geschaeftspartnerFilter by remember(ablauf) { mutableStateOf<String?>(null) }
+    var rohstoffFilter by remember(ablauf) { mutableStateOf<String?>(null) }
+    var geschaeftspartnerMenueOffen by remember { mutableStateOf(false) }
+    var rohstoffMenueOffen by remember { mutableStateOf(false) }
+    val geschaeftspartnerOptionen = remember(ablauf) {
+        ablauf.map { eintrag -> eintrag.geschaeftspartner }.distinct().sorted()
+    }
+    val rohstoffOptionen = remember(ablauf) {
+        ablauf.map { eintrag -> eintrag.rohstoffOderVorgang }.distinct().sorted()
+    }
+    val gefilterterAblauf = ablauf.filter { eintrag ->
+        (geschaeftspartnerFilter == null ||
+            eintrag.geschaeftspartner == geschaeftspartnerFilter) &&
+            (rohstoffFilter == null || eintrag.rohstoffOderVorgang == rohstoffFilter)
+    }
+    val rundenGruppen = gefilterterAblauf
+        .groupBy { eintrag -> eintrag.runde }
+        .toSortedMap(reverseOrder())
 
-    Column(modifier = Modifier.fillMaxWidth().padding(5.dp)) {
-        Text(
-            text = "Ablauf",
-            modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
-            textAlign = TextAlign.Center,
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(5.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
         if (ablauf.isEmpty()) {
             Text(
                 text = "Noch keine Abläufe",
                 modifier = Modifier.padding(8.dp),
             )
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-            ) {
-                SpielerAblaufTabellenzeile(
-                    runde = "Runde",
-                    spieler = "Spieler",
-                    geschaeftspartner = "Geschäftspartner",
-                    anzahl = "Anzahl",
-                    rohstoffOderVorgang = "Rohstoff / Vorgang",
-                    preis = "Preis",
-                    hintergrund = Color(0xFFE1E1E1),
-                    istKopfzeile = true,
+            SpielerAblaufKopfzeile(
+                geschaeftspartnerFilter = geschaeftspartnerFilter,
+                geschaeftspartnerOptionen = geschaeftspartnerOptionen,
+                geschaeftspartnerMenueOffen = geschaeftspartnerMenueOffen,
+                rohstoffFilter = rohstoffFilter,
+                rohstoffOptionen = rohstoffOptionen,
+                rohstoffMenueOffen = rohstoffMenueOffen,
+                onGeschaeftspartnerMenue = { geschaeftspartnerMenueOffen = it },
+                onGeschaeftspartnerFilter = {
+                    geschaeftspartnerFilter = it
+                    geschaeftspartnerMenueOffen = false
+                },
+                onRohstoffMenue = { rohstoffMenueOffen = it },
+                onRohstoffFilter = {
+                    rohstoffFilter = it
+                    rohstoffMenueOffen = false
+                },
+            )
+            if (gefilterterAblauf.isEmpty()) {
+                Text(
+                    text = "Keine Abläufe für diese Filter.",
+                    modifier = Modifier.padding(8.dp),
                 )
+            } else {
                 rundenGruppen.forEach { (runde, zeilen) ->
                     val istEingeklappt = runde in eingeklappteRunden
                     val beiRundenKlick = {
@@ -633,24 +671,26 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                         }
                     }
                     if (istEingeklappt) {
+                        val saldo = zeilen.fold(Zahlungsmittel()) { summe, zeile ->
+                            summe + zeile.preis
+                        }
                         SpielerAblaufTabellenzeile(
                             runde = runde.toString(),
-                            spieler = "${zeilen.size} Zeilen",
-                            geschaeftspartner = "eingeklappt",
-                            anzahl = "",
-                            rohstoffOderVorgang = "",
-                            preis = "",
+                            geschaeftspartner = "${zeilen.size} Zeilen",
+                            rohstoffOderVorgang = "eingeklappt",
+                            preis = "Saldo: ${saldo.zuMark()}",
                             hintergrund = Color(0xFFE1E1E1),
                             beiRundenKlick = beiRundenKlick,
                         )
                     } else {
                         zeilen.forEach { eintrag ->
+                            val rohstoffMitAnzahl = eintrag.anzahl?.let { anzahl ->
+                                "${eintrag.rohstoffOderVorgang} ($anzahl Stk)"
+                            } ?: eintrag.rohstoffOderVorgang
                             SpielerAblaufTabellenzeile(
                                 runde = eintrag.runde.toString(),
-                                spieler = eintrag.spieler,
                                 geschaeftspartner = eintrag.geschaeftspartner,
-                                anzahl = eintrag.anzahl?.toString().orEmpty(),
-                                rohstoffOderVorgang = eintrag.rohstoffOderVorgang,
+                                rohstoffOderVorgang = rohstoffMitAnzahl,
                                 preis = eintrag.preis.zuMark(),
                                 hintergrund = if (eintrag.preis < Zahlungsmittel()) {
                                     Color(0xFFE8CACA)
@@ -670,9 +710,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
 @Composable
 private fun SpielerAblaufTabellenzeile(
     runde: String,
-    spieler: String,
     geschaeftspartner: String,
-    anzahl: String,
     rohstoffOderVorgang: String,
     preis: String,
     hintergrund: Color,
@@ -681,43 +719,117 @@ private fun SpielerAblaufTabellenzeile(
 ) {
     Row(
         modifier = Modifier
-            .width(720.dp)
+            .fillMaxWidth()
             .background(hintergrund),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TabellenZelle(
             text = runde,
-            modifier = Modifier.weight(0.55f),
+            modifier = Modifier.weight(0.5f),
             istKopfzeile = istKopfzeile,
             beiKlick = beiRundenKlick,
         )
         TabellenZelle(
-            text = spieler,
-            modifier = Modifier.weight(0.9f),
-            istKopfzeile = istKopfzeile,
-        )
-        TabellenZelle(
             text = geschaeftspartner,
-            modifier = Modifier.weight(0.9f),
-            istKopfzeile = istKopfzeile,
-        )
-        TabellenZelle(
-            text = anzahl,
-            modifier = Modifier.weight(0.55f),
+            modifier = Modifier.weight(1.15f),
             istKopfzeile = istKopfzeile,
         )
         TabellenZelle(
             text = rohstoffOderVorgang,
-            modifier = Modifier.weight(1.25f),
+            modifier = Modifier.weight(1.55f),
             textAlign = TextAlign.Start,
             istKopfzeile = istKopfzeile,
         )
         TabellenZelle(
             text = preis,
-            modifier = Modifier.weight(0.85f),
+            modifier = Modifier.weight(1f),
             textAlign = TextAlign.End,
             istKopfzeile = istKopfzeile,
         )
+    }
+}
+
+@Composable
+private fun SpielerAblaufKopfzeile(
+    geschaeftspartnerFilter: String?,
+    geschaeftspartnerOptionen: List<String>,
+    geschaeftspartnerMenueOffen: Boolean,
+    rohstoffFilter: String?,
+    rohstoffOptionen: List<String>,
+    rohstoffMenueOffen: Boolean,
+    onGeschaeftspartnerMenue: (Boolean) -> Unit,
+    onGeschaeftspartnerFilter: (String?) -> Unit,
+    onRohstoffMenue: (Boolean) -> Unit,
+    onRohstoffFilter: (String?) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(Color(0xFFE1E1E1)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TabellenZelle(
+            text = "Runde",
+            modifier = Modifier.weight(0.5f),
+            istKopfzeile = true,
+        )
+        AblaufFilterZelle(
+            label = "Geschäftspartner",
+            auswahl = geschaeftspartnerFilter,
+            optionen = geschaeftspartnerOptionen,
+            menueOffen = geschaeftspartnerMenueOffen,
+            onMenueAendern = onGeschaeftspartnerMenue,
+            onAuswahl = onGeschaeftspartnerFilter,
+            modifier = Modifier.weight(1.15f),
+        )
+        AblaufFilterZelle(
+            label = "Rohstoff / Vorgang",
+            auswahl = rohstoffFilter,
+            optionen = rohstoffOptionen,
+            menueOffen = rohstoffMenueOffen,
+            onMenueAendern = onRohstoffMenue,
+            onAuswahl = onRohstoffFilter,
+            modifier = Modifier.weight(1.55f),
+        )
+        TabellenZelle(
+            text = "Preis",
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.End,
+            istKopfzeile = true,
+        )
+    }
+}
+
+@Composable
+private fun AblaufFilterZelle(
+    label: String,
+    auswahl: String?,
+    optionen: List<String>,
+    menueOffen: Boolean,
+    onMenueAendern: (Boolean) -> Unit,
+    onAuswahl: (String?) -> Unit,
+    modifier: Modifier,
+) {
+    Box(modifier = modifier) {
+        TabellenZelle(
+            text = "$label: ${auswahl ?: "Alle"} ▾",
+            modifier = Modifier.fillMaxWidth(),
+            istKopfzeile = true,
+            beiKlick = { onMenueAendern(true) },
+        )
+        DropdownMenu(
+            expanded = menueOffen,
+            onDismissRequest = { onMenueAendern(false) },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Alle") },
+                onClick = { onAuswahl(null) },
+            )
+            optionen.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = { onAuswahl(option) },
+                )
+            }
+        }
     }
 }
 

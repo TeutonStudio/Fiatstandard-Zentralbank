@@ -85,14 +85,6 @@ fun zeigeAussenhandel(spiel: Spiel) {
         modifier = Modifier.verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Card(modifier = ModiPad5) {
-            Text(
-                text = "Außenhandelsbilanz",
-                fontSize = 40.sp,
-                modifier = ModiPad5,
-            )
-        }
-
         AussenhandelsbilanzDiagramm(spiel)
         HafenPreisKarte(spiel.aktuelleMarktpreise)
     }

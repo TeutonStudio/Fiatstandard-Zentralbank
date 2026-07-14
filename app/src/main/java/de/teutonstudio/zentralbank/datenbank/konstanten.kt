@@ -228,4 +228,11 @@ data class AnleiheAblaufEintrag(
         AnleiheAblaufArt.ZINS,
         AnleiheAblaufArt.RUECKKAUF -> an
     }
+    val zahlungstaetiger: JuristischePerson get() = when (art) {
+        AnleiheAblaufArt.EMISSION,
+        AnleiheAblaufArt.HANDEL -> an
+        AnleiheAblaufArt.ZINS,
+        AnleiheAblaufArt.RUECKKAUF -> von
+    }
+    val buchungssatz: String get() = "${zahlungstaetiger.name} an ${zahlungsempfaenger.name}"
 }

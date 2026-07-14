@@ -270,6 +270,59 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             fehlermeldung = "Anleihe konnte nicht gespeichert werden.",
         )
 
+    fun erfasseAnleihenhandel(handel: Anleihenhandel): Boolean {
+        val bestehendeAnleihe = aktuellesSpiel.anleihen
+            .firstOrNull { anzeige -> anzeige.anleihe === handel.anleihe }
+            ?: return emittiereAnleihe(handel)
+        val bisherigesDatum = aktuelleDaten.second
+            .filterIsInstance<AnleiheDaten>()
+            .firstOrNull { daten -> daten.passtZu(bestehendeAnleihe) }
+
+        val neueAnzeige = try {
+            aktuellesSpiel.fuegeHandelZurAktuellenRundeHinzu(handel)
+            aktuellesSpiel.anleihen.first { anzeige -> anzeige.anleihe === handel.anleihe }
+        } catch (throwable: Throwable) {
+            _domainFehler.tryEmit(
+                throwable.message ?: "Anleihehandel konnte nicht gespeichert werden."
+            )
+            return false
+        }
+
+        val aktualisiertesDatum = (bisherigesDatum ?: AnleiheDaten(
+            aktuelleRundenDaten().copy(index = bestehendeAnleihe.emittiert),
+            bestehendeAnleihe.handelsverlauf,
+        ).copy(spielID = aktuelleDaten.first.spielID)).copy(
+            handel = neueAnzeige.speichereHandelsverlauf(),
+        )
+        val spielDaten = aktuelleDaten.first
+        val neueDatenListe = if (bisherigesDatum == null) {
+            aktuelleDaten.second + aktualisiertesDatum
+        } else {
+            aktuelleDaten.second.map { daten ->
+                if (daten === bisherigesDatum) aktualisiertesDatum else daten
+            }
+        }
+        aktuelleDaten = spielDaten to neueDatenListe
+        synchronisiereDomainNachLegacyAenderung()
+
+        if (spielDaten.spielID == (-1).toLong()) return true
+
+        _spielDatenListe.update { spiele ->
+            spiele + (spielDaten to neueDatenListe)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                datenbankBereit.await()
+                DAO.updateAnleiheHandel(aktualisiertesDatum)
+            } catch (throwable: Throwable) {
+                _domainFehler.tryEmit(
+                    throwable.message ?: "Anleihehandel konnte nicht gespeichert werden."
+                )
+            }
+        }
+        return true
+    }
+
     private fun aktuelleRundenDaten(): RundeDaten {
         val runde = (aktuellesSpiel.aktuelleRunde - 1).coerceAtLeast(0)
         return RundeDaten(
@@ -296,21 +349,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val neueDatenListe = aktuelleDaten.second + datum
         aktuelleDaten = spielDaten to neueDatenListe
 
-        val bisherigerDomainZustand = gameEngine?.state
-        val abgebildeterDomainZustand = aktuellesSpiel.zuDomainGameState()
-        val domainZustand = if (bisherigerDomainZustand == null) {
-            abgebildeterDomainZustand
-        } else {
-            abgebildeterDomainZustand.copy(
-                rundenzähler = bisherigerDomainZustand.rundenzähler,
-                aktiverSpieler = bisherigerDomainZustand.aktiverSpieler,
-                zugStatus = bisherigerDomainZustand.zugStatus,
-                schuldenstriche = bisherigerDomainZustand.schuldenstriche,
-                ueberschuldungen = bisherigerDomainZustand.ueberschuldungen,
-            )
-        }
-        gameEngine = GameEngine(domainZustand)
-        aktualisiereDomainState(domainZustand)
+        synchronisiereDomainNachLegacyAenderung()
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -327,6 +366,24 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         return true
+    }
+
+    private fun synchronisiereDomainNachLegacyAenderung() {
+        val bisherigerDomainZustand = gameEngine?.state
+        val abgebildeterDomainZustand = aktuellesSpiel.zuDomainGameState()
+        val domainZustand = if (bisherigerDomainZustand == null) {
+            abgebildeterDomainZustand
+        } else {
+            abgebildeterDomainZustand.copy(
+                rundenzähler = bisherigerDomainZustand.rundenzähler,
+                aktiverSpieler = bisherigerDomainZustand.aktiverSpieler,
+                zugStatus = bisherigerDomainZustand.zugStatus,
+                schuldenstriche = bisherigerDomainZustand.schuldenstriche,
+                ueberschuldungen = bisherigerDomainZustand.ueberschuldungen,
+            )
+        }
+        gameEngine = GameEngine(domainZustand)
+        aktualisiereDomainState(domainZustand)
     }
 
     private fun aktualisiereDomainState(state: GameState) {

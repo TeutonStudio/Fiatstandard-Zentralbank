@@ -18,7 +18,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
+import de.teutonstudio.zentralbank.domain.zug.Phase
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.AusgabenDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.RohstoffHandelDialog
@@ -93,6 +95,7 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.Game.route) {
             val domainUiState = viewModel.domainUiState.collectAsState().value
+            val domainState = viewModel.domainState.collectAsState().value
             Spielmenü(
                 { navController.navigate(route = Screen.PlayerSaldo.route) },
                 { navController.navigate(route = Screen.DebtSaldo.route) },
@@ -103,6 +106,16 @@ fun Navigation(viewModel: GameViewModel) {
                 viewModel::naechsterZugabschnitt,
                 zugText = domainUiState?.zug?.text ?: "Kein Zug aktiv",
             )
+            val zugStatus = domainState?.zugStatus
+            if (zugStatus?.phase == Phase.Ausgaben) {
+                AusgabenDialog(
+                    plan = viewModel.aktuellesSpiel.erhalteAusgabenplan(
+                        spielerName = zugStatus.spieler.wert,
+                        runde = domainState.rundenzähler,
+                    ),
+                    onClose = viewModel::naechsterZugabschnitt,
+                )
+            }
         }
 
         var ausgewähltesBauwerk: Bauteil
@@ -162,9 +175,12 @@ fun Navigation(viewModel: GameViewModel) {
         composable(route = Screen.NewCredit.route) {
             AnleiheDialog(
                 spiel = viewModel.aktuellesSpiel,
+                aktuellerSpielerName = viewModel.domainState.collectAsState().value
+                    ?.zugStatus?.spieler?.wert
+                    ?: viewModel.aktuellesSpiel.spielerStringListe.firstOrNull().orEmpty(),
                 onDismiss = { navController.popBackStack() },
                 onCreate = { handel ->
-                    if (viewModel.emittiereAnleihe(handel)) {
+                    if (viewModel.erfasseAnleihenhandel(handel)) {
                         navController.popBackStack()
                     }
                 },

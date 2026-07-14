@@ -113,7 +113,21 @@ Offene Punkte:
 ## Ablaufdarstellungen und Zinsgewinne
 
 - Der Anleihenablauf verwendet die Spalten Runde, Zahlungsempfänger und Betrag. Bei Emissionen erhält der Herausgeber das Geld, bei Handel der bisherige Halter und bei Zins/Rückzahlung der in der jeweiligen Runde aktuelle Halter.
-- Der Spielerablauf zeigt Rohstoffhandel mit Runde, Spieler, Geschäftspartner, Anzahl, Rohstoff und vorzeichenbehaftetem Preis.
+- Der Spielerablauf zeigt Rohstoffhandel mit Runde, Geschäftspartner, Rohstoff einschließlich Anzahl und vorzeichenbehaftetem Preis.
 - Anleihekäufe, Anleiheverkäufe und erhaltene Zinszahlungen erscheinen als eigene Ablaufzeilen.
 - Ein Tipp auf eine Rundenzelle klappt ausschließlich die Zeilen dieser Runde ein oder aus; die Gruppenzeile bleibt zum erneuten Aufklappen sichtbar.
 - In der globalen Schuldenansicht ersetzt die kumulierte Kurve `Zinsgewinne` die globalen Zinsschulden. Sie zählt nur Zinszahlungen an die Geschäftsbank; Zahlungen an andere Spieler sind kein Bankgewinn.
+
+## Zugausgaben und Anleihenhandel
+
+- Die globale Bilanz zeigt nur noch eine Schuldenkurve. `Globale Schulden` verwendet Nennwerte plus verbleibende kumulierte Zinsverbindlichkeiten aller Spieler.
+- `Globales Barvermögen` summiert ausschließlich die Barbestände der Spieler und trägt keinen M2-Zusatz mehr.
+- Anleihen-Cards behalten ihre feste Größe; der Ablauf scrollt in einem separaten Dialog.
+- Beim Eintritt in die Ausgabenphase erscheint ein Plan der fälligen Zins-/Rückzahlungen und des Rohstoffverbrauchs je Gebäude. Schließen wechselt automatisch in die Aktionsphase.
+- Der aktive Spieler ist beim Anleihedialog fest vorgegeben. Über denselben Auswahlknopf sind Neuemissionen, Verkäufe eigener Bestände und Rückkäufe selbst emittierter Anleihen möglich.
+- Folgegeschäfte einer Anleihe werden am bestehenden Datensatz gespeichert; nur der aktuelle Besitzer darf verkaufen.
+- Die Bedienungsanleitung ist nur noch über den Floating-Button im Spielmenü erreichbar.
+- Im Anleihenablauf richtet sich die Farbe jeder Zeile ausschließlich nach ihrer Runde: vergangene Runden sind vergangen, die ausgewählte aktuelle Runde ist fällig und zukünftige Runden sind offen. Dies gilt auch für eingeklappte Rundengruppen.
+- Anleihen- und Spielerabläufe ersetzen nicht mehr die zweite Cardseite, sondern öffnen in einem eigenen scrollbaren Dialog mit Schließen-„×“ rechts oben. Die Cards zeigen dauerhaft ihre normale Vorderseite.
+- Der Spielerablauf ist absteigend nach Runde sortiert und auf Runde, Geschäftspartner, Rohstoff/Vorgang sowie Preis verdichtet. Partner und Rohstoff/Vorgang sind über die Kopfzeile filterbar, Rohstoffmengen stehen direkt beim Rohstoff und eingeklappte Runden zeigen ihren gefilterten Saldo.
+- Der Anleihenablauf verwendet ebenfalls ein schmaleres Dialogfenster und zeigt zukünftige Runden zuerst. Ein Schalter wechselt die Empfängerspalte zum Buchungssatz „Zahlungspflichtiger an Zahlungsempfänger“; der Ablauf enthält stets alle geplanten Zahlungen bis zur Tilgung.
