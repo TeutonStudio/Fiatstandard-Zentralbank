@@ -80,6 +80,65 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
     }
 
+    fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {
+        if (neuerWarenkorb.values.any { menge -> menge < 0 }) {
+            _domainFehler.tryEmit("Warenkorbmengen dürfen nicht negativ sein.")
+            return
+        }
+
+        val warenkorb = neuerWarenkorb.filterValues { menge -> menge > 0 }.toMap()
+        val engine = gameEngine
+        if (engine == null) {
+            _domainFehler.tryEmit("Kein Spiel geladen.")
+            return
+        }
+
+        val ergebnis = engine.apply(
+            GameEvent.WarenkorbGeaendert(
+                warenkorb = warenkorb.mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
+            )
+        )
+        if (ergebnis.isFailure) {
+            _domainFehler.tryEmit(
+                ergebnis.exceptionOrNull()?.message ?: "Warenkorb konnte nicht geändert werden."
+            )
+            return
+        }
+
+        aktuellesSpiel.aktualisiereWarenkorb(warenkorb)
+
+        val bisherigeDaten = aktuelleDaten
+        val neueSpielDaten = bisherigeDaten.first.copy(
+            warenkorb = warenkorb.zuSpeicherWarenkorb()
+        )
+        aktuelleDaten = neueSpielDaten to bisherigeDaten.second
+
+        aktualisiereDomainState(ergebnis.getOrThrow())
+
+        _spielSpeicher.update { spiele ->
+            val übersicht = spiele[bisherigeDaten.first]
+                ?: (aktuellesSpiel.aktuelleRunde to aktuellesSpiel.spielerStringListe)
+            (spiele - bisherigeDaten.first) + (neueSpielDaten to übersicht)
+        }
+
+        if (neueSpielDaten.spielID == (-1).toLong()) return
+
+        _spielDatenListe.update { spiele ->
+            (spiele - bisherigeDaten.first) + (neueSpielDaten to bisherigeDaten.second)
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                datenbankBereit.await()
+                DAO.updateSpiel(neueSpielDaten)
+            } catch (throwable: Throwable) {
+                _domainFehler.tryEmit(
+                    throwable.message ?: "Warenkorb konnte nicht gespeichert werden."
+                )
+            }
+        }
+    }
+
     private fun aktualisiereDomainState(state: GameState) {
         _domainState.value = state
         _domainUiState.value = state.zuGameUiState()
@@ -117,10 +176,15 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             val daten = spiel.zuSpeicherDaten()
             val gameID = withContext(Dispatchers.IO) { DAO.insertSpielSatz(daten) }
             if (gameID != (-1).toLong()) {
-                setzeAktuellesSpiel(spiel, daten)
+                val gespeicherteDaten = daten.first.copy(spielID = gameID) to daten.second
+                setzeAktuellesSpiel(spiel, gespeicherteDaten)
+
+                _spielDatenListe.update {
+                    it + gespeicherteDaten
+                }
 
                 _spielSpeicher.update {
-                    it + (daten.first to Pair(spiel.aktuelleRunde,spiel.spielerStringListe))
+                    it + (gespeicherteDaten.first to Pair(spiel.aktuelleRunde,spiel.spielerStringListe))
                 }
             } else { println("GameID macht Probleme") }
         }

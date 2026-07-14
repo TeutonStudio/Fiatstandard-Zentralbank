@@ -42,6 +42,10 @@ class ZentralbankSpeicher(
 
     public suspend fun insertSpielSatz(daten: Pair<SpielDaten,List<SpeicherDaten>>): Long = insertAll(daten.toMap()).first()
 
+    public suspend fun updateSpiel(daten: SpielDaten) {
+        gameDao.update(daten)
+    }
+
     public fun observeDatenZuSpiel(spielID: Long): Flow<List<SpeicherDaten>> {
         val flows: List<Flow<List<SpeicherDaten>>> = listOf(
             roundDao.observeBySpiel(spielID).alsSpeicherDaten(),

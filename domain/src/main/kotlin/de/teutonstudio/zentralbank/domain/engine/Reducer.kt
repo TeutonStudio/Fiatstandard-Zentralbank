@@ -25,6 +25,7 @@ object Reducer {
         return runCatching {
             state.pruefeZugGate(event)
             when (event) {
+                is GameEvent.WarenkorbGeaendert -> state.warenkorbAendern(event.warenkorb)
                 is GameEvent.RohstoffEinnahme -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = 1)
                 is GameEvent.RohstoffAusgabe -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = -1)
                 is GameEvent.Transaktion -> state.bucheTransaktion(event.von, event.an, event.betrag)
@@ -45,6 +46,8 @@ object Reducer {
 }
 
 private fun GameState.pruefeZugGate(event: GameEvent) {
+    if (event is GameEvent.WarenkorbGeaendert) return
+
     val zug = zugStatus ?: return
     val faelligerSchuldenstrich = faelligerSchuldenstrichSpieler()
     if (faelligerSchuldenstrich != null) {
@@ -66,6 +69,7 @@ private fun GameState.pruefeZugGate(event: GameEvent) {
 }
 
 private fun GameEvent.schrittTyp(): SchrittTyp? = when (this) {
+    is GameEvent.WarenkorbGeaendert -> null
     is GameEvent.RohstoffEinnahme -> SchrittTyp.ROHSTOFF_EINNAHMEN
     is GameEvent.RohstoffAusgabe -> SchrittTyp.ROHSTOFF_AUSGABEN
     is GameEvent.Transaktion -> when (grund) {
@@ -87,6 +91,7 @@ private fun GameEvent.schrittTyp(): SchrittTyp? = when (this) {
 }
 
 private fun GameEvent.primaererSpieler(): SpielerId? = when (this) {
+    is GameEvent.WarenkorbGeaendert -> null
     is GameEvent.RohstoffEinnahme -> spieler
     is GameEvent.RohstoffAusgabe -> spieler
     is GameEvent.Transaktion -> when (von) {
@@ -104,6 +109,13 @@ private fun GameEvent.primaererSpieler(): SpielerId? = when (this) {
     is GameEvent.SchrittAbgeschlossen,
     is GameEvent.PhaseAbgeschlossen,
     GameEvent.ZugBeendet -> null
+}
+
+private fun GameState.warenkorbAendern(warenkorb: Map<Rohstoff, Int>): GameState {
+    require(warenkorb.values.all { menge -> menge >= 0 }) {
+        "Warenkorbmengen duerfen nicht negativ sein."
+    }
+    return copy(warenkorb = warenkorb.filterValues { menge -> menge > 0 })
 }
 
 private fun GameState.schrittAbschliessen(event: GameEvent.SchrittAbgeschlossen): GameState {

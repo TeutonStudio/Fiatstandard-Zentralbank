@@ -163,11 +163,14 @@ const val prozentpunkt = 100
 open class Spiel(
     private val runden: MutableList<Runde>,
     private val spieler: List<Spieler>, // Zu beginn des Spiels definiert
-    public val warenkorb: Map<Rohstoffe, Int> = emptyMap(), // Zu beginn des Spiels definiert
+    warenkorb: Map<Rohstoffe, Int> = emptyMap(), // Zu beginn des Spiels definiert
     private val inflationsziel: Triple<Float,Float,Float>, // Zielwert, ein schritt, zwei schritte
     private val handel: Handelsregister, // Handelsdaten während des Spiels
     private val konflikt: Kriegsregister,
 ) {
+    public var warenkorb: Map<Rohstoffe, Int> = warenkorb.filterValues { menge -> menge > 0 }
+        private set
+
     constructor(
         leitzinssatz: Float,
         spieler: Map<Spieler,Zahlungsmittel>,
@@ -200,6 +203,15 @@ open class Spiel(
     public val aktuelleRunde: Int get() = runden.size
     private val cache: MutableList<Zahlungsmittel> = mutableListOf()
     init { List(aktuelleRunde) { cache.add(baueCache(it)) } }
+
+    fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {
+        require(neuerWarenkorb.values.all { menge -> menge >= 0 }) {
+            "Warenkorbmengen dürfen nicht negativ sein."
+        }
+        warenkorb = neuerWarenkorb.filterValues { menge -> menge > 0 }.toMap()
+        cache.clear()
+        List(aktuelleRunde) { runde -> cache.add(baueCache(runde)) }
+    }
 
     private fun erhaltePreisWarenkorbZurRunde(runde: Int): Zahlungsmittel {
         if (runde == 0) return Zahlungsmittel()

@@ -145,7 +145,10 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.MarketSaldo.route) {
             Titel(Screen.Game.navigiere(navController)) {
-                zeigeMarktplatz(viewModel.aktuellesSpiel) {}
+                zeigeMarktplatz(
+                    spiel = viewModel.aktuellesSpiel,
+                    onWarenkorbAendern = viewModel::aktualisiereWarenkorb,
+                )
             }
         }
 

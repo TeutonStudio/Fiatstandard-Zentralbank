@@ -13,6 +13,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface GameEvent {
     @Serializable
+    data class WarenkorbGeaendert(
+        val warenkorb: Map<Rohstoff, Int>,
+    ) : GameEvent
+
+    @Serializable
     data class RohstoffEinnahme(
         val spieler: SpielerId,
         val mengen: Map<Rohstoff, Int>,

@@ -49,11 +49,6 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLa
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
-import com.patrykandpatrick.vico.compose.common.Insets
-import com.patrykandpatrick.vico.compose.common.LegendItem
-import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
-import com.patrykandpatrick.vico.compose.common.component.TextComponent
-import com.patrykandpatrick.vico.compose.common.rememberHorizontalLegend
 import com.patrykandpatrick.vico.compose.common.Fill
 import de.teutonstudio.zentralbank.R
 
@@ -63,12 +58,15 @@ import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
+import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.LeftText
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
+import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 
 @Composable
 fun SpielerBilanz(
@@ -98,13 +96,25 @@ fun SpielerBilanz(
                 }
             }
 
-            val chartModel = remember(serien) {
-                if (serien.isEmpty()) {
+            val legende = spielerListe.map { spieler ->
+                DiagrammLegendenEintrag(
+                    id = "spieler:${spieler.name}",
+                    bezeichnung = spieler.name,
+                    farbe = spielerFarben[spieler] ?: Color.Black,
+                )
+            }
+            val legendenStatus = rememberDiagrammLegendenStatus(legende)
+            val sichtbareSerien = serien.filter { (spieler, _) ->
+                legendenStatus.istSichtbar("spieler:${spieler.name}")
+            }
+
+            val chartModel = remember(sichtbareSerien) {
+                if (sichtbareSerien.isEmpty()) {
                     null
                 } else {
                     CartesianChartModel(
                         LineCartesianLayerModel.build {
-                            serien.forEach { (_, yWerte) ->
+                            sichtbareSerien.forEach { (_, yWerte) ->
                                 series(
                                     x = yWerte.indices.toList(),
                                     y = yWerte
@@ -115,30 +125,25 @@ fun SpielerBilanz(
                 }
             }
 
-            val legendIcon = ShapeComponent(margins = Insets(0.5.dp))
-            val legendText = TextComponent(
-                padding = Insets(
-                    start = 5.dp,
-                    top = 0.dp,
-                    end = 10.dp,
-                    bottom = 0.dp,
-                )
-            )
-
             Column(modifier = ModiPad5) {
-                if (chartModel == null) {
-                    Text(
+                when {
+                    serien.isEmpty() -> Text(
                         text = "Noch keine Bilanzdaten vorhanden",
                         modifier = Modifier.padding(16.dp)
                     )
-                } else {
-                    CartesianChartHost(
+
+                    chartModel == null -> Text(
+                        text = "Keine Datenreihe ausgewählt",
+                        modifier = Modifier.padding(16.dp),
+                    )
+
+                    else -> CartesianChartHost(
                         modifier = ModiPad5,
                         chart = rememberCartesianChart(
                             rememberLineCartesianLayer(
                                 lineProvider = LineCartesianLayer.LineProvider.series(
-                                    spielerListe.map {
-                                        val farbe = spielerFarben[it] ?: Color.Black
+                                    sichtbareSerien.map { (spieler, _) ->
+                                        val farbe = spielerFarben[spieler] ?: Color.Black
 
                                         LineCartesianLayer.rememberLine(
                                             fill = remember(farbe) {
@@ -152,25 +157,17 @@ fun SpielerBilanz(
                             ),
                             endAxis = endAxis,
                             bottomAxis = bottomAxis,
-                            legend = rememberHorizontalLegend(
-                                items = {
-                                    spielerListe.map {
-                                        val farbe = spielerFarben[it] ?: Color.Black
-
-                                        add( LegendItem(
-                                            icon = legendIcon.copy(Fill(farbe)),
-                                            labelComponent = legendText,
-                                            label = it.name,
-                                        ) )
-                                    }
-                                },
-                                iconSize = 8.dp,
-                                padding = Insets(8.dp),
-                            )
                         ),
                         model = chartModel,
                         scrollState = scrollState,
                         zoomState = zoomState
+                    )
+                }
+
+                if (serien.isNotEmpty()) {
+                    UmschaltbareDiagrammLegende(
+                        eintraege = legende,
+                        status = legendenStatus,
                     )
                 }
 

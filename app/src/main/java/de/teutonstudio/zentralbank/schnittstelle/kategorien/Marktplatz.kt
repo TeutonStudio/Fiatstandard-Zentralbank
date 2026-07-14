@@ -48,11 +48,6 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.Insets
-import com.patrykandpatrick.vico.compose.common.LegendItem
-import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
-import com.patrykandpatrick.vico.compose.common.component.TextComponent
-import com.patrykandpatrick.vico.compose.common.rememberHorizontalLegend
 import de.teutonstudio.zentralbank.R
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -63,11 +58,15 @@ import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.summeGeld
 import de.teutonstudio.zentralbank.datenbank.toBauteilPreis
+import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
+import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteilPreis
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
 import de.teutonstudio.zentralbank.schnittstelle.markBy
+import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 
 @Composable
 fun zeigeHafenPreis(
@@ -160,11 +159,6 @@ private enum class MarktpreisKategorie(val titel: String) {
     WARENKORB("Warenkorb"),
 }
 
-private data class MarktpreisLegende(
-    val bezeichnung: String,
-    val farbe: Color,
-)
-
 private val rohstoffMarktfarben = mapOf(
     Rohstoffe.NAHRUNG to Color(0xFF8A6D8F),
     Rohstoffe.LEHM to Color(0xFFB58B5A),
@@ -230,7 +224,11 @@ private fun <A> List<Map<A, Zahlungsmittel>>.toChart(args: List<A>): CartesianCh
     }
 
 @Composable
-fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
+fun zeigeMarktplatz(
+    spiel: Spiel,
+    onTrade: (HandelsDaten) -> Unit = {},
+    onWarenkorbAendern: (Map<Rohstoffe, Int>) -> Unit = {},
+) {
     val hafenListe = remember {
         listOf(
             "3 : 1 Hafen",
@@ -247,6 +245,7 @@ fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
     val isBilanzExpanded = remember { mutableStateOf(true) }
 
     var marktpreisKategorie by remember { mutableStateOf(MarktpreisKategorie.ROHSTOFFE) }
+    var warenkorbDialogOffen by remember { mutableStateOf(false) }
     val isBuying = remember { mutableStateOf(false) }
     val isSelling = remember { mutableStateOf(false) }
 
@@ -273,41 +272,59 @@ fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
                     spiel.marktpreise.zuWarenkorbpreisen(spiel.warenkorb)
                 }
 
-                val chartModel = when (marktpreisKategorie) {
-                    MarktpreisKategorie.ROHSTOFFE -> spiel.marktpreise.toChart(rohstoffe)
-                    MarktpreisKategorie.BAUWERKE -> spiel.marktpreise.toBauteilPreis().toChart(bauwerke)
-                    MarktpreisKategorie.WARENKORB -> warenkorbpreise.toChart(
-                        listOf(MarktpreisKategorie.WARENKORB)
-                    )
-                }
-
                 val legende = when (marktpreisKategorie) {
                     MarktpreisKategorie.ROHSTOFFE -> rohstoffe.map { rohstoff ->
-                        MarktpreisLegende(
+                        DiagrammLegendenEintrag(
+                            id = "rohstoff:${rohstoff.name}",
                             bezeichnung = rohstoff.str,
                             farbe = rohstoffMarktfarben.getValue(rohstoff),
                         )
                     }
 
                     MarktpreisKategorie.BAUWERKE -> bauwerke.map { bauwerk ->
-                        MarktpreisLegende(
+                        DiagrammLegendenEintrag(
+                            id = "bauwerk:${bauwerk.str}",
                             bezeichnung = bauwerk.str,
                             farbe = bauwerkMarktfarben.getValue(bauwerk),
                         )
                     }
 
                     MarktpreisKategorie.WARENKORB -> listOf(
-                        MarktpreisLegende("Warenkorb", warenkorbMarktfarbe)
+                        DiagrammLegendenEintrag(
+                            id = "warenkorb",
+                            bezeichnung = "Warenkorb",
+                            farbe = warenkorbMarktfarbe,
+                        )
                     )
                 }
 
-                val legendIcon = ShapeComponent(margins = Insets(.5f.dp))
-                val legendText = TextComponent(padding = Insets(5f.dp, 0f.dp, 10f.dp, 0f.dp))
+                val legendenStatus = rememberDiagrammLegendenStatus(legende)
+                val sichtbareIndizes = legende.indices.filter { index ->
+                    legendenStatus.istSichtbar(legende[index].id)
+                }
+                val sichtbareLegende = sichtbareIndizes.map(legende::get)
+                val chartModel = if (sichtbareIndizes.isEmpty()) {
+                    null
+                } else {
+                    when (marktpreisKategorie) {
+                        MarktpreisKategorie.ROHSTOFFE -> spiel.marktpreise.toChart(
+                            sichtbareIndizes.map(rohstoffe::get)
+                        )
+
+                        MarktpreisKategorie.BAUWERKE -> spiel.marktpreise.toBauteilPreis().toChart(
+                            sichtbareIndizes.map(bauwerke::get)
+                        )
+
+                        MarktpreisKategorie.WARENKORB -> warenkorbpreise.toChart(
+                            listOf(MarktpreisKategorie.WARENKORB)
+                        )
+                    }
+                }
 
                 val bilanzModifier = ModiPad5.clickable { isBilanzExpanded.value = !isBilanzExpanded.value }
 
                 if (isBilanzExpanded.value) {
-                    val linien = legende.map { eintrag ->
+                    val linien = sichtbareLegende.map { eintrag ->
                         LineCartesianLayer.rememberLine(
                             fill = remember(eintrag.farbe) {
                                 LineCartesianLayer.LineFill.single(
@@ -336,31 +353,56 @@ fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
                             }
                         }
 
-                        CartesianChartHost(
-                            modifier = bilanzModifier,
-                            chart = rememberCartesianChart(
-                                rememberLineCartesianLayer(
-                                    lineProvider = series(*linien.toTypedArray())
+                        if (chartModel == null) {
+                            Text(
+                                text = "Keine Datenreihe ausgewählt",
+                                modifier = ModiPad5,
+                            )
+                        } else {
+                            CartesianChartHost(
+                                modifier = bilanzModifier,
+                                chart = rememberCartesianChart(
+                                    rememberLineCartesianLayer(
+                                        lineProvider = series(*linien.toTypedArray())
+                                    ),
+                                    endAxis = VerticalAxis.rememberEnd(),
+                                    bottomAxis = HorizontalAxis.rememberBottom(),
                                 ),
-                                endAxis = VerticalAxis.rememberEnd(),
-                                bottomAxis = HorizontalAxis.rememberBottom(),
-                                legend = rememberHorizontalLegend(
-                                    items = {
-                                        legende.forEach { eintrag ->
-                                            add(LegendItem(
-                                                icon = legendIcon.copy(Fill(eintrag.farbe)),
-                                                labelComponent = legendText,
-                                                label = eintrag.bezeichnung,
-                                            ))
-                                        }
-                                    },
-                                    iconSize = 8.dp,
-                                    iconLabelSpacing = 8.dp
+                                model = chartModel,
+                                scrollState = rememberVicoScrollState(),
+                                zoomState = rememberVicoZoomState(
+                                    initialZoom = remember { Zoom.Content }
                                 )
-                            ),
-                            model = chartModel,
-                            scrollState = rememberVicoScrollState(),
-                            zoomState = rememberVicoZoomState(initialZoom = remember { Zoom.Content })
+                            )
+                        }
+
+                        UmschaltbareDiagrammLegende(
+                            eintraege = legende,
+                            status = legendenStatus,
+                            beiKlick = if (marktpreisKategorie == MarktpreisKategorie.WARENKORB) {
+                                { _ -> warenkorbDialogOffen = true }
+                            } else {
+                                null
+                            },
+                            beiLangemKlick = if (marktpreisKategorie == MarktpreisKategorie.WARENKORB) {
+                                { _ -> warenkorbDialogOffen = true }
+                            } else {
+                                null
+                            },
+                            klickBeschreibung = if (
+                                marktpreisKategorie == MarktpreisKategorie.WARENKORB
+                            ) {
+                                "Warenkorb bearbeiten"
+                            } else {
+                                "Datenreihe ein- oder ausblenden"
+                            },
+                            langerKlickBeschreibung = if (
+                                marktpreisKategorie == MarktpreisKategorie.WARENKORB
+                            ) {
+                                "Warenkorb bearbeiten"
+                            } else {
+                                "Nur diese Datenreihe anzeigen"
+                            },
                         )
                     }
                 } else {
@@ -518,6 +560,17 @@ fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
             }*/
         }
     }
+
+    if (warenkorbDialogOffen) {
+        WarenkorbBearbeitenDialog(
+            warenkorb = spiel.warenkorb,
+            beiAbbruch = { warenkorbDialogOffen = false },
+            beiSpeichern = { neuerWarenkorb ->
+                onWarenkorbAendern(neuerWarenkorb)
+                warenkorbDialogOffen = false
+            },
+        )
+    }
 }
 
 @Preview(
@@ -528,7 +581,7 @@ fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
 private fun PreviewMarktplatz() {
     val spiel = remember { TestSpiel }
     Column {
-        zeigeMarktplatz(spiel) {}
+        zeigeMarktplatz(spiel)
 //        zeigeHafenPreis("3 : 1 Hafen",marketprices,{})
         /*
         zeigeWarenkorb(

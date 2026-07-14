@@ -28,16 +28,14 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.Insets
-import com.patrykandpatrick.vico.compose.common.LegendItem
-import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
-import com.patrykandpatrick.vico.compose.common.component.TextComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
-import com.patrykandpatrick.vico.compose.common.rememberHorizontalLegend
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
+import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
+import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
+import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 
 
 @Composable
@@ -66,19 +64,35 @@ fun zeigeAussenhandel(
                 )
             }
         } else {
-            val resourceChartModel = remember(resourceSaldoList, Rohstoffe.entries) {
-                CartesianChartModel(
-                    ColumnCartesianLayerModel.build {
-                        Rohstoffe.entries.forEach { resource ->
-                            series(
-                                x = List(resourceSaldoList.size) { idx -> idx + 1 },
-                                y = resourceSaldoList.map { mapByList ->
-                                    mapByList[resource]?.toIntOderNull() ?: 0
-                                }
-                            )
-                        }
-                    }
+            val rohstoffe = Rohstoffe.entries.toList()
+            val legende = rohstoffe.map { rohstoff ->
+                DiagrammLegendenEintrag(
+                    id = "aussenhandel-rohstoff:${rohstoff.name}",
+                    bezeichnung = rohstoff.str,
+                    farbe = rohstoff.farbe,
                 )
+            }
+            val legendenStatus = rememberDiagrammLegendenStatus(legende)
+            val sichtbareRohstoffe = rohstoffe.filter { rohstoff ->
+                legendenStatus.istSichtbar("aussenhandel-rohstoff:${rohstoff.name}")
+            }
+            val resourceChartModel = remember(resourceSaldoList, sichtbareRohstoffe) {
+                if (sichtbareRohstoffe.isEmpty()) {
+                    null
+                } else {
+                    CartesianChartModel(
+                        ColumnCartesianLayerModel.build {
+                            sichtbareRohstoffe.forEach { resource ->
+                                series(
+                                    x = List(resourceSaldoList.size) { idx -> idx + 1 },
+                                    y = resourceSaldoList.map { mapByList ->
+                                        mapByList[resource]?.toIntOderNull() ?: 0
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
             }
 
             val resourceScrollState = rememberVicoScrollState()
@@ -90,50 +104,42 @@ fun zeigeAussenhandel(
             val endAxis = VerticalAxis.rememberEnd()
             val bottomAxis = HorizontalAxis.rememberBottom()
 
-            val legendIcon = ShapeComponent(margins = Insets(.5f.dp))
-            val legendText = TextComponent(
-                padding = Insets(5f.dp, 0f.dp, 10f.dp, 0f.dp)
-            )
-
             Card(modifier = ModiPad5) {
-                CartesianChartHost(
-                    modifier = ModiPad5,
-                    chart = rememberCartesianChart(
-                        rememberColumnCartesianLayer(
-                            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                                Rohstoffe.entries.map { resource ->
-                                    rememberLineComponent(
-                                        fill = Fill(resource.farbe),
-                                        thickness = 8.dp
-                                    )
-                                }
-                            )
-                        ),
-                        startAxis = startAxis,
-                        endAxis = endAxis,
-                        bottomAxis = bottomAxis,
-                        legend = rememberHorizontalLegend(
-                            items = {
-                                Rohstoffe.entries.forEach { resource ->
-                                    add(
-                                        LegendItem(
-                                            icon = legendIcon.copy(
-                                                fill = Fill(resource.farbe)
-                                            ),
-                                            labelComponent = legendText,
-                                            label = resource.str
-                                        )
-                                    )
-                                }
-                            },
-                            iconSize = 8.dp,
-                            iconLabelSpacing = 8.dp
+                Column {
+                    if (resourceChartModel == null) {
+                        Text(
+                            text = "Keine Datenreihe ausgewählt",
+                            modifier = ModiPad5,
                         )
-                    ),
-                    model = resourceChartModel,
-                    scrollState = resourceScrollState,
-                    zoomState = resourceZoomState
-                )
+                    } else {
+                        CartesianChartHost(
+                            modifier = ModiPad5,
+                            chart = rememberCartesianChart(
+                                rememberColumnCartesianLayer(
+                                    columnProvider = ColumnCartesianLayer.ColumnProvider.series(
+                                        sichtbareRohstoffe.map { resource ->
+                                            rememberLineComponent(
+                                                fill = Fill(resource.farbe),
+                                                thickness = 8.dp
+                                            )
+                                        }
+                                    )
+                                ),
+                                startAxis = startAxis,
+                                endAxis = endAxis,
+                                bottomAxis = bottomAxis,
+                            ),
+                            model = resourceChartModel,
+                            scrollState = resourceScrollState,
+                            zoomState = resourceZoomState
+                        )
+                    }
+
+                    UmschaltbareDiagrammLegende(
+                        eintraege = legende,
+                        status = legendenStatus,
+                    )
+                }
             }
         }
 
@@ -145,17 +151,31 @@ fun zeigeAussenhandel(
                 )
             }
         } else {
-            val saldoChartModel = remember(priceSaldoList) {
-                CartesianChartModel(
-                    LineCartesianLayerModel.build {
-                        series(
-                            x = List(priceSaldoList.size) { idx -> idx + 1 },
-                            y = priceSaldoList.map { saldo ->
-                                saldo.toIntOderNull() ?: 0
-                            }
-                        )
-                    }
+            val saldoFarbe = Color.Gray
+            val legende = listOf(
+                DiagrammLegendenEintrag(
+                    id = "aussenhandel-geldbilanz",
+                    bezeichnung = "Geldbilanz",
+                    farbe = saldoFarbe,
                 )
+            )
+            val legendenStatus = rememberDiagrammLegendenStatus(legende)
+            val saldoSichtbar = legendenStatus.istSichtbar("aussenhandel-geldbilanz")
+            val saldoChartModel = remember(priceSaldoList, saldoSichtbar) {
+                if (!saldoSichtbar) {
+                    null
+                } else {
+                    CartesianChartModel(
+                        LineCartesianLayerModel.build {
+                            series(
+                                x = List(priceSaldoList.size) { idx -> idx + 1 },
+                                y = priceSaldoList.map { saldo ->
+                                    saldo.toIntOderNull() ?: 0
+                                }
+                            )
+                        }
+                    )
+                }
             }
 
             val saldoScrollState = rememberVicoScrollState()
@@ -167,27 +187,41 @@ fun zeigeAussenhandel(
             val bottomAxis = HorizontalAxis.rememberBottom()
 
             Card(modifier = Modifier.padding(5.dp)) {
-                CartesianChartHost(
-                    modifier = Modifier.padding(5.dp),
-                    chart = rememberCartesianChart(
-                        rememberLineCartesianLayer(
-                            lineProvider = LineCartesianLayer.LineProvider.series(
-                                LineCartesianLayer.rememberLine(
-                                    remember {
-                                        LineCartesianLayer.LineFill.single(
-                                            Fill(Color.Gray)
+                Column {
+                    if (saldoChartModel == null) {
+                        Text(
+                            text = "Keine Datenreihe ausgewählt",
+                            modifier = ModiPad5,
+                        )
+                    } else {
+                        CartesianChartHost(
+                            modifier = Modifier.padding(5.dp),
+                            chart = rememberCartesianChart(
+                                rememberLineCartesianLayer(
+                                    lineProvider = LineCartesianLayer.LineProvider.series(
+                                        LineCartesianLayer.rememberLine(
+                                            remember {
+                                                LineCartesianLayer.LineFill.single(
+                                                    Fill(saldoFarbe)
+                                                )
+                                            }
                                         )
-                                    }
-                                )
-                            )
-                        ),
-                        endAxis = endAxis,
-                        bottomAxis = bottomAxis
-                    ),
-                    model = saldoChartModel,
-                    scrollState = saldoScrollState,
-                    zoomState = saldoZoomState
-                )
+                                    )
+                                ),
+                                endAxis = endAxis,
+                                bottomAxis = bottomAxis
+                            ),
+                            model = saldoChartModel,
+                            scrollState = saldoScrollState,
+                            zoomState = saldoZoomState
+                        )
+                    }
+
+                    UmschaltbareDiagrammLegende(
+                        eintraege = legende,
+                        status = legendenStatus,
+                    )
+                }
             }
         }
     }

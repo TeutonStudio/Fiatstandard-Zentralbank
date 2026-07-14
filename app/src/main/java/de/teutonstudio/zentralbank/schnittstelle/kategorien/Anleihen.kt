@@ -39,6 +39,7 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProdu
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.columnSeries
 import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
+import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
@@ -47,11 +48,7 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.Insets
-import com.patrykandpatrick.vico.compose.common.LegendItem
-import com.patrykandpatrick.vico.compose.common.component.ShapeComponent
-import com.patrykandpatrick.vico.compose.common.component.TextComponent
-import com.patrykandpatrick.vico.compose.common.rememberHorizontalLegend
+import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Anleihe
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
 import de.teutonstudio.zentralbank.datenbank.Bauteil
@@ -66,11 +63,14 @@ import de.teutonstudio.zentralbank.datenbank.summeGeld
 import de.teutonstudio.zentralbank.datenbank.toY
 import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.datenbank.zuZinssatz
+import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.LeftText
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
+import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import kotlin.math.abs
 
 private const val GLOBAL_PLAYER = "Global"
@@ -242,70 +242,83 @@ private fun BalanceChart(
     val modelProducer = remember { CartesianChartModelProducer() }
     val spieler = spiel.spielerListe.firstOrNull { it.name == ausgewählterSpieler }
     val spielerFarbe = erhalteSpielerFarben(spiel.spielerListe)[spieler] ?: Color.LightGray
-    val serien = listOf(
-        "Barvermögen" to spielerFarbe,
-        "Marktwert" to spielerFarbe.abgedunkelt(0.2f),
-        "Verbindlichkeiten" to spielerFarbe.abgedunkelt(0.45f),
+    val legende = listOf(
+        DiagrammLegendenEintrag(
+            id = "bilanz-barvermoegen",
+            bezeichnung = "Barvermögen",
+            farbe = spielerFarbe,
+        ),
+        DiagrammLegendenEintrag(
+            id = "bilanz-marktwert",
+            bezeichnung = "Marktwert",
+            farbe = spielerFarbe.abgedunkelt(0.2f),
+        ),
+        DiagrammLegendenEintrag(
+            id = "bilanz-verbindlichkeiten",
+            bezeichnung = "Verbindlichkeiten",
+            farbe = spielerFarbe.abgedunkelt(0.45f),
+        ),
     )
-    val legendIcon = ShapeComponent(margins = Insets(0.5.dp))
-    val legendText = TextComponent(
-        padding = Insets(
-            start = 5.dp,
-            top = 0.dp,
-            end = 10.dp,
-            bottom = 0.dp,
-        )
+    val reihen = listOf(
+        legende[0] to spiel.spielerSaldo.toY(ausgewählterSpieler),
+        legende[1] to spiel.spielerMarktwert.toY(ausgewählterSpieler),
+        legende[2] to spiel.spielerSchulden.toY(ausgewählterSpieler),
     )
+    val legendenStatus = rememberDiagrammLegendenStatus(legende)
+    val sichtbareReihen = reihen.filter { (eintrag, _) ->
+        legendenStatus.istSichtbar(eintrag.id)
+    }
 
-    LaunchedEffect(runden, spiel) {
-        modelProducer.runTransaction {
-            lineSeries {
-                series(x = runden, y = spiel.spielerSaldo.toY(ausgewählterSpieler))
-                series(x = runden, y = spiel.spielerMarktwert.toY(ausgewählterSpieler))
-                series(x = runden, y = spiel.spielerSchulden.toY(ausgewählterSpieler))
+    LaunchedEffect(runden, sichtbareReihen) {
+        if (sichtbareReihen.isNotEmpty()) {
+            modelProducer.runTransaction {
+                lineSeries {
+                    sichtbareReihen.forEach { (_, werte) ->
+                        series(x = runden, y = werte)
+                    }
+                }
             }
         }
     }
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
-            CartesianChartHost(
-                modifier = ModiPad5,
-                chart = rememberCartesianChart(
-                    rememberLineCartesianLayer(
-                        lineProvider = LineCartesianLayer.LineProvider.series(
-                            serien.map { (_, farbe) ->
-                                LineCartesianLayer.rememberLine(
-                                    fill = remember(farbe) {
-                                        LineCartesianLayer.LineFill.single(Fill(farbe))
-                                    }
-                                )
-                            }
-                        )
-                    ),
-                    startAxis = VerticalAxis.rememberStart(),
-                    bottomAxis = HorizontalAxis.rememberBottom(),
-                    legend = rememberHorizontalLegend(
-                        items = {
-                            serien.forEach { (label, farbe) ->
-                                add(
-                                    LegendItem(
-                                        icon = legendIcon.copy(Fill(farbe)),
-                                        labelComponent = legendText,
-                                        label = label,
+            if (sichtbareReihen.isEmpty()) {
+                Text(
+                    text = "Keine Datenreihe ausgewählt",
+                    modifier = ModiPad5,
+                )
+            } else {
+                CartesianChartHost(
+                    modifier = ModiPad5,
+                    chart = rememberCartesianChart(
+                        rememberLineCartesianLayer(
+                            lineProvider = LineCartesianLayer.LineProvider.series(
+                                sichtbareReihen.map { (eintrag, _) ->
+                                    val farbe = eintrag.farbe
+
+                                    LineCartesianLayer.rememberLine(
+                                        fill = remember(farbe) {
+                                            LineCartesianLayer.LineFill.single(Fill(farbe))
+                                        }
                                     )
-                                )
-                            }
-                        },
-                        iconSize = 8.dp,
-                        padding = Insets(8.dp),
+                                }
+                            )
+                        ),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(),
                     ),
-                ),
-                modelProducer = modelProducer,
-                scrollState = rememberVicoScrollState(),
-                zoomState = rememberVicoZoomState(
-                    initialZoom = Zoom.Content,
-                ),
+                    modelProducer = modelProducer,
+                    scrollState = rememberVicoScrollState(),
+                    zoomState = rememberVicoZoomState(
+                        initialZoom = Zoom.Content,
+                    ),
+                )
+            }
+
+            UmschaltbareDiagrammLegende(
+                eintraege = legende,
+                status = legendenStatus,
             )
         }
     }
@@ -337,15 +350,34 @@ private fun GlobalBalanceChart(
     }
 
     val modelProducer = remember { CartesianChartModelProducer() }
+    val legende = listOf(
+        DiagrammLegendenEintrag(
+            id = "global-unvermoegen",
+            bezeichnung = "globales Unvermögen",
+            farbe = Color(0xFF607D8B),
+        ),
+        DiagrammLegendenEintrag(
+            id = "global-anleihe-unvermoegen",
+            bezeichnung = "offenes Anleihe-Unvermögen",
+            farbe = Color(0xFF9A6B5A),
+        ),
+    )
+    val reihen = listOf(
+        legende[0] to globalDebt,
+        legende[1] to globalUnvermoegen,
+    )
+    val legendenStatus = rememberDiagrammLegendenStatus(legende)
+    val sichtbareReihen = reihen.filter { (eintrag, _) ->
+        legendenStatus.istSichtbar(eintrag.id)
+    }
 
-    LaunchedEffect(globalDebt, globalUnvermoegen) {
-        modelProducer.runTransaction {
-            lineSeries {
-                if (globalDebt.isNotEmpty()) {
-                    series(x = x, y = globalDebt)
-                }
-                if (globalUnvermoegen.isNotEmpty()) {
-                    series(x = x, y = globalUnvermoegen)
+    LaunchedEffect(x, sichtbareReihen) {
+        if (sichtbareReihen.isNotEmpty()) {
+            modelProducer.runTransaction {
+                lineSeries {
+                    sichtbareReihen.forEach { (_, werte) ->
+                        series(x = x, y = werte)
+                    }
                 }
             }
         }
@@ -353,25 +385,42 @@ private fun GlobalBalanceChart(
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
-            CartesianChartHost(
-                modifier = ModiPad5,
-                chart = rememberCartesianChart(
-                    rememberLineCartesianLayer(),
-                    startAxis = VerticalAxis.rememberStart(),
-                    bottomAxis = HorizontalAxis.rememberBottom(),
-                ),
-                modelProducer = modelProducer,
-                scrollState = rememberVicoScrollState(),
-                zoomState = rememberVicoZoomState(
-                    initialZoom = Zoom.Content,
-                ),
-            )
-
-            SimpleLegend(
-                labels = listOf(
-                    "globales Unvermögen",
-                    "offenes Anleihe-Unvermögen",
+            if (sichtbareReihen.isEmpty()) {
+                Text(
+                    text = "Keine Datenreihe ausgewählt",
+                    modifier = ModiPad5,
                 )
+            } else {
+                CartesianChartHost(
+                    modifier = ModiPad5,
+                    chart = rememberCartesianChart(
+                        rememberLineCartesianLayer(
+                            lineProvider = LineCartesianLayer.LineProvider.series(
+                                sichtbareReihen.map { (eintrag, _) ->
+                                    val farbe = eintrag.farbe
+
+                                    LineCartesianLayer.rememberLine(
+                                        fill = remember(farbe) {
+                                            LineCartesianLayer.LineFill.single(Fill(farbe))
+                                        }
+                                    )
+                                }
+                            )
+                        ),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(),
+                    ),
+                    modelProducer = modelProducer,
+                    scrollState = rememberVicoScrollState(),
+                    zoomState = rememberVicoZoomState(
+                        initialZoom = Zoom.Content,
+                    ),
+                )
+            }
+
+            UmschaltbareDiagrammLegende(
+                eintraege = legende,
+                status = legendenStatus,
             )
         }
     }
@@ -411,12 +460,35 @@ private fun ManagementChart(
     )
 
     val modelProducer = remember { CartesianChartModelProducer() }
+    val legende = listOf(
+        DiagrammLegendenEintrag(
+            id = "verwaltung-anleihen",
+            bezeichnung = "Anleihen",
+            farbe = Color(0xFF607D8B),
+        ),
+        DiagrammLegendenEintrag(
+            id = "verwaltung-standorte",
+            bezeichnung = "Standorte / Banken",
+            farbe = Color(0xFF8A7552),
+        ),
+    )
+    val reihen = listOf(
+        legende[0] to anleihenSortiert,
+        legende[1] to verwaltungsLimit,
+    )
+    val legendenStatus = rememberDiagrammLegendenStatus(legende)
+    val sichtbareReihen = reihen.filter { (eintrag, _) ->
+        legendenStatus.istSichtbar(eintrag.id)
+    }
 
-    LaunchedEffect(anleihenSortiert, verwaltungsLimit) {
-        modelProducer.runTransaction {
-            columnSeries {
-                series(anleihenSortiert)
-                series(verwaltungsLimit)
+    LaunchedEffect(sichtbareReihen) {
+        if (sichtbareReihen.isNotEmpty()) {
+            modelProducer.runTransaction {
+                columnSeries {
+                    sichtbareReihen.forEach { (_, werte) ->
+                        series(werte)
+                    }
+                }
             }
         }
     }
@@ -429,29 +501,43 @@ private fun ManagementChart(
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
-            CartesianChartHost(
-                modifier = ModiPad5,
-                chart = rememberCartesianChart(
-                    rememberColumnCartesianLayer(),
-                    startAxis = VerticalAxis.rememberStart(),
-                    bottomAxis = HorizontalAxis.rememberBottom(
-                        valueFormatter = CartesianValueFormatter { _, value, _ ->
-                            labels.getOrNull(value.toInt()) ?: ""
-                        }
-                    ),
-                ),
-                modelProducer = modelProducer,
-                scrollState = rememberVicoScrollState(),
-                zoomState = rememberVicoZoomState(
-                    initialZoom = Zoom.Content,
-                ),
-            )
-
-            SimpleLegend(
-                labels = listOf(
-                    "Anleihen",
-                    "Standorte / Banken",
+            if (sichtbareReihen.isEmpty()) {
+                Text(
+                    text = "Keine Datenreihe ausgewählt",
+                    modifier = ModiPad5,
                 )
+            } else {
+                CartesianChartHost(
+                    modifier = ModiPad5,
+                    chart = rememberCartesianChart(
+                        rememberColumnCartesianLayer(
+                            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
+                                sichtbareReihen.map { (eintrag, _) ->
+                                    rememberLineComponent(
+                                        fill = Fill(eintrag.farbe),
+                                        thickness = 8.dp,
+                                    )
+                                }
+                            )
+                        ),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(
+                            valueFormatter = CartesianValueFormatter { _, value, _ ->
+                                labels.getOrNull(value.toInt()) ?: ""
+                            }
+                        ),
+                    ),
+                    modelProducer = modelProducer,
+                    scrollState = rememberVicoScrollState(),
+                    zoomState = rememberVicoZoomState(
+                        initialZoom = Zoom.Content,
+                    ),
+                )
+            }
+
+            UmschaltbareDiagrammLegende(
+                eintraege = legende,
+                status = legendenStatus,
             )
         }
     }
@@ -567,22 +653,6 @@ private fun HeaderDropdownCard(
                 beiAuswahl(it)
                 ausgeklappt = false
             }) }
-        }
-    }
-}
-
-@Composable
-private fun SimpleLegend(labels: List<String>) {
-    Row(
-        modifier = ModiPad5,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        labels.forEach { label ->
-            Text(
-                text = label,
-                modifier = Modifier.padding(horizontal = 8.dp),
-                fontSize = 12.sp,
-            )
         }
     }
 }

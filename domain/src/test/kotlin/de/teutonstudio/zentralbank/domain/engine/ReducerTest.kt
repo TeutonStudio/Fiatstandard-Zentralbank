@@ -55,6 +55,31 @@ class ReducerTest {
     )
 
     @Test
+    fun warenkorbAenderungErsetztZusammensetzungUndEntferntNullmengen() {
+        val state = Reducer.reduce(
+            startState(),
+            GameEvent.WarenkorbGeaendert(
+                mapOf(
+                    Rohstoff.HOLZ to 4,
+                    Rohstoff.STAHL to 0,
+                )
+            ),
+        ).getOrThrow()
+
+        assertEquals(mapOf(Rohstoff.HOLZ to 4), state.warenkorb)
+    }
+
+    @Test
+    fun warenkorbAenderungLehntNegativeMengenAb() {
+        val result = Reducer.reduce(
+            startState(),
+            GameEvent.WarenkorbGeaendert(mapOf(Rohstoff.HOLZ to -1)),
+        )
+
+        assertTrue(result.isFailure)
+    }
+
+    @Test
     fun rohstoffEinnahmeErhoehtBestand() {
         val state = Reducer.reduce(
             startState(),

@@ -18,9 +18,19 @@ data class SpielDaten(
     constructor(warenkorb: Map<Rohstoffe,Int>, spieler:List<Spieler>, inflationswerte: Triple<Float, Float, Float>) : this(
         spielID=(-1).toLong(),
         spieler=spieler.joinToString("/") { it.name },
-        warenkorb=warenkorb.map { "${it.key}#${it.value}" }.joinToString("/"),
+        warenkorb=warenkorb.zuSpeicherWarenkorb(),
         inflationsziel=inflationswerte.first,
         nAbweichung=inflationswerte.second,
         sAbweichung=inflationswerte.third,
     )
+}
+
+fun Map<Rohstoffe, Int>.zuSpeicherWarenkorb(): String {
+    require(values.all { menge -> menge >= 0 }) {
+        "Warenkorbmengen dürfen nicht negativ sein."
+    }
+    return entries
+        .filter { (_, menge) -> menge > 0 }
+        .sortedBy { (rohstoff, _) -> rohstoff.ordinal }
+        .joinToString("/") { (rohstoff, menge) -> "${rohstoff.name}#$menge" }
 }
