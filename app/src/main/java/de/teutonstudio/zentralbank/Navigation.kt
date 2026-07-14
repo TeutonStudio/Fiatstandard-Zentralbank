@@ -17,15 +17,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.czboracle.ui.composables.AnleihenRegister
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.ui.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.ui.eingabe.Titel
 import de.teutonstudio.zentralbank.ui.eingabe.bearbeiteRunde
-import de.teutonstudio.zentralbank.ui.kategorien.SpielLaden
+import de.teutonstudio.zentralbank.ui.kategorien.AnleihenRegister
 import de.teutonstudio.zentralbank.ui.kategorien.Hauptmenü
 import de.teutonstudio.zentralbank.ui.kategorien.SpielErstellen
+import de.teutonstudio.zentralbank.ui.kategorien.SpielLaden
 import de.teutonstudio.zentralbank.ui.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.ui.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.ui.kategorien.zeigeMarktplatz

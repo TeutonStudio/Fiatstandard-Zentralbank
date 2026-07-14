@@ -1,4 +1,4 @@
-package com.example.czboracle.ui.composables
+package de.teutonstudio.zentralbank.ui.kategorien
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
