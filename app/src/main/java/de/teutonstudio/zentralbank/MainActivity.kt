@@ -6,7 +6,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
-import de.teutonstudio.zentralbank.ui.theme.CZBOracleRechnerTheme
+import de.teutonstudio.zentralbank.schnittstelle.theme.CZBOracleRechnerTheme
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

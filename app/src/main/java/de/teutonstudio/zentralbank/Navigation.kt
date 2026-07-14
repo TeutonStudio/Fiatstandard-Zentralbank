@@ -19,16 +19,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
-import de.teutonstudio.zentralbank.ui.ausgabe.zeigeSpieler
-import de.teutonstudio.zentralbank.ui.eingabe.Titel
-import de.teutonstudio.zentralbank.ui.eingabe.bearbeiteRunde
-import de.teutonstudio.zentralbank.ui.kategorien.AnleihenRegister
-import de.teutonstudio.zentralbank.ui.kategorien.Hauptmenü
-import de.teutonstudio.zentralbank.ui.kategorien.SpielErstellen
-import de.teutonstudio.zentralbank.ui.kategorien.SpielLaden
-import de.teutonstudio.zentralbank.ui.kategorien.Spielmenü
-import de.teutonstudio.zentralbank.ui.kategorien.zeigeAussenhandel
-import de.teutonstudio.zentralbank.ui.kategorien.zeigeMarktplatz
+import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.bearbeiteRunde
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AnleihenRegister
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.Hauptmenü
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielErstellen
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielLaden
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
 
 private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
 

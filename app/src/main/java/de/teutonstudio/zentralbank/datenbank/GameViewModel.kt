@@ -9,8 +9,8 @@ import androidx.lifecycle.viewModelScope
 import de.teutonstudio.zentralbank.domain.GameState
 import de.teutonstudio.zentralbank.domain.engine.GameEngine
 import de.teutonstudio.zentralbank.domain.events.GameEvent
-import de.teutonstudio.zentralbank.ui.domain.GameUiState
-import de.teutonstudio.zentralbank.ui.domain.zuGameUiState
+import de.teutonstudio.zentralbank.schnittstelle.domain.GameUiState
+import de.teutonstudio.zentralbank.schnittstelle.domain.zuGameUiState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
