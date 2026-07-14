@@ -71,6 +71,7 @@ import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteilPreis
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegendenStatus
@@ -321,6 +322,7 @@ fun zeigeMarktplatz(
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
                                             valueFormatter = stueckAchsenFormatter,
+                                            itemPlacer = ganzzahligerStueckAchsenItemPlacer,
                                         ),
                                         bottomAxis = HorizontalAxis.rememberBottom(),
                                     ),

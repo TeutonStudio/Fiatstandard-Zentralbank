@@ -1,12 +1,18 @@
 package de.teutonstudio.zentralbank.schnittstelle
 
+import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
 val markAchsenFormatter = einheitenAchsenFormatter("M")
-val stueckAchsenFormatter = einheitenAchsenFormatter("Stk")
+val stueckAchsenFormatter = CartesianValueFormatter { _, value, _ ->
+    "${value.roundToLong()} Stk"
+}
+val ganzzahligerStueckAchsenItemPlacer = VerticalAxis.ItemPlacer.step(
+    step = { 1.0 },
+)
 
 private fun einheitenAchsenFormatter(einheit: String) =
     CartesianValueFormatter { _, value, _ ->

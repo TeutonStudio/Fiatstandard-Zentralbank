@@ -13,18 +13,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,15 +81,20 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
-import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
+import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.roundToLong
+import kotlin.math.sign
 
 private const val GLOBAL_PLAYER = "Global"
 private val anleiheFaelligFarbe = Color(0xFFD8C28F)
 private val anleiheOffenFarbe = Color(0xFF9EB5C7)
 private val anleiheAbgelaufenFarbe = Color(0xFFC7C7C7)
+private const val MAX_Y_ACHSE_EXPONENT = 5f
 
 private val relevanceStrings = listOf(
     "gezahlte",
@@ -151,6 +159,39 @@ fun fiatWoodoo(
     }
 }
 
+private fun Number.aufExponentielleAchse(
+    exponent: Float,
+    maximalbetrag: Double,
+): Double {
+    val wert = toDouble()
+    if (exponent <= 1f || maximalbetrag <= 0.0 || wert == 0.0) return wert
+    return wert.sign * maximalbetrag *
+        (abs(wert) / maximalbetrag).pow(1.0 / exponent.toDouble())
+}
+
+private fun Double.vonExponentiellerAchse(
+    exponent: Float,
+    maximalbetrag: Double,
+): Double {
+    if (exponent <= 1f || maximalbetrag <= 0.0 || this == 0.0) return this
+    return sign * maximalbetrag *
+        (abs(this) / maximalbetrag).pow(exponent.toDouble())
+}
+
+private fun exponentiellerMarkAchsenFormatter(
+    exponent: Float,
+    maximalbetrag: Double,
+) = CartesianValueFormatter { _, value, _ ->
+    val originalwert = value.vonExponentiellerAchse(exponent, maximalbetrag)
+    val gerundet = originalwert.roundToLong()
+    val beschriftung = if (abs(originalwert - gerundet) < 0.0001) {
+        gerundet.toString()
+    } else {
+        String.format(Locale.GERMANY, "%.1f", originalwert)
+    }
+    "$beschriftung M"
+}
+
 @Composable
 fun Header(
     modifierChoseLegende: Modifier = Modifier.scale(.75f),
@@ -170,6 +211,7 @@ fun Header(
     content: @Composable () -> Unit,
 ) {
     var isBilanzExpanded by remember { mutableStateOf(true) }
+    var yAchsenExponent by remember { mutableFloatStateOf(1f) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -190,6 +232,8 @@ fun Header(
                     BalanceChart(
                         spiel = spiel,
                         ausgewählterSpieler = ausgewählterSpieler,
+                        yAchsenExponent = yAchsenExponent,
+                        onYAchsenExponentChange = { yAchsenExponent = it },
                     )
                 }
             } else {
@@ -227,6 +271,8 @@ fun Header(
 private fun BalanceChart(
     spiel: Spiel,
     ausgewählterSpieler: String,
+    yAchsenExponent: Float,
+    onYAchsenExponentChange: (Float) -> Unit,
 ) {
     val reihenLängen = listOf(
         spiel.spielerSaldo.size,
@@ -246,7 +292,11 @@ private fun BalanceChart(
     }
 
     if (ausgewählterSpieler == GLOBAL_PLAYER) {
-        GlobalBalanceChart(spiel)
+        GlobalBalanceChart(
+            spiel = spiel,
+            yAchsenExponent = yAchsenExponent,
+            onYAchsenExponentChange = onYAchsenExponentChange,
+        )
         return
     }
 
@@ -292,13 +342,22 @@ private fun BalanceChart(
     val sichtbareReihen = reihen.filter { (eintrag, _) ->
         legendenStatus.istSichtbar(eintrag.id)
     }
+    val maximalbetrag = sichtbareReihen
+        .flatMap { (_, werte) -> werte }
+        .maxOfOrNull { wert -> abs(wert.toDouble()) }
+        ?: 0.0
 
-    LaunchedEffect(runden, sichtbareReihen) {
+    LaunchedEffect(runden, sichtbareReihen, yAchsenExponent, maximalbetrag) {
         if (sichtbareReihen.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
                     sichtbareReihen.forEach { (_, werte) ->
-                        series(x = runden, y = werte)
+                        series(
+                            x = runden,
+                            y = werte.map { wert ->
+                                wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
+                            },
+                        )
                     }
                 }
             }
@@ -335,7 +394,10 @@ private fun BalanceChart(
                             )
                         ),
                         startAxis = VerticalAxis.rememberStart(
-                            valueFormatter = markAchsenFormatter,
+                            valueFormatter = exponentiellerMarkAchsenFormatter(
+                                exponent = yAchsenExponent,
+                                maximalbetrag = maximalbetrag,
+                            ),
                         ),
                         bottomAxis = HorizontalAxis.rememberBottom(),
                     ),
@@ -347,9 +409,11 @@ private fun BalanceChart(
                 )
             }
 
-            UmschaltbareDiagrammLegende(
-                eintraege = legende,
-                status = legendenStatus,
+            SchuldenLegendenZeile(
+                yAchsenExponent = yAchsenExponent,
+                onYAchsenExponentChange = onYAchsenExponentChange,
+                legende = legende,
+                legendenStatus = legendenStatus,
             )
         }
     }
@@ -358,6 +422,8 @@ private fun BalanceChart(
 @Composable
 private fun GlobalBalanceChart(
     spiel: Spiel,
+    yAchsenExponent: Float,
+    onYAchsenExponentChange: (Float) -> Unit,
 ) {
     val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
     val globaleSchulden = spiel.globaleKombinierteSchulden.map { it.toIntOderNull() ?: 0 }
@@ -396,13 +462,22 @@ private fun GlobalBalanceChart(
     val sichtbareReihen = reihen.filter { (eintrag, _) ->
         legendenStatus.istSichtbar(eintrag.id)
     }
+    val maximalbetrag = sichtbareReihen
+        .flatMap { (_, werte) -> werte }
+        .maxOfOrNull { wert -> abs(wert.toDouble()) }
+        ?: 0.0
 
-    LaunchedEffect(x, sichtbareReihen) {
+    LaunchedEffect(x, sichtbareReihen, yAchsenExponent, maximalbetrag) {
         if (sichtbareReihen.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
                     sichtbareReihen.forEach { (_, werte) ->
-                        series(x = x, y = werte)
+                        series(
+                            x = x,
+                            y = werte.map { wert ->
+                                wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
+                            },
+                        )
                     }
                 }
             }
@@ -439,7 +514,10 @@ private fun GlobalBalanceChart(
                             )
                         ),
                         startAxis = VerticalAxis.rememberStart(
-                            valueFormatter = markAchsenFormatter,
+                            valueFormatter = exponentiellerMarkAchsenFormatter(
+                                exponent = yAchsenExponent,
+                                maximalbetrag = maximalbetrag,
+                            ),
                         ),
                         bottomAxis = HorizontalAxis.rememberBottom(),
                     ),
@@ -451,11 +529,50 @@ private fun GlobalBalanceChart(
                 )
             }
 
-            UmschaltbareDiagrammLegende(
-                eintraege = legende,
-                status = legendenStatus,
+            SchuldenLegendenZeile(
+                yAchsenExponent = yAchsenExponent,
+                onYAchsenExponentChange = onYAchsenExponentChange,
+                legende = legende,
+                legendenStatus = legendenStatus,
             )
         }
+    }
+}
+
+@Composable
+private fun SchuldenLegendenZeile(
+    yAchsenExponent: Float,
+    onYAchsenExponentChange: (Float) -> Unit,
+    legende: List<DiagrammLegendenEintrag>,
+    legendenStatus: de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenStatus,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.width(150.dp).padding(start = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = if (yAchsenExponent <= 1f) {
+                    "Y-Achse: linear"
+                } else {
+                    "Y-Exponent: ${String.format(Locale.GERMANY, "%.1f", yAchsenExponent)}"
+                },
+                fontSize = 10.sp,
+            )
+            Slider(
+                value = yAchsenExponent,
+                onValueChange = onYAchsenExponentChange,
+                valueRange = 1f..MAX_Y_ACHSE_EXPONENT,
+            )
+        }
+        UmschaltbareDiagrammLegende(
+            eintraege = legende,
+            status = legendenStatus,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -555,6 +672,7 @@ private fun ManagementChart(
                         ),
                         startAxis = VerticalAxis.rememberStart(
                             valueFormatter = stueckAchsenFormatter,
+                            itemPlacer = ganzzahligerStueckAchsenItemPlacer,
                         ),
                         bottomAxis = HorizontalAxis.rememberBottom(
                             valueFormatter = CartesianValueFormatter { _, value, _ ->
@@ -893,7 +1011,12 @@ private fun AnleiheAblauf(
     var zeigeBuchungssatz by remember(eintrag) { mutableStateOf(false) }
     val ablaufScrollState = rememberScrollState()
     val rundenGruppen = remember(ablauf) {
-        ablauf.groupBy { ereignis -> ereignis.runde }.toSortedMap(reverseOrder())
+        ablauf
+            .groupBy { ereignis -> ereignis.runde }
+            .mapValues { (_, ereignisse) ->
+                ereignisse.sortedByDescending { ereignis -> ereignis.art.reihenfolge }
+            }
+            .toSortedMap(reverseOrder())
     }
     LaunchedEffect(eintrag, aktuelleRunde) {
         ablaufScrollState.scrollTo(0)

@@ -52,6 +52,7 @@ import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
+import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
@@ -235,7 +236,12 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                             valueFormatter = when (einheit) {
                                 BilanzEinheit.PREIS -> markAchsenFormatter
                                 BilanzEinheit.STUECK -> stueckAchsenFormatter
-                            }
+                            },
+                            itemPlacer = if (einheit == BilanzEinheit.STUECK) {
+                                ganzzahligerStueckAchsenItemPlacer
+                            } else {
+                                VerticalAxis.ItemPlacer.step()
+                            },
                         ),
                         bottomAxis = HorizontalAxis.rememberBottom(),
                     ),

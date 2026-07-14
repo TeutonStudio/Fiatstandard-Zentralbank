@@ -139,3 +139,6 @@ Offene Punkte:
 - Der bei Spielbeginn festgelegte Preisinflationswarenkorb bleibt von späteren Änderungen des normalen Warenkorbs unberührt und erscheint als zweite Kurve im bestehenden Warenkorb-Graphen.
 - Die Bauwerk-Legende ist in Land, Ecken und Linien gegliedert. In der Spielmenü-Karte mit Runde und Leitzins zeigen kompakte Spielerkarten den aktiven Spieler und die verbleibenden Züge bis zur nächsten Marktpreisberechnung.
 - Spielgebundene Navigationsziele prüfen den geladenen Spielzustand. Stellt Android nach einem Prozessneustart eine Spielroute ohne initialisiertes Spiel wieder her, führt die Navigation sicher ins Hauptmenü zurück, statt auf ein uninitialisiertes `lateinit`-Feld zuzugreifen.
+- Die Schuldenbilanz besitzt links in der Legendenzeile einen stufenlosen Y-Achsenregler. Der linke Anschlag ist linear; weiter rechts wächst die Achse zunehmend exponentiell, während ihre Beschriftung weiterhin die tatsächlichen Markbeträge zeigt.
+- Bei mehreren Anleihenereignissen in derselben Runde steht die Zinszahlung im absteigend dargestellten Ablauf über dem zeitlich vorherigen Anleihehandel.
+- Sämtliche vertikalen Stückachsen verwenden ganzzahlige Tick-Abstände und zeigen ausschließlich ganzzahlige `Stk`-Beschriftungen.
