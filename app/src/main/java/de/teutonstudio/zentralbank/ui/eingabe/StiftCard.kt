@@ -224,7 +224,7 @@ private fun DrawScope.drawStiftStrich(
             y = (aktuellerPunkt.y + naechsterPunkt.y) / 2f
         )
 
-        path.quadraticBezierTo(
+        path.quadraticTo(
             x1 = aktuellerPunkt.x,
             y1 = aktuellerPunkt.y,
             x2 = mittelpunkt.x,
@@ -245,4 +245,3 @@ private fun DrawScope.drawStiftStrich(
         )
     )
 }
-
