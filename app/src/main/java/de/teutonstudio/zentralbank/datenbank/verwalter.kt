@@ -618,11 +618,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }*/
 
-    /**
-     * Alias für alten Tippfehler. Ja, sogar Bugs bekommen manchmal Bestandsschutz.
-     */
-    //fun auslandsSaldoZurRund(runde: Int): Map<Rohstoffe, Int> = auslandsSaldoZurRunde(runde)
-
 /*    fun siedlerSchuldStatistikBisZurRunde(
         runde: Int
     ): List<Map<String, Pair<Zahlungsmittel, Map<Int, Int>>>> {

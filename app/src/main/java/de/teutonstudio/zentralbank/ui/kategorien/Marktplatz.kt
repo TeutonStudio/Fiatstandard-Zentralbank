@@ -91,7 +91,6 @@ fun zeigeHafenPreis(
             }
             VerticalGrid(
                 columns = SimpleGridCells.Fixed(3),
-//                modifier = Modifier.width(250.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -279,7 +278,6 @@ fun zeigeMarktplatz(spiel: Spiel,onTrade: (HandelsDaten) -> Unit) {
                     val gewählterRohstoff = inputResource.value
                     val gewählterSpieler = eingabeSpieler.value
                     val saldo = spiel.spielerSaldo.lastOrNull()?.map { it.key.name to it.value }?.toMap() ?: emptyMap()
-//                    val spielerListe = saldo?.keys.orEmpty().toList()
 
                     val art = if(isBuying.value) "Kauf" else "Verkauf"
                     Text(

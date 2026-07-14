@@ -48,36 +48,7 @@ fun TextCard(text: String, modifier: Modifier = Modifier, fontSize: TextUnit = 2
     if (darfKlick) { Card(onClick = beiKlick, modifier) { inhalt() } } else { Card(modifier) { inhalt() } }
 }
 
-//@Composable
-//fun zeigeRohstoff(rohstoff: Rohstoffe, fontsize: Int = 10, text: Boolean = true) {
-//    Row(modifier = Modifier, horizontalArrangement = Arrangement.End) {
-//        val modifier = Modifier.padding(5.dp)
-//        Image(resourceIcon(rohstoff),rohstoff,modifier)
-//        if (text) {
-//            Text(
-//                text = rohstoff,
-//                modifier = modifier,
-//                fontSize = fontsize.sp)
-//        }
-//    }
-//}
-
-//@Composable
-//fun resourceIcon(rohstoff: Rohstoffe): Painter {
-//    return when (rohstoff) {
-//        Rohstoffe.VIEH -> painterResource(R.drawable.vieh)
-//        Rohstoffe.GETREIDE -> painterResource(R.drawable.getreide)
-//        Rohstoffe.HOLZ -> painterResource(R.drawable.holz)
-//        Rohstoffe.STEIN -> painterResource(R.drawable.stein)
-//        Rohstoffe.ZIEGEL -> painterResource(R.drawable.ziegel)
-//        else -> null
-//    } ?: painterResource(R.drawable.empty)
-//}
-
 public fun Configuration.isLandscape(): Boolean = orientation == Configuration.ORIENTATION_LANDSCAPE
-/*private fun isLandscape(configuration: Configuration): Boolean {
-    return configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-}*/
 
 @OptIn(ExperimentalGridApi::class)
 @Composable
@@ -108,57 +79,14 @@ fun GridByOrientation(verteilungVertical: Int = 2, verteilungHorizontal: Int = 3
     }
 }
 
-/*@Composable
-fun FlowByOrientation(
-    verteilungRow: Int = 2, verteilungColumn: Int = 3,
-    size: MutableState<IntSize> = remember { mutableStateOf(IntSize(0,0)) },
-    contents: List<@Composable () -> Unit>
-) {
-    if (isLandscape(LocalConfiguration.current)) {
-        FlowRow(
-            modifier = Modifier.wrapContentSize().onSizeChanged { size.value = it },
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            itemVerticalAlignment = Alignment.CenterVertically,
-            maxItemsInEachRow = verteilungRow,
-        ) { contents.forEach { it() } }
-    } else {
-        FlowColumn(
-            modifier = Modifier.wrapContentSize().onSizeChanged { size.value = it },
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            itemHorizontalAlignment = Alignment.CenterHorizontally,
-            maxItemsInEachColumn = verteilungColumn,
-        ) { contents.forEach { it() } }
-    }
-}*/
-
-/*@Composable
-fun CustomGrid(
-    contents: @Composable (Int) -> Unit
-) {
-    Column() {
-        GridByOrientation(SimpleGridCells.Fixed(3)) {
-            contents(0)
-            contents(1)
-            contents(2)
-            contents(3)
-            contents(4)
-            contents(5)
-        }
-        contents(6)
-    }
-}*/
-
 @Composable
 fun FlowByOrientation(
     verteilungRow: Int = 2,
     verteilungColumn: Int = 3,
-//    size: MutableState<IntSize> = remember { mutableStateOf(IntSize.Zero) },
     content: @Composable (FlowRowScope.() -> Unit)
 ) {
     FlowRow(
-        modifier = Modifier.wrapContentSize(), //.onSizeChanged { size.value = it },
+        modifier = Modifier.wrapContentSize(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
@@ -200,22 +128,6 @@ fun ColumnOrRowByOrientation(vararg contents: @Composable () -> Unit) {
         }
     }
 }
-
-/*@Composable
-fun Titel(beiKlick: () -> Unit, inhalt: @Composable BoxScope.() -> Unit) {
-    Scaffold(
-        modifier = ModiPad5.fillMaxSize(),
-        contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = {
-            Card(modifier = ModiPad15.fillMaxWidth(), onClick = beiKlick) {
-                val text = if (LocalConfiguration.current.isLandscape()) "Fiatreich Zentralbank" else "FZB"
-                Text(text,ModiPad15.fillMaxWidth(),Color.Unspecified,null)
-            }
-        }
-    ) {
-        Box(modifier = Modifier.fillMaxSize().padding(it).consumeWindowInsets(it), contentAlignment = Alignment.Center, content = inhalt)
-    }
-}*/
 
 fun markBy(betrag: Zahlungsmittel?): String {
     if (betrag == null) return ""

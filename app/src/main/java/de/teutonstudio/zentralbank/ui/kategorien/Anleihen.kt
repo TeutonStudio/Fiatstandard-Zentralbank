@@ -392,7 +392,6 @@ private fun ManagementChart(
     aktuelleRunde: Int,
     spielerBauSaldo: Map<String, Map<Bauteil, Int>>,
     anleihen: Iterable<AnleiheAnzeige>,
-//    runden: List<Runde>,
 ) {
     val currentRound = selectedRound ?: aktuelleRunde
 

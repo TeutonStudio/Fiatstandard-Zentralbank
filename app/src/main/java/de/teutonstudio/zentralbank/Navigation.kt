@@ -46,8 +46,6 @@ sealed class Screen(val route: String) {
     object NewTrade: Screen(route = "new_trade")
     object NewCredit: Screen(route = "new_credit")
     object NewBuild: Screen(route = "new_build")
-//    object TradeRegister : Screen(route = "trade_register")
-//    object CreditRegister : Screen(route = "credit_register")
 }
 
 @Composable
@@ -125,12 +123,6 @@ fun Navigation(viewModel: GameViewModel) {
                     navController.navigate(route = "new_build")
                     ausgewähltesBauwerk = it
                 }, { spieler, bauteil, wahr ->
-/*                    viewModel.neuesBauwerk(Bauwerk(
-                        viewModel.aktuellesSpielDaten.SpielID,
-                        viewModel.aktuelleRunde,
-                        siedler,
-                        bauwerke,
-                    ))*/
                 }, { (aggressor,verteidiger) ->
                     viewModel.declareWar(aggressor,verteidiger)
                 }, { (aggressor,verteidiger) ->
@@ -153,11 +145,7 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.MarketSaldo.route) {
             Titel(Screen.Game.navigiere(navController)) {
-                zeigeMarktplatz(viewModel.aktuellesSpiel) { /*inputTrade: HandelsDaten ->
-                    viewModel.neuerHandel(inputTrade.copy(runde = viewModel.aktuelleRunde))
-                    println(inputTrade)
-                    navController.navigate(route = Screen.Game.route)*/
-                }
+                zeigeMarktplatz(viewModel.aktuellesSpiel) {}
             }
         }
 
@@ -168,27 +156,10 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.NewTrade.route) {
-            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-/*                CreateTrade(viewModel.playerList.collectAsState().value.map { it.playerName }, viewModel.currentRound, viewModel.marketPrices) { trade ->
-                    viewModel.newTrade(trade)
-                    navController.navigate(route = Screen.Game.route)
-                }*/
-//                EditTrade(
-//                    trade = Trade(-1,viewModel.currentGame.GameID,viewModel.currentRound,"","",0,"",0f),
-//                    viewModel.currentRound, viewModel.marketPrices[viewModel.currentRound-1], viewModel.playerList.collectAsState().value
-//                ) { inputTrade: Trade ->
-//                    viewModel.newTrade(inputTrade)
-//                    println(inputTrade)
-//                    navController.navigate(route = Screen.Game.route)
-//                }
-            } }
+            Titel(Screen.Game.navigiere(navController)) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {}
+            }
         }
-
-//        composable(route = Screen.PriceIndex.route) {
-//            CZBScrenn(spielMenü) {
-//                ShowPreisindex(viewModel.marketPrices)
-//            }
-//        }
 
         composable(route = Screen.NewCredit.route) {
             Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -208,12 +179,9 @@ fun Navigation(viewModel: GameViewModel) {
         }
 
         composable(route = Screen.NewBuild.route) {
-            Titel(Screen.Game.navigiere(navController)) { Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-/*                EditBuild(viewModel.currentRound, viewModel.playerList.collectAsState().value, ausgewähltesBauwerk) { build ->
-                    viewModel.newBuild(build)
-                    navController.navigate(route = "player_saldo")
-                }*/
-            } }
+            Titel(Screen.Game.navigiere(navController)) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
+            }
         }
     }
 }

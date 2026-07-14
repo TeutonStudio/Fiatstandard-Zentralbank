@@ -34,7 +34,6 @@ fun List<EnumMap<Rohstoffe,Int>>.sum(): EnumMap<Rohstoffe,Int> = Rohstoffe.assoc
 fun List<EnumMap<Rohstoffe, Zahlungsmittel>>.toBauteilPreis(): List<Map<Bauteil, Zahlungsmittel>> = this.map { Bauteil.entries.associateWith { b -> b.zuPreis(it) } }
 
 fun  List<Map<out JuristischePerson, Zahlungsmittel>>.toY(spieler: String): List<Int> = this.map { it.toList().find { it.first.name == spieler }?.second?.toIntOderNull() ?: 0 }
-// fun List<Map<Spieler, Zahlungsmittel>>.toY(spieler: String): List<Int> = (this as List<Map<JuristischePerson, Zahlungsmittel>>).toY(spieler)
 
 @JvmName("listOfMapBauteilAndInt_toSum")
 fun List<Map<Bauteil,Int>>.sum(): Map<Bauteil,Int> = Bauteil.entries.associateWith { key -> this.sumOf { it[key] ?: 0 } }

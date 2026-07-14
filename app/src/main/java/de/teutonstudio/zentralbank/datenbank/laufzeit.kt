@@ -286,8 +286,6 @@ class Spieler(
     private val cache: MutableList<Map<out Bauteil,Int>> = mutableListOf()
     init { List(max(gebaut.size, kontrolle.size)) { cache.add(baueCache(it,cache)) } }
 
-//    public fun erhalteNamen(): String = name
-
     public fun erhalteBauteilSaldoZurRunde(runde:Int=cache.lastIndex, bauteil: Bauteil): Int = cache[runde][bauteil]!!
     public fun erhalteBauSaldoZurRunde(runde:Int=cache.lastIndex): Map<out Bauteil,Int> = cache[runde]
 

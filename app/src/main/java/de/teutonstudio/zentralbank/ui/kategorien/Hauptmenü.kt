@@ -8,20 +8,6 @@ import de.teutonstudio.zentralbank.ui.RowOrColumnByOrientation
 import de.teutonstudio.zentralbank.ui.eingabe.ImageCard
 import de.teutonstudio.zentralbank.ui.eingabe.Titel
 
-
-/*
-@Composable
-fun SpielCard(text: String, picture: Int, beiKlick: () -> Unit ) {
-    Card( modifier = Modifier.padding(5.dp), onClick = beiKlick ) {
-        Column( horizontalAlignment = Alignment.CenterHorizontally ) {
-            Image(painter = painterResource(id = picture), contentDescription = null, modifier = Modifier.padding(5.dp))
-            Text(text = text)
-        }
-    }
-}
-*/
-
-
 @Composable
 fun Hauptmenü(beiNeu: () -> Unit, beiLade: () -> Unit) {
     Titel { RowOrColumnByOrientation(
