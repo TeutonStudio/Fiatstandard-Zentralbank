@@ -367,13 +367,28 @@ open class Spiel(
         List(aktuelleRunde) { runde -> cache.add(baueCache(runde)) }
     }
 
-    fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
-        handel.erhalteHandelsverlauf(spieler)
+    fun erhalteHandelsverlauf(person: JuristischePerson): List<SpielerHandelseintrag> =
+        handel.erhalteHandelsverlauf(person)
 
     fun erhalteRohstoffHandelsstueckDifferenz(
-        spieler: Spieler,
+        person: JuristischePerson,
+    ): List<Map<Rohstoffe, Int>> = erhalteRohstoffHandelsdifferenz(
+        person = person,
+        wert = RohstoffHandel::anzahl,
+    )
+
+    fun erhalteRohstoffHandelsmarkDifferenz(
+        person: JuristischePerson,
+    ): List<Map<Rohstoffe, Int>> = erhalteRohstoffHandelsdifferenz(
+        person = person,
+        wert = { handel -> handel.betrag.toIntOderNull() ?: 0 },
+    )
+
+    private fun erhalteRohstoffHandelsdifferenz(
+        person: JuristischePerson,
+        wert: (RohstoffHandel) -> Int,
     ): List<Map<Rohstoffe, Int>> {
-        val handelNachRunde = erhalteHandelsverlauf(spieler)
+        val handelNachRunde = erhalteHandelsverlauf(person)
             .mapNotNull { eintrag ->
                 (eintrag.handel as? RohstoffHandel)?.let { handel -> eintrag.runde to handel }
             }
@@ -382,9 +397,9 @@ open class Spiel(
 
         return List(aktuelleRunde) { runde ->
             handelNachRunde[runde].orEmpty().forEach { handel ->
-                val differenz = when (spieler) {
-                    handel.besitzer -> handel.anzahl
-                    handel.erwerber -> -handel.anzahl
+                val differenz = when (person) {
+                    handel.besitzer -> wert(handel)
+                    handel.erwerber -> -wert(handel)
                     else -> 0
                 }
                 kumuliert[handel.rohstoff] = kumuliert.getValue(handel.rohstoff) + differenz
@@ -718,11 +733,11 @@ data class Handelsregister(
 
     public fun jeHandelZurRunde(runde:Int,jeHandel:(Handel) -> Unit) = einträge[runde].forEach { jeHandel(it) }
 
-    fun erhalteHandelsverlauf(spieler: Spieler): List<SpielerHandelseintrag> =
+    fun erhalteHandelsverlauf(person: JuristischePerson): List<SpielerHandelseintrag> =
         einträge.flatMapIndexed { runde, handelsmenge ->
             handelsmenge.mapNotNull { handel ->
                 if (handel.erhalteBetrag() == Zahlungsmittel()) return@mapNotNull null
-                when (spieler) {
+                when (person) {
                     handel.besitzer -> SpielerHandelseintrag(
                         runde = runde,
                         handel = handel,

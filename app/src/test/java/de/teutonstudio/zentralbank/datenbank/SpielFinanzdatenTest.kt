@@ -386,6 +386,58 @@ class SpielFinanzdatenTest {
     }
 
     @Test
+    fun rohstoffHandelsdifferenzNachStueckUndMarkZeigtAuslandInvertiert() {
+        val spiel = neuesSpiel(anna to 100.toZahlungsmittel())
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = anna,
+                    erwerber = Ausland,
+                    betrag = 12.toZahlungsmittel(),
+                    anzahl = 3,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                RohstoffHandel(
+                    besitzer = Ausland,
+                    erwerber = anna,
+                    betrag = 5.toZahlungsmittel(),
+                    anzahl = 1,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        assertEquals(
+            listOf(0, 3, 2),
+            spiel.erhalteRohstoffHandelsstueckDifferenz(anna)
+                .map { differenz -> differenz.getValue(Rohstoffe.HOLZ) },
+        )
+        assertEquals(
+            listOf(0, -3, -2),
+            spiel.erhalteRohstoffHandelsstueckDifferenz(Ausland)
+                .map { differenz -> differenz.getValue(Rohstoffe.HOLZ) },
+        )
+        assertEquals(
+            listOf(0, 12, 7),
+            spiel.erhalteRohstoffHandelsmarkDifferenz(anna)
+                .map { differenz -> differenz.getValue(Rohstoffe.HOLZ) },
+        )
+        assertEquals(
+            listOf(0, -12, -7),
+            spiel.erhalteRohstoffHandelsmarkDifferenz(Ausland)
+                .map { differenz -> differenz.getValue(Rohstoffe.HOLZ) },
+        )
+    }
+
+    @Test
     fun bearbeitbarerWarenkorbAendertPreisinflationswarenkorbNicht() {
         val spiel = neuesSpiel(anna to 100.toZahlungsmittel())
         val preisinflationswarenkorb = spiel.preisinflationswarenkorb

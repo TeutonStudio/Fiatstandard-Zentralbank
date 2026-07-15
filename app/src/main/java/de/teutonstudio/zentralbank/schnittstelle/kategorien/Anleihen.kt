@@ -440,12 +440,12 @@ private fun GlobalBalanceChart(
     val legende = listOf(
         DiagrammLegendenEintrag(
             id = "spieler-barvermoegen",
-            bezeichnung = "Spieler-Barvermögen (ohne Ausland)",
+            bezeichnung = "Spieler-Barvermögen",
             farbe = Color(0xFF90A4AE),
         ),
         DiagrammLegendenEintrag(
             id = "global-barvermoegen",
-            bezeichnung = "Globales Barvermögen (mit Ausland)",
+            bezeichnung = "Globales Barvermögen",
             farbe = Color(0xFF607D8B),
         ),
         DiagrammLegendenEintrag(

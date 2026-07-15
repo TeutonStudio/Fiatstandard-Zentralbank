@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,6 +14,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +39,7 @@ import com.patrykandpatrick.vico.compose.cartesian.Zoom
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
@@ -53,11 +54,14 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Bauteil
+import de.teutonstudio.zentralbank.datenbank.Ausland
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.HandelsDaten
 import de.teutonstudio.zentralbank.datenbank.Handelslinie
+import de.teutonstudio.zentralbank.datenbank.JuristischePerson
 import de.teutonstudio.zentralbank.datenbank.Spiel
+import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
@@ -75,18 +79,26 @@ import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPla
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegendenStatus
-import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
 private enum class MarktpreisKategorie(val titel: String) {
-    ROHSTOFFE("Alle Rohstoffe"),
-    BAUWERKE("Alle Bauwerke"),
-    WARENKORB("Warenkorb"),
+    HANDELSGUETER("Alle Handelsgüter"),
     HANDELSDIFFERENZ("Handelsdifferenz"),
 }
 
 private enum class WarenkorbReihe {
-    WARENKORB,
     PREISINFLATIONSKORB,
+    WARENKORB,
+}
+
+private enum class HandelsdifferenzEinheit(
+    val titel: String,
+    val achsenEinheit: String,
+) {
+    STUECK("Stk", "Stk"),
+    MARK("Mark", "M"),
 }
 
 private val warenkorbMarktfarbe = Color(0xFF75658A)
@@ -97,35 +109,33 @@ private fun List<Map<Rohstoffe, Zahlungsmittel>>.zuWarenkorbpreisen(
     preisinflationswarenkorb: Map<Rohstoffe, Int>,
 ): List<Map<WarenkorbReihe, Zahlungsmittel>> = map { preise ->
     mapOf(
-        WarenkorbReihe.WARENKORB to warenkorb.entries.summeGeld { (rohstoff, anzahl) ->
-            (preise[rohstoff] ?: Zahlungsmittel()) * anzahl
-        },
         WarenkorbReihe.PREISINFLATIONSKORB to
             preisinflationswarenkorb.entries.summeGeld { (rohstoff, anzahl) ->
                 (preise[rohstoff] ?: Zahlungsmittel()) * anzahl
             },
+        WarenkorbReihe.WARENKORB to warenkorb.entries.summeGeld { (rohstoff, anzahl) ->
+            (preise[rohstoff] ?: Zahlungsmittel()) * anzahl
+        },
     )
 }
 
 @Composable
-private fun <A> List<Map<A, Zahlungsmittel>>.toChart(args: List<A>): CartesianChartModel =
-    remember(this, args) {
+private fun List<List<Int>>.zuLinienChart(): CartesianChartModel =
+    remember(this) {
         CartesianChartModel(
             LineCartesianLayerModel.build {
-                args.forEach { arg ->
+                forEach { werte ->
                     series(
-                        x = indices.toList(),
-                        y = map { preisMap ->
-                            preisMap[arg]?.toIntOderNull() ?: 0
-                        },
+                        x = werte.indices.toList(),
+                        y = werte,
                     )
                 }
             }
         )
-    }
+}
 
 @Composable
-private fun List<Map<Rohstoffe, Int>>.zuStueckChart(
+private fun List<Map<Rohstoffe, Int>>.zuDifferenzChart(
     rohstoffe: List<Rohstoffe>,
 ): CartesianChartModel = remember(this, rohstoffe) {
     CartesianChartModel(
@@ -140,6 +150,26 @@ private fun List<Map<Rohstoffe, Int>>.zuStueckChart(
     )
 }
 
+private fun <A> List<Map<A, Zahlungsmittel>>.werteFuer(arg: A): List<Int> =
+    map { werte -> werte[arg]?.toIntOderNull() ?: 0 }
+
+private fun handelsdifferenzAchsenFormatter(
+    einheit: HandelsdifferenzEinheit,
+) = CartesianValueFormatter { _, value, _ ->
+    val betrag = abs(value)
+    val gerundet = betrag.roundToLong()
+    val betragText = if (abs(betrag - gerundet) < 0.0001) {
+        gerundet.toString()
+    } else {
+        String.format(Locale.GERMANY, "%.1f", betrag)
+    }
+    when {
+        value > 0.0 -> "Export $betragText ${einheit.achsenEinheit}"
+        value < 0.0 -> "Import $betragText ${einheit.achsenEinheit}"
+        else -> "0 ${einheit.achsenEinheit}"
+    }
+}
+
 @Composable
 fun zeigeMarktplatz(
     spiel: Spiel,
@@ -148,7 +178,10 @@ fun zeigeMarktplatz(
 ) {
     val isBilanzExpanded = remember { mutableStateOf(true) }
 
-    var marktpreisKategorie by remember { mutableStateOf(MarktpreisKategorie.ROHSTOFFE) }
+    var marktpreisKategorie by remember { mutableStateOf(MarktpreisKategorie.HANDELSGUETER) }
+    var handelsdifferenzEinheit by remember {
+        mutableStateOf(HandelsdifferenzEinheit.STUECK)
+    }
     var warenkorbDialogOffen by remember { mutableStateOf(false) }
     val isBuying = remember { mutableStateOf(false) }
     val isSelling = remember { mutableStateOf(false) }
@@ -189,53 +222,68 @@ fun zeigeMarktplatz(
                         preisinflationswarenkorb = spiel.preisinflationswarenkorb,
                     )
                 }
-                val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
-                val spielerLegende = spiel.spielerListe.map { spieler ->
+                val rohstoffLegende = rohstoffe.map { rohstoff ->
                     DiagrammLegendenEintrag(
-                        id = "handelsdifferenz-spieler:${spieler.name}",
-                        bezeichnung = spieler.name,
-                        farbe = spielerFarben.getValue(spieler),
+                        id = "rohstoff:${rohstoff.name}",
+                        bezeichnung = rohstoff.str,
+                        farbe = rohstoff.farbe,
+                    )
+                }
+                val bauwerkLegende = bauwerke.map { bauwerk ->
+                    DiagrammLegendenEintrag(
+                        id = "bauwerk:${bauwerk.str}",
+                        bezeichnung = bauwerk.str,
+                        farbe = bauwerk.farbe,
+                    )
+                }
+                val warenkorbLegende = listOf(
+                    DiagrammLegendenEintrag(
+                        id = "preisinflationswarenkorb",
+                        bezeichnung = "Preisinflationswarenkorb",
+                        farbe = preisinflationswarenkorbFarbe,
+                    ),
+                    DiagrammLegendenEintrag(
+                        id = "warenkorb",
+                        bezeichnung = "Warenkorb",
+                        farbe = warenkorbMarktfarbe,
+                    ),
+                )
+                val handelsgueterLegende = rohstoffLegende + bauwerkLegende + warenkorbLegende
+                val handelsgueterWerte = remember(
+                    spiel.marktpreise,
+                    spiel.bauwerkMarktpreise,
+                    warenkorbpreise,
+                ) {
+                    rohstoffe.map { rohstoff -> spiel.marktpreise.werteFuer(rohstoff) } +
+                        bauwerke.map { bauwerk -> spiel.bauwerkMarktpreise.werteFuer(bauwerk) } +
+                        warenkorbReihen.map { reihe -> warenkorbpreise.werteFuer(reihe) }
+                }
+                val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
+                val handelspersonen: List<JuristischePerson> =
+                    spiel.spielerListe.map { spieler -> spieler as JuristischePerson } + Ausland
+                val spielerLegende = handelspersonen.map { person ->
+                    DiagrammLegendenEintrag(
+                        id = "handelsdifferenz-spieler:${person.name}",
+                        bezeichnung = person.name,
+                        farbe = when (person) {
+                            is Spieler -> spielerFarben.getValue(person)
+                            Ausland -> Color(0xFF455A64)
+                            else -> Color.Gray
+                        },
                     )
                 }
                 val spielerLegendenStatus = rememberExklusivenDiagrammLegendenStatus(spielerLegende)
-                val ausgewaehlterSpieler = spielerLegende
+                val ausgewaehlteHandelsperson = spielerLegende
                     .firstOrNull { eintrag -> spielerLegendenStatus.istSichtbar(eintrag.id) }
                     ?.let { eintrag ->
-                        spiel.spielerListe.firstOrNull { spieler ->
-                            eintrag.id == "handelsdifferenz-spieler:${spieler.name}"
+                        handelspersonen.firstOrNull { person ->
+                            eintrag.id == "handelsdifferenz-spieler:${person.name}"
                         }
                     }
 
                 val legende = when (marktpreisKategorie) {
-                    MarktpreisKategorie.ROHSTOFFE,
-                    MarktpreisKategorie.HANDELSDIFFERENZ -> rohstoffe.map { rohstoff ->
-                        DiagrammLegendenEintrag(
-                            id = "rohstoff:${rohstoff.name}",
-                            bezeichnung = rohstoff.str,
-                            farbe = rohstoff.farbe,
-                        )
-                    }
-
-                    MarktpreisKategorie.BAUWERKE -> bauwerke.map { bauwerk ->
-                        DiagrammLegendenEintrag(
-                            id = "bauwerk:${bauwerk.str}",
-                            bezeichnung = bauwerk.str,
-                            farbe = bauwerk.farbe,
-                        )
-                    }
-
-                    MarktpreisKategorie.WARENKORB -> listOf(
-                        DiagrammLegendenEintrag(
-                            id = "warenkorb",
-                            bezeichnung = "Warenkorb",
-                            farbe = warenkorbMarktfarbe,
-                        ),
-                        DiagrammLegendenEintrag(
-                            id = "preisinflationswarenkorb",
-                            bezeichnung = "Preisinflationswarenkorb",
-                            farbe = preisinflationswarenkorbFarbe,
-                        ),
-                    )
+                    MarktpreisKategorie.HANDELSGUETER -> handelsgueterLegende
+                    MarktpreisKategorie.HANDELSDIFFERENZ -> rohstoffLegende
                 }
 
                 val legendenStatus = rememberDiagrammLegendenStatus(legende)
@@ -247,22 +295,21 @@ fun zeigeMarktplatz(
                     null
                 } else {
                     when (marktpreisKategorie) {
-                        MarktpreisKategorie.ROHSTOFFE -> spiel.marktpreise.toChart(
-                            sichtbareIndizes.map(rohstoffe::get)
-                        )
+                        MarktpreisKategorie.HANDELSGUETER -> sichtbareIndizes
+                            .map(handelsgueterWerte::get)
+                            .zuLinienChart()
 
-                        MarktpreisKategorie.BAUWERKE -> spiel.bauwerkMarktpreise.toChart(
-                            sichtbareIndizes.map(bauwerke::get)
-                        )
-
-                        MarktpreisKategorie.WARENKORB -> warenkorbpreise.toChart(
-                            sichtbareIndizes.map(warenkorbReihen::get)
-                        )
-
-                        MarktpreisKategorie.HANDELSDIFFERENZ -> ausgewaehlterSpieler
-                            ?.let { spieler ->
-                                spiel.erhalteRohstoffHandelsstueckDifferenz(spieler)
-                                    .zuStueckChart(sichtbareIndizes.map(rohstoffe::get))
+                        MarktpreisKategorie.HANDELSDIFFERENZ -> ausgewaehlteHandelsperson
+                            ?.let { person ->
+                                val differenz = when (handelsdifferenzEinheit) {
+                                    HandelsdifferenzEinheit.STUECK ->
+                                        spiel.erhalteRohstoffHandelsstueckDifferenz(person)
+                                    HandelsdifferenzEinheit.MARK ->
+                                        spiel.erhalteRohstoffHandelsmarkDifferenz(person)
+                                }
+                                differenz.zuDifferenzChart(
+                                    sichtbareIndizes.map(rohstoffe::get)
+                                )
                             }
                     }
                 }
@@ -299,6 +346,21 @@ fun zeigeMarktplatz(
                                 )
                             }
                         }
+                        if (marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ) {
+                            FlowRow(
+                                modifier = ModiPad5,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                HandelsdifferenzEinheit.entries.forEach { einheit ->
+                                    FilterChip(
+                                        selected = handelsdifferenzEinheit == einheit,
+                                        onClick = { handelsdifferenzEinheit = einheit },
+                                        label = { Text(einheit.titel) },
+                                    )
+                                }
+                            }
+                        }
 
                         if (chartModel == null) {
                             Text(
@@ -321,8 +383,17 @@ fun zeigeMarktplatz(
                                             )
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
-                                            valueFormatter = stueckAchsenFormatter,
-                                            itemPlacer = ganzzahligerStueckAchsenItemPlacer,
+                                            valueFormatter = handelsdifferenzAchsenFormatter(
+                                                handelsdifferenzEinheit
+                                            ),
+                                            itemPlacer = if (
+                                                handelsdifferenzEinheit ==
+                                                HandelsdifferenzEinheit.STUECK
+                                            ) {
+                                                ganzzahligerStueckAchsenItemPlacer
+                                            } else {
+                                                VerticalAxis.ItemPlacer.step()
+                                            },
                                         ),
                                         bottomAxis = HorizontalAxis.rememberBottom(),
                                     ),
@@ -353,18 +424,29 @@ fun zeigeMarktplatz(
                             }
                         }
 
-                        if (marktpreisKategorie == MarktpreisKategorie.BAUWERKE) {
+                        if (marktpreisKategorie == MarktpreisKategorie.HANDELSGUETER) {
                             val gruppen = listOf(
+                                "Rohstoffe" to rohstoffLegende.map { it.id }.toSet(),
                                 "Land" to Wirtschaftsregionen.entries.map { "bauwerk:${it.str}" }.toSet(),
                                 "Ecken" to Verwaltungsstandort.entries.map { "bauwerk:${it.str}" }.toSet(),
                                 "Linien" to Handelslinie.entries.map { "bauwerk:${it.str}" }.toSet(),
+                                "Warenkörbe" to warenkorbLegende.map { it.id }.toSet(),
                             )
                             gruppen.forEach { (titel, ids) ->
+                                val istWarenkorbGruppe = titel == "Warenkörbe"
                                 Text(
                                     text = titel,
                                     fontWeight = FontWeight.SemiBold,
                                     modifier = Modifier.padding(start = 12.dp, top = 4.dp),
                                 )
+                                if (istWarenkorbGruppe) {
+                                    TextButton(
+                                        onClick = { warenkorbDialogOffen = true },
+                                        modifier = Modifier.padding(start = 4.dp),
+                                    ) {
+                                        Text("Warenkorb bearbeiten")
+                                    }
+                                }
                                 UmschaltbareDiagrammLegende(
                                     eintraege = legende.filter { eintrag -> eintrag.id in ids },
                                     status = legendenStatus,
@@ -374,47 +456,11 @@ fun zeigeMarktplatz(
                             UmschaltbareDiagrammLegende(
                                 eintraege = legende,
                                 status = legendenStatus,
-                                beiKlick = if (marktpreisKategorie == MarktpreisKategorie.WARENKORB) {
-                                    { eintrag ->
-                                        if (eintrag.id == "warenkorb") {
-                                            warenkorbDialogOffen = true
-                                        } else {
-                                            legendenStatus.umschalten(eintrag.id)
-                                        }
-                                    }
-                                } else {
-                                    null
-                                },
-                                beiLangemKlick = if (marktpreisKategorie == MarktpreisKategorie.WARENKORB) {
-                                    { eintrag ->
-                                        if (eintrag.id == "warenkorb") {
-                                            warenkorbDialogOffen = true
-                                        } else {
-                                            legendenStatus.nurAnzeigen(eintrag.id)
-                                        }
-                                    }
-                                } else {
-                                    null
-                                },
-                                klickBeschreibung = if (
-                                    marktpreisKategorie == MarktpreisKategorie.WARENKORB
-                                ) {
-                                    "Warenkorb bearbeiten oder Datenreihe umschalten"
-                                } else {
-                                    "Datenreihe ein- oder ausblenden"
-                                },
-                                langerKlickBeschreibung = if (
-                                    marktpreisKategorie == MarktpreisKategorie.WARENKORB
-                                ) {
-                                    "Warenkorb bearbeiten oder Datenreihe einzeln anzeigen"
-                                } else {
-                                    "Nur diese Datenreihe anzeigen"
-                                },
                             )
                         }
                         if (marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ) {
                             Text(
-                                text = "Spieler",
+                                text = "Spieler / Ausland",
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(start = 12.dp, top = 4.dp),
                             )
@@ -427,8 +473,8 @@ fun zeigeMarktplatz(
                                 beiLangemKlick = { eintrag ->
                                     spielerLegendenStatus.nurAnzeigen(eintrag.id)
                                 },
-                                klickBeschreibung = "Spieler auswählen",
-                                langerKlickBeschreibung = "Spieler auswählen",
+                                klickBeschreibung = "Spieler oder Ausland auswählen",
+                                langerKlickBeschreibung = "Spieler oder Ausland auswählen",
                             )
                         }
                     }
