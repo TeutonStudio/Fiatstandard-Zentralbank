@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
@@ -82,6 +83,8 @@ import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
+
+private val spielerKartenMindestbreite = 340.dp
 
 @Composable
 fun SpielerBilanz(
@@ -210,7 +213,7 @@ fun zeigeSpieler(
         ) {
             SpielerBilanz(spiel.spielerSaldo)
             VerticalGrid(
-                columns = SimpleGridCells.Adaptive(225.dp),
+                columns = SimpleGridCells.Adaptive(spielerKartenMindestbreite),
                 horizontalArrangement = Arrangement.Center,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -505,7 +508,10 @@ fun zeigeSpielerDaten(
     }
 
     Card(
-        modifier = ModiPad5,
+        modifier = Modifier
+            .padding(5.dp)
+            .widthIn(min = spielerKartenMindestbreite)
+            .fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = siedlerFarbe,
             contentColor = siedlerFarbe.lesbareSchriftfarbe(),
@@ -518,10 +524,8 @@ fun zeigeSpielerDaten(
             }
         },
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize().offset(20.dp, 0.dp)
-        ) {
-            Column(modifier = Modifier.width(280.dp)) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 VerticalGrid(
                     columns = SimpleGridCells.Fixed(2),
                     modifier = ModiPad5,
@@ -529,7 +533,7 @@ fun zeigeSpielerDaten(
                     Text(
                         text = siedlerName,
                         fontSize = 20.sp,
-                        modifier = ModiPad5.span(2).offset((-25).dp, 0.dp),
+                        modifier = ModiPad5.span(2),
                         textAlign = TextAlign.Center
                     )
 
