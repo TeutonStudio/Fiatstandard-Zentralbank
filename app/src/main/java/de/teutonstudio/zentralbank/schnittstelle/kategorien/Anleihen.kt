@@ -128,6 +128,11 @@ private data class SchuldenDiagrammReihe(
     val werte: List<Int>,
 )
 
+internal fun <T> List<T>.bisRundeFortgeschrieben(letzteRunde: Int): List<T> {
+    if (isEmpty() || lastIndex >= letzteRunde) return this
+    return this + List(letzteRunde - lastIndex) { last() }
+}
+
 internal data class AnleiheZinsvergleich(
     val leitzins: Double,
     val anleihenzins: Double,
@@ -253,6 +258,25 @@ private fun exponentiellerMarkAchsenFormatter(
 }
 
 @Composable
+private fun SchuldenGraphTabAuswahl(
+    ausgewählterTab: SchuldenGraphTab,
+    onTabAuswahl: (SchuldenGraphTab) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SchuldenGraphTab.entries.forEach { tab ->
+            FilterChip(
+                selected = ausgewählterTab == tab,
+                onClick = { onTabAuswahl(tab) },
+                label = { Text(tab.titel) },
+            )
+        }
+    }
+}
+
+@Composable
 fun Header(
     modifierChoseLegende: Modifier = Modifier.scale(.75f),
     modifierChoseLabel: Modifier = Modifier.scale(1.1f),
@@ -283,26 +307,35 @@ fun Header(
                 anleihen = spiel.anleihen,
             )
         } else {
-            Row(
-                modifier = ModiPad5,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SchuldenGraphTab.entries.forEach { tab ->
-                    FilterChip(
-                        selected = graphTab == tab,
-                        onClick = { graphTab = tab },
-                        label = { Text(tab.titel) },
+            val globaleAnsicht = ausgewählterSpieler == GLOBAL_PLAYER
+            val angezeigterGraphTab = if (globaleAnsicht) {
+                graphTab
+            } else {
+                SchuldenGraphTab.BILANZ
+            }
+            val tabAuswahl: (@Composable () -> Unit)? = if (globaleAnsicht) {
+                {
+                    SchuldenGraphTabAuswahl(
+                        ausgewählterTab = graphTab,
+                        onTabAuswahl = { graphTab = it },
                     )
                 }
+            } else {
+                null
             }
-            when (graphTab) {
+
+            when (angezeigterGraphTab) {
                 SchuldenGraphTab.BILANZ -> BalanceChart(
                     spiel = spiel,
                     ausgewählterSpieler = ausgewählterSpieler,
                     yAchsenExponent = yAchsenExponent,
                     onYAchsenExponentChange = { yAchsenExponent = it },
+                    tabAuswahl = tabAuswahl,
                 )
-                SchuldenGraphTab.ZINSEN_UND_EMISSIONEN -> LeitzinsEmissionenChart(spiel)
+                SchuldenGraphTab.ZINSEN_UND_EMISSIONEN -> LeitzinsEmissionenChart(
+                    spiel = spiel,
+                    tabAuswahl = tabAuswahl,
+                )
             }
         }
 
@@ -327,11 +360,25 @@ fun Header(
 }
 
 @Composable
+private fun SchuldenGraphHinweisCard(
+    text: String,
+    tabAuswahl: (@Composable () -> Unit)?,
+) {
+    Card(modifier = ModiPad5) {
+        Column(modifier = ModiPad5) {
+            tabAuswahl?.invoke()
+            Text(text = text, modifier = ModiPad5)
+        }
+    }
+}
+
+@Composable
 private fun BalanceChart(
     spiel: Spiel,
     ausgewählterSpieler: String,
     yAchsenExponent: Float,
     onYAchsenExponentChange: (Float) -> Unit,
+    tabAuswahl: (@Composable () -> Unit)?,
 ) {
     val reihenLängen = listOf(
         spiel.spielerSaldo.size,
@@ -339,12 +386,15 @@ private fun BalanceChart(
         spiel.spielerKombinierteSchulden.size,
     )
     if (reihenLängen.any { länge -> länge == 0 }) {
-        EmptyInfoCard("Keine Bilanzdaten vorhanden.")
+        SchuldenGraphHinweisCard("Keine Bilanzdaten vorhanden.", tabAuswahl)
         return
     }
 
     if (reihenLängen.distinct().size != 1) {
-        EmptyInfoCard("Bilanzdaten haben unterschiedliche Längen.")
+        SchuldenGraphHinweisCard(
+            "Bilanzdaten haben unterschiedliche Längen.",
+            tabAuswahl,
+        )
         return
     }
 
@@ -353,12 +403,13 @@ private fun BalanceChart(
             spiel = spiel,
             yAchsenExponent = yAchsenExponent,
             onYAchsenExponentChange = onYAchsenExponentChange,
+            tabAuswahl = tabAuswahl,
         )
         return
     }
 
-    val historischeRunden = List(spiel.aktuelleRunde) { it }
-    val schuldenRunden = spiel.schuldenProjektionsrunden
+    val prognoseRunden = spiel.schuldenProjektionsrunden
+    val letztePrognoseRunde = spiel.letzteSchuldenProjektionsrunde
     val zeitpunkt = spiel.aktuellerZeitpunkt
     val modelProducer = remember { CartesianChartModelProducer() }
     val spieler = spiel.spielerListe.firstOrNull { it.name == ausgewählterSpieler }
@@ -383,18 +434,21 @@ private fun BalanceChart(
     val reihen = listOf(
         SchuldenDiagrammReihe(
             legende[0],
-            historischeRunden,
-            spiel.spielerSaldo.toY(ausgewählterSpieler),
+            prognoseRunden,
+            spiel.spielerSaldo.toY(ausgewählterSpieler)
+                .bisRundeFortgeschrieben(letztePrognoseRunde),
         ),
         SchuldenDiagrammReihe(
             legende[1],
-            historischeRunden,
-            spiel.spielerMarktwert.toY(ausgewählterSpieler),
+            prognoseRunden,
+            spiel.spielerMarktwert.toY(ausgewählterSpieler)
+                .bisRundeFortgeschrieben(letztePrognoseRunde),
         ),
         SchuldenDiagrammReihe(
             legende[2],
-            schuldenRunden,
-            spiel.spielerKombinierteSchuldenMitProjektion.toY(ausgewählterSpieler),
+            prognoseRunden,
+            spiel.spielerKombinierteSchuldenMitProjektion.toY(ausgewählterSpieler)
+                .bisRundeFortgeschrieben(letztePrognoseRunde),
         ),
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
@@ -426,6 +480,7 @@ private fun BalanceChart(
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
+            tabAuswahl?.invoke()
             if (sichtbareReihen.isEmpty()) {
                 Text(
                     text = "Keine Datenreihe ausgewählt",
@@ -473,18 +528,26 @@ private fun GlobalBalanceChart(
     spiel: Spiel,
     yAchsenExponent: Float,
     onYAchsenExponentChange: (Float) -> Unit,
+    tabAuswahl: (@Composable () -> Unit)?,
 ) {
-    val spielerBarvermögen = spiel.spielerBarvermögen.map { it.toIntOderNull() ?: 0 }
-    val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
+    val letztePrognoseRunde = spiel.letzteSchuldenProjektionsrunde
+    val prognoseRunden = spiel.schuldenProjektionsrunden
+    val spielerBarvermögen = spiel.spielerBarvermögen
+        .map { it.toIntOderNull() ?: 0 }
+        .bisRundeFortgeschrieben(letztePrognoseRunde)
+    val globalesBarvermögen = spiel.globalesBarvermögen
+        .map { it.toIntOderNull() ?: 0 }
+        .bisRundeFortgeschrieben(letztePrognoseRunde)
     val globaleSchulden = spiel.globaleKombinierteSchuldenMitProjektion
         .map { it.toIntOderNull() ?: 0 }
-    val zinsgewinne = spiel.bankZinsgewinneMitProjektion.map { it.toIntOderNull() ?: 0 }
-    val historischeRunden = globalesBarvermögen.indices.toList()
-    val schuldenRunden = spiel.schuldenProjektionsrunden
+        .bisRundeFortgeschrieben(letztePrognoseRunde)
+    val zinsgewinne = spiel.bankZinsgewinneMitProjektion
+        .map { it.toIntOderNull() ?: 0 }
+        .bisRundeFortgeschrieben(letztePrognoseRunde)
     val zeitpunkt = spiel.aktuellerZeitpunkt
 
-    if (historischeRunden.isEmpty()) {
-        EmptyInfoCard("Keine globalen Bilanzwerte vorhanden.")
+    if (globalesBarvermögen.isEmpty()) {
+        SchuldenGraphHinweisCard("Keine globalen Bilanzwerte vorhanden.", tabAuswahl)
         return
     }
 
@@ -512,10 +575,10 @@ private fun GlobalBalanceChart(
         ),
     )
     val reihen = listOf(
-        SchuldenDiagrammReihe(legende[0], historischeRunden, spielerBarvermögen),
-        SchuldenDiagrammReihe(legende[1], historischeRunden, globalesBarvermögen),
-        SchuldenDiagrammReihe(legende[2], schuldenRunden, globaleSchulden),
-        SchuldenDiagrammReihe(legende[3], schuldenRunden, zinsgewinne),
+        SchuldenDiagrammReihe(legende[0], prognoseRunden, spielerBarvermögen),
+        SchuldenDiagrammReihe(legende[1], prognoseRunden, globalesBarvermögen),
+        SchuldenDiagrammReihe(legende[2], prognoseRunden, globaleSchulden),
+        SchuldenDiagrammReihe(legende[3], prognoseRunden, zinsgewinne),
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
     val sichtbareReihen = reihen.filter { reihe ->
@@ -546,6 +609,7 @@ private fun GlobalBalanceChart(
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
+            tabAuswahl?.invoke()
             if (sichtbareReihen.isEmpty()) {
                 Text(
                     text = "Keine Datenreihe ausgewählt",
@@ -595,9 +659,12 @@ private data class EmissionsZinsBalken(
 )
 
 @Composable
-private fun LeitzinsEmissionenChart(spiel: Spiel) {
+private fun LeitzinsEmissionenChart(
+    spiel: Spiel,
+    tabAuswahl: (@Composable () -> Unit)?,
+) {
     val zeitpunkt = spiel.aktuellerZeitpunkt
-    val leitzinsWerte = List(spiel.aktuelleRunde) { runde ->
+    val leitzinsWerte = List(spiel.letzteSchuldenProjektionsrunde + 1) { runde ->
         spiel.leitzinssatz(runde) ?: spiel.aktuellerLeitzinssatz
     }
     val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
@@ -691,6 +758,7 @@ private fun LeitzinsEmissionenChart(spiel: Spiel) {
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
+            tabAuswahl?.invoke()
             Text(
                 text = "Leitzins und Anleihenzins bei Emission",
                 fontSize = 18.sp,
