@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.datenbank.Anleihe
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
+import de.teutonstudio.zentralbank.datenbank.AnleiheStatus
 import de.teutonstudio.zentralbank.datenbank.Anleihenhandel
 import de.teutonstudio.zentralbank.datenbank.Ausland
 import de.teutonstudio.zentralbank.datenbank.Geschäftsbank
@@ -143,7 +144,7 @@ fun HandelDialog(
     val aktuelleRunde = (spiel.aktuelleRunde - 1).coerceAtLeast(0)
     val handelbareAnleihen = spiel.anleihen
         .filter { eintrag ->
-            eintrag.faelligkeit > aktuelleRunde &&
+            spiel.erhalteAnleiheStatus(eintrag) == AnleiheStatus.OFFEN &&
                 aktuelleRunde !in eintrag.handelsverlauf
         }
         .sortedWith(
@@ -317,7 +318,7 @@ fun AnleiheDialog(
             emptyList()
         } else {
             val handelbareAnleihen = spiel.anleihen.filter { eintrag ->
-                eintrag.faelligkeit > aktuelleRunde &&
+                spiel.erhalteAnleiheStatus(eintrag) == AnleiheStatus.OFFEN &&
                     aktuelleRunde !in eintrag.handelsverlauf
             }
             listOf(AnleiheAuswahl(AnleiheVorgang.EMISSION)) +

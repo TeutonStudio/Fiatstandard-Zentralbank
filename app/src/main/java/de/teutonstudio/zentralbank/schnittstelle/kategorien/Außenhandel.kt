@@ -52,9 +52,11 @@ import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPla
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.seriesMitSubrundenPrognose
 
 private data class HafenTarif(
     val bezeichnung: String,
@@ -143,7 +145,14 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
         }
     }
 
-    val chartModel = remember(einheit, werteNachRohstoff, gesamtWerte, sichtbareReihen) {
+    val zeitpunkt = spiel.aktuellerZeitpunkt
+    val chartModel = remember(
+        einheit,
+        werteNachRohstoff,
+        gesamtWerte,
+        sichtbareReihen,
+        zeitpunkt,
+    ) {
         if (sichtbareReihen.isEmpty()) {
             null
         } else {
@@ -154,6 +163,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                             seriesMitGepunkteterAktuellerRunde(
                                 x = werte.indices.toList(),
                                 y = werte,
+                                zeitpunkt = zeitpunkt,
                             )
                         }
                     }
@@ -162,9 +172,10 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                 BilanzEinheit.STUECK -> CartesianChartModel(
                     ColumnCartesianLayerModel.build {
                         sichtbareReihen.forEach { (_, werte) ->
-                            series(
+                            seriesMitSubrundenPrognose(
                                 x = werte.indices.toList(),
                                 y = werte,
+                                zeitpunkt = zeitpunkt,
                             )
                         }
                     }
@@ -213,7 +224,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                             BilanzEinheit.STUECK -> rememberColumnCartesianLayer(
                                 columnProvider = rememberSaeulenMitGepunkteterAktuellerRunde(
                                     eintraege = sichtbareReihen.map { (eintrag, _) -> eintrag },
-                                    aktuelleRundeX = spiel.aktuelleRunde - 1,
+                                    prognoseAbX = zeitpunkt.prognoseAbX,
                                 )
                             )
                         },
@@ -232,7 +243,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                                 VerticalAxis.ItemPlacer.step()
                             },
                         ),
-                        bottomAxis = HorizontalAxis.rememberBottom(),
+                        bottomAxis = rememberRundenachse(zeitpunkt),
                     ),
                     model = chartModel,
                     scrollState = rememberVicoScrollState(),

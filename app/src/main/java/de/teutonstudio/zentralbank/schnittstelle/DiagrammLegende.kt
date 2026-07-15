@@ -84,6 +84,7 @@ fun UmschaltbareDiagrammLegende(
     beiLangemKlick: ((DiagrammLegendenEintrag) -> Unit)? = null,
     klickBeschreibung: String = "Datenreihe ein- oder ausblenden",
     langerKlickBeschreibung: String = "Nur diese Datenreihe anzeigen",
+    interaktiv: Boolean = true,
 ) {
     FlowRow(
         modifier = modifier
@@ -94,20 +95,24 @@ fun UmschaltbareDiagrammLegende(
     ) {
         eintraege.forEach { eintrag ->
             val sichtbar = status.istSichtbar(eintrag.id)
+            val eintragModifier = Modifier.padding(horizontal = 4.dp)
+            val interaktiverModifier = if (interaktiv) {
+                eintragModifier.combinedClickable(
+                    role = if (beiKlick == null) Role.Checkbox else Role.Button,
+                    onClickLabel = klickBeschreibung,
+                    onLongClickLabel = langerKlickBeschreibung,
+                    onClick = {
+                        beiKlick?.invoke(eintrag) ?: status.umschalten(eintrag.id)
+                    },
+                    onLongClick = {
+                        beiLangemKlick?.invoke(eintrag) ?: status.nurAnzeigen(eintrag.id)
+                    },
+                )
+            } else {
+                eintragModifier
+            }
             Surface(
-                modifier = Modifier
-                    .padding(horizontal = 4.dp)
-                    .combinedClickable(
-                        role = if (beiKlick == null) Role.Checkbox else Role.Button,
-                        onClickLabel = klickBeschreibung,
-                        onLongClickLabel = langerKlickBeschreibung,
-                        onClick = {
-                            beiKlick?.invoke(eintrag) ?: status.umschalten(eintrag.id)
-                        },
-                        onLongClick = {
-                            beiLangemKlick?.invoke(eintrag) ?: status.nurAnzeigen(eintrag.id)
-                        },
-                    ),
+                modifier = interaktiverModifier,
                 shape = RoundedCornerShape(8.dp),
                 color = if (sichtbar) {
                     MaterialTheme.colorScheme.secondaryContainer

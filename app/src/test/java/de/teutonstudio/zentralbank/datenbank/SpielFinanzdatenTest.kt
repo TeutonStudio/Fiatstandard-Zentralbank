@@ -448,6 +448,13 @@ class SpielFinanzdatenTest {
                 .erwarteteAnleihenRenditeProzent ?: Float.NaN,
             0.001f,
         )
+        assertEquals(
+            listOf(-2),
+            spiel.erhalteSpielerAblauf(anna)
+                .filter { eintrag -> eintrag.art == SpielerAblaufArt.ZINSZAHLUNG }
+                .map { eintrag -> eintrag.preis.toIntOderNull() },
+        )
+        spiel.aktualisiereAktivenSpieler(bernd.name)
         val emittentenAblauf = spiel.erhalteSpielerAblauf(anna)
         val emission = emittentenAblauf.first { eintrag ->
             eintrag.art == SpielerAblaufArt.ANLEIHE_EMITTIERT
@@ -474,6 +481,73 @@ class SpielFinanzdatenTest {
                 .erwarteteAnleihenRenditeProzent ?: Float.NaN,
             0.001f,
         )
+    }
+
+    @Test
+    fun anleiheStatusFolgtDemEmittentenzugInDerFaelligkeitsrunde() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+            clara to 100.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = bernd,
+            sondervermögen = 40.toZahlungsmittel(),
+            unvermögen = 2.toZahlungsmittel(),
+            laufzeit = 1,
+        )
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            Anleihenhandel(
+                besitzer = bernd,
+                erwerber = Geschäftsbank,
+                anleihe = anleihe,
+                preis = 40.toZahlungsmittel(),
+            )
+        )
+        spiel.beginneNaechsteRunde()
+        spiel.beginneNaechsteRunde()
+        val anzeige = spiel.anleihen.single { eintrag -> eintrag.anleihe == anleihe }
+
+        spiel.aktualisiereAktivenSpieler(anna.name)
+        assertEquals(AnleiheStatus.OFFEN, spiel.erhalteAnleiheStatus(anzeige))
+
+        spiel.aktualisiereAktivenSpieler(bernd.name)
+        assertEquals(AnleiheStatus.FAELLIG, spiel.erhalteAnleiheStatus(anzeige))
+
+        spiel.aktualisiereAktivenSpieler(clara.name)
+        assertEquals(AnleiheStatus.GEZAHLT, spiel.erhalteAnleiheStatus(anzeige))
+    }
+
+    @Test
+    fun spielerAblaufSortiertVorgaengeNachSpielerreihenfolge() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+            clara to 100.toZahlungsmittel(),
+        )
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = clara,
+                erwerber = anna,
+                rohstoff = Rohstoffe.HOLZ,
+                anzahl = 1,
+                betrag = 5.toZahlungsmittel(),
+            )
+        )
+        spiel.fuegeHandelZurAktuellenRundeHinzu(
+            RohstoffHandel(
+                besitzer = bernd,
+                erwerber = anna,
+                rohstoff = Rohstoffe.LEHM,
+                anzahl = 1,
+                betrag = 4.toZahlungsmittel(),
+            )
+        )
+
+        val ablauf = spiel.erhalteSpielerAblauf(anna)
+
+        assertEquals(listOf(bernd.name, clara.name), ablauf.map { it.geschaeftspartner })
+        assertEquals(listOf(1, 2), ablauf.map { it.zugPosition })
     }
 
     @Test

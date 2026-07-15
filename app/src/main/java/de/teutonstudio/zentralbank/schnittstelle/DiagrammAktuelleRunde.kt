@@ -6,6 +6,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.patrykandpatrick.vico.compose.cartesian.axis.Axis
+import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
@@ -16,22 +19,91 @@ import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.LineComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
+import de.teutonstudio.zentralbank.datenbank.SpielZeitpunkt
+import kotlin.math.roundToInt
+
+internal data class DiagrammSubrundenDaten(
+    val x: List<Double>,
+    val y: List<Number>,
+    val prognoseAbX: Double,
+)
+
+internal fun erweitereDiagrammUmSubrunden(
+    x: Collection<Number>,
+    y: Collection<Number>,
+    zeitpunkt: SpielZeitpunkt,
+): DiagrammSubrundenDaten {
+    require(x.size == y.size) { "X- und Y-Werte müssen gleich lang sein." }
+    if (x.isEmpty()) return DiagrammSubrundenDaten(emptyList(), emptyList(), zeitpunkt.prognoseAbX)
+
+    val rundenXWerte = x.map(Number::toDouble)
+    val yWerte = y.toList()
+    val aktuellerRundenIndex = rundenXWerte.indexOfFirst { wert ->
+        wert == zeitpunkt.runde.toDouble()
+    }
+    if (aktuellerRundenIndex < 0 || zeitpunkt.runde == 0) {
+        return DiagrammSubrundenDaten(
+            x = if (zeitpunkt.runde == 0) {
+                rundenXWerte
+            } else {
+                rundenXWerte.map { runde -> runde * zeitpunkt.spielerAnzahl }
+            },
+            y = yWerte,
+            prognoseAbX = if (zeitpunkt.runde == 0) 0.0 else zeitpunkt.prognoseAbX,
+        )
+    }
+
+    val xWerte = rundenXWerte.map { runde -> runde * zeitpunkt.spielerAnzahl }
+
+    val aktuelleRundeY = yWerte[aktuellerRundenIndex]
+    val vorherigeRundeY = yWerte.getOrNull(aktuellerRundenIndex - 1) ?: aktuelleRundeY
+    val neueX = mutableListOf<Double>()
+    val neueY = mutableListOf<Number>()
+
+    xWerte.indices.forEach { index ->
+        if (index != aktuellerRundenIndex) {
+            neueX += xWerte[index]
+            neueY += yWerte[index]
+            return@forEach
+        }
+
+        repeat(zeitpunkt.spielerAnzahl) { spielerIndex ->
+            neueX += zeitpunkt.xNachZug(spielerIndex)
+            neueY += if (spielerIndex < zeitpunkt.aktiverSpielerIndex) {
+                vorherigeRundeY
+            } else {
+                aktuelleRundeY
+            }
+        }
+    }
+
+    return DiagrammSubrundenDaten(
+        x = neueX,
+        y = neueY,
+        prognoseAbX = zeitpunkt.prognoseAbX,
+    )
+}
 
 fun LineCartesianLayerModel.BuilderScope.seriesMitGepunkteterAktuellerRunde(
     x: Collection<Number>,
     y: Collection<Number>,
     aktuelleRundeX: Number? = null,
+    zeitpunkt: SpielZeitpunkt? = null,
 ) {
     require(x.size == y.size) { "X- und Y-Werte müssen gleich lang sein." }
     if (x.isEmpty()) return
 
-    val xWerte = x.toList()
-    val yWerte = y.toList()
-    val aktuelleRunde = (aktuelleRundeX ?: xWerte.last()).toDouble()
-    val aktuellerIndex = xWerte.indexOfLast { wert -> wert.toDouble() <= aktuelleRunde }
-    require(aktuellerIndex >= 0) { "Die aktuelle Runde muss innerhalb der X-Werte liegen." }
-    val historischeAnzahl = aktuellerIndex.coerceAtLeast(1)
-    val gepunkteterStart = (aktuellerIndex - 1).coerceAtLeast(0)
+    val subrundenDaten = zeitpunkt?.let { aktuellerZeitpunkt ->
+        erweitereDiagrammUmSubrunden(x, y, aktuellerZeitpunkt)
+    }
+    val xWerte = subrundenDaten?.x ?: x.toList()
+    val yWerte = subrundenDaten?.y ?: y.toList()
+    val prognoseAbX = subrundenDaten?.prognoseAbX
+        ?: (aktuelleRundeX ?: xWerte.last()).toDouble()
+    val prognoseIndex = xWerte.indexOfFirst { wert -> wert.toDouble() >= prognoseAbX }
+    require(prognoseIndex >= 0) { "Die aktuelle Runde muss innerhalb der X-Werte liegen." }
+    val historischeAnzahl = prognoseIndex.coerceAtLeast(1)
+    val gepunkteterStart = (prognoseIndex - 1).coerceAtLeast(0)
 
     series(
         x = xWerte.take(historischeAnzahl),
@@ -40,6 +112,34 @@ fun LineCartesianLayerModel.BuilderScope.seriesMitGepunkteterAktuellerRunde(
     series(
         x = xWerte.drop(gepunkteterStart),
         y = yWerte.drop(gepunkteterStart),
+    )
+}
+
+fun ColumnCartesianLayerModel.BuilderScope.seriesMitSubrundenPrognose(
+    x: Collection<Number>,
+    y: Collection<Number>,
+    zeitpunkt: SpielZeitpunkt,
+) {
+    val daten = erweitereDiagrammUmSubrunden(x, y, zeitpunkt)
+    series(x = daten.x, y = daten.y)
+}
+
+@Composable
+fun rememberRundenachse(
+    zeitpunkt: SpielZeitpunkt,
+): HorizontalAxis<Axis.Position.Horizontal.Bottom> {
+    val abstand = if (zeitpunkt.runde == 0) 1 else zeitpunkt.spielerAnzahl
+    val itemPlacer = remember(abstand) {
+        HorizontalAxis.ItemPlacer.aligned(spacing = { abstand })
+    }
+    val formatter = remember(abstand) {
+        CartesianValueFormatter { _, value, _ ->
+            (value.roundToInt() / abstand).toString()
+        }
+    }
+    return HorizontalAxis.rememberBottom(
+        valueFormatter = formatter,
+        itemPlacer = itemPlacer,
     )
 }
 
@@ -74,7 +174,7 @@ fun rememberLinienMitGepunkteterAktuellerRunde(
 @Composable
 fun rememberSaeulenMitGepunkteterAktuellerRunde(
     eintraege: List<DiagrammLegendenEintrag>,
-    aktuelleRundeX: Number,
+    prognoseAbX: Number,
     dicke: Dp = 8.dp,
 ): ColumnCartesianLayer.ColumnProvider {
     val normaleSaeulen = eintraege.map { eintrag ->
@@ -94,16 +194,16 @@ fun rememberSaeulenMitGepunkteterAktuellerRunde(
             ),
         )
     }
-    val aktuellesX = aktuelleRundeX.toDouble()
+    val prognoseStart = prognoseAbX.toDouble()
 
-    return remember(normaleSaeulen, aktuelleSaeulen, aktuellesX) {
+    return remember(normaleSaeulen, aktuelleSaeulen, prognoseStart) {
         object : ColumnCartesianLayer.ColumnProvider {
             override fun getColumn(
                 entry: ColumnCartesianLayerModel.Entry,
                 seriesIndex: Int,
                 extraStore: ExtraStore,
             ): LineComponent {
-                val saeulen = if (entry.x == aktuellesX) aktuelleSaeulen else normaleSaeulen
+                val saeulen = if (entry.x >= prognoseStart) aktuelleSaeulen else normaleSaeulen
                 return saeulen[seriesIndex % saeulen.size]
             }
 

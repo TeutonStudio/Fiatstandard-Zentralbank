@@ -24,6 +24,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -72,6 +73,7 @@ import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Anleihe
 import de.teutonstudio.zentralbank.datenbank.AnleiheAblaufArt
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
+import de.teutonstudio.zentralbank.datenbank.AnleiheStatus
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Runde
 import de.teutonstudio.zentralbank.datenbank.Spiel
@@ -97,6 +99,8 @@ import de.teutonstudio.zentralbank.schnittstelle.mitAblaufRundentrenner
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
+import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
 import java.util.Locale
@@ -112,6 +116,11 @@ private val anleiheAbgelaufenFarbe = Color(0xFFC7C7C7)
 private const val ZINSWERTE_ERKLAERUNG =
     "Anleihenzinssatz bei Leitzinssatz: prozentuale Abweichung"
 private const val MAX_Y_ACHSE_EXPONENT = 5f
+
+private enum class SchuldenGraphTab(val titel: String) {
+    BILANZ("Bilanz"),
+    ZINSEN_UND_EMISSIONEN("Leitzins & Emissionen"),
+}
 
 private data class SchuldenDiagrammReihe(
     val eintrag: DiagrammLegendenEintrag,
@@ -262,6 +271,7 @@ fun Header(
     content: @Composable () -> Unit,
 ) {
     var yAchsenExponent by remember { mutableFloatStateOf(1f) }
+    var graphTab by remember { mutableStateOf(SchuldenGraphTab.BILANZ) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (showManagementView) {
@@ -273,12 +283,27 @@ fun Header(
                 anleihen = spiel.anleihen,
             )
         } else {
-            BalanceChart(
-                spiel = spiel,
-                ausgewählterSpieler = ausgewählterSpieler,
-                yAchsenExponent = yAchsenExponent,
-                onYAchsenExponentChange = { yAchsenExponent = it },
-            )
+            Row(
+                modifier = ModiPad5,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SchuldenGraphTab.entries.forEach { tab ->
+                    FilterChip(
+                        selected = graphTab == tab,
+                        onClick = { graphTab = tab },
+                        label = { Text(tab.titel) },
+                    )
+                }
+            }
+            when (graphTab) {
+                SchuldenGraphTab.BILANZ -> BalanceChart(
+                    spiel = spiel,
+                    ausgewählterSpieler = ausgewählterSpieler,
+                    yAchsenExponent = yAchsenExponent,
+                    onYAchsenExponentChange = { yAchsenExponent = it },
+                )
+                SchuldenGraphTab.ZINSEN_UND_EMISSIONEN -> LeitzinsEmissionenChart(spiel)
+            }
         }
 
         HeaderControls(
@@ -311,8 +336,6 @@ private fun BalanceChart(
     val reihenLängen = listOf(
         spiel.spielerSaldo.size,
         spiel.spielerMarktwert.size,
-        spiel.spielerSchulden.size,
-        spiel.spielerZinsschulden.size,
         spiel.spielerKombinierteSchulden.size,
     )
     if (reihenLängen.any { länge -> länge == 0 }) {
@@ -336,6 +359,7 @@ private fun BalanceChart(
 
     val historischeRunden = List(spiel.aktuelleRunde) { it }
     val schuldenRunden = spiel.schuldenProjektionsrunden
+    val zeitpunkt = spiel.aktuellerZeitpunkt
     val modelProducer = remember { CartesianChartModelProducer() }
     val spieler = spiel.spielerListe.firstOrNull { it.name == ausgewählterSpieler }
     val spielerFarbe = erhalteSpielerFarben(spiel.spielerListe)[spieler] ?: Color.LightGray
@@ -355,16 +379,6 @@ private fun BalanceChart(
             bezeichnung = "Schulden",
             farbe = spielerFarbe.abgedunkelt(0.45f),
         ),
-        DiagrammLegendenEintrag(
-            id = "bilanz-zinsschulden",
-            bezeichnung = "Zinsschulden",
-            farbe = Color(0xFF8A7552),
-        ),
-        DiagrammLegendenEintrag(
-            id = "bilanz-kombinierte-schulden",
-            bezeichnung = "Kombinierte Schulden",
-            farbe = Color(0xFF8A5D65),
-        ),
     )
     val reihen = listOf(
         SchuldenDiagrammReihe(
@@ -380,16 +394,6 @@ private fun BalanceChart(
         SchuldenDiagrammReihe(
             legende[2],
             schuldenRunden,
-            spiel.spielerSchuldenMitProjektion.toY(ausgewählterSpieler),
-        ),
-        SchuldenDiagrammReihe(
-            legende[3],
-            schuldenRunden,
-            spiel.spielerZinsschuldenMitProjektion.toY(ausgewählterSpieler),
-        ),
-        SchuldenDiagrammReihe(
-            legende[4],
-            schuldenRunden,
             spiel.spielerKombinierteSchuldenMitProjektion.toY(ausgewählterSpieler),
         ),
     )
@@ -402,7 +406,7 @@ private fun BalanceChart(
         .maxOfOrNull { wert -> abs(wert.toDouble()) }
         ?: 0.0
 
-    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag) {
+    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag, zeitpunkt) {
         if (sichtbareReihen.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
@@ -412,7 +416,7 @@ private fun BalanceChart(
                             y = reihe.werte.map { wert ->
                                 wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
                             },
-                            aktuelleRundeX = spiel.aktuelleRunde - 1,
+                            zeitpunkt = zeitpunkt,
                         )
                     }
                 }
@@ -444,7 +448,7 @@ private fun BalanceChart(
                                 maximalbetrag = maximalbetrag,
                             ),
                         ),
-                        bottomAxis = HorizontalAxis.rememberBottom(),
+                        bottomAxis = rememberRundenachse(zeitpunkt),
                     ),
                     modelProducer = modelProducer,
                     scrollState = rememberVicoScrollState(),
@@ -477,6 +481,7 @@ private fun GlobalBalanceChart(
     val zinsgewinne = spiel.bankZinsgewinneMitProjektion.map { it.toIntOderNull() ?: 0 }
     val historischeRunden = globalesBarvermögen.indices.toList()
     val schuldenRunden = spiel.schuldenProjektionsrunden
+    val zeitpunkt = spiel.aktuellerZeitpunkt
 
     if (historischeRunden.isEmpty()) {
         EmptyInfoCard("Keine globalen Bilanzwerte vorhanden.")
@@ -521,7 +526,7 @@ private fun GlobalBalanceChart(
         .maxOfOrNull { wert -> abs(wert.toDouble()) }
         ?: 0.0
 
-    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag) {
+    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag, zeitpunkt) {
         if (sichtbareReihen.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
@@ -531,7 +536,7 @@ private fun GlobalBalanceChart(
                             y = reihe.werte.map { wert ->
                                 wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
                             },
-                            aktuelleRundeX = spiel.aktuelleRunde - 1,
+                            zeitpunkt = zeitpunkt,
                         )
                     }
                 }
@@ -563,7 +568,7 @@ private fun GlobalBalanceChart(
                                 maximalbetrag = maximalbetrag,
                             ),
                         ),
-                        bottomAxis = HorizontalAxis.rememberBottom(),
+                        bottomAxis = rememberRundenachse(zeitpunkt),
                     ),
                     modelProducer = modelProducer,
                     scrollState = rememberVicoScrollState(),
@@ -578,6 +583,130 @@ private fun GlobalBalanceChart(
                 onYAchsenExponentChange = onYAchsenExponentChange,
                 legende = legende,
                 legendenStatus = legendenStatus,
+            )
+        }
+    }
+}
+
+private data class EmissionsZinsBalken(
+    val x: Double,
+    val zins: Int,
+    val legendenEintrag: DiagrammLegendenEintrag,
+)
+
+@Composable
+private fun LeitzinsEmissionenChart(spiel: Spiel) {
+    val zeitpunkt = spiel.aktuellerZeitpunkt
+    val leitzinsWerte = List(spiel.aktuelleRunde) { runde ->
+        spiel.leitzinssatz(runde) ?: spiel.aktuellerLeitzinssatz
+    }
+    val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
+    val spielerLegende = spiel.spielerListe.associate { spieler ->
+        spieler.name to DiagrammLegendenEintrag(
+            id = "emissionszins:${spieler.name}",
+            bezeichnung = spieler.name,
+            farbe = spielerFarben[spieler] ?: Color.Gray,
+        )
+    }
+    val emissionsBalken = spiel.anleihen
+        .sortedWith(
+            compareBy<AnleiheAnzeige> { anleihe -> anleihe.emittiert }
+                .thenBy { anleihe -> spiel.spielerIndex(anleihe.schuldiger.name) }
+                .thenBy { anleihe -> anleihe.sondervermoegen.toIntOderNull() },
+        )
+        .mapNotNull { anleihe ->
+            val legendenEintrag = spielerLegende[anleihe.schuldiger.name]
+                ?: return@mapNotNull null
+            val spielerIndex = spiel.spielerIndex(anleihe.schuldiger.name)
+            EmissionsZinsBalken(
+                x = zeitpunkt.xNachZug(anleihe.emittiert, spielerIndex),
+                zins = anleihe.anleihe.erhalteZinssatz(),
+                legendenEintrag = legendenEintrag,
+            )
+        }
+    val leitzinsLegende = DiagrammLegendenEintrag(
+        id = "leitzins",
+        bezeichnung = "Leitzins",
+        farbe = Color(0xFF37474F),
+    )
+    val emissionsLegende = spiel.spielerListe.mapNotNull { spieler ->
+        spielerLegende[spieler.name]?.takeIf { eintrag ->
+            emissionsBalken.any { balken -> balken.legendenEintrag.id == eintrag.id }
+        }
+    }
+    val legende = listOf(leitzinsLegende) + emissionsLegende
+    val legendenStatus = rememberDiagrammLegendenStatus(legende)
+    val modelProducer = remember { CartesianChartModelProducer() }
+
+    LaunchedEffect(leitzinsWerte, emissionsBalken, zeitpunkt) {
+        modelProducer.runTransaction {
+            if (emissionsBalken.isNotEmpty()) {
+                columnSeries {
+                    emissionsBalken.forEach { balken ->
+                        series(x = listOf(balken.x), y = listOf(balken.zins))
+                    }
+                }
+            }
+            lineSeries {
+                seriesMitGepunkteterAktuellerRunde(
+                    x = leitzinsWerte.indices.toList(),
+                    y = leitzinsWerte,
+                    zeitpunkt = zeitpunkt,
+                )
+            }
+        }
+    }
+
+    val linienLayer = rememberLineCartesianLayer(
+        lineProvider = LineCartesianLayer.LineProvider.series(
+            rememberLinienMitGepunkteterAktuellerRunde(listOf(leitzinsLegende))
+        )
+    )
+    val prozentFormatter = remember {
+        CartesianValueFormatter { _, value, _ ->
+            String.format(Locale.GERMANY, "%.1f %%", value)
+        }
+    }
+    val endAchse = VerticalAxis.rememberEnd(valueFormatter = prozentFormatter)
+    val rundenAchse = rememberRundenachse(zeitpunkt)
+    val chart = if (emissionsBalken.isEmpty()) {
+        rememberCartesianChart(
+            linienLayer,
+            endAxis = endAchse,
+            bottomAxis = rundenAchse,
+        )
+    } else {
+        rememberCartesianChart(
+            rememberColumnCartesianLayer(
+                columnProvider = rememberSaeulenMitGepunkteterAktuellerRunde(
+                    eintraege = emissionsBalken.map { balken -> balken.legendenEintrag },
+                    prognoseAbX = zeitpunkt.prognoseAbX,
+                ),
+            ),
+            linienLayer,
+            endAxis = endAchse,
+            bottomAxis = rundenAchse,
+        )
+    }
+
+    Card(modifier = ModiPad5) {
+        Column(modifier = ModiPad5) {
+            Text(
+                text = "Leitzins und Anleihenzins bei Emission",
+                fontSize = 18.sp,
+                modifier = ModiPad5,
+            )
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = chart,
+                modelProducer = modelProducer,
+                scrollState = rememberVicoScrollState(),
+                zoomState = rememberVicoZoomState(initialZoom = Zoom.Content),
+            )
+            UmschaltbareDiagrammLegende(
+                eintraege = legende,
+                status = legendenStatus,
+                interaktiv = false,
             )
         }
     }
@@ -934,11 +1063,12 @@ fun AnleihenRegister(
                 val currentRound = eingabeRunde
                 val filteredDebt = anleihen
                     .filter { anleihe ->
+                        val status = spiel.erhalteAnleiheStatus(anleihe, currentRound)
                         when (eingabeRelevanz) {
-                            "gezahlte" -> anleihe.faelligkeit < currentRound
-                            "fällige" -> anleihe.faelligkeit == currentRound
-                            "offene" -> anleihe.faelligkeit > currentRound
-                            "fällige & offene" -> anleihe.faelligkeit >= currentRound
+                            "gezahlte" -> status == AnleiheStatus.GEZAHLT
+                            "fällige" -> status == AnleiheStatus.FAELLIG
+                            "offene" -> status == AnleiheStatus.OFFEN
+                            "fällige & offene" -> status != AnleiheStatus.GEZAHLT
                             "alle" -> true
                             else -> true
                         }
@@ -962,8 +1092,8 @@ fun AnleihenRegister(
                     VerticalGrid(columns = SimpleGridCells.Adaptive(270.dp)) {
                         filteredDebt.forEach { eintrag -> AnleiheCard(
                             modifier = ModiPad5.height(270.dp),
-                            aktuelleRunde = currentRound,
                             eintrag = eintrag,
+                            status = spiel.erhalteAnleiheStatus(eintrag, currentRound),
                             onShowAblauf = { geoeffneteAnleihe = eintrag },
                             onDelete = onDelete,
                         ) }
@@ -993,16 +1123,15 @@ fun AnleihenRegister(
 @Composable
 private fun AnleiheCard(
     modifier: Modifier,
-    aktuelleRunde: Int,
     eintrag: AnleiheAnzeige,
+    status: AnleiheStatus,
     onShowAblauf: () -> Unit,
     onDelete: (AnleiheAnzeige) -> Unit,
 ) {
-    val restlaufzeit = eintrag.faelligkeit - aktuelleRunde
-    val (status, statusFarbe) = when {
-        restlaufzeit < 0 -> "gezahlt" to Color(0xFFA9C2A5)
-        restlaufzeit == 0 -> "fällig" to anleiheFaelligFarbe
-        else -> "offen" to anleiheOffenFarbe
+    val (statusText, statusFarbe) = when (status) {
+        AnleiheStatus.GEZAHLT -> "gezahlt" to Color(0xFFA9C2A5)
+        AnleiheStatus.FAELLIG -> "fällig" to anleiheFaelligFarbe
+        AnleiheStatus.OFFEN -> "offen" to anleiheOffenFarbe
     }
 
     Card(
@@ -1032,7 +1161,7 @@ private fun AnleiheCard(
                 RightText(text = "Fällig zu:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
                 LeftText(text = eintrag.faelligkeit.toString(), fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
                 RightText(text = "Status:", fontSize = 12.sp,modifier = Modifier.fillMaxWidth())
-                LeftText(text = status,fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
+                LeftText(text = statusText,fontSize = 14.sp,modifier = Modifier.fillMaxWidth())
                 Text(
                     text = "Ablauf anzeigen",
                     fontSize = 12.sp,
@@ -1173,10 +1302,16 @@ private fun AnleiheAblauf(
             )
             rundenGruppen.entries.forEachIndexed { rundenIndex, (runde, ereignisse) ->
                 val istEingeklappt = runde in eingeklappteRunden
-                val rundenHintergrund = when {
-                    runde < aktuelleRunde -> anleiheAbgelaufenFarbe
-                    runde == aktuelleRunde -> anleiheFaelligFarbe
-                    else -> anleiheOffenFarbe
+                val rundenHintergrund = when (
+                    spiel.erhalteZuggebundenenStatus(
+                        ereignisRunde = runde,
+                        spielerName = eintrag.schuldiger.name,
+                        betrachteteRunde = aktuelleRunde,
+                    )
+                ) {
+                    AnleiheStatus.GEZAHLT -> anleiheAbgelaufenFarbe
+                    AnleiheStatus.FAELLIG -> anleiheFaelligFarbe
+                    AnleiheStatus.OFFEN -> anleiheOffenFarbe
                 }
                 val beiRundenKlick = {
                     eingeklappteRunden = if (istEingeklappt) {

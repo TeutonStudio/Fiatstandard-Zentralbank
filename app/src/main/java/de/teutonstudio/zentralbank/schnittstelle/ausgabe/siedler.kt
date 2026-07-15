@@ -89,6 +89,7 @@ import de.teutonstudio.zentralbank.schnittstelle.mitAblaufRundentrenner
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import java.util.Locale
 import kotlin.math.abs
@@ -97,8 +98,10 @@ private val spielerKartenMindestbreite = 340.dp
 
 @Composable
 fun SpielerBilanz(
-    spielerSaldo: List<Map<Spieler, Zahlungsmittel>>,
+    spiel: Spiel,
 ) {
+    val spielerSaldo = spiel.spielerSaldo
+    val zeitpunkt = spiel.aktuellerZeitpunkt
     val spielerListe = spielerSaldo.first().keys.toList()
     Card(modifier = ModiPad5) {
             //val spielerNamen = spielerListe.map { it.erhalteNamen() }
@@ -110,7 +113,7 @@ fun SpielerBilanz(
             val endAxis = VerticalAxis.rememberEnd(
                 valueFormatter = markAchsenFormatter,
             )
-            val bottomAxis = HorizontalAxis.rememberBottom()
+            val bottomAxis = rememberRundenachse(zeitpunkt)
 
             val serien = remember(spielerListe, spielerSaldo) {
                 spielerListe.mapNotNull { spieler ->
@@ -134,7 +137,7 @@ fun SpielerBilanz(
                 legendenStatus.istSichtbar("spieler:${spieler.name}")
             }
 
-            val chartModel = remember(sichtbareSerien) {
+            val chartModel = remember(sichtbareSerien, zeitpunkt) {
                 if (sichtbareSerien.isEmpty()) {
                     null
                 } else {
@@ -143,7 +146,8 @@ fun SpielerBilanz(
                             sichtbareSerien.forEach { (_, yWerte) ->
                                 seriesMitGepunkteterAktuellerRunde(
                                     x = yWerte.indices.toList(),
-                                    y = yWerte
+                                    y = yWerte,
+                                    zeitpunkt = zeitpunkt,
                                 )
                             }
                         }
@@ -220,7 +224,7 @@ fun zeigeSpieler(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SpielerBilanz(spiel.spielerSaldo)
+            SpielerBilanz(spiel)
             VerticalGrid(
                 columns = SimpleGridCells.Adaptive(spielerKartenMindestbreite),
                 horizontalArrangement = Arrangement.Center,

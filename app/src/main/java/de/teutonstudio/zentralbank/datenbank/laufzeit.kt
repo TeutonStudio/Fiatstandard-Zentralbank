@@ -206,6 +206,47 @@ private fun Kriegsregister.baueCache(idx: Int ,cache: List<Map<String, KonfliktS
 }
 
 const val prozentpunkt = 100
+
+data class SpielZeitpunkt(
+    val runde: Int,
+    val aktiverSpielerIndex: Int,
+    val spielerAnzahl: Int,
+) {
+    init {
+        require(runde >= 0) { "Die Runde darf nicht negativ sein." }
+        require(spielerAnzahl > 0) { "Ein Spiel benötigt mindestens einen Spieler." }
+        require(aktiverSpielerIndex in 0 until spielerAnzahl) {
+            "Der aktive Spieler muss Teil der Spielerreihenfolge sein."
+        }
+    }
+
+    val prognoseAbX: Double
+        get() = xNachZug(runde, aktiverSpielerIndex)
+
+    fun xNachZug(spielerIndex: Int): Double {
+        return xNachZug(runde, spielerIndex)
+    }
+
+    fun xNachZug(runde: Int, spielerIndex: Int): Double {
+        require(runde >= 0) { "Die Runde darf nicht negativ sein." }
+        require(spielerIndex in 0 until spielerAnzahl) {
+            "Der Spieler muss Teil der Spielerreihenfolge sein."
+        }
+        if (runde == 0) return 0.0
+        // Vico unterstützt X-Werte mit höchstens vier Nachkommastellen. Bruchteile
+        // einer Runde (insbesondere Siebtel) würden diese Grenze überschreiten.
+        // Deshalb bildet die Diagrammachse jede Runde auf `spielerAnzahl` ganzzahlige
+        // Schritte ab; die Achsenbeschriftung rechnet diese Schritte wieder in Runden um.
+        return ((runde - 1) * spielerAnzahl + spielerIndex + 1).toDouble()
+    }
+}
+
+enum class AnleiheStatus {
+    GEZAHLT,
+    FAELLIG,
+    OFFEN,
+}
+
 open class Spiel(
     private val runden: MutableList<Runde>,
     private val spieler: List<Spieler>, // Zu beginn des Spiels definiert
@@ -214,6 +255,8 @@ open class Spiel(
     private val handel: Handelsregister, // Handelsdaten während des Spiels
     private val konflikt: Kriegsregister,
 ) {
+    private var aktiverSpielerName: String? = spieler.firstOrNull()?.name
+
     public val preisinflationswarenkorb: Map<Rohstoffe, Int> =
         warenkorb.filterValues { menge -> menge > 0 }.toMap()
     public var warenkorb: Map<Rohstoffe, Int> = preisinflationswarenkorb
@@ -240,6 +283,54 @@ open class Spiel(
 
     public val spielerStringListe = spieler.map { it.name }
     public val spielerListe = spieler.map { it }
+    public val aktuellerSpielerIndex: Int
+        get() = spieler.indexOfFirst { eintrag -> eintrag.name == aktiverSpielerName }
+            .takeIf { index -> index >= 0 }
+            ?: 0
+    public val aktuellerZeitpunkt: SpielZeitpunkt
+        get() = SpielZeitpunkt(
+            runde = (aktuelleRunde - 1).coerceAtLeast(0),
+            aktiverSpielerIndex = aktuellerSpielerIndex,
+            spielerAnzahl = spieler.size.coerceAtLeast(1),
+        )
+
+    fun aktualisiereAktivenSpieler(spielerName: String?) {
+        aktiverSpielerName = spielerName
+            ?.takeIf { name -> spieler.any { eintrag -> eintrag.name == name } }
+            ?: spieler.firstOrNull()?.name
+    }
+
+    fun spielerIndex(spielerName: String): Int =
+        spieler.indexOfFirst { eintrag -> eintrag.name == spielerName }
+            .takeIf { index -> index >= 0 }
+            ?: spieler.size
+
+    fun erhalteAnleiheStatus(
+        anleihe: AnleiheAnzeige,
+        runde: Int = (aktuelleRunde - 1).coerceAtLeast(0),
+    ): AnleiheStatus = erhalteZuggebundenenStatus(
+        ereignisRunde = anleihe.faelligkeit,
+        spielerName = anleihe.schuldiger.name,
+        betrachteteRunde = runde,
+    )
+
+    fun erhalteZuggebundenenStatus(
+        ereignisRunde: Int,
+        spielerName: String,
+        betrachteteRunde: Int = (aktuelleRunde - 1).coerceAtLeast(0),
+    ): AnleiheStatus {
+        if (ereignisRunde < betrachteteRunde) return AnleiheStatus.GEZAHLT
+        if (ereignisRunde > betrachteteRunde) return AnleiheStatus.OFFEN
+
+        val laufendeRunde = (aktuelleRunde - 1).coerceAtLeast(0)
+        if (betrachteteRunde != laufendeRunde) return AnleiheStatus.FAELLIG
+
+        return when (spielerIndex(spielerName).compareTo(aktuellerSpielerIndex)) {
+            -1 -> AnleiheStatus.GEZAHLT
+            0 -> AnleiheStatus.FAELLIG
+            else -> AnleiheStatus.OFFEN
+        }
+    }
     public val spielerMarktwert: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx ->
         val bewertungspreise = erhalteBauwerkBewertungspreiseZurRunde(idx)
         spielerListe.associateWith { spieler ->
@@ -424,7 +515,7 @@ open class Spiel(
                         "Eine neue Anleihe muss vom aktiven Emittenten ausgegeben werden."
                     }
                 } else {
-                    require((aktuelleRunde - 1) < bestehendeAnleihe.faelligkeit) {
+                    require(erhalteAnleiheStatus(bestehendeAnleihe) == AnleiheStatus.OFFEN) {
                         "Eine fällige Anleihe kann nicht mehr gehandelt werden."
                     }
                     require(neuerHandel.besitzer == bestehendeAnleihe.aktuellerBesitzer) {
@@ -501,6 +592,10 @@ open class Spiel(
                     anzahl = handel.anzahl,
                     rohstoffOderVorgang = handel.rohstoff.str,
                     preis = eintrag.saldo,
+                    zugPosition = spielerIndex(
+                        (handel.besitzer as? Spieler)?.name
+                            ?: (handel.erwerber as? Spieler)?.name.orEmpty()
+                    ),
                 )
                 is Anleihenhandel -> {
                     val anzeige = anleihenNachObjekt[handel.anleihe]
@@ -521,6 +616,13 @@ open class Spiel(
                             else -> "Anleihe erworben"
                         },
                         preis = eintrag.saldo,
+                        zugPosition = spielerIndex(
+                            if (handel.erwerber == handel.anleihe.schuldiger) {
+                                handel.erwerber.name
+                            } else {
+                                handel.besitzer.name
+                            }
+                        ),
                         anleihenAnzeigeZusatz = anzeige?.takeIf { istEmission }?.let { emission ->
                             "${emission.laufzeit} " +
                                 if (emission.laufzeit == 1) {
@@ -546,7 +648,14 @@ open class Spiel(
         val anleihenZahlungsZeilen = anleihen.flatMap { anleihe ->
             anleihe.erhalteAblauf()
                 .mapNotNull { eintrag ->
-                    if (eintrag.runde >= aktuelleRunde) return@mapNotNull null
+                    if (
+                        erhalteZuggebundenenStatus(
+                            ereignisRunde = eintrag.runde,
+                            spielerName = anleihe.schuldiger.name,
+                        ) != AnleiheStatus.GEZAHLT
+                    ) {
+                        return@mapNotNull null
+                    }
                     val istEmpfaenger = eintrag.an.name == spieler.name
                     val istZahler = eintrag.von.name == spieler.name
                     if (!istEmpfaenger && !istZahler) return@mapNotNull null
@@ -565,6 +674,7 @@ open class Spiel(
                             rohstoffOderVorgang = "Zinszahlung " +
                                 "(${eintrag.runde - anleihe.emittiert} von ${anleihe.laufzeit})",
                             preis = if (istEmpfaenger) eintrag.betrag else -eintrag.betrag,
+                            zugPosition = spielerIndex(eintrag.von.name),
                         )
                         AnleiheAblaufArt.RUECKKAUF -> SpielerAblaufEintrag(
                             runde = eintrag.runde,
@@ -586,6 +696,7 @@ open class Spiel(
                                 "Anleihe ausgelöst (Rückkauf)"
                             },
                             preis = if (istEmpfaenger) eintrag.betrag else -eintrag.betrag,
+                            zugPosition = spielerIndex(eintrag.von.name),
                         )
                         AnleiheAblaufArt.EMISSION,
                         AnleiheAblaufArt.HANDEL -> null
@@ -594,6 +705,7 @@ open class Spiel(
         }
         return (handelsZeilen + anleihenZahlungsZeilen).sortedWith(
             compareBy<SpielerAblaufEintrag> { eintrag -> eintrag.runde }
+                .thenBy { eintrag -> eintrag.zugPosition }
                 .thenByDescending { eintrag -> eintrag.art.reihenfolge }
         )
     }
@@ -952,6 +1064,7 @@ data class SpielerAblaufEintrag(
     val anzahl: Int?,
     val rohstoffOderVorgang: String,
     val preis: Zahlungsmittel,
+    val zugPosition: Int,
     val anleihenAnzeigeZusatz: String? = null,
     val erwarteteAnleihenRenditeProzent: Float? = null,
 )

@@ -1,10 +1,96 @@
 package de.teutonstudio.zentralbank.schnittstelle
 
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
+import de.teutonstudio.zentralbank.datenbank.SpielZeitpunkt
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiagrammAktuelleRundeTest {
+    @Test
+    fun siebenSpielerErzeugenSechsSubrundenpunkteZwischenZweiRunden() {
+        val zeitpunkt = SpielZeitpunkt(
+            runde = 3,
+            aktiverSpielerIndex = 2,
+            spielerAnzahl = 7,
+        )
+
+        val daten = erweitereDiagrammUmSubrunden(
+            x = listOf(0, 1, 2, 3, 4),
+            y = listOf(10, 20, 30, 40, 50),
+            zeitpunkt = zeitpunkt,
+        )
+
+        assertEquals(
+            listOf(0.0, 7.0, 14.0) +
+                (15..21).map(Int::toDouble) +
+                28.0,
+            daten.x,
+        )
+        assertEquals(
+            listOf<Number>(10, 20, 30, 30, 30, 40, 40, 40, 40, 40, 50),
+            daten.y,
+        )
+        assertEquals(17.0, daten.prognoseAbX, 0.0)
+    }
+
+    @Test
+    fun subrundenSindBisZumAktuellenSpielerHistorischUndDanachGepunktet() {
+        val zeitpunkt = SpielZeitpunkt(
+            runde = 3,
+            aktiverSpielerIndex = 2,
+            spielerAnzahl = 7,
+        )
+        val model = LineCartesianLayerModel.build {
+            seriesMitGepunkteterAktuellerRunde(
+                x = listOf(0, 1, 2, 3, 4),
+                y = listOf(10, 20, 30, 40, 50),
+                zeitpunkt = zeitpunkt,
+            )
+        }
+
+        assertEquals(
+            listOf(0.0, 7.0, 14.0, 15.0, 16.0),
+            model.series[0].map { eintrag -> eintrag.x },
+        )
+        assertEquals(
+            (16..21).map(Int::toDouble) + 28.0,
+            model.series[1].map { eintrag -> eintrag.x },
+        )
+    }
+
+    @Test
+    fun subrundenVerwendenAuchBeiNichtTeilbarenSpielerzahlenExakteXWerte() {
+        listOf(3, 6, 7).forEach { spielerAnzahl ->
+            val zeitpunkt = SpielZeitpunkt(
+                runde = 3,
+                aktiverSpielerIndex = 1,
+                spielerAnzahl = spielerAnzahl,
+            )
+
+            val daten = erweitereDiagrammUmSubrunden(
+                x = listOf(0, 1, 2, 3),
+                y = listOf(10, 20, 30, 40),
+                zeitpunkt = zeitpunkt,
+            )
+
+            assertTrue(
+                "Alle X-Werte müssen für $spielerAnzahl Spieler ganzzahlig sein.",
+                daten.x.all { wert -> wert % 1.0 == 0.0 },
+            )
+            assertEquals(
+                (2 * spielerAnzahl + 2).toDouble(),
+                daten.prognoseAbX,
+                0.0,
+            )
+
+            val model = LineCartesianLayerModel.build {
+                series(x = daten.x, y = daten.y)
+            }
+            assertEquals(1.0, model.getXDeltaGcd(), 0.0)
+        }
+    }
+
     @Test
     fun aktuelleRundeWirdAlsEigenesLetztesLiniensegmentAufgeteilt() {
         val model = LineCartesianLayerModel.build {

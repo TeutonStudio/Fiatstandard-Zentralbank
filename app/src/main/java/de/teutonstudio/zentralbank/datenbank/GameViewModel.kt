@@ -389,6 +389,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
 
     private fun aktualisiereDomainState(state: GameState) {
+        aktuellesSpielOderNull?.aktualisiereAktivenSpieler(state.zugStatus?.spieler?.wert)
         _domainState.value = state
         _domainUiState.value = state.zuGameUiState()
     }

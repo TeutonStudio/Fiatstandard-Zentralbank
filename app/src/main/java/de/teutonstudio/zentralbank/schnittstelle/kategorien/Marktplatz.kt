@@ -58,6 +58,7 @@ import de.teutonstudio.zentralbank.datenbank.HandelsDaten
 import de.teutonstudio.zentralbank.datenbank.Handelslinie
 import de.teutonstudio.zentralbank.datenbank.JuristischePerson
 import de.teutonstudio.zentralbank.datenbank.Spiel
+import de.teutonstudio.zentralbank.datenbank.SpielZeitpunkt
 import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
@@ -78,9 +79,11 @@ import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.seriesMitSubrundenPrognose
 
 private enum class MarktpreisKategorie(val titel: String) {
     HANDELSGUETER("Alle Handelsgüter"),
@@ -119,14 +122,17 @@ private fun List<Map<Rohstoffe, Zahlungsmittel>>.zuWarenkorbpreisen(
 }
 
 @Composable
-private fun List<List<Int>>.zuLinienChart(): CartesianChartModel =
-    remember(this) {
+private fun List<List<Int>>.zuLinienChart(
+    zeitpunkt: SpielZeitpunkt,
+): CartesianChartModel =
+    remember(this, zeitpunkt) {
         CartesianChartModel(
             LineCartesianLayerModel.build {
                 forEach { werte ->
                     seriesMitGepunkteterAktuellerRunde(
                         x = werte.indices.toList(),
                         y = werte,
+                        zeitpunkt = zeitpunkt,
                     )
                 }
             }
@@ -136,13 +142,15 @@ private fun List<List<Int>>.zuLinienChart(): CartesianChartModel =
 @Composable
 private fun List<Map<Rohstoffe, Int>>.zuStueckDifferenzChart(
     rohstoffe: List<Rohstoffe>,
-): CartesianChartModel = remember(this, rohstoffe) {
+    zeitpunkt: SpielZeitpunkt,
+): CartesianChartModel = remember(this, rohstoffe, zeitpunkt) {
     CartesianChartModel(
         ColumnCartesianLayerModel.build {
             rohstoffe.forEach { rohstoff ->
-                series(
+                seriesMitSubrundenPrognose(
                     x = indices.toList(),
                     y = map { differenz -> differenz[rohstoff] ?: 0 },
+                    zeitpunkt = zeitpunkt,
                 )
             }
         }
@@ -277,7 +285,7 @@ fun zeigeMarktplatz(
                     when (marktpreisKategorie) {
                         MarktpreisKategorie.HANDELSGUETER -> sichtbareIndizes
                             .map(handelsgueterWerte::get)
-                            .zuLinienChart()
+                            .zuLinienChart(spiel.aktuellerZeitpunkt)
 
                         MarktpreisKategorie.HANDELSDIFFERENZ -> ausgewaehlteHandelsperson
                             ?.let { person ->
@@ -285,14 +293,17 @@ fun zeigeMarktplatz(
                                 when (handelsdifferenzEinheit) {
                                     HandelsdifferenzEinheit.STUECK -> spiel
                                         .erhalteRohstoffHandelsstueckDifferenz(person)
-                                        .zuStueckDifferenzChart(ausgewaehlteRohstoffe)
+                                        .zuStueckDifferenzChart(
+                                            ausgewaehlteRohstoffe,
+                                            spiel.aktuellerZeitpunkt,
+                                        )
 
                                     HandelsdifferenzEinheit.MARK -> {
                                         val differenz = spiel
                                             .erhalteRohstoffHandelsmarkDifferenz(person)
                                         ausgewaehlteRohstoffe.map { rohstoff ->
                                             differenz.map { runde -> runde[rohstoff] ?: 0 }
-                                        }.zuLinienChart()
+                                        }.zuLinienChart(spiel.aktuellerZeitpunkt)
                                     }
                                 }
                             }
@@ -352,7 +363,8 @@ fun zeigeMarktplatz(
                                             columnProvider =
                                                 rememberSaeulenMitGepunkteterAktuellerRunde(
                                                     eintraege = sichtbareLegende,
-                                                    aktuelleRundeX = spiel.aktuelleRunde - 1,
+                                                    prognoseAbX =
+                                                        spiel.aktuellerZeitpunkt.prognoseAbX,
                                                 ),
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
@@ -370,7 +382,7 @@ fun zeigeMarktplatz(
                                                 VerticalAxis.ItemPlacer.step()
                                             },
                                         ),
-                                        bottomAxis = HorizontalAxis.rememberBottom(),
+                                        bottomAxis = rememberRundenachse(spiel.aktuellerZeitpunkt),
                                     ),
                                     model = chartModel,
                                     scrollState = rememberVicoScrollState(),
@@ -399,7 +411,7 @@ fun zeigeMarktplatz(
                                                 markAchsenFormatter
                                             },
                                         ),
-                                        bottomAxis = HorizontalAxis.rememberBottom(),
+                                        bottomAxis = rememberRundenachse(spiel.aktuellerZeitpunkt),
                                     ),
                                     model = chartModel,
                                     scrollState = rememberVicoScrollState(),
