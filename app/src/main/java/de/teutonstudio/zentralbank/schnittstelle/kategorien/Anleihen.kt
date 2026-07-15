@@ -1089,18 +1089,28 @@ private fun AnleiheAblauf(
     }
     val spaltenbreiten = AnleiheAblaufSpaltenbreiten(
         runde = maxOf(
-            rememberAblaufSpaltenbreite(listOf("Runde"), 9.sp, 8.dp),
-            rememberAblaufSpaltenbreite(rundenGruppen.keys.map(Int::toString), 10.sp, 8.dp),
+            rememberAblaufSpaltenbreite(listOf("Runde"), 11.sp, 8.dp),
+            rememberAblaufSpaltenbreite(rundenGruppen.keys.map(Int::toString), 12.sp, 8.dp),
         ),
         zinswerte = maxOf(
-            rememberAblaufSpaltenbreite(listOf("Zinswerte"), 9.sp, 8.dp),
-            rememberAblaufSpaltenbreite(listOf(ZINSWERTE_ERKLAERUNG), 7.sp, 8.dp),
-            rememberAblaufSpaltenbreite(zinswertTexte, 8.sp, 8.dp),
+            rememberAblaufSpaltenbreite(
+                listOf("Zinswerte"),
+                11.sp,
+                8.dp,
+                FontWeight.SemiBold,
+            ),
+            rememberAblaufSpaltenbreite(listOf(ZINSWERTE_ERKLAERUNG), 9.sp, 8.dp),
+            rememberAblaufSpaltenbreite(
+                zinswertTexte,
+                10.sp,
+                8.dp,
+                FontWeight.SemiBold,
+            ),
         ),
         zahlungsempfaenger = maxOf(
             rememberAblaufSpaltenbreite(
                 listOf(if (zeigeBuchungssatz) "Emittent an Halter" else "Zahlungsempfänger"),
-                9.sp,
+                11.sp,
                 64.dp,
             ),
             rememberAblaufSpaltenbreite(
@@ -1111,15 +1121,15 @@ private fun AnleiheAblauf(
                         ereignis.zahlungsempfaenger.name
                     }
                 } + rundenGruppen.values.map { ereignisse -> "${ereignisse.size} Zahlungen" },
-                10.sp,
+                12.sp,
                 8.dp,
             ),
         ),
         betrag = maxOf(
-            rememberAblaufSpaltenbreite(listOf("Betrag"), 9.sp, 8.dp),
+            rememberAblaufSpaltenbreite(listOf("Betrag"), 11.sp, 8.dp),
             rememberAblaufSpaltenbreite(
                 ablauf.map { ereignis -> ereignis.betrag.zuMark() } + "eingeklappt",
-                10.sp,
+                12.sp,
                 8.dp,
             ),
         ),
@@ -1292,7 +1302,7 @@ private fun AnleiheZinswerteZelle(
     modifier: Modifier,
     istKompakt: Boolean,
 ) {
-    val schriftgroesse = if (istKompakt) 7.sp else 8.sp
+    val schriftgroesse = if (istKompakt) 9.sp else 10.sp
     val abweichung = zinsvergleich?.relativeAbweichung
     val abweichungsfarbe = when {
         abweichung == null || abs(abweichung) < 0.05 -> LocalContentColor.current
@@ -1327,7 +1337,7 @@ private fun AnleiheZinswerteKopfzelle(
         Text(
             text = "Zinswerte",
             modifier = Modifier.fillMaxWidth(),
-            fontSize = 9.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -1335,7 +1345,7 @@ private fun AnleiheZinswerteKopfzelle(
         Text(
             text = erklaerung,
             modifier = Modifier.fillMaxWidth(),
-            fontSize = 7.sp,
+            fontSize = 9.sp,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
@@ -1380,7 +1390,7 @@ private fun AnleiheBuchungssatzKopfzelle(
             Text(
                 text = text,
                 modifier = Modifier.weight(1f),
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 textAlign = TextAlign.Center,
             )
             Switch(
@@ -1415,9 +1425,9 @@ private fun AnleiheTabellenZelle(
                 },
             ),
         fontSize = when {
-            istKopfzeile -> 9.sp
-            istKompakt -> 8.sp
-            else -> 10.sp
+            istKopfzeile -> 11.sp
+            istKompakt -> 10.sp
+            else -> 12.sp
         },
         textAlign = textAlign,
     )

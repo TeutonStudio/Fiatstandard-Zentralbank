@@ -646,43 +646,43 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
         .toSortedMap(reverseOrder())
     val spaltenbreiten = SpielerAblaufSpaltenbreiten(
         runde = maxOf(
-            rememberAblaufSpaltenbreite(listOf("Runde"), 10.sp),
+            rememberAblaufSpaltenbreite(listOf("Runde"), 12.sp),
             rememberAblaufSpaltenbreite(
                 gefilterterAblauf.map { eintrag -> eintrag.runde.toString() },
-                11.sp,
+                13.sp,
             ),
         ),
         geschaeftspartner = maxOf(
             rememberAblaufSpaltenbreite(
                 listOf("Geschäftspartner: ${geschaeftspartnerFilter ?: "Alle"} ▾"),
-                10.sp,
+                12.sp,
             ),
             rememberAblaufSpaltenbreite(
                 gefilterterAblauf.map { eintrag -> eintrag.geschaeftspartner } +
                     rundenGruppen.values.map { zeilen -> "${zeilen.size} Zeilen" } +
                     "kumulativ",
-                11.sp,
+                13.sp,
             ),
         ),
         vorgang = maxOf(
             rememberAblaufSpaltenbreite(
                 listOf("Rohstoff / Vorgang: ${rohstoffFilter ?: "Alle"} ▾"),
-                10.sp,
+                12.sp,
             ),
             rememberAblaufSpaltenbreite(
                 gefilterterAblauf.map(SpielerAblaufEintrag::ablaufVorgangstext) +
                     listOf("eingeklappt", "Saldo zum Rundenende"),
-                11.sp,
+                13.sp,
             ),
         ),
         preis = maxOf(
-            rememberAblaufSpaltenbreite(listOf("Preis"), 10.sp),
+            rememberAblaufSpaltenbreite(listOf("Preis"), 12.sp),
             rememberAblaufSpaltenbreite(
                 gefilterterAblauf.map { eintrag -> eintrag.preis.zuMark() } +
                     rundenGruppen.values.map { zeilen ->
                         "Saldo: ${zeilen.fold(Zahlungsmittel()) { summe, zeile -> summe + zeile.preis }.zuMark()}"
                     } + listOf(minRundenSaldo.zuMark(), "Saldo: ${minRundenSaldo.zuMark()}"),
-                11.sp,
+                13.sp,
             ),
         ),
     )
@@ -976,9 +976,9 @@ private fun TabellenZelle(
                 },
             ),
         fontSize = when {
-            istKopfzeile -> 10.sp
-            istKompakt -> 9.sp
-            else -> 11.sp
+            istKopfzeile -> 12.sp
+            istKompakt -> 11.sp
+            else -> 13.sp
         },
         textAlign = textAlign,
         maxLines = 1,
