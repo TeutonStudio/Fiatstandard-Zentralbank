@@ -112,12 +112,21 @@ private data class Schuldenstand(
 private fun Anleihe.istStartguthaben(): Boolean =
     sondervermögen == Zahlungsmittel() && unvermögen < Zahlungsmittel()
 
-private fun Handelsregister.baueSchuldenstand(idx:Int): Schuldenstand {
+private fun Handelsregister.baueSchuldenstand(
+    idx: Int,
+    gläubigerFilter: JuristischePerson? = null,
+): Schuldenstand {
     val kapital = bekannteSpieler().associateWith { Zahlungsmittel() }.toMutableMap()
     val zinsen = bekannteSpieler().associateWith { Zahlungsmittel() }.toMutableMap()
 
-    erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert,anleihe,_) ->
+    erhalteRelevanteAnleihen(idx).forEachTriple { (emittiert, anleihe, handelsverlauf) ->
         if (anleihe.istStartguthaben()) return@forEachTriple
+        if (
+            gläubigerFilter != null &&
+            handelsverlauf.gläubiger(idx) != gläubigerFilter
+        ) {
+            return@forEachTriple
+        }
 
         val fälligkeitsrunde = anleihe.faelligkeitsrunde(emittiert)
         if (idx in emittiert until fälligkeitsrunde) {
@@ -338,7 +347,9 @@ open class Spiel(
         }
     }
 
-    private fun projizierteSchuldenstaende(): List<Schuldenstand> {
+    private fun projizierteSchuldenstaende(
+        gläubigerFilter: JuristischePerson? = null,
+    ): List<Schuldenstand> {
         val bestehendeAnleihen = anleihen
         val letzteRunde = maxOf(
             aktuelleRunde - 1,
@@ -355,6 +366,9 @@ open class Spiel(
 
             bestehendeAnleihen
                 .filter { anleihe -> runde in anleihe.emittiert until anleihe.faelligkeit }
+                .filter { anleihe ->
+                    gläubigerFilter == null || anleihe.aktuellerBesitzer == gläubigerFilter
+                }
                 .forEach { anleihe ->
                     val schuldiger = anleihe.schuldiger
                     kapital[schuldiger] = kapital.getOrDefault(schuldiger, Zahlungsmittel()) +
@@ -395,6 +409,17 @@ open class Spiel(
         spielerSchuldenMitProjektion.zip(spielerZinsschuldenMitProjektion) { kapital, zinsen ->
             spielerListe.associateWith { spieler ->
                 kapital.getValue(spieler) + zinsen.getValue(spieler)
+            }
+        }
+    public val spielerKombinierteBankschuldenMitProjektion: List<Map<Spieler, Zahlungsmittel>>
+        get() = (
+            List(aktuelleRunde) { runde ->
+                handel.baueSchuldenstand(runde, Geschäftsbank)
+            } + projizierteSchuldenstaende(Geschäftsbank)
+        ).map { schuldenstand ->
+            spielerListe.associateWith { spieler ->
+                schuldenstand.kapital.getOrDefault(spieler, Zahlungsmittel()) +
+                    schuldenstand.zinsen.getOrDefault(spieler, Zahlungsmittel())
             }
         }
     public val spielerBarvermögen: List<Zahlungsmittel> get() =

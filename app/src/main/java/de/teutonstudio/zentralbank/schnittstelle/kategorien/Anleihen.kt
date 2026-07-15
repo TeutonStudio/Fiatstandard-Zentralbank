@@ -430,6 +430,11 @@ private fun BalanceChart(
             bezeichnung = "Schulden",
             farbe = spielerFarbe.abgedunkelt(0.45f),
         ),
+        DiagrammLegendenEintrag(
+            id = "bilanz-bankschulden",
+            bezeichnung = "Bankschulden",
+            farbe = spielerFarbe.abgedunkelt(0.65f),
+        ),
     )
     val reihen = listOf(
         SchuldenDiagrammReihe(
@@ -448,6 +453,13 @@ private fun BalanceChart(
             legende[2],
             prognoseRunden,
             spiel.spielerKombinierteSchuldenMitProjektion.toY(ausgewählterSpieler)
+                .bisRundeFortgeschrieben(letztePrognoseRunde),
+        ),
+        SchuldenDiagrammReihe(
+            legende[3],
+            prognoseRunden,
+            spiel.spielerKombinierteBankschuldenMitProjektion
+                .toY(ausgewählterSpieler)
                 .bisRundeFortgeschrieben(letztePrognoseRunde),
         ),
     )
@@ -493,7 +505,8 @@ private fun BalanceChart(
                         rememberLineCartesianLayer(
                             lineProvider = LineCartesianLayer.LineProvider.series(
                                 rememberLinienMitGepunkteterAktuellerRunde(
-                                    sichtbareReihen.map { reihe -> reihe.eintrag }
+                                    eintraege = sichtbareReihen.map { reihe -> reihe.eintrag },
+                                    mitPunkten = true,
                                 )
                             )
                         ),
@@ -622,7 +635,8 @@ private fun GlobalBalanceChart(
                         rememberLineCartesianLayer(
                             lineProvider = LineCartesianLayer.LineProvider.series(
                                 rememberLinienMitGepunkteterAktuellerRunde(
-                                    sichtbareReihen.map { reihe -> reihe.eintrag }
+                                    eintraege = sichtbareReihen.map { reihe -> reihe.eintrag },
+                                    mitPunkten = true,
                                 )
                             )
                         ),
@@ -726,7 +740,10 @@ private fun LeitzinsEmissionenChart(
 
     val linienLayer = rememberLineCartesianLayer(
         lineProvider = LineCartesianLayer.LineProvider.series(
-            rememberLinienMitGepunkteterAktuellerRunde(listOf(leitzinsLegende))
+            rememberLinienMitGepunkteterAktuellerRunde(
+                eintraege = listOf(leitzinsLegende),
+                mitPunkten = true,
+            )
         )
     )
     val prozentFormatter = remember {

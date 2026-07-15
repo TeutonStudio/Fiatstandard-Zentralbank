@@ -18,6 +18,7 @@ import com.patrykandpatrick.vico.compose.common.DashedShape
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.LineComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import de.teutonstudio.zentralbank.datenbank.SpielZeitpunkt
 import kotlin.math.roundToInt
@@ -146,10 +147,27 @@ fun rememberRundenachse(
 @Composable
 fun rememberLinienMitGepunkteterAktuellerRunde(
     eintraege: List<DiagrammLegendenEintrag>,
+    mitPunkten: Boolean = false,
 ): List<LineCartesianLayer.Line> = eintraege.flatMap { eintrag ->
     val farbe = eintrag.farbe
     val fuellung = remember(farbe) {
         LineCartesianLayer.LineFill.single(Fill(farbe))
+    }
+    val punktProvider = if (mitPunkten) {
+        val punktKomponente = rememberShapeComponent(
+            fill = Fill(farbe),
+            shape = CircleShape,
+        )
+        remember(punktKomponente) {
+            LineCartesianLayer.PointProvider.single(
+                LineCartesianLayer.Point(
+                    component = punktKomponente,
+                    size = 6.dp,
+                )
+            )
+        }
+    } else {
+        null
     }
     val interpolator = remember {
         LineCartesianLayer.Interpolator.cubic(curvature = 0.5f)
@@ -157,6 +175,7 @@ fun rememberLinienMitGepunkteterAktuellerRunde(
     listOf(
         LineCartesianLayer.rememberLine(
             fill = fuellung,
+            pointProvider = punktProvider,
             interpolator = interpolator,
         ),
         LineCartesianLayer.rememberLine(
@@ -166,6 +185,7 @@ fun rememberLinienMitGepunkteterAktuellerRunde(
                 dashLength = 2.dp,
                 gapLength = 4.dp,
             ),
+            pointProvider = punktProvider,
             interpolator = interpolator,
         ),
     )
