@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.datenbank
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -427,7 +428,7 @@ class SpielFinanzdatenTest {
             listOf(
                 SpielerAblaufArt.ROHSTOFFHANDEL,
                 SpielerAblaufArt.ANLEIHE_ERWORBEN,
-                SpielerAblaufArt.ZINS_ERHALTEN,
+                SpielerAblaufArt.ZINSZAHLUNG,
                 SpielerAblaufArt.ANLEIHE_VERKAUFT,
             ),
             ablauf.map { eintrag -> eintrag.art },
@@ -437,10 +438,28 @@ class SpielFinanzdatenTest {
         assertEquals(3, ablauf.first().anzahl)
         assertEquals("lehm", ablauf.first().rohstoffOderVorgang)
         assertEquals(
+            "Zinszahlung (1 von 2)",
+            ablauf.first { eintrag -> eintrag.art == SpielerAblaufArt.ZINSZAHLUNG }
+                .rohstoffOderVorgang,
+        )
+        assertEquals(
             10f,
             ablauf.first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_ERWORBEN }
                 .erwarteteAnleihenRenditeProzent ?: Float.NaN,
             0.001f,
+        )
+        val emittentenAblauf = spiel.erhalteSpielerAblauf(anna)
+        val emission = emittentenAblauf.first { eintrag ->
+            eintrag.art == SpielerAblaufArt.ANLEIHE_EMITTIERT
+        }
+        assertEquals("Anleihe emittiert", emission.rohstoffOderVorgang)
+        assertEquals("2 Runden je 2 Mark", emission.anleihenAnzeigeZusatz)
+        assertNull(emission.erwarteteAnleihenRenditeProzent)
+        assertEquals(
+            listOf(-2, -2),
+            emittentenAblauf
+                .filter { eintrag -> eintrag.art == SpielerAblaufArt.ZINSZAHLUNG }
+                .map { eintrag -> eintrag.preis.toIntOderNull() },
         )
         assertEquals(
             0f,
@@ -469,7 +488,7 @@ class SpielFinanzdatenTest {
 
         assertEquals(0f, anleihekauf.erwarteteAnleihenRenditeProzent ?: Float.NaN, 0.001f)
         assertTrue(
-            rundeSieben.indexOfFirst { eintrag -> eintrag.art == SpielerAblaufArt.ZINS_ERHALTEN } <
+            rundeSieben.indexOfFirst { eintrag -> eintrag.art == SpielerAblaufArt.ZINSZAHLUNG } <
                 rundeSieben.indexOf(anleihekauf)
         )
         assertEquals(
@@ -478,6 +497,12 @@ class SpielFinanzdatenTest {
                 eintrag.runde == 8 && eintrag.art == SpielerAblaufArt.RUECKKAUF_ERHALTEN
             }.preis.toIntOderNull(),
         )
+        val bernd = TestSpiel.spielerListe.single { spieler -> spieler.name == "Bernd" }
+        val ausloesung = TestSpiel.erhalteSpielerAblauf(bernd).first { eintrag ->
+            eintrag.runde == 8 && eintrag.art == SpielerAblaufArt.ANLEIHE_AUSGELOEST
+        }
+        assertEquals("Anleihe ausgelöst (Rückkauf)", ausloesung.rohstoffOderVorgang)
+        assertEquals(-60, ausloesung.preis.toIntOderNull())
     }
 
     @Test

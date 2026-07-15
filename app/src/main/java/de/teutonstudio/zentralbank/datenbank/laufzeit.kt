@@ -484,6 +484,7 @@ open class Spiel(
     }
 
     fun erhalteSpielerAblauf(spieler: Spieler): List<SpielerAblaufEintrag> {
+        val anleihenNachObjekt = anleihen.associateBy { anzeige -> anzeige.anleihe }
         val handelsZeilen = erhalteHandelsverlauf(spieler).mapNotNull { eintrag ->
             val handel = eintrag.handel
             val partner = if (handel.besitzer.name == spieler.name) {
@@ -501,59 +502,94 @@ open class Spiel(
                     rohstoffOderVorgang = handel.rohstoff.str,
                     preis = eintrag.saldo,
                 )
-                is Anleihenhandel -> SpielerAblaufEintrag(
-                    runde = eintrag.runde,
-                    art = if (eintrag.istEinnahme) {
-                        SpielerAblaufArt.ANLEIHE_VERKAUFT
-                    } else {
-                        SpielerAblaufArt.ANLEIHE_ERWORBEN
-                    },
-                    spieler = spieler.name,
-                    geschaeftspartner = partner.name,
-                    anzahl = 1,
-                    rohstoffOderVorgang = if (eintrag.istEinnahme) {
-                        "Anleihe verkauft"
-                    } else {
-                        "Anleihe erworben"
-                    },
-                    preis = eintrag.saldo,
-                    erwarteteAnleihenRenditeProzent = anleihen
-                        .firstOrNull { anzeige -> anzeige.anleihe == handel.anleihe }
-                        ?.erwarteteRenditeProzent(
-                            handelsrunde = eintrag.runde,
-                            handelspreis = handel.preis,
-                            istVerkauf = eintrag.istEinnahme,
-                        ),
-                )
+                is Anleihenhandel -> {
+                    val anzeige = anleihenNachObjekt[handel.anleihe]
+                    val istEmission = eintrag.istEinnahme && eintrag.runde == anzeige?.emittiert
+                    SpielerAblaufEintrag(
+                        runde = eintrag.runde,
+                        art = when {
+                            istEmission -> SpielerAblaufArt.ANLEIHE_EMITTIERT
+                            eintrag.istEinnahme -> SpielerAblaufArt.ANLEIHE_VERKAUFT
+                            else -> SpielerAblaufArt.ANLEIHE_ERWORBEN
+                        },
+                        spieler = spieler.name,
+                        geschaeftspartner = partner.name,
+                        anzahl = 1,
+                        rohstoffOderVorgang = when {
+                            istEmission -> "Anleihe emittiert"
+                            eintrag.istEinnahme -> "Anleihe verkauft"
+                            else -> "Anleihe erworben"
+                        },
+                        preis = eintrag.saldo,
+                        anleihenAnzeigeZusatz = anzeige?.takeIf { istEmission }?.let { emission ->
+                            "${emission.laufzeit} " +
+                                if (emission.laufzeit == 1) {
+                                    "Runde je ${emission.unvermoegen.zuMark()}"
+                                } else {
+                                    "Runden je ${emission.unvermoegen.zuMark()}"
+                                }
+                        },
+                        erwarteteAnleihenRenditeProzent = if (istEmission) {
+                            null
+                        } else {
+                            anzeige?.erwarteteRenditeProzent(
+                                handelsrunde = eintrag.runde,
+                                handelspreis = handel.preis,
+                                istVerkauf = eintrag.istEinnahme,
+                            )
+                        },
+                    )
+                }
                 else -> null
             }
         }
         val anleihenZahlungsZeilen = anleihen.flatMap { anleihe ->
             anleihe.erhalteAblauf()
-                .filter { eintrag ->
-                    (eintrag.art == AnleiheAblaufArt.ZINS ||
-                        eintrag.art == AnleiheAblaufArt.RUECKKAUF) &&
-                        eintrag.an.name == spieler.name &&
-                        eintrag.runde < aktuelleRunde
-                }
-                .map { eintrag ->
-                    SpielerAblaufEintrag(
-                        runde = eintrag.runde,
-                        art = if (eintrag.art == AnleiheAblaufArt.ZINS) {
-                            SpielerAblaufArt.ZINS_ERHALTEN
-                        } else {
-                            SpielerAblaufArt.RUECKKAUF_ERHALTEN
-                        },
-                        spieler = spieler.name,
-                        geschaeftspartner = eintrag.von.name,
-                        anzahl = null,
-                        rohstoffOderVorgang = if (eintrag.art == AnleiheAblaufArt.ZINS) {
-                            "Zins erhalten"
-                        } else {
-                            "Rückkauf erhalten"
-                        },
-                        preis = eintrag.betrag,
-                    )
+                .mapNotNull { eintrag ->
+                    if (eintrag.runde >= aktuelleRunde) return@mapNotNull null
+                    val istEmpfaenger = eintrag.an.name == spieler.name
+                    val istZahler = eintrag.von.name == spieler.name
+                    if (!istEmpfaenger && !istZahler) return@mapNotNull null
+
+                    when (eintrag.art) {
+                        AnleiheAblaufArt.ZINS -> SpielerAblaufEintrag(
+                            runde = eintrag.runde,
+                            art = SpielerAblaufArt.ZINSZAHLUNG,
+                            spieler = spieler.name,
+                            geschaeftspartner = if (istEmpfaenger) {
+                                eintrag.von.name
+                            } else {
+                                eintrag.an.name
+                            },
+                            anzahl = null,
+                            rohstoffOderVorgang = "Zinszahlung " +
+                                "(${eintrag.runde - anleihe.emittiert} von ${anleihe.laufzeit})",
+                            preis = if (istEmpfaenger) eintrag.betrag else -eintrag.betrag,
+                        )
+                        AnleiheAblaufArt.RUECKKAUF -> SpielerAblaufEintrag(
+                            runde = eintrag.runde,
+                            art = if (istEmpfaenger) {
+                                SpielerAblaufArt.RUECKKAUF_ERHALTEN
+                            } else {
+                                SpielerAblaufArt.ANLEIHE_AUSGELOEST
+                            },
+                            spieler = spieler.name,
+                            geschaeftspartner = if (istEmpfaenger) {
+                                eintrag.von.name
+                            } else {
+                                eintrag.an.name
+                            },
+                            anzahl = null,
+                            rohstoffOderVorgang = if (istEmpfaenger) {
+                                "Rückkauf erhalten"
+                            } else {
+                                "Anleihe ausgelöst (Rückkauf)"
+                            },
+                            preis = if (istEmpfaenger) eintrag.betrag else -eintrag.betrag,
+                        )
+                        AnleiheAblaufArt.EMISSION,
+                        AnleiheAblaufArt.HANDEL -> null
+                    }
                 }
         }
         return (handelsZeilen + anleihenZahlungsZeilen).sortedWith(
@@ -902,8 +938,10 @@ enum class SpielerAblaufArt(internal val reihenfolge: Int) {
     ROHSTOFFHANDEL(2),
     ANLEIHE_ERWORBEN(1),
     ANLEIHE_VERKAUFT(1),
-    ZINS_ERHALTEN(3),
+    ANLEIHE_EMITTIERT(1),
+    ZINSZAHLUNG(3),
     RUECKKAUF_ERHALTEN(4),
+    ANLEIHE_AUSGELOEST(4),
 }
 
 data class SpielerAblaufEintrag(
@@ -914,6 +952,7 @@ data class SpielerAblaufEintrag(
     val anzahl: Int?,
     val rohstoffOderVorgang: String,
     val preis: Zahlungsmittel,
+    val anleihenAnzeigeZusatz: String? = null,
     val erwarteteAnleihenRenditeProzent: Float? = null,
 )
 

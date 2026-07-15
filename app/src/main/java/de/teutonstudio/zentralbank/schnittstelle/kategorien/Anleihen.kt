@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -92,6 +93,7 @@ import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
+import de.teutonstudio.zentralbank.schnittstelle.mitAblaufRundentrenner
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
@@ -1112,7 +1114,7 @@ private fun AnleiheAblauf(
             rememberAblaufSpaltenbreite(
                 listOf(if (zeigeBuchungssatz) "Emittent an Halter" else "Zahlungsempfänger"),
                 11.sp,
-                64.dp,
+                84.dp,
             ),
             rememberAblaufSpaltenbreite(
                 ablauf.map { ereignis ->
@@ -1169,7 +1171,7 @@ private fun AnleiheAblauf(
                 buchungssatzSchalterAktiv = zeigeBuchungssatz,
                 beiBuchungssatzAenderung = { zeigeBuchungssatz = it },
             )
-            rundenGruppen.forEach { (runde, ereignisse) ->
+            rundenGruppen.entries.forEachIndexed { rundenIndex, (runde, ereignisse) ->
                 val istEingeklappt = runde in eingeklappteRunden
                 val rundenHintergrund = when {
                     runde < aktuelleRunde -> anleiheAbgelaufenFarbe
@@ -1192,9 +1194,10 @@ private fun AnleiheAblauf(
                         spaltenbreiten = spaltenbreiten,
                         beiRundenKlick = beiRundenKlick,
                         istKompakt = true,
+                        obereRundentrennung = rundenIndex > 0,
                     )
                 } else {
-                    ereignisse.forEach { ereignis ->
+                    ereignisse.forEachIndexed { ereignisIndex, ereignis ->
                         val zahlungsempfaenger = ereignis.zahlungsempfaenger
                         val zinsvergleich = if (ereignis.art == AnleiheAblaufArt.HANDEL) {
                             null
@@ -1217,6 +1220,7 @@ private fun AnleiheAblauf(
                             hintergrund = rundenHintergrund,
                             spaltenbreiten = spaltenbreiten,
                             beiRundenKlick = beiRundenKlick,
+                            obereRundentrennung = rundenIndex > 0 && ereignisIndex == 0,
                         )
                     }
                 }
@@ -1245,12 +1249,14 @@ private fun AnleiheAblaufTabellenzeile(
     buchungssatzSchalterAktiv: Boolean? = null,
     beiBuchungssatzAenderung: ((Boolean) -> Unit)? = null,
     istKompakt: Boolean = false,
+    obereRundentrennung: Boolean = false,
 ) {
     CompositionLocalProvider(LocalContentColor provides hintergrund.lesbareSchriftfarbe()) {
         Row(
             modifier = Modifier
                 .height(IntrinsicSize.Min)
-                .background(hintergrund),
+                .background(hintergrund)
+                .mitAblaufRundentrenner(obereRundentrennung),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnleiheTabellenZelle(
@@ -1394,6 +1400,8 @@ private fun AnleiheBuchungssatzKopfzelle(
                 modifier = Modifier.weight(1f),
                 fontSize = 11.sp,
                 textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Switch(
                 checked = aktiv,
