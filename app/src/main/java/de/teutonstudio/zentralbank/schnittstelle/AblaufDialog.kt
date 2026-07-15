@@ -3,7 +3,6 @@ package de.teutonstudio.zentralbank.schnittstelle
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -37,7 +36,8 @@ fun AblaufDialog(
     val konfiguration = LocalConfiguration.current
     val bildschirmbreite = konfiguration.screenWidthDp.dp
     val bildschirmhoehe = konfiguration.screenHeightDp.dp
-    val minimaleDialogbreite = minOf(640.dp, bildschirmbreite * 0.92f)
+    val maximaleDialogbreite = bildschirmbreite * breitenAnteil
+    val minimaleDialogbreite = minOf(360.dp, maximaleDialogbreite)
     val minimaleDialoghoehe = minOf(360.dp, bildschirmhoehe * 0.60f)
     val maximaleDialoghoehe = bildschirmhoehe * 0.88f
     Dialog(
@@ -46,8 +46,10 @@ fun AblaufDialog(
     ) {
         Card(
             modifier = Modifier
-                .widthIn(min = minimaleDialogbreite)
-                .fillMaxWidth(breitenAnteil)
+                .widthIn(
+                    min = minimaleDialogbreite,
+                    max = maximaleDialogbreite,
+                )
                 .heightIn(
                     min = minimaleDialoghoehe,
                     max = maximaleDialoghoehe,
@@ -55,12 +57,11 @@ fun AblaufDialog(
         ) {
             Column {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 4.dp),
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = titel,
-                        modifier = Modifier.weight(1f),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                     )
@@ -70,7 +71,6 @@ fun AblaufDialog(
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
                         .weight(1f, fill = false)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {

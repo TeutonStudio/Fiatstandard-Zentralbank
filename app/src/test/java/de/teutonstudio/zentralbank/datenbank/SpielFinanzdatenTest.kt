@@ -443,17 +443,40 @@ class SpielFinanzdatenTest {
             0.001f,
         )
         assertEquals(
-            5f,
+            0f,
             ablauf.first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_VERKAUFT }
                 .erwarteteAnleihenRenditeProzent ?: Float.NaN,
             0.001f,
         )
         assertEquals(
-            -4.7619f,
+            0f,
             spiel.erhalteSpielerAblauf(clara)
                 .first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_ERWORBEN }
                 .erwarteteAnleihenRenditeProzent ?: Float.NaN,
             0.001f,
+        )
+    }
+
+    @Test
+    fun davidsAnleihekaufEnthaeltZinsUndRueckkaufInChronologischUmgekehrterAnzeige() {
+        val david = TestSpiel.spielerListe.single { spieler -> spieler.name == "David" }
+        val ablauf = TestSpiel.erhalteSpielerAblauf(david)
+        val rundeSieben = ablauf.filter { eintrag -> eintrag.runde == 7 }
+        val anleihekauf = rundeSieben.first { eintrag ->
+            eintrag.art == SpielerAblaufArt.ANLEIHE_ERWORBEN &&
+                eintrag.preis == (-64).toZahlungsmittel()
+        }
+
+        assertEquals(0f, anleihekauf.erwarteteAnleihenRenditeProzent ?: Float.NaN, 0.001f)
+        assertTrue(
+            rundeSieben.indexOfFirst { eintrag -> eintrag.art == SpielerAblaufArt.ZINS_ERHALTEN } <
+                rundeSieben.indexOf(anleihekauf)
+        )
+        assertEquals(
+            60,
+            ablauf.first { eintrag ->
+                eintrag.runde == 8 && eintrag.art == SpielerAblaufArt.RUECKKAUF_ERHALTEN
+            }.preis.toIntOderNull(),
         )
     }
 

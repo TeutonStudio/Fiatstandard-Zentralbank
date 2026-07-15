@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -1122,7 +1123,7 @@ private fun AnleiheAblauf(
                     }
                 } + rundenGruppen.values.map { ereignisse -> "${ereignisse.size} Zahlungen" },
                 12.sp,
-                8.dp,
+                16.dp,
             ),
         ),
         betrag = maxOf(
@@ -1134,12 +1135,13 @@ private fun AnleiheAblauf(
             ),
         ),
     )
+    val tabellenbreite = spaltenbreiten.runde + spaltenbreiten.zinswerte +
+        spaltenbreiten.zahlungsempfaenger + spaltenbreiten.betrag
     LaunchedEffect(eintrag, aktuelleRunde) {
         ablaufScrollState.scrollTo(0)
     }
     Column(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(5.dp)
             .verticalScroll(ablaufScrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1148,7 +1150,7 @@ private fun AnleiheAblauf(
             text = "Vollständiger Ablauf bis zur Tilgung in Runde ${eintrag.faelligkeit} · " +
                 "Runde antippen zum Ein-/Ausklappen\n" +
                 "Für zukünftige Runden wird der aktuelle Leitzins fortgeschrieben.",
-            modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
+            modifier = Modifier.widthIn(max = tabellenbreite).padding(bottom = 5.dp),
             textAlign = TextAlign.Center,
         )
         Column(modifier = Modifier.horizontalScroll(tabellenScrollState)) {

@@ -528,28 +528,37 @@ open class Spiel(
                 else -> null
             }
         }
-        val zinsZeilen = anleihen.flatMap { anleihe ->
+        val anleihenZahlungsZeilen = anleihen.flatMap { anleihe ->
             anleihe.erhalteAblauf()
                 .filter { eintrag ->
-                    eintrag.art == AnleiheAblaufArt.ZINS &&
+                    (eintrag.art == AnleiheAblaufArt.ZINS ||
+                        eintrag.art == AnleiheAblaufArt.RUECKKAUF) &&
                         eintrag.an.name == spieler.name &&
                         eintrag.runde < aktuelleRunde
                 }
                 .map { eintrag ->
                     SpielerAblaufEintrag(
                         runde = eintrag.runde,
-                        art = SpielerAblaufArt.ZINS_ERHALTEN,
+                        art = if (eintrag.art == AnleiheAblaufArt.ZINS) {
+                            SpielerAblaufArt.ZINS_ERHALTEN
+                        } else {
+                            SpielerAblaufArt.RUECKKAUF_ERHALTEN
+                        },
                         spieler = spieler.name,
                         geschaeftspartner = eintrag.von.name,
                         anzahl = null,
-                        rohstoffOderVorgang = "Zins erhalten",
+                        rohstoffOderVorgang = if (eintrag.art == AnleiheAblaufArt.ZINS) {
+                            "Zins erhalten"
+                        } else {
+                            "Rückkauf erhalten"
+                        },
                         preis = eintrag.betrag,
                     )
                 }
         }
-        return (handelsZeilen + zinsZeilen).sortedWith(
+        return (handelsZeilen + anleihenZahlungsZeilen).sortedWith(
             compareBy<SpielerAblaufEintrag> { eintrag -> eintrag.runde }
-                .thenBy { eintrag -> eintrag.art.reihenfolge }
+                .thenByDescending { eintrag -> eintrag.art.reihenfolge }
         )
     }
 
@@ -890,10 +899,11 @@ data class SpielerHandelseintrag(
 }
 
 enum class SpielerAblaufArt(internal val reihenfolge: Int) {
-    ROHSTOFFHANDEL(0),
+    ROHSTOFFHANDEL(2),
     ANLEIHE_ERWORBEN(1),
     ANLEIHE_VERKAUFT(1),
-    ZINS_ERHALTEN(2),
+    ZINS_ERHALTEN(3),
+    RUECKKAUF_ERHALTEN(4),
 }
 
 data class SpielerAblaufEintrag(
@@ -916,7 +926,7 @@ private fun AnleiheAnzeige.erwarteteRenditeProzent(
 
     val erwarteteZahlungen = erhalteAblauf()
         .filter { eintrag ->
-            eintrag.runde > handelsrunde &&
+            eintrag.runde >= handelsrunde &&
                 (eintrag.art == AnleiheAblaufArt.ZINS ||
                     eintrag.art == AnleiheAblaufArt.RUECKKAUF)
         }

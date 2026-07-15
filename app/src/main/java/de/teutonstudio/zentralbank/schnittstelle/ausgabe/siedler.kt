@@ -686,6 +686,8 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
             ),
         ),
     )
+    val tabellenbreite = spaltenbreiten.runde + spaltenbreiten.geschaeftspartner +
+        spaltenbreiten.vorgang + spaltenbreiten.preis
     val sichtbareRunden = rundenGruppen.keys
     val alleRundenEingeklappt = sichtbareRunden.isNotEmpty() &&
         sichtbareRunden.all(eingeklappteRunden::contains)
@@ -699,7 +701,6 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
             .padding(5.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -719,7 +720,9 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                 supportingText = { Text("Kleinste dargestellte Runde") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
+                modifier = Modifier
+                    .width(minOf(320.dp, tabellenbreite))
+                    .padding(bottom = 5.dp),
             )
             Column(modifier = Modifier.horizontalScroll(tabellenScrollState)) {
                 SpielerAblaufKopfzeile(
