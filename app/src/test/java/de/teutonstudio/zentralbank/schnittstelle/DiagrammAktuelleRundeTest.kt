@@ -8,6 +8,14 @@ import org.junit.Test
 
 class DiagrammAktuelleRundeTest {
     @Test
+    fun rundenwerteOhneSubrundenEnthaltenNurVolleRunden() {
+        assertEquals(
+            listOf(0, 1, 2, 3, 4),
+            rundenXWerteOhneSubrunden(anzahl = 5),
+        )
+    }
+
+    @Test
     fun siebenSpielerErzeugenSechsSubrundenpunkteZwischenZweiRunden() {
         val zeitpunkt = SpielZeitpunkt(
             runde = 3,

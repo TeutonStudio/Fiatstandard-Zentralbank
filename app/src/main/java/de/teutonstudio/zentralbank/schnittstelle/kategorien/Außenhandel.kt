@@ -54,9 +54,10 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberVollrundenachse
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.rundenXWerteOhneSubrunden
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
-import de.teutonstudio.zentralbank.schnittstelle.seriesMitSubrundenPrognose
 
 private data class HafenTarif(
     val bezeichnung: String,
@@ -172,10 +173,11 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                 BilanzEinheit.STUECK -> CartesianChartModel(
                     ColumnCartesianLayerModel.build {
                         sichtbareReihen.forEach { (_, werte) ->
-                            seriesMitSubrundenPrognose(
-                                x = werte.indices.toList(),
+                            series(
+                                x = rundenXWerteOhneSubrunden(
+                                    anzahl = werte.size,
+                                ),
                                 y = werte,
-                                zeitpunkt = zeitpunkt,
                             )
                         }
                     }
@@ -200,8 +202,8 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
             }
             Text(
                 text = when (einheit) {
-                    BilanzEinheit.PREIS -> "Preisdifferenz (kumuliert)"
-                    BilanzEinheit.STUECK -> "Stückdifferenz (kumuliert)"
+                    BilanzEinheit.PREIS -> "Außenhandelsbilanz (kumuliert)"
+                    BilanzEinheit.STUECK -> "Außenmengenbilanz (kumuliert)"
                 },
                 fontSize = 24.sp,
                 modifier = ModiPad5,
@@ -224,7 +226,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                             BilanzEinheit.STUECK -> rememberColumnCartesianLayer(
                                 columnProvider = rememberSaeulenMitGepunkteterAktuellerRunde(
                                     eintraege = sichtbareReihen.map { (eintrag, _) -> eintrag },
-                                    prognoseAbX = zeitpunkt.prognoseAbX,
+                                    prognoseAbX = zeitpunkt.runde,
                                 )
                             )
                         },
@@ -243,7 +245,10 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                                 VerticalAxis.ItemPlacer.step()
                             },
                         ),
-                        bottomAxis = rememberRundenachse(zeitpunkt),
+                        bottomAxis = when (einheit) {
+                            BilanzEinheit.PREIS -> rememberRundenachse(zeitpunkt)
+                            BilanzEinheit.STUECK -> rememberVollrundenachse()
+                        },
                     ),
                     model = chartModel,
                     scrollState = rememberVicoScrollState(),

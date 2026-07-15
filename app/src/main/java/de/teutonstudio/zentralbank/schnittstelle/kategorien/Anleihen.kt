@@ -506,7 +506,6 @@ private fun BalanceChart(
                             lineProvider = LineCartesianLayer.LineProvider.series(
                                 rememberLinienMitGepunkteterAktuellerRunde(
                                     eintraege = sichtbareReihen.map { reihe -> reihe.eintrag },
-                                    mitPunkten = true,
                                 )
                             )
                         ),
@@ -636,7 +635,6 @@ private fun GlobalBalanceChart(
                             lineProvider = LineCartesianLayer.LineProvider.series(
                                 rememberLinienMitGepunkteterAktuellerRunde(
                                     eintraege = sichtbareReihen.map { reihe -> reihe.eintrag },
-                                    mitPunkten = true,
                                 )
                             )
                         ),
@@ -742,7 +740,6 @@ private fun LeitzinsEmissionenChart(
         lineProvider = LineCartesianLayer.LineProvider.series(
             rememberLinienMitGepunkteterAktuellerRunde(
                 eintraege = listOf(leitzinsLegende),
-                mitPunkten = true,
             )
         )
     )

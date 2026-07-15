@@ -6,8 +6,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.patrykandpatrick.vico.compose.cartesian.CartesianDrawingContext
 import com.patrykandpatrick.vico.compose.cartesian.axis.Axis
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisGuidelineComponent
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
@@ -18,9 +20,10 @@ import com.patrykandpatrick.vico.compose.common.DashedShape
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.LineComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
-import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import de.teutonstudio.zentralbank.datenbank.SpielZeitpunkt
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 internal data class DiagrammSubrundenDaten(
@@ -28,6 +31,13 @@ internal data class DiagrammSubrundenDaten(
     val y: List<Number>,
     val prognoseAbX: Double,
 )
+
+internal fun rundenXWerteOhneSubrunden(
+    anzahl: Int,
+): List<Int> {
+    require(anzahl >= 0) { "Die Anzahl der Rundenwerte darf nicht negativ sein." }
+    return List(anzahl) { runde -> runde }
+}
 
 internal fun erweitereDiagrammUmSubrunden(
     x: Collection<Number>,
@@ -144,30 +154,67 @@ fun rememberRundenachse(
     )
 }
 
+private fun vollrundenImBereich(
+    sichtbarerBereich: ClosedFloatingPointRange<Double>,
+    gesamterBereich: ClosedFloatingPointRange<Double>,
+    rand: Int,
+): List<Double> {
+    val ersteRunde = maxOf(
+        ceil(sichtbarerBereich.start).toInt() - rand,
+        ceil(gesamterBereich.start).toInt(),
+    )
+    val letzteRunde = minOf(
+        floor(sichtbarerBereich.endInclusive).toInt() + rand,
+        floor(gesamterBereich.endInclusive).toInt(),
+    )
+    if (ersteRunde > letzteRunde) return emptyList()
+    return (ersteRunde..letzteRunde).map(Int::toDouble)
+}
+
+@Composable
+fun rememberVollrundenachse(): HorizontalAxis<Axis.Position.Horizontal.Bottom> {
+    val itemPlacer = remember {
+        val basis = HorizontalAxis.ItemPlacer.aligned(spacing = { 1 })
+        object : HorizontalAxis.ItemPlacer by basis {
+            override fun getLabelValues(
+                context: CartesianDrawingContext,
+                visibleXRange: ClosedFloatingPointRange<Double>,
+                fullXRange: ClosedFloatingPointRange<Double>,
+                maxLabelWidth: Float,
+            ): List<Double> = vollrundenImBereich(visibleXRange, fullXRange, rand = 2)
+
+            override fun getLineValues(
+                context: CartesianDrawingContext,
+                visibleXRange: ClosedFloatingPointRange<Double>,
+                fullXRange: ClosedFloatingPointRange<Double>,
+                maxLabelWidth: Float,
+            ): List<Double> = vollrundenImBereich(visibleXRange, fullXRange, rand = 1)
+        }
+    }
+    val formatter = remember {
+        CartesianValueFormatter { _, value, _ -> value.roundToInt().toString() }
+    }
+    val hilfslinie = rememberAxisGuidelineComponent(
+        shape = DashedShape(
+            shape = CircleShape,
+            dashLength = 2.dp,
+            gapLength = 4.dp,
+        )
+    )
+    return HorizontalAxis.rememberBottom(
+        valueFormatter = formatter,
+        guideline = hilfslinie,
+        itemPlacer = itemPlacer,
+    )
+}
+
 @Composable
 fun rememberLinienMitGepunkteterAktuellerRunde(
     eintraege: List<DiagrammLegendenEintrag>,
-    mitPunkten: Boolean = false,
 ): List<LineCartesianLayer.Line> = eintraege.flatMap { eintrag ->
     val farbe = eintrag.farbe
     val fuellung = remember(farbe) {
         LineCartesianLayer.LineFill.single(Fill(farbe))
-    }
-    val punktProvider = if (mitPunkten) {
-        val punktKomponente = rememberShapeComponent(
-            fill = Fill(farbe),
-            shape = CircleShape,
-        )
-        remember(punktKomponente) {
-            LineCartesianLayer.PointProvider.single(
-                LineCartesianLayer.Point(
-                    component = punktKomponente,
-                    size = 6.dp,
-                )
-            )
-        }
-    } else {
-        null
     }
     val interpolator = remember {
         LineCartesianLayer.Interpolator.cubic(curvature = 0.5f)
@@ -175,7 +222,6 @@ fun rememberLinienMitGepunkteterAktuellerRunde(
     listOf(
         LineCartesianLayer.rememberLine(
             fill = fuellung,
-            pointProvider = punktProvider,
             interpolator = interpolator,
         ),
         LineCartesianLayer.rememberLine(
@@ -185,7 +231,6 @@ fun rememberLinienMitGepunkteterAktuellerRunde(
                 dashLength = 2.dp,
                 gapLength = 4.dp,
             ),
-            pointProvider = punktProvider,
             interpolator = interpolator,
         ),
     )

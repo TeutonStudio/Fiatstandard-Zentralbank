@@ -81,13 +81,17 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegen
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberVollrundenachse
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.rundenXWerteOhneSubrunden
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
-import de.teutonstudio.zentralbank.schnittstelle.seriesMitSubrundenPrognose
 
-private enum class MarktpreisKategorie(val titel: String) {
-    HANDELSGUETER("Alle Handelsgüter"),
-    HANDELSDIFFERENZ("Handelsdifferenz"),
+private enum class MarktpreisKategorie(
+    val titel: String,
+    val überschrift: String,
+) {
+    HANDELSGUETER("Preishistorie", "Preishistorie"),
+    HANDELSDIFFERENZ("Innenbilanz", "Innenbilanz (kumuliert)"),
 }
 
 private enum class WarenkorbReihe {
@@ -142,15 +146,13 @@ private fun List<List<Int>>.zuLinienChart(
 @Composable
 private fun List<Map<Rohstoffe, Int>>.zuStueckDifferenzChart(
     rohstoffe: List<Rohstoffe>,
-    zeitpunkt: SpielZeitpunkt,
-): CartesianChartModel = remember(this, rohstoffe, zeitpunkt) {
+): CartesianChartModel = remember(this, rohstoffe) {
     CartesianChartModel(
         ColumnCartesianLayerModel.build {
             rohstoffe.forEach { rohstoff ->
-                seriesMitSubrundenPrognose(
-                    x = indices.toList(),
+                series(
+                    x = rundenXWerteOhneSubrunden(size),
                     y = map { differenz -> differenz[rohstoff] ?: 0 },
-                    zeitpunkt = zeitpunkt,
                 )
             }
         }
@@ -295,7 +297,6 @@ fun zeigeMarktplatz(
                                         .erhalteRohstoffHandelsstueckDifferenz(person)
                                         .zuStueckDifferenzChart(
                                             ausgewaehlteRohstoffe,
-                                            spiel.aktuellerZeitpunkt,
                                         )
 
                                     HandelsdifferenzEinheit.MARK -> {
@@ -346,6 +347,12 @@ fun zeigeMarktplatz(
                             }
                         }
 
+                        Text(
+                            text = marktpreisKategorie.überschrift,
+                            fontSize = 24.sp,
+                            modifier = ModiPad5,
+                        )
+
                         if (chartModel == null) {
                             Text(
                                 text = "Keine Datenreihe ausgewählt",
@@ -363,8 +370,7 @@ fun zeigeMarktplatz(
                                             columnProvider =
                                                 rememberSaeulenMitGepunkteterAktuellerRunde(
                                                     eintraege = sichtbareLegende,
-                                                    prognoseAbX =
-                                                        spiel.aktuellerZeitpunkt.prognoseAbX,
+                                                    prognoseAbX = spiel.aktuellerZeitpunkt.runde,
                                                 ),
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
@@ -382,7 +388,7 @@ fun zeigeMarktplatz(
                                                 VerticalAxis.ItemPlacer.step()
                                             },
                                         ),
-                                        bottomAxis = rememberRundenachse(spiel.aktuellerZeitpunkt),
+                                        bottomAxis = rememberVollrundenachse(),
                                     ),
                                     model = chartModel,
                                     scrollState = rememberVicoScrollState(),
