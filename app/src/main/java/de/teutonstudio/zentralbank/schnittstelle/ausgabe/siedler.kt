@@ -19,11 +19,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -73,6 +77,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
@@ -513,16 +518,20 @@ fun zeigeSpielerDaten(
 
     Card(
         modifier = ModiPad5,
+        colors = CardDefaults.cardColors(
+            containerColor = siedlerFarbe,
+            contentColor = siedlerFarbe.lesbareSchriftfarbe(),
+        ),
         onClick = {
             if (istBearbeitbar) {
                 isPlayerExpanded.value = !isPlayerExpanded.value
             } else {
                 zeigeAblaufDialog = true
             }
-        }
+        },
     ) {
         Box(
-            modifier = Modifier.background(siedlerFarbe).fillMaxSize().offset(20.dp, 0.dp)
+            modifier = Modifier.fillMaxSize().offset(20.dp, 0.dp)
         ) {
             Column(modifier = Modifier.width(280.dp)) {
                 VerticalGrid(
@@ -702,7 +711,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                             geschaeftspartner = "${zeilen.size} Zeilen",
                             rohstoffOderVorgang = "eingeklappt",
                             preis = "Saldo: ${saldo.zuMark()}",
-                            hintergrund = Color(0xFFE1E1E1),
+                            hintergrund = MaterialTheme.colorScheme.surfaceVariant,
                             beiRundenKlick = beiRundenKlick,
                             istKompakt = true,
                         )
@@ -713,7 +722,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                                 geschaeftspartner = "kumulativ",
                                 rohstoffOderVorgang = "Saldo zum Rundenende",
                                 preis = minRundenSaldo.zuMark(),
-                                hintergrund = Color(0xFFE1E1E1),
+                                hintergrund = MaterialTheme.colorScheme.surfaceVariant,
                                 beiRundenKlick = beiRundenKlick,
                                 istKompakt = true,
                             )
@@ -752,39 +761,41 @@ private fun SpielerAblaufTabellenzeile(
     beiRundenKlick: (() -> Unit)? = null,
     istKompakt: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(hintergrund),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TabellenZelle(
-            text = runde,
-            modifier = Modifier.weight(0.5f),
-            istKopfzeile = istKopfzeile,
-            beiKlick = beiRundenKlick,
-            istKompakt = istKompakt,
-        )
-        TabellenZelle(
-            text = geschaeftspartner,
-            modifier = Modifier.weight(1.15f),
-            istKopfzeile = istKopfzeile,
-            istKompakt = istKompakt,
-        )
-        TabellenZelle(
-            text = rohstoffOderVorgang,
-            modifier = Modifier.weight(1.55f),
-            textAlign = TextAlign.Start,
-            istKopfzeile = istKopfzeile,
-            istKompakt = istKompakt,
-        )
-        TabellenZelle(
-            text = preis,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.End,
-            istKopfzeile = istKopfzeile,
-            istKompakt = istKompakt,
-        )
+    CompositionLocalProvider(LocalContentColor provides hintergrund.lesbareSchriftfarbe()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(hintergrund),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabellenZelle(
+                text = runde,
+                modifier = Modifier.weight(0.5f),
+                istKopfzeile = istKopfzeile,
+                beiKlick = beiRundenKlick,
+                istKompakt = istKompakt,
+            )
+            TabellenZelle(
+                text = geschaeftspartner,
+                modifier = Modifier.weight(1.15f),
+                istKopfzeile = istKopfzeile,
+                istKompakt = istKompakt,
+            )
+            TabellenZelle(
+                text = rohstoffOderVorgang,
+                modifier = Modifier.weight(1.55f),
+                textAlign = TextAlign.Start,
+                istKopfzeile = istKopfzeile,
+                istKompakt = istKompakt,
+            )
+            TabellenZelle(
+                text = preis,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End,
+                istKopfzeile = istKopfzeile,
+                istKompakt = istKompakt,
+            )
+        }
     }
 }
 
@@ -801,39 +812,42 @@ private fun SpielerAblaufKopfzeile(
     onRohstoffMenue: (Boolean) -> Unit,
     onRohstoffFilter: (String?) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().background(Color(0xFFE1E1E1)),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TabellenZelle(
-            text = "Runde",
-            modifier = Modifier.weight(0.5f),
-            istKopfzeile = true,
-        )
-        AblaufFilterZelle(
-            label = "Geschäftspartner",
-            auswahl = geschaeftspartnerFilter,
-            optionen = geschaeftspartnerOptionen,
-            menueOffen = geschaeftspartnerMenueOffen,
-            onMenueAendern = onGeschaeftspartnerMenue,
-            onAuswahl = onGeschaeftspartnerFilter,
-            modifier = Modifier.weight(1.15f),
-        )
-        AblaufFilterZelle(
-            label = "Rohstoff / Vorgang",
-            auswahl = rohstoffFilter,
-            optionen = rohstoffOptionen,
-            menueOffen = rohstoffMenueOffen,
-            onMenueAendern = onRohstoffMenue,
-            onAuswahl = onRohstoffFilter,
-            modifier = Modifier.weight(1.55f),
-        )
-        TabellenZelle(
-            text = "Preis",
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.End,
-            istKopfzeile = true,
-        )
+    val hintergrund = MaterialTheme.colorScheme.surfaceVariant
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+        Row(
+            modifier = Modifier.fillMaxWidth().background(hintergrund),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabellenZelle(
+                text = "Runde",
+                modifier = Modifier.weight(0.5f),
+                istKopfzeile = true,
+            )
+            AblaufFilterZelle(
+                label = "Geschäftspartner",
+                auswahl = geschaeftspartnerFilter,
+                optionen = geschaeftspartnerOptionen,
+                menueOffen = geschaeftspartnerMenueOffen,
+                onMenueAendern = onGeschaeftspartnerMenue,
+                onAuswahl = onGeschaeftspartnerFilter,
+                modifier = Modifier.weight(1.15f),
+            )
+            AblaufFilterZelle(
+                label = "Rohstoff / Vorgang",
+                auswahl = rohstoffFilter,
+                optionen = rohstoffOptionen,
+                menueOffen = rohstoffMenueOffen,
+                onMenueAendern = onRohstoffMenue,
+                onAuswahl = onRohstoffFilter,
+                modifier = Modifier.weight(1.55f),
+            )
+            TabellenZelle(
+                text = "Preis",
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End,
+                istKopfzeile = true,
+            )
+        }
     }
 }
 

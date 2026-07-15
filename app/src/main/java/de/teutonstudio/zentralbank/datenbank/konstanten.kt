@@ -66,7 +66,7 @@ val Bauteil.farbe: Color get() = when (this) {
     Wirtschaftsregionen.SRAFINNERIE -> Color(0xFF4D7164)
     Wirtschaftsregionen.KOHLEMINE -> Color(0xFF865B63)
     Wirtschaftsregionen.STAHLFABRIK -> Color(0xFF666A7B)
-    Wirtschaftsregionen.EISENMINE -> Color(0xFF796149)
+    Wirtschaftsregionen.EISENMINE -> Color(0xFF7B634B)
 }
 fun Int.zuZinssatz(): String = "$this %"
 fun Zahlungsmittel.zuMark(): String = "${toIntOderNull()} Mark"
@@ -135,10 +135,10 @@ enum class Rohstoffe(val str: String, val farbe: Color) {
     LEHM("lehm", Color(0xFFB58B5A)),
     ZIEGEL("ziegel", Color(0xFFA75D5D)),
     HOLZ("holz", Color(0xFF6F8061)),
-    ROHÖL("rohöl", Color(0xFF4F565D)),
-    SCHWERÖL("schweröl", Color(0xFF6D5A70)),
+    ROHÖL("rohöl", Color(0xFF66737D)),
+    SCHWERÖL("schweröl", Color(0xFF795F7C)),
     DIESEL("diesel", Color(0xFF8A7A45)),
-    KOHLE("kohle", Color(0xFF343A40)),
+    KOHLE("kohle", Color(0xFF697078)),
     STAHL("stahl", Color(0xFF718096)),
     EISEN("eisen", Color(0xFF8C6F63));
 

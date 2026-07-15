@@ -49,6 +49,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
+import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
@@ -303,7 +304,8 @@ private fun HafenPreisKarte(marktpreise: Map<Rohstoffe, Zahlungsmittel>) {
                 Card(
                     modifier = ModiPad5.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = rohstoff.farbe.copy(alpha = 0.32f),
+                        containerColor = rohstoff.farbe,
+                        contentColor = rohstoff.farbe.lesbareSchriftfarbe(),
                     ),
                 ) {
                     Row(

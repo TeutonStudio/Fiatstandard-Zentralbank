@@ -20,11 +20,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -81,6 +84,7 @@ import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
+import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
@@ -949,7 +953,10 @@ private fun AnleiheCard(
     Card(
         modifier = modifier,
         onClick = onShowAblauf,
-        colors = CardDefaults.cardColors(containerColor = statusFarbe),
+        colors = CardDefaults.cardColors(
+            containerColor = statusFarbe,
+            contentColor = statusFarbe.lesbareSchriftfarbe(),
+        ),
     ) {
         Grid({
                 repeat(2) { column(100.dp) }
@@ -1027,7 +1034,7 @@ private fun AnleiheAblauf(
                 "Zahlungsempfänger"
             },
             betrag = "Betrag",
-            hintergrund = Color(0xFFE1E1E1),
+            hintergrund = MaterialTheme.colorScheme.surfaceVariant,
             istKopfzeile = true,
             buchungssatzSchalterAktiv = zeigeBuchungssatz,
             beiBuchungssatzAenderung = { zeigeBuchungssatz = it },
@@ -1087,41 +1094,43 @@ private fun AnleiheAblaufTabellenzeile(
     beiBuchungssatzAenderung: ((Boolean) -> Unit)? = null,
     istKompakt: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(hintergrund),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AnleiheTabellenZelle(
-            text = runde,
-            modifier = Modifier.weight(0.6f),
-            istKopfzeile = istKopfzeile,
-            beiKlick = beiRundenKlick,
-            istKompakt = istKompakt,
-        )
-        if (buchungssatzSchalterAktiv != null && beiBuchungssatzAenderung != null) {
-            AnleiheBuchungssatzKopfzelle(
-                text = zahlungsempfaenger,
-                aktiv = buchungssatzSchalterAktiv,
-                beiAenderung = beiBuchungssatzAenderung,
-                modifier = Modifier.weight(1.4f),
-            )
-        } else {
+    CompositionLocalProvider(LocalContentColor provides hintergrund.lesbareSchriftfarbe()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(hintergrund),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             AnleiheTabellenZelle(
-                text = zahlungsempfaenger,
-                modifier = Modifier.weight(1.4f),
+                text = runde,
+                modifier = Modifier.weight(0.6f),
+                istKopfzeile = istKopfzeile,
+                beiKlick = beiRundenKlick,
+                istKompakt = istKompakt,
+            )
+            if (buchungssatzSchalterAktiv != null && beiBuchungssatzAenderung != null) {
+                AnleiheBuchungssatzKopfzelle(
+                    text = zahlungsempfaenger,
+                    aktiv = buchungssatzSchalterAktiv,
+                    beiAenderung = beiBuchungssatzAenderung,
+                    modifier = Modifier.weight(1.4f),
+                )
+            } else {
+                AnleiheTabellenZelle(
+                    text = zahlungsempfaenger,
+                    modifier = Modifier.weight(1.4f),
+                    istKopfzeile = istKopfzeile,
+                    istKompakt = istKompakt,
+                )
+            }
+            AnleiheTabellenZelle(
+                text = betrag,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.End,
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
             )
         }
-        AnleiheTabellenZelle(
-            text = betrag,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.End,
-            istKopfzeile = istKopfzeile,
-            istKompakt = istKompakt,
-        )
     }
 }
 
@@ -1132,25 +1141,29 @@ private fun AnleiheBuchungssatzKopfzelle(
     beiAenderung: (Boolean) -> Unit,
     modifier: Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .background(if (aktiv) Color(0xFFB8D8B2) else Color.Transparent)
-            .border(0.5.dp, Color(0xFF8D8D8D))
-            .padding(horizontal = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.weight(1f),
-            fontSize = 9.sp,
-            textAlign = TextAlign.Center,
-        )
-        Switch(
-            checked = aktiv,
-            onCheckedChange = beiAenderung,
-            modifier = Modifier.scale(0.65f),
-        )
+    val hintergrund = if (aktiv) Color(0xFFB8D8B2) else Color.Transparent
+    val inhaltFarbe = if (aktiv) hintergrund.lesbareSchriftfarbe() else LocalContentColor.current
+    CompositionLocalProvider(LocalContentColor provides inhaltFarbe) {
+        Row(
+            modifier = modifier
+                .background(hintergrund)
+                .border(0.5.dp, Color(0xFF8D8D8D))
+                .padding(horizontal = 3.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = text,
+                modifier = Modifier.weight(1f),
+                fontSize = 9.sp,
+                textAlign = TextAlign.Center,
+            )
+            Switch(
+                checked = aktiv,
+                onCheckedChange = beiAenderung,
+                modifier = Modifier.scale(0.65f),
+            )
+        }
     }
 }
 

@@ -34,6 +34,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.TextCard
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
+import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 
 @Composable
 fun definiereRohstoffMenge(
@@ -73,7 +74,8 @@ fun definiereWarenkorb(
             Card(
                 modifier = ModiPad5,
                 colors = CardDefaults.cardColors(
-                    containerColor = it.farbe.copy(alpha = 0.32f),
+                    containerColor = it.farbe,
+                    contentColor = it.farbe.lesbareSchriftfarbe(),
                 ),
             ) {
                 definiereRohstoffMenge(it,menge)
@@ -110,7 +112,8 @@ fun WarenkorbBearbeitenDialog(
                     Card(
                         modifier = ModiPad5,
                         colors = CardDefaults.cardColors(
-                            containerColor = rohstoff.farbe.copy(alpha = 0.32f),
+                            containerColor = rohstoff.farbe,
+                            contentColor = rohstoff.farbe.lesbareSchriftfarbe(),
                         ),
                     ) {
                         Row(

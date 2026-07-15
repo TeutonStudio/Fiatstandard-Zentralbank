@@ -32,6 +32,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.TextCard
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteil
+import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 
 
 @Composable
@@ -86,7 +87,8 @@ fun definiereBauteile(
                             LaunchedEffect(menge.intValue) { inhalt[it] = menge.intValue }
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = it.farbe.copy(alpha = 0.32f),
+                                    containerColor = it.farbe,
+                                    contentColor = it.farbe.lesbareSchriftfarbe(),
                                 ),
                             ) {
                                 definiereBauteilMenge(it, menge)

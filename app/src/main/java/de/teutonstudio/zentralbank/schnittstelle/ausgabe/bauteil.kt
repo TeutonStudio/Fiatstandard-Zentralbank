@@ -33,6 +33,7 @@ import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.datenbank.zuPreis
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.RightText
+import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import java.util.EnumMap
 
 
@@ -92,7 +93,8 @@ fun zeigeBauteilPreis(
         modifier = modifier,
         onClick = { beiKlick(bauteil) },
         colors = CardDefaults.cardColors(
-            containerColor = bauteil.farbe.copy(alpha = 0.32f),
+            containerColor = bauteil.farbe,
+            contentColor = bauteil.farbe.lesbareSchriftfarbe(),
         ),
     ) {
         val inhalt = bauteil.kosten.filter { if (nicht_null_zeilen) true else it.value != 0 }.map { it.key to (it.value to marktpreise[it.key]!!.zuMark()) }.toMap()

@@ -70,6 +70,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteilPreis
+import de.teutonstudio.zentralbank.schnittstelle.auslandFarbe
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
@@ -248,7 +249,7 @@ fun zeigeMarktplatz(
                         bezeichnung = person.name,
                         farbe = when (person) {
                             is Spieler -> spielerFarben.getValue(person)
-                            Ausland -> Color(0xFF455A64)
+                            Ausland -> auslandFarbe
                             else -> Color.Gray
                         },
                     )
