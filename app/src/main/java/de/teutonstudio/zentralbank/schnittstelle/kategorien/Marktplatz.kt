@@ -104,7 +104,7 @@ private enum class HandelsdifferenzEinheit(
     val achsenEinheit: String,
 ) {
     STUECK("Stk", "Stk"),
-    MARK("Mark", "M"),
+    MARK("Mark", "ℳ"),
 }
 
 private val warenkorbMarktfarbe = Color(0xFF75658A)

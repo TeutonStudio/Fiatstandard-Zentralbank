@@ -254,7 +254,7 @@ private fun exponentiellerMarkAchsenFormatter(
     } else {
         String.format(Locale.GERMANY, "%.1f", originalwert)
     }
-    "$beschriftung M"
+    "$beschriftung ℳ"
 }
 
 @Composable

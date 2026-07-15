@@ -235,7 +235,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                                 positiveRichtung = "Export",
                                 negativeRichtung = "Import",
                                 einheit = when (einheit) {
-                                    BilanzEinheit.PREIS -> "M"
+                                    BilanzEinheit.PREIS -> "ℳ"
                                     BilanzEinheit.STUECK -> "Stk"
                                 },
                             ),

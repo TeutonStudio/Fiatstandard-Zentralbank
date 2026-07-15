@@ -1058,16 +1058,16 @@ private fun baueZahlungsmittel(
         val ONE = Zahlungsmittel(1, listOf(1))
 
         private val WÄHRUNGS_EINHEITEN = listOf(
-            "Mark" to "M",
-            "Tausend Mark" to "Tsd M",
-            "Million Mark" to "Mio M",
-            "Milliarde Mark" to "Mia M",
-            "Billion Mark" to "Bio M",
-            "Billiarde Mark" to "Bia M",
-            "Trillion Mark" to "Trio M",
-            "Trilliarde Mark" to "Tria M",
-            "Quadrillion Mark" to "Qrio M",
-            "Quadrilliarde Mark" to "Qria M"
+            "Mark" to "ℳ",
+            "Tausend Mark" to "Tsd ℳ",
+            "Million Mark" to "Mio ℳ",
+            "Milliarde Mark" to "Mia ℳ",
+            "Billion Mark" to "Bio ℳ",
+            "Billiarde Mark" to "Bia ℳ",
+            "Trillion Mark" to "Trio ℳ",
+            "Trilliarde Mark" to "Tria ℳ",
+            "Quadrillion Mark" to "Qrio ℳ",
+            "Quadrilliarde Mark" to "Qria ℳ"
         )
 
         fun finanzQuote(
