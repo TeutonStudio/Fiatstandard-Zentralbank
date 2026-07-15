@@ -76,11 +76,9 @@ import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.schnittstelle.AblaufDialog
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
-import de.teutonstudio.zentralbank.schnittstelle.LeftText
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
-import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
@@ -538,64 +536,62 @@ fun zeigeSpielerDaten(
         },
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                VerticalGrid(
-                    columns = SimpleGridCells.Fixed(2),
-                    modifier = ModiPad5,
-                ) {
-                    Text(
-                        text = siedlerName,
-                        fontSize = 20.sp,
-                        modifier = ModiPad5.span(2),
-                        textAlign = TextAlign.Center
-                    )
+            Column(modifier = ModiPad5.fillMaxWidth()) {
+                Text(
+                    text = siedlerName,
+                    fontSize = 20.sp,
+                    modifier = ModiPad5.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
 
-                    if (isPlayerExpanded.value && istBearbeitbar) {
-                        Bauteil.entries.forEach { bauteil ->
-                            RightText(text = "$bauteil: ")
+                if (isPlayerExpanded.value && istBearbeitbar) {
+                    Bauteil.entries.forEach { bauteil ->
+                        val amount = playerBauteilAmount[bauteil] ?: 0
+                        BauteilMengenZeile(
+                            bezeichnung = bauteil.str,
+                            anzahl = amount,
+                        ) {
+                            val modi = Modifier.padding(horizontal = 5.dp)
+                            Image(
+                                painter = painterResource(id = R.drawable.plus),
+                                contentDescription = null,
+                                modifier = modi.clickable {
+                                    playerBauteilAmount[bauteil] = amount + 1
+                                    onManipulateData(siedlerName, bauteil, true)
+                                }
+                            )
 
-                            Row {
-                                val amount = playerBauteilAmount[bauteil] ?: 0
-                                val modi = Modifier.padding(5.dp, 0.dp)
-
-                                LeftText(text = "$amount stk",modifier = modi)
-
-                                Image(
-                                    painter = painterResource(id = R.drawable.plus),
-                                    contentDescription = null,
-                                    modifier = modi.clickable {
-                                        playerBauteilAmount[bauteil] = amount + 1
-                                        onManipulateData(siedlerName, bauteil, true)
-                                    }
-                                )
-
-                                Image(
-                                    painter = painterResource(id = R.drawable.minus),
-                                    contentDescription = null,
-                                    alpha = 0.5f,
-                                    modifier = modi.clickable {
-                                        playerBauteilAmount[bauteil] = amount - 1
-                                        onManipulateData(siedlerName, bauteil, false)
-                                    }
-                                )
-                            }
+                            Image(
+                                painter = painterResource(id = R.drawable.minus),
+                                contentDescription = null,
+                                alpha = 0.5f,
+                                modifier = modi.clickable {
+                                    playerBauteilAmount[bauteil] = amount - 1
+                                    onManipulateData(siedlerName, bauteil, false)
+                                }
+                            )
                         }
+                    }
+                } else {
+                    val belegteBauteile = Bauteil.entries
+                        .map { it to (playerBauteilAmount[it] ?: 0) }
+                        .filter { (_, anzahl) -> anzahl != 0 }
+
+                    if (belegteBauteile.isEmpty()) {
+                        Text(text = "Keine Bauteile", modifier = ModiPad5.fillMaxWidth())
                     } else {
-                        val belegteBauteile = Bauteil.entries
-                            .map { it to (playerBauteilAmount[it] ?: 0) }
-                            .filter { (_, anzahl) -> anzahl != 0 }
+                        belegteBauteile.take(5).forEach { (bauteil, anzahl) ->
+                            BauteilMengenZeile(
+                                bezeichnung = bauteil.str,
+                                anzahl = anzahl,
+                            )
+                        }
 
-                        if (belegteBauteile.isEmpty()) {
-                            Text(text = "Keine Bauteile",modifier = Modifier.span(2))
-                        } else {
-                            belegteBauteile.take(5).forEach { (bauteil, anzahl) ->
-                                RightText(text = "${bauteil.str}: ")
-                                LeftText(text = "$anzahl stk")
-                            }
-
-                            if (belegteBauteile.size > 5) {
-                                Text(text = "+ ${belegteBauteile.size - 5} weitere", modifier = Modifier.span(2))
-                            }
+                        if (belegteBauteile.size > 5) {
+                            Text(
+                                text = "+ ${belegteBauteile.size - 5} weitere",
+                                modifier = ModiPad5.fillMaxWidth(),
+                            )
                         }
                     }
                 }
@@ -609,6 +605,37 @@ fun zeigeSpielerDaten(
             onDismiss = { zeigeAblaufDialog = false },
         ) {
             SpielerAblauf(ablauf)
+        }
+    }
+}
+
+@Composable
+private fun BauteilMengenZeile(
+    bezeichnung: String,
+    anzahl: Int,
+    aktionen: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = ModiPad5.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = bezeichnung,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Start,
+        )
+        Text(
+            text = ":",
+            modifier = Modifier.width(24.dp),
+            textAlign = TextAlign.Center,
+        )
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "$anzahl Stk", textAlign = TextAlign.End)
+            aktionen?.invoke()
         }
     }
 }

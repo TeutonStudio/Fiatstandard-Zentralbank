@@ -1,12 +1,22 @@
 package de.teutonstudio.zentralbank.schnittstelle
 
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.withStyle
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
+import de.teutonstudio.zentralbank.R
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-val markAchsenFormatter = einheitenAchsenFormatter("ℳ")
+private const val MARK_ZEICHEN = "ℳ"
+private val markZeichenSchrift = FontFamily(Font(R.font.zentralbank_mark_symbol))
+
+val markAchsenFormatter = einheitenAchsenFormatter(MARK_ZEICHEN)
 val stueckAchsenFormatter = CartesianValueFormatter { _, value, _ ->
     "${value.roundToLong()} Stk"
 }
@@ -24,14 +34,32 @@ fun richtungsAchsenFormatter(
         value < 0.0 -> negativeRichtung
         else -> null
     }
-    val beschriftung = "${abs(value).alsAchsenwert()} $einheit"
-    if (richtung == null) beschriftung else "$richtung $beschriftung"
+    val beschriftung = abs(value).alsAchsenwert()
+    val beschriftungMitRichtung = if (richtung == null) beschriftung else "$richtung $beschriftung"
+    beschriftungMitEinheit(beschriftungMitRichtung, einheit)
 }
 
 private fun einheitenAchsenFormatter(einheit: String) =
     CartesianValueFormatter { _, value, _ ->
-        "${value.alsAchsenwert()} $einheit"
+        beschriftungMitEinheit(value.alsAchsenwert(), einheit)
     }
+
+internal fun markBeschriftung(beschriftung: String): AnnotatedString = buildAnnotatedString {
+    append(beschriftung)
+    append(' ')
+    withStyle(SpanStyle(fontFamily = markZeichenSchrift)) {
+        append(MARK_ZEICHEN)
+    }
+}
+
+private fun beschriftungMitEinheit(
+    beschriftung: String,
+    einheit: String,
+): CharSequence = if (einheit == MARK_ZEICHEN) {
+    markBeschriftung(beschriftung)
+} else {
+    "$beschriftung $einheit"
+}
 
 private fun Double.alsAchsenwert(): String {
     val gerundet = roundToLong()

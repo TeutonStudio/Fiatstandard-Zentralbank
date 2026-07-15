@@ -95,6 +95,7 @@ import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
+import de.teutonstudio.zentralbank.schnittstelle.markBeschriftung
 import de.teutonstudio.zentralbank.schnittstelle.mitAblaufRundentrenner
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
@@ -254,7 +255,7 @@ private fun exponentiellerMarkAchsenFormatter(
     } else {
         String.format(Locale.GERMANY, "%.1f", originalwert)
     }
-    "$beschriftung ℳ"
+    markBeschriftung(beschriftung)
 }
 
 @Composable
