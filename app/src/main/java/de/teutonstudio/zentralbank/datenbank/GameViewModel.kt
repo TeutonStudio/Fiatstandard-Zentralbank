@@ -445,11 +445,21 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         TODO()
     }
 
-    public val ladeSpiel = { it: SpielDaten -> ladeSpiel(it) }
-    private fun ladeSpiel(daten: SpielDaten) {
+    public val ladeSpiel = { daten: SpielDaten, nachLaden: () -> Unit ->
+        ladeSpiel(daten, nachLaden)
+    }
+    private fun ladeSpiel(daten: SpielDaten, nachLaden: () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            datenbankBereit.await()
-            ladeSpielDaten(daten)
+            try {
+                datenbankBereit.await()
+                ladeSpielDaten(daten)
+                withContext(Dispatchers.Main) { nachLaden() }
+            } catch (throwable: Throwable) {
+                _domainFehler.emit(
+                    throwable.message?.let { "Spielstand konnte nicht geladen werden: $it" }
+                        ?: "Spielstand konnte nicht geladen werden."
+                )
+            }
         }
     }
     private suspend fun ladeAktuellesSpielNeu() { ladeSpielDaten(aktuelleDaten.first) }

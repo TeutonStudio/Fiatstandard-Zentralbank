@@ -26,7 +26,7 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 fun SpielLaden(
     beiAbbruch: () -> Unit,
     beiLöschen: (SpielDaten) -> Unit = {},
-    beiLaden: (SpielDaten) -> Unit,
+    beiLaden: (SpielDaten, () -> Unit) -> Unit,
     nachLaden: () -> Unit,
     speicher: Map<SpielDaten, Pair<Int, List<String>>>,
 ) {
@@ -35,7 +35,11 @@ fun SpielLaden(
     Titel(
         beiLöschen = { if (valideAuswahl.value) { beiLöschen(spielstand!!) } else null },
         beiZurück = beiAbbruch,
-        beiWeiter = { if (valideAuswahl.value) { spielstand?.let { beiLaden(it); nachLaden() } } else null },
+        beiWeiter = {
+            if (valideAuswahl.value) {
+                spielstand?.let { beiLaden(it, nachLaden) }
+            } else null
+        },
         anleitung = remember { mutableStateOf(false) }
     ) {
         LazyColumn(
@@ -66,6 +70,6 @@ fun SpielLaden(
 fun LoadGamePreview() {
     val spiel = remember { TestSpiel }
     Column() {
-        SpielLaden({},{},{},{},mapOf())
+        SpielLaden({}, {}, { _, _ -> }, {}, mapOf())
     }
 }
