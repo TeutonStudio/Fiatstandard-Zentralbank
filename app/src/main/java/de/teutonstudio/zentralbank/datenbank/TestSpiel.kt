@@ -136,6 +136,7 @@ object TestSpiel : Spiel(
             handelDaten = setOf(
                 rohstoff(bernd, clara, 9, 3, Rohstoffe.LEHM),
                 rohstoff(clara, anna, 18, 1, Rohstoffe.SCHWERÖL),
+                Anleihenhandel(anna, bernd, anleiheDavid1, 74.toZahlungsmittel()),
             ),
             konfliktDaten = setOf(
                 vertrag(bernd, eva, Vertragsart.KRIEGSERKLÄRUNG),

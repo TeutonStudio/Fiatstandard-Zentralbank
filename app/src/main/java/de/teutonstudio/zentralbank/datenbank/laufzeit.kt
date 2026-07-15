@@ -322,18 +322,22 @@ open class Spiel(
         spielerKombinierteSchuldenMitProjektion.map { runde ->
             runde.values.summeGeld { schulden -> schulden }
         }
-    public val bankZinsgewinne: List<Zahlungsmittel> get() {
+    private fun bankZinsgewinneBis(letzteRunde: Int): List<Zahlungsmittel> {
         val bankZinsen = anleihen
             .flatMap { anleihe -> anleihe.erhalteAblauf() }
             .filter { eintrag ->
                 eintrag.art == AnleiheAblaufArt.ZINS && eintrag.an == Geschäftsbank
             }
-        return List(aktuelleRunde) { runde ->
+        return List(letzteRunde + 1) { runde ->
             bankZinsen
                 .filter { eintrag -> eintrag.runde <= runde }
                 .summeGeld { eintrag -> eintrag.betrag }
         }
     }
+    public val bankZinsgewinne: List<Zahlungsmittel> get() =
+        bankZinsgewinneBis(aktuelleRunde - 1)
+    public val bankZinsgewinneMitProjektion: List<Zahlungsmittel> get() =
+        bankZinsgewinneBis(letzteSchuldenProjektionsrunde)
     public val aussenhandelsbilanzNachRohstoff: List<EnumMap<Rohstoffe, Zahlungsmittel>> get() =
         List(aktuelleRunde) { runde -> handel.erhalteAussenhandelsbilanzZurRunde(runde) }
     public val aussenhandelsbilanzGesamt: List<Zahlungsmittel> get() =
@@ -517,7 +521,8 @@ open class Spiel(
                         .firstOrNull { anzeige -> anzeige.anleihe == handel.anleihe }
                         ?.erwarteteRenditeProzent(
                             handelsrunde = eintrag.runde,
-                            kaufpreis = handel.preis,
+                            handelspreis = handel.preis,
+                            istVerkauf = eintrag.istEinnahme,
                         ),
                 )
                 else -> null
@@ -904,19 +909,26 @@ data class SpielerAblaufEintrag(
 
 private fun AnleiheAnzeige.erwarteteRenditeProzent(
     handelsrunde: Int,
-    kaufpreis: Zahlungsmittel,
+    handelspreis: Zahlungsmittel,
+    istVerkauf: Boolean,
 ): Float? {
-    if (kaufpreis <= Zahlungsmittel()) return null
+    if (handelspreis <= Zahlungsmittel()) return null
 
     val erwarteteZahlungen = erhalteAblauf()
         .filter { eintrag ->
-            eintrag.runde >= handelsrunde &&
+            eintrag.runde > handelsrunde &&
                 (eintrag.art == AnleiheAblaufArt.ZINS ||
                     eintrag.art == AnleiheAblaufArt.RUECKKAUF)
         }
         .summeGeld { eintrag -> eintrag.betrag }
+    if (erwarteteZahlungen <= Zahlungsmittel()) return null
 
-    return (erwarteteZahlungen / kaufpreis - 1f) * 100f
+    val verhältnis = if (istVerkauf) {
+        handelspreis / erwarteteZahlungen
+    } else {
+        erwarteteZahlungen / handelspreis
+    }
+    return (verhältnis - 1f) * 100f
 }
 
 data class Ausgabenplan(

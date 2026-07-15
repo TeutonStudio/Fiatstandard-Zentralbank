@@ -58,6 +58,12 @@ class ZahlungsmittelCharacterizationTest {
         )
         assertTrue(TestSpiel.marktpreise.isNotEmpty())
         assertTrue(TestSpiel.spielerBarvermögen.distinct().size > 1)
+        val anna = TestSpiel.spielerListe.single { spieler -> spieler.name == "Anna" }
+        assertTrue(
+            TestSpiel.spielerSaldo.all { salden ->
+                salden.getValue(anna) >= Zahlungsmittel()
+            }
+        )
         assertTrue(
             TestSpiel.aussenhandelsbilanzGesamt.any { bilanz ->
                 bilanz != Zahlungsmittel()

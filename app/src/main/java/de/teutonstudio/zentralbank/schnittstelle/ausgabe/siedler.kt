@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import com.cheonjaeung.compose.grid.SimpleGridCells
@@ -81,6 +83,7 @@ import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import java.util.Locale
@@ -612,6 +615,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
     }
     var geschaeftspartnerMenueOffen by remember { mutableStateOf(false) }
     var rohstoffMenueOffen by remember { mutableStateOf(false) }
+    val tabellenScrollState = rememberScrollState()
     val geschaeftspartnerOptionen = remember(ablauf) {
         ablauf.map { eintrag -> eintrag.geschaeftspartner }.distinct().sorted()
     }
@@ -640,10 +644,52 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
             }
         }
         .toSortedMap(reverseOrder())
+    val spaltenbreiten = SpielerAblaufSpaltenbreiten(
+        runde = maxOf(
+            rememberAblaufSpaltenbreite(listOf("Runde"), 10.sp),
+            rememberAblaufSpaltenbreite(
+                gefilterterAblauf.map { eintrag -> eintrag.runde.toString() },
+                11.sp,
+            ),
+        ),
+        geschaeftspartner = maxOf(
+            rememberAblaufSpaltenbreite(
+                listOf("Geschäftspartner: ${geschaeftspartnerFilter ?: "Alle"} ▾"),
+                10.sp,
+            ),
+            rememberAblaufSpaltenbreite(
+                gefilterterAblauf.map { eintrag -> eintrag.geschaeftspartner } +
+                    rundenGruppen.values.map { zeilen -> "${zeilen.size} Zeilen" } +
+                    "kumulativ",
+                11.sp,
+            ),
+        ),
+        vorgang = maxOf(
+            rememberAblaufSpaltenbreite(
+                listOf("Rohstoff / Vorgang: ${rohstoffFilter ?: "Alle"} ▾"),
+                10.sp,
+            ),
+            rememberAblaufSpaltenbreite(
+                gefilterterAblauf.map(SpielerAblaufEintrag::ablaufVorgangstext) +
+                    listOf("eingeklappt", "Saldo zum Rundenende"),
+                11.sp,
+            ),
+        ),
+        preis = maxOf(
+            rememberAblaufSpaltenbreite(listOf("Preis"), 10.sp),
+            rememberAblaufSpaltenbreite(
+                gefilterterAblauf.map { eintrag -> eintrag.preis.zuMark() } +
+                    rundenGruppen.values.map { zeilen ->
+                        "Saldo: ${zeilen.fold(Zahlungsmittel()) { summe, zeile -> summe + zeile.preis }.zuMark()}"
+                    } + listOf(minRundenSaldo.zuMark(), "Saldo: ${minRundenSaldo.zuMark()}"),
+                11.sp,
+            ),
+        ),
+    )
     val sichtbareRunden = rundenGruppen.keys
     val alleRundenEingeklappt = sichtbareRunden.isNotEmpty() &&
         sichtbareRunden.all(eingeklappteRunden::contains)
-    val beiRundenKlick = {
+    val beiAllenRundenKlick = {
         eingeklappteRunden = if (alleRundenEingeklappt) {
             emptySet()
         } else {
@@ -653,9 +699,10 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(5.dp)
             .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (ablauf.isEmpty()) {
             Text(
@@ -674,26 +721,36 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
             )
-            SpielerAblaufKopfzeile(
-                geschaeftspartnerFilter = geschaeftspartnerFilter,
-                geschaeftspartnerOptionen = geschaeftspartnerOptionen,
-                geschaeftspartnerMenueOffen = geschaeftspartnerMenueOffen,
-                rohstoffFilter = rohstoffFilter,
-                rohstoffOptionen = rohstoffOptionen,
-                rohstoffMenueOffen = rohstoffMenueOffen,
-                onGeschaeftspartnerMenue = { geschaeftspartnerMenueOffen = it },
-                onGeschaeftspartnerFilter = {
-                    geschaeftspartnerFilter = it
-                    geschaeftspartnerMenueOffen = false
-                },
-                onRohstoffMenue = { rohstoffMenueOffen = it },
-                onRohstoffFilter = {
-                    rohstoffFilter = it
-                    rohstoffMenueOffen = false
-                },
-            )
-            rundenGruppen.forEach { (runde, zeilen) ->
+            Column(modifier = Modifier.horizontalScroll(tabellenScrollState)) {
+                SpielerAblaufKopfzeile(
+                    geschaeftspartnerFilter = geschaeftspartnerFilter,
+                    geschaeftspartnerOptionen = geschaeftspartnerOptionen,
+                    geschaeftspartnerMenueOffen = geschaeftspartnerMenueOffen,
+                    rohstoffFilter = rohstoffFilter,
+                    rohstoffOptionen = rohstoffOptionen,
+                    rohstoffMenueOffen = rohstoffMenueOffen,
+                    spaltenbreiten = spaltenbreiten,
+                    beiRundenKlick = beiAllenRundenKlick,
+                    onGeschaeftspartnerMenue = { geschaeftspartnerMenueOffen = it },
+                    onGeschaeftspartnerFilter = {
+                        geschaeftspartnerFilter = it
+                        geschaeftspartnerMenueOffen = false
+                    },
+                    onRohstoffMenue = { rohstoffMenueOffen = it },
+                    onRohstoffFilter = {
+                        rohstoffFilter = it
+                        rohstoffMenueOffen = false
+                    },
+                )
+                rundenGruppen.forEach { (runde, zeilen) ->
                     val istEingeklappt = runde in eingeklappteRunden
+                    val beiRundenKlick = {
+                        eingeklappteRunden = if (istEingeklappt) {
+                            eingeklappteRunden - runde
+                        } else {
+                            eingeklappteRunden + runde
+                        }
+                    }
                     if (istEingeklappt) {
                         val saldo = if (minRunde > 0 && runde == minRunde) {
                             minRundenSaldo
@@ -706,6 +763,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                             rohstoffOderVorgang = "eingeklappt",
                             preis = "Saldo: ${saldo.zuMark()}",
                             hintergrund = MaterialTheme.colorScheme.surfaceVariant,
+                            spaltenbreiten = spaltenbreiten,
                             beiRundenKlick = beiRundenKlick,
                             istKompakt = true,
                         )
@@ -717,38 +775,41 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                                 rohstoffOderVorgang = "Saldo zum Rundenende",
                                 preis = minRundenSaldo.zuMark(),
                                 hintergrund = MaterialTheme.colorScheme.surfaceVariant,
+                                spaltenbreiten = spaltenbreiten,
                                 beiRundenKlick = beiRundenKlick,
                                 istKompakt = true,
                             )
                         }
                         zeilen.forEach { eintrag ->
                             val rendite = eintrag.erwarteteAnleihenRenditeProzent
-                            val rohstoffMitAnzahl = if (rendite != null) {
-                                "${eintrag.rohstoffOderVorgang} (${rendite.alsRendite()})"
-                            } else {
-                                eintrag.anzahl?.let { anzahl ->
-                                    "${eintrag.rohstoffOderVorgang} ($anzahl Stk)"
-                                } ?: eintrag.rohstoffOderVorgang
-                            }
                             SpielerAblaufTabellenzeile(
                                 runde = eintrag.runde.toString(),
                                 geschaeftspartner = eintrag.geschaeftspartner,
-                                rohstoffOderVorgang = rohstoffMitAnzahl,
+                                rohstoffOderVorgang = eintrag.ablaufVorgangstext(),
                                 preis = eintrag.preis.zuMark(),
                                 hintergrund = if (eintrag.preis < Zahlungsmittel()) {
                                     Color(0xFFE8CACA)
                                 } else {
                                     Color(0xFFD2E2CE)
                                 },
+                                spaltenbreiten = spaltenbreiten,
                                 vorgangsfarbe = rendite?.renditeFarbe(),
                                 beiRundenKlick = beiRundenKlick,
                             )
                         }
                     }
                 }
+            }
         }
     }
 }
+
+private data class SpielerAblaufSpaltenbreiten(
+    val runde: Dp,
+    val geschaeftspartner: Dp,
+    val vorgang: Dp,
+    val preis: Dp,
+)
 
 @Composable
 private fun SpielerAblaufTabellenzeile(
@@ -757,6 +818,7 @@ private fun SpielerAblaufTabellenzeile(
     rohstoffOderVorgang: String,
     preis: String,
     hintergrund: Color,
+    spaltenbreiten: SpielerAblaufSpaltenbreiten,
     istKopfzeile: Boolean = false,
     beiRundenKlick: (() -> Unit)? = null,
     istKompakt: Boolean = false,
@@ -765,26 +827,25 @@ private fun SpielerAblaufTabellenzeile(
     CompositionLocalProvider(LocalContentColor provides hintergrund.lesbareSchriftfarbe()) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .background(hintergrund),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TabellenZelle(
                 text = runde,
-                modifier = Modifier.weight(0.5f),
+                modifier = Modifier.width(spaltenbreiten.runde),
                 istKopfzeile = istKopfzeile,
                 beiKlick = beiRundenKlick,
                 istKompakt = istKompakt,
             )
             TabellenZelle(
                 text = geschaeftspartner,
-                modifier = Modifier.weight(1.15f),
+                modifier = Modifier.width(spaltenbreiten.geschaeftspartner),
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
             )
             TabellenZelle(
                 text = rohstoffOderVorgang,
-                modifier = Modifier.weight(1.55f),
+                modifier = Modifier.width(spaltenbreiten.vorgang),
                 textAlign = TextAlign.Start,
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
@@ -792,7 +853,7 @@ private fun SpielerAblaufTabellenzeile(
             )
             TabellenZelle(
                 text = preis,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(spaltenbreiten.preis),
                 textAlign = TextAlign.End,
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
@@ -809,6 +870,8 @@ private fun SpielerAblaufKopfzeile(
     rohstoffFilter: String?,
     rohstoffOptionen: List<String>,
     rohstoffMenueOffen: Boolean,
+    spaltenbreiten: SpielerAblaufSpaltenbreiten,
+    beiRundenKlick: () -> Unit,
     onGeschaeftspartnerMenue: (Boolean) -> Unit,
     onGeschaeftspartnerFilter: (String?) -> Unit,
     onRohstoffMenue: (Boolean) -> Unit,
@@ -817,13 +880,14 @@ private fun SpielerAblaufKopfzeile(
     val hintergrund = MaterialTheme.colorScheme.surfaceVariant
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
         Row(
-            modifier = Modifier.fillMaxWidth().background(hintergrund),
+            modifier = Modifier.background(hintergrund),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TabellenZelle(
                 text = "Runde",
-                modifier = Modifier.weight(0.5f),
+                modifier = Modifier.width(spaltenbreiten.runde),
                 istKopfzeile = true,
+                beiKlick = beiRundenKlick,
             )
             AblaufFilterZelle(
                 label = "Geschäftspartner",
@@ -832,7 +896,7 @@ private fun SpielerAblaufKopfzeile(
                 menueOffen = geschaeftspartnerMenueOffen,
                 onMenueAendern = onGeschaeftspartnerMenue,
                 onAuswahl = onGeschaeftspartnerFilter,
-                modifier = Modifier.weight(1.15f),
+                modifier = Modifier.width(spaltenbreiten.geschaeftspartner),
             )
             AblaufFilterZelle(
                 label = "Rohstoff / Vorgang",
@@ -841,11 +905,11 @@ private fun SpielerAblaufKopfzeile(
                 menueOffen = rohstoffMenueOffen,
                 onMenueAendern = onRohstoffMenue,
                 onAuswahl = onRohstoffFilter,
-                modifier = Modifier.weight(1.55f),
+                modifier = Modifier.width(spaltenbreiten.vorgang),
             )
             TabellenZelle(
                 text = "Preis",
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(spaltenbreiten.preis),
                 textAlign = TextAlign.End,
                 istKopfzeile = true,
             )
@@ -929,6 +993,16 @@ private fun Float.alsRendite(): String {
         "0,0 %"
     } else {
         String.format(Locale.GERMANY, "%+.1f %%", normalisiert)
+    }
+}
+
+private fun SpielerAblaufEintrag.ablaufVorgangstext(): String {
+    val rendite = erwarteteAnleihenRenditeProzent
+    return if (rendite != null) {
+        "$rohstoffOderVorgang (${rendite.alsRendite()})"
+    } else {
+        anzahl?.let { menge -> "$rohstoffOderVorgang ($menge Stk)" }
+            ?: rohstoffOderVorgang
     }
 }
 

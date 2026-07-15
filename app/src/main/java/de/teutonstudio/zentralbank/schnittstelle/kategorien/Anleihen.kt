@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.cheonjaeung.compose.grid.SimpleGridCells
 import com.cheonjaeung.compose.grid.VerticalGrid
@@ -90,6 +92,7 @@ import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
@@ -103,6 +106,8 @@ private const val GLOBAL_PLAYER = "Global"
 private val anleiheFaelligFarbe = Color(0xFFD8C28F)
 private val anleiheOffenFarbe = Color(0xFF9EB5C7)
 private val anleiheAbgelaufenFarbe = Color(0xFFC7C7C7)
+private const val ZINSWERTE_ERKLAERUNG =
+    "Anleihenzinssatz bei Leitzinssatz: prozentuale Abweichung"
 private const val MAX_Y_ACHSE_EXPONENT = 5f
 
 private data class SchuldenDiagrammReihe(
@@ -466,7 +471,7 @@ private fun GlobalBalanceChart(
     val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
     val globaleSchulden = spiel.globaleKombinierteSchuldenMitProjektion
         .map { it.toIntOderNull() ?: 0 }
-    val zinsgewinne = spiel.bankZinsgewinne.map { it.toIntOderNull() ?: 0 }
+    val zinsgewinne = spiel.bankZinsgewinneMitProjektion.map { it.toIntOderNull() ?: 0 }
     val historischeRunden = globalesBarvermögen.indices.toList()
     val schuldenRunden = spiel.schuldenProjektionsrunden
 
@@ -502,7 +507,7 @@ private fun GlobalBalanceChart(
         SchuldenDiagrammReihe(legende[0], historischeRunden, spielerBarvermögen),
         SchuldenDiagrammReihe(legende[1], historischeRunden, globalesBarvermögen),
         SchuldenDiagrammReihe(legende[2], schuldenRunden, globaleSchulden),
-        SchuldenDiagrammReihe(legende[3], historischeRunden, zinsgewinne),
+        SchuldenDiagrammReihe(legende[3], schuldenRunden, zinsgewinne),
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
     val sichtbareReihen = reihen.filter { reihe ->
@@ -1051,6 +1056,7 @@ private fun AnleiheAblauf(
     var eingeklappteRunden by remember(eintrag) { mutableStateOf(emptySet<Int>()) }
     var zeigeBuchungssatz by remember(eintrag) { mutableStateOf(false) }
     val ablaufScrollState = rememberScrollState()
+    val tabellenScrollState = rememberScrollState()
     val rundenGruppen = remember(ablauf) {
         ablauf
             .groupBy { ereignis -> ereignis.runde }
@@ -1059,14 +1065,74 @@ private fun AnleiheAblauf(
             }
             .toSortedMap(reverseOrder())
     }
+    val alleRundenEingeklappt = rundenGruppen.isNotEmpty() &&
+        rundenGruppen.keys.all(eingeklappteRunden::contains)
+    val beiAllenRundenKlick = {
+        eingeklappteRunden = if (alleRundenEingeklappt) {
+            emptySet()
+        } else {
+            rundenGruppen.keys
+        }
+    }
+    val zinswertTexte = ablauf.mapNotNull { ereignis ->
+        if (ereignis.art == AnleiheAblaufArt.HANDEL) {
+            null
+        } else {
+            formatiereAnleiheZinsvergleich(
+                berechneAnleiheZinsvergleich(
+                    anleihe = eintrag.anleihe,
+                    leitzins = spiel.leitzinssatz(ereignis.runde)
+                        ?: spiel.aktuellerLeitzinssatz,
+                )
+            )
+        }
+    }
+    val spaltenbreiten = AnleiheAblaufSpaltenbreiten(
+        runde = maxOf(
+            rememberAblaufSpaltenbreite(listOf("Runde"), 9.sp, 8.dp),
+            rememberAblaufSpaltenbreite(rundenGruppen.keys.map(Int::toString), 10.sp, 8.dp),
+        ),
+        zinswerte = maxOf(
+            rememberAblaufSpaltenbreite(listOf("Zinswerte"), 9.sp, 8.dp),
+            rememberAblaufSpaltenbreite(listOf(ZINSWERTE_ERKLAERUNG), 7.sp, 8.dp),
+            rememberAblaufSpaltenbreite(zinswertTexte, 8.sp, 8.dp),
+        ),
+        zahlungsempfaenger = maxOf(
+            rememberAblaufSpaltenbreite(
+                listOf(if (zeigeBuchungssatz) "Emittent an Halter" else "Zahlungsempfänger"),
+                9.sp,
+                64.dp,
+            ),
+            rememberAblaufSpaltenbreite(
+                ablauf.map { ereignis ->
+                    if (zeigeBuchungssatz) {
+                        ereignis.buchungssatz
+                    } else {
+                        ereignis.zahlungsempfaenger.name
+                    }
+                } + rundenGruppen.values.map { ereignisse -> "${ereignisse.size} Zahlungen" },
+                10.sp,
+                8.dp,
+            ),
+        ),
+        betrag = maxOf(
+            rememberAblaufSpaltenbreite(listOf("Betrag"), 9.sp, 8.dp),
+            rememberAblaufSpaltenbreite(
+                ablauf.map { ereignis -> ereignis.betrag.zuMark() } + "eingeklappt",
+                10.sp,
+                8.dp,
+            ),
+        ),
+    )
     LaunchedEffect(eintrag, aktuelleRunde) {
         ablaufScrollState.scrollTo(0)
     }
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(5.dp)
             .verticalScroll(ablaufScrollState),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = "Vollständiger Ablauf bis zur Tilgung in Runde ${eintrag.faelligkeit} · " +
@@ -1075,71 +1141,84 @@ private fun AnleiheAblauf(
             modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
             textAlign = TextAlign.Center,
         )
-        AnleiheAblaufTabellenzeile(
-            runde = "Runde",
-            zahlungsempfaenger = if (zeigeBuchungssatz) {
-                "Emittent an Halter"
-            } else {
-                "Zahlungsempfänger"
-            },
-            betrag = "Betrag",
-            hintergrund = MaterialTheme.colorScheme.surfaceVariant,
-            istKopfzeile = true,
-            buchungssatzSchalterAktiv = zeigeBuchungssatz,
-            beiBuchungssatzAenderung = { zeigeBuchungssatz = it },
-        )
-        rundenGruppen.forEach { (runde, ereignisse) ->
-            val istEingeklappt = runde in eingeklappteRunden
-            val rundenHintergrund = when {
-                runde < aktuelleRunde -> anleiheAbgelaufenFarbe
-                runde == aktuelleRunde -> anleiheFaelligFarbe
-                else -> anleiheOffenFarbe
-            }
-            val beiRundenKlick = {
-                eingeklappteRunden = if (istEingeklappt) {
-                    eingeklappteRunden - runde
+        Column(modifier = Modifier.horizontalScroll(tabellenScrollState)) {
+            AnleiheAblaufTabellenzeile(
+                runde = "Runde",
+                zahlungsempfaenger = if (zeigeBuchungssatz) {
+                    "Emittent an Halter"
                 } else {
-                    eingeklappteRunden + runde
+                    "Zahlungsempfänger"
+                },
+                betrag = "Betrag",
+                hintergrund = MaterialTheme.colorScheme.surfaceVariant,
+                spaltenbreiten = spaltenbreiten,
+                istKopfzeile = true,
+                beiRundenKlick = beiAllenRundenKlick,
+                buchungssatzSchalterAktiv = zeigeBuchungssatz,
+                beiBuchungssatzAenderung = { zeigeBuchungssatz = it },
+            )
+            rundenGruppen.forEach { (runde, ereignisse) ->
+                val istEingeklappt = runde in eingeklappteRunden
+                val rundenHintergrund = when {
+                    runde < aktuelleRunde -> anleiheAbgelaufenFarbe
+                    runde == aktuelleRunde -> anleiheFaelligFarbe
+                    else -> anleiheOffenFarbe
                 }
-            }
-            if (istEingeklappt) {
-                AnleiheAblaufTabellenzeile(
-                    runde = runde.toString(),
-                    zahlungsempfaenger = "${ereignisse.size} Zahlungen",
-                    betrag = "eingeklappt",
-                    hintergrund = rundenHintergrund,
-                    beiRundenKlick = beiRundenKlick,
-                    istKompakt = true,
-                )
-            } else {
-                ereignisse.forEach { ereignis ->
-                    val zahlungsempfaenger = ereignis.zahlungsempfaenger
-                    val zinsvergleich = if (ereignis.art == AnleiheAblaufArt.HANDEL) {
-                        null
+                val beiRundenKlick = {
+                    eingeklappteRunden = if (istEingeklappt) {
+                        eingeklappteRunden - runde
                     } else {
-                        berechneAnleiheZinsvergleich(
-                            anleihe = eintrag.anleihe,
-                            leitzins = spiel.leitzinssatz(ereignis.runde)
-                                ?: spiel.aktuellerLeitzinssatz,
+                        eingeklappteRunden + runde
+                    }
+                }
+                if (istEingeklappt) {
+                    AnleiheAblaufTabellenzeile(
+                        runde = runde.toString(),
+                        zahlungsempfaenger = "${ereignisse.size} Zahlungen",
+                        betrag = "eingeklappt",
+                        hintergrund = rundenHintergrund,
+                        spaltenbreiten = spaltenbreiten,
+                        beiRundenKlick = beiRundenKlick,
+                        istKompakt = true,
+                    )
+                } else {
+                    ereignisse.forEach { ereignis ->
+                        val zahlungsempfaenger = ereignis.zahlungsempfaenger
+                        val zinsvergleich = if (ereignis.art == AnleiheAblaufArt.HANDEL) {
+                            null
+                        } else {
+                            berechneAnleiheZinsvergleich(
+                                anleihe = eintrag.anleihe,
+                                leitzins = spiel.leitzinssatz(ereignis.runde)
+                                    ?: spiel.aktuellerLeitzinssatz,
+                            )
+                        }
+                        AnleiheAblaufTabellenzeile(
+                            runde = ereignis.runde.toString(),
+                            zinsvergleich = zinsvergleich,
+                            zahlungsempfaenger = if (zeigeBuchungssatz) {
+                                ereignis.buchungssatz
+                            } else {
+                                zahlungsempfaenger.name
+                            },
+                            betrag = ereignis.betrag.zuMark(),
+                            hintergrund = rundenHintergrund,
+                            spaltenbreiten = spaltenbreiten,
+                            beiRundenKlick = beiRundenKlick,
                         )
                     }
-                    AnleiheAblaufTabellenzeile(
-                        runde = ereignis.runde.toString(),
-                        zinsvergleich = zinsvergleich,
-                        zahlungsempfaenger = if (zeigeBuchungssatz) {
-                            ereignis.buchungssatz
-                        } else {
-                            zahlungsempfaenger.name
-                        },
-                        betrag = ereignis.betrag.zuMark(),
-                        hintergrund = rundenHintergrund,
-                        beiRundenKlick = beiRundenKlick,
-                    )
                 }
             }
         }
     }
 }
+
+private data class AnleiheAblaufSpaltenbreiten(
+    val runde: Dp,
+    val zinswerte: Dp,
+    val zahlungsempfaenger: Dp,
+    val betrag: Dp,
+)
 
 @Composable
 private fun AnleiheAblaufTabellenzeile(
@@ -1147,6 +1226,7 @@ private fun AnleiheAblaufTabellenzeile(
     zahlungsempfaenger: String,
     betrag: String,
     hintergrund: Color,
+    spaltenbreiten: AnleiheAblaufSpaltenbreiten,
     zinsvergleich: AnleiheZinsvergleich? = null,
     istKopfzeile: Boolean = false,
     beiRundenKlick: (() -> Unit)? = null,
@@ -1157,28 +1237,26 @@ private fun AnleiheAblaufTabellenzeile(
     CompositionLocalProvider(LocalContentColor provides hintergrund.lesbareSchriftfarbe()) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
                 .height(IntrinsicSize.Min)
                 .background(hintergrund),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnleiheTabellenZelle(
                 text = runde,
-                modifier = Modifier.weight(0.5f).fillMaxHeight(),
+                modifier = Modifier.width(spaltenbreiten.runde).fillMaxHeight(),
                 istKopfzeile = istKopfzeile,
                 beiKlick = beiRundenKlick,
                 istKompakt = istKompakt,
             )
             if (istKopfzeile) {
-                AnleiheTabellenZelle(
-                    text = "Zinswerte",
-                    modifier = Modifier.weight(1.2f).fillMaxHeight(),
-                    istKopfzeile = true,
+                AnleiheZinswerteKopfzelle(
+                    erklaerung = ZINSWERTE_ERKLAERUNG,
+                    modifier = Modifier.width(spaltenbreiten.zinswerte).fillMaxHeight(),
                 )
             } else {
                 AnleiheZinswerteZelle(
                     zinsvergleich = zinsvergleich,
-                    modifier = Modifier.weight(1.2f).fillMaxHeight(),
+                    modifier = Modifier.width(spaltenbreiten.zinswerte).fillMaxHeight(),
                     istKompakt = istKompakt,
                 )
             }
@@ -1187,19 +1265,19 @@ private fun AnleiheAblaufTabellenzeile(
                     text = zahlungsempfaenger,
                     aktiv = buchungssatzSchalterAktiv,
                     beiAenderung = beiBuchungssatzAenderung,
-                    modifier = Modifier.weight(1.4f).fillMaxHeight(),
+                    modifier = Modifier.width(spaltenbreiten.zahlungsempfaenger).fillMaxHeight(),
                 )
             } else {
                 AnleiheTabellenZelle(
                     text = zahlungsempfaenger,
-                    modifier = Modifier.weight(1.4f).fillMaxHeight(),
+                    modifier = Modifier.width(spaltenbreiten.zahlungsempfaenger).fillMaxHeight(),
                     istKopfzeile = istKopfzeile,
                     istKompakt = istKompakt,
                 )
             }
             AnleiheTabellenZelle(
                 text = betrag,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.width(spaltenbreiten.betrag).fillMaxHeight(),
                 textAlign = TextAlign.End,
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
@@ -1229,8 +1307,39 @@ private fun AnleiheZinswerteZelle(
         color = abweichungsfarbe,
         fontSize = schriftgroesse,
         fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
         maxLines = 1,
     )
+}
+
+@Composable
+private fun AnleiheZinswerteKopfzelle(
+    erklaerung: String,
+    modifier: Modifier,
+) {
+    Column(
+        modifier = modifier
+            .border(0.5.dp, Color(0xFF8D8D8D))
+            .padding(horizontal = 3.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Zinswerte",
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+        Text(
+            text = erklaerung,
+            modifier = Modifier.fillMaxWidth(),
+            fontSize = 7.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+        )
+    }
 }
 
 internal fun formatiereAnleiheZinsvergleich(zinsvergleich: AnleiheZinsvergleich): String =

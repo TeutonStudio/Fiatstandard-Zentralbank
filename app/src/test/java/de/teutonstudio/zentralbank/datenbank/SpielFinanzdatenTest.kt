@@ -380,6 +380,7 @@ class SpielFinanzdatenTest {
         val spiel = neuesSpiel(
             anna to 100.toZahlungsmittel(),
             bernd to 100.toZahlungsmittel(),
+            clara to 100.toZahlungsmittel(),
         )
         val anleihe = Anleihe(
             schuldiger = anna,
@@ -412,7 +413,7 @@ class SpielFinanzdatenTest {
             handelDaten = setOf(
                 Anleihenhandel(
                     besitzer = bernd,
-                    erwerber = Geschäftsbank,
+                    erwerber = clara,
                     anleihe = anleihe,
                     preis = 42.toZahlungsmittel(),
                 )
@@ -442,8 +443,15 @@ class SpielFinanzdatenTest {
             0.001f,
         )
         assertEquals(
-            0f,
+            5f,
             ablauf.first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_VERKAUFT }
+                .erwarteteAnleihenRenditeProzent ?: Float.NaN,
+            0.001f,
+        )
+        assertEquals(
+            -4.7619f,
+            spiel.erhalteSpielerAblauf(clara)
+                .first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_ERWORBEN }
                 .erwarteteAnleihenRenditeProzent ?: Float.NaN,
             0.001f,
         )
@@ -567,7 +575,7 @@ class SpielFinanzdatenTest {
             schuldiger = anna,
             sondervermögen = 40.toZahlungsmittel(),
             unvermögen = 2.toZahlungsmittel(),
-            laufzeit = 2,
+            laufzeit = 3,
         )
         spiel.neueRundenDatenDefinieren(
             spielerDaten = emptyMap(),
@@ -598,6 +606,10 @@ class SpielFinanzdatenTest {
         assertEquals(
             listOf(0, 0, 0, 2),
             spiel.bankZinsgewinne.map { betrag -> betrag.toIntOderNull() },
+        )
+        assertEquals(
+            listOf(0, 0, 0, 2, 4, 4),
+            spiel.bankZinsgewinneMitProjektion.map { betrag -> betrag.toIntOderNull() },
         )
     }
 

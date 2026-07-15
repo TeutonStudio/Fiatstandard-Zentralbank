@@ -359,7 +359,11 @@ fun AnleiheDialog(
     }
     val nennwertWert = nennwert.toIntOrNull()
     val zinsWert = zins.toIntOrNull()
-    val preisWert = preis.toIntOrNull()
+    val preisWert = if (vorgang == AnleiheVorgang.EMISSION) {
+        nennwertWert
+    } else {
+        preis.toIntOrNull()
+    }
     val laufzeitWert = laufzeit.toIntOrNull()
     val anleiheZinssatz = when (vorgang) {
         AnleiheVorgang.EMISSION -> if (
@@ -446,9 +450,8 @@ fun AnleiheDialog(
                         PersonenAuswahl("Erster Erwerber", moeglicheKaeufer, erwerber) {
                             erwerber = it
                         }
-                        Zahlenfeld("Nennwert / Rückkauf (Mark)", nennwert) { nennwert = it }
-                        Zahlenfeld("Zins je Runde (Mark)", zins) { zins = it }
-                        Zahlenfeld("Emissionspreis (Mark)", preis) { preis = it }
+                        Zahlenfeld("Sondervermögen / Nennwert (Mark)", nennwert) { nennwert = it }
+                        Zahlenfeld("Unvermögen / Zahlung je Runde (Mark)", zins) { zins = it }
                         Zahlenfeld("Laufzeit (Runden)", laufzeit) { laufzeit = it }
                         Text(
                             text = "Zinsen werden ab der nächsten Runde bis einschließlich " +
