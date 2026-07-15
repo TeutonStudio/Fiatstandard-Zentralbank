@@ -50,12 +50,10 @@ import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
-import com.patrykandpatrick.vico.compose.common.Fill
 import de.teutonstudio.zentralbank.R
 
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
@@ -77,6 +75,8 @@ import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 
 @Composable
 fun SpielerBilanz(
@@ -127,7 +127,7 @@ fun SpielerBilanz(
                     CartesianChartModel(
                         LineCartesianLayerModel.build {
                             sichtbareSerien.forEach { (_, yWerte) ->
-                                series(
+                                seriesMitGepunkteterAktuellerRunde(
                                     x = yWerte.indices.toList(),
                                     y = yWerte
                                 )
@@ -154,22 +154,15 @@ fun SpielerBilanz(
                         chart = rememberCartesianChart(
                             rememberLineCartesianLayer(
                                 lineProvider = LineCartesianLayer.LineProvider.series(
-                                    sichtbareSerien.map { (spieler, _) ->
-                                        val farbe = spielerFarben[spieler] ?: Color.Black
-
-                                        LineCartesianLayer.rememberLine(
-                                            fill = remember(farbe) {
-                                                LineCartesianLayer.LineFill.single(
-                                                    Fill(farbe)
-                                                )
-                                            },
-                                            interpolator = remember {
-                                                LineCartesianLayer.Interpolator.cubic(
-                                                    curvature = 0.5f,
-                                                )
-                                            },
-                                        )
-                                    }
+                                    rememberLinienMitGepunkteterAktuellerRunde(
+                                        sichtbareSerien.map { (spieler, _) ->
+                                            DiagrammLegendenEintrag(
+                                                id = "spieler:${spieler.name}",
+                                                bezeichnung = spieler.name,
+                                                farbe = spielerFarben[spieler] ?: Color.Black,
+                                            )
+                                        }
+                                    )
                                 )
                             ),
                             endAxis = endAxis,

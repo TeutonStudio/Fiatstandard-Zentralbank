@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.datenbank
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -9,6 +10,63 @@ class SpielFinanzdatenTest {
     private val anna = Spieler("Anna", emptyMap())
     private val bernd = Spieler("Bernd", emptyMap())
     private val clara = Spieler("Clara", emptyMap())
+
+    @Test
+    fun auslandHandeltKeineAnleihenUndGeschaeftsbankKeineRohstoffe() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 100.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = anna,
+            sondervermögen = 50.toZahlungsmittel(),
+            unvermögen = 5.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            spiel.fuegeHandelZurAktuellenRundeHinzu(
+                Anleihenhandel(
+                    besitzer = anna,
+                    erwerber = Ausland,
+                    anleihe = anleihe,
+                    preis = 50.toZahlungsmittel(),
+                )
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            spiel.fuegeHandelZurAktuellenRundeHinzu(
+                Anleihenhandel(
+                    besitzer = Ausland,
+                    erwerber = bernd,
+                    anleihe = anleihe,
+                    preis = 50.toZahlungsmittel(),
+                )
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            spiel.fuegeHandelZurAktuellenRundeHinzu(
+                RohstoffHandel(
+                    besitzer = Geschäftsbank,
+                    erwerber = bernd,
+                    betrag = 10.toZahlungsmittel(),
+                    anzahl = 1,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            )
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            spiel.fuegeHandelZurAktuellenRundeHinzu(
+                RohstoffHandel(
+                    besitzer = anna,
+                    erwerber = Geschäftsbank,
+                    betrag = 10.toZahlungsmittel(),
+                    anzahl = 1,
+                    rohstoff = Rohstoffe.HOLZ,
+                )
+            )
+        }
+    }
 
     @Test
     fun barvermoegenUndSchuldenFolgenDemZahlungsplanNachRunde() {

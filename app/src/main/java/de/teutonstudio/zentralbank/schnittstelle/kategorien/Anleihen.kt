@@ -52,7 +52,6 @@ import com.patrykandpatrick.vico.compose.cartesian.data.columnSeries
 import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
@@ -83,6 +82,8 @@ import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
 import java.util.Locale
 import kotlin.math.abs
@@ -352,7 +353,7 @@ private fun BalanceChart(
             modelProducer.runTransaction {
                 lineSeries {
                     sichtbareReihen.forEach { (_, werte) ->
-                        series(
+                        seriesMitGepunkteterAktuellerRunde(
                             x = runden,
                             y = werte.map { wert ->
                                 wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
@@ -377,20 +378,9 @@ private fun BalanceChart(
                     chart = rememberCartesianChart(
                         rememberLineCartesianLayer(
                             lineProvider = LineCartesianLayer.LineProvider.series(
-                                sichtbareReihen.map { (eintrag, _) ->
-                                    val farbe = eintrag.farbe
-
-                                    LineCartesianLayer.rememberLine(
-                                        fill = remember(farbe) {
-                                            LineCartesianLayer.LineFill.single(Fill(farbe))
-                                        },
-                                        interpolator = remember {
-                                            LineCartesianLayer.Interpolator.cubic(
-                                                curvature = 0.5f,
-                                            )
-                                        },
-                                    )
-                                }
+                                rememberLinienMitGepunkteterAktuellerRunde(
+                                    sichtbareReihen.map { (eintrag, _) -> eintrag }
+                                )
                             )
                         ),
                         endAxis = VerticalAxis.rememberEnd(
@@ -479,7 +469,7 @@ private fun GlobalBalanceChart(
             modelProducer.runTransaction {
                 lineSeries {
                     sichtbareReihen.forEach { (_, werte) ->
-                        series(
+                        seriesMitGepunkteterAktuellerRunde(
                             x = x,
                             y = werte.map { wert ->
                                 wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
@@ -504,20 +494,9 @@ private fun GlobalBalanceChart(
                     chart = rememberCartesianChart(
                         rememberLineCartesianLayer(
                             lineProvider = LineCartesianLayer.LineProvider.series(
-                                sichtbareReihen.map { (eintrag, _) ->
-                                    val farbe = eintrag.farbe
-
-                                    LineCartesianLayer.rememberLine(
-                                        fill = remember(farbe) {
-                                            LineCartesianLayer.LineFill.single(Fill(farbe))
-                                        },
-                                        interpolator = remember {
-                                            LineCartesianLayer.Interpolator.cubic(
-                                                curvature = 0.5f,
-                                            )
-                                        },
-                                    )
-                                }
+                                rememberLinienMitGepunkteterAktuellerRunde(
+                                    sichtbareReihen.map { (eintrag, _) -> eintrag }
+                                )
                             )
                         ),
                         endAxis = VerticalAxis.rememberEnd(

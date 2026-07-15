@@ -33,16 +33,12 @@ import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
-import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
-import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
@@ -54,7 +50,10 @@ import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 
 private data class HafenTarif(
     val bezeichnung: String,
@@ -151,7 +150,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                 BilanzEinheit.PREIS -> CartesianChartModel(
                     LineCartesianLayerModel.build {
                         sichtbareReihen.forEach { (_, werte) ->
-                            series(
+                            seriesMitGepunkteterAktuellerRunde(
                                 x = werte.indices.toList(),
                                 y = werte,
                             )
@@ -204,30 +203,16 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                         when (einheit) {
                             BilanzEinheit.PREIS -> rememberLineCartesianLayer(
                                 lineProvider = LineCartesianLayer.LineProvider.series(
-                                    sichtbareReihen.map { (eintrag, _) ->
-                                        val farbe = eintrag.farbe
-                                        LineCartesianLayer.rememberLine(
-                                            fill = remember(farbe) {
-                                                LineCartesianLayer.LineFill.single(Fill(farbe))
-                                            },
-                                            interpolator = remember {
-                                                LineCartesianLayer.Interpolator.cubic(
-                                                    curvature = 0.5f,
-                                                )
-                                            },
-                                        )
-                                    }
+                                    rememberLinienMitGepunkteterAktuellerRunde(
+                                        sichtbareReihen.map { (eintrag, _) -> eintrag }
+                                    )
                                 )
                             )
 
                             BilanzEinheit.STUECK -> rememberColumnCartesianLayer(
-                                columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                                    sichtbareReihen.map { (eintrag, _) ->
-                                        rememberLineComponent(
-                                            fill = Fill(eintrag.farbe),
-                                            thickness = 8.dp,
-                                        )
-                                    }
+                                columnProvider = rememberSaeulenMitGepunkteterAktuellerRunde(
+                                    eintraege = sichtbareReihen.map { (eintrag, _) -> eintrag },
+                                    aktuelleRundeX = spiel.aktuelleRunde - 1,
                                 )
                             )
                         },

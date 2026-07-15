@@ -29,4 +29,17 @@ class DiagrammLegendenStatusTest {
 
         assertEquals(setOf("b"), status.sichtbareIds)
     }
+
+    @Test
+    fun sichtbarkeitSetzen_schaltetEineGanzeGruppeGemeinsam() {
+        val status = DiagrammLegendenStatus(listOf("a", "b", "c", "d"))
+
+        status.sichtbarkeitSetzen(listOf("b", "c"), sichtbar = false)
+
+        assertEquals(setOf("a", "d"), status.sichtbareIds)
+
+        status.sichtbarkeitSetzen(listOf("b", "c"), sichtbar = true)
+
+        assertEquals(setOf("a", "b", "c", "d"), status.sichtbareIds)
+    }
 }

@@ -120,24 +120,30 @@ fun HandelDialog(
     onCreateRohstoff: (RohstoffHandel) -> Unit,
     onCreateAnleihe: (Anleihenhandel) -> Unit,
 ) {
-    val personen = remember(spiel.spielerListe) {
-        spiel.spielerListe.map { it as JuristischePerson } + Geschäftsbank + Ausland
+    val rohstoffPersonen = remember(spiel.spielerListe) {
+        spiel.spielerListe.map { it as JuristischePerson } + Ausland
     }
-    var besitzer by remember(personen) { mutableStateOf(personen.firstOrNull()) }
-    var erwerber by remember(personen) {
-        mutableStateOf(personen.getOrNull(1) ?: personen.firstOrNull())
+    val anleihePersonen = remember(spiel.spielerListe) {
+        spiel.spielerListe.map { it as JuristischePerson } + Geschäftsbank
+    }
+    var besitzer by remember(rohstoffPersonen) { mutableStateOf(rohstoffPersonen.firstOrNull()) }
+    var erwerber by remember(rohstoffPersonen) {
+        mutableStateOf(rohstoffPersonen.getOrNull(1) ?: rohstoffPersonen.firstOrNull())
     }
     var handelsgut by remember {
         mutableStateOf<HandelsgutAuswahl>(HandelsgutAuswahl.Rohstoff(Rohstoffe.entries.first()))
     }
     var menge by remember { mutableStateOf("1") }
     var gesamtpreis by remember { mutableStateOf("") }
+    val personen = when (handelsgut) {
+        is HandelsgutAuswahl.Rohstoff -> rohstoffPersonen
+        is HandelsgutAuswahl.AnleiheWert -> anleihePersonen
+    }
 
     val aktuelleRunde = (spiel.aktuelleRunde - 1).coerceAtLeast(0)
     val handelbareAnleihen = spiel.anleihen
         .filter { eintrag ->
-            eintrag.aktuellerBesitzer == besitzer &&
-                eintrag.faelligkeit > aktuelleRunde &&
+            eintrag.faelligkeit > aktuelleRunde &&
                 aktuelleRunde !in eintrag.handelsverlauf
         }
         .sortedWith(
@@ -170,6 +176,8 @@ fun HandelDialog(
     )
     val fehler = when {
         besitzer == null || erwerber == null -> "Es sind keine Handelspartner vorhanden."
+        besitzer !in personen || erwerber !in personen ->
+            "Die gewählten Handelspartner dürfen dieses Handelsgut nicht handeln."
         besitzer == erwerber -> "Verkäufer und Erwerber müssen verschieden sein."
         handelsgut is HandelsgutAuswahl.Rohstoff && (mengeWert == null || mengeWert <= 0) ->
             "Die Menge muss größer als 0 sein."
@@ -192,13 +200,35 @@ fun HandelDialog(
                     val ausgewaehlteAnleihe = handelsgut as? HandelsgutAuswahl.AnleiheWert
                     if (ausgewaehlteAnleihe?.anleihe?.aktuellerBesitzer != neuerBesitzer) {
                         handelsgut = HandelsgutAuswahl.Rohstoff(Rohstoffe.entries.first())
+                        if (neuerBesitzer !in rohstoffPersonen) {
+                            besitzer = rohstoffPersonen.firstOrNull()
+                        }
+                        if (erwerber !in rohstoffPersonen || erwerber == besitzer) {
+                            erwerber = rohstoffPersonen.firstOrNull { person -> person != besitzer }
+                        }
                     }
                 }
                 PersonenAuswahl("Erwerber", personen, erwerber) { erwerber = it }
                 HandelsgutAuswahlFeld(
                     auswahl = handelsgut,
                     handelbareAnleihen = handelbareAnleihen,
-                    onSelect = { handelsgut = it },
+                    onSelect = { neueAuswahl ->
+                        handelsgut = neueAuswahl
+                        val erlaubtePersonen = when (neueAuswahl) {
+                            is HandelsgutAuswahl.Rohstoff -> rohstoffPersonen
+                            is HandelsgutAuswahl.AnleiheWert -> anleihePersonen
+                        }
+                        besitzer = when (neueAuswahl) {
+                            is HandelsgutAuswahl.Rohstoff ->
+                                besitzer?.takeIf { person -> person in erlaubtePersonen }
+                                    ?: erlaubtePersonen.firstOrNull()
+                            is HandelsgutAuswahl.AnleiheWert ->
+                                neueAuswahl.anleihe.aktuellerBesitzer
+                        }
+                        if (erwerber !in erlaubtePersonen || erwerber == besitzer) {
+                            erwerber = erlaubtePersonen.firstOrNull { person -> person != besitzer }
+                        }
+                    },
                 )
                 if (handelsgut is HandelsgutAuswahl.Rohstoff) {
                     Zahlenfeld("Menge (Stk)", menge) { menge = it }
@@ -276,7 +306,7 @@ fun AnleiheDialog(
         spiel.spielerListe.firstOrNull { spieler -> spieler.name == aktuellerSpielerName }
     }
     val personen = remember(spiel.spielerListe) {
-        spiel.spielerListe.map { it as JuristischePerson } + Geschäftsbank + Ausland
+        spiel.spielerListe.map { it as JuristischePerson } + Geschäftsbank
     }
     val moeglicheKaeufer = remember(personen, aktuellerSpieler) {
         personen.filter { person -> person != aktuellerSpieler }

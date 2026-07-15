@@ -328,10 +328,21 @@ open class Spiel(
             "Der Handelspreis muss größer als 0 sein."
         }
         when (neuerHandel) {
-            is RohstoffHandel -> require(neuerHandel.anzahl > 0) {
-                "Die gehandelte Menge muss größer als 0 sein."
+            is RohstoffHandel -> {
+                require(
+                    neuerHandel.besitzer != Geschäftsbank &&
+                        neuerHandel.erwerber != Geschäftsbank
+                ) {
+                    "Die Geschäftsbank kann keine Rohstoffe kaufen oder verkaufen."
+                }
+                require(neuerHandel.anzahl > 0) {
+                    "Die gehandelte Menge muss größer als 0 sein."
+                }
             }
             is Anleihenhandel -> {
+                require(neuerHandel.besitzer != Ausland && neuerHandel.erwerber != Ausland) {
+                    "Das Ausland kann keine Anleihen kaufen oder verkaufen."
+                }
                 require(neuerHandel.anleihe.schuldiger in spielerListe) {
                     "Nur ein Spieler kann eine Anleihe emittieren."
                 }

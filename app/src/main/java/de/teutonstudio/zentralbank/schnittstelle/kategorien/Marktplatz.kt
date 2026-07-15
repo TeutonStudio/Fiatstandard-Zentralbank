@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -13,6 +15,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -41,17 +44,12 @@ import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
-import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer.LineProvider.Companion.series
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
-import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
-import com.patrykandpatrick.vico.compose.common.Fill
-import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Ausland
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -78,7 +76,10 @@ import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPla
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegendenStatus
+import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 
 private enum class MarktpreisKategorie(val titel: String) {
     HANDELSGUETER("Alle Handelsgüter"),
@@ -122,7 +123,7 @@ private fun List<List<Int>>.zuLinienChart(): CartesianChartModel =
         CartesianChartModel(
             LineCartesianLayerModel.build {
                 forEach { werte ->
-                    series(
+                    seriesMitGepunkteterAktuellerRunde(
                         x = werte.indices.toList(),
                         y = werte,
                     )
@@ -302,47 +303,37 @@ fun zeigeMarktplatz(
                 val bilanzModifier = ModiPad5.clickable { isBilanzExpanded.value = !isBilanzExpanded.value }
 
                 if (isBilanzExpanded.value) {
-                    val linien = sichtbareLegende.map { eintrag ->
-                        LineCartesianLayer.rememberLine(
-                            fill = remember(eintrag.farbe) {
-                                LineCartesianLayer.LineFill.single(
-                                    Fill(eintrag.farbe)
-                                )
-                            },
-                            interpolator = remember {
-                                LineCartesianLayer.Interpolator.cubic(
-                                    curvature = 0.5f
-                                )
-                            }
-                        )
-                    }
+                    val linien = rememberLinienMitGepunkteterAktuellerRunde(sichtbareLegende)
 
                     Column {
-                        FlowRow(
-                            modifier = ModiPad5,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        Row(
+                            modifier = ModiPad5.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            MarktpreisKategorie.entries.forEach { kategorie ->
-                                FilterChip(
-                                    selected = marktpreisKategorie == kategorie,
-                                    onClick = { marktpreisKategorie = kategorie },
-                                    label = { Text(kategorie.titel) },
-                                )
-                            }
-                        }
-                        if (marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ) {
                             FlowRow(
-                                modifier = ModiPad5,
+                                modifier = Modifier.weight(1f),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                HandelsdifferenzEinheit.entries.forEach { einheit ->
+                                MarktpreisKategorie.entries.forEach { kategorie ->
                                     FilterChip(
-                                        selected = handelsdifferenzEinheit == einheit,
-                                        onClick = { handelsdifferenzEinheit = einheit },
-                                        label = { Text(einheit.titel) },
+                                        selected = marktpreisKategorie == kategorie,
+                                        onClick = { marktpreisKategorie = kategorie },
+                                        label = { Text(kategorie.titel) },
                                     )
+                                }
+                            }
+                            if (marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    HandelsdifferenzEinheit.entries.forEach { einheit ->
+                                        FilterChip(
+                                            selected = handelsdifferenzEinheit == einheit,
+                                            onClick = { handelsdifferenzEinheit = einheit },
+                                            label = { Text(einheit.titel) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -361,14 +352,11 @@ fun zeigeMarktplatz(
                                     modifier = bilanzModifier,
                                     chart = rememberCartesianChart(
                                         rememberColumnCartesianLayer(
-                                            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                                                sichtbareLegende.map { eintrag ->
-                                                    rememberLineComponent(
-                                                        fill = Fill(eintrag.farbe),
-                                                        thickness = 8.dp,
-                                                    )
-                                                }
-                                            )
+                                            columnProvider =
+                                                rememberSaeulenMitGepunkteterAktuellerRunde(
+                                                    eintraege = sichtbareLegende,
+                                                    aktuelleRundeX = spiel.aktuelleRunde - 1,
+                                                ),
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
                                             valueFormatter = richtungsAchsenFormatter(
@@ -435,18 +423,26 @@ fun zeigeMarktplatz(
                             )
                             gruppen.forEach { (titel, ids) ->
                                 val istWarenkorbGruppe = titel == "Warenkörbe"
-                                Text(
-                                    text = titel,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(start = 12.dp, top = 4.dp),
-                                )
-                                if (istWarenkorbGruppe) {
-                                    TextButton(
-                                        onClick = { warenkorbDialogOffen = true },
-                                        modifier = Modifier.padding(start = 4.dp),
-                                    ) {
-                                        Text("Warenkorb bearbeiten")
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = titel,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (istWarenkorbGruppe) {
+                                        TextButton(onClick = { warenkorbDialogOffen = true }) {
+                                            Text("Warenkorb bearbeiten")
+                                        }
                                     }
+                                    Switch(
+                                        checked = ids.any(legendenStatus::istSichtbar),
+                                        onCheckedChange = { sichtbar ->
+                                            legendenStatus.sichtbarkeitSetzen(ids, sichtbar)
+                                        },
+                                    )
                                 }
                                 UmschaltbareDiagrammLegende(
                                     eintraege = legende.filter { eintrag -> eintrag.id in ids },

@@ -53,6 +53,10 @@ class DiagrammLegendenStatus internal constructor(ids: Collection<String>) {
     fun nurAnzeigen(id: String) {
         sichtbareIds = setOf(id)
     }
+
+    fun sichtbarkeitSetzen(ids: Collection<String>, sichtbar: Boolean) {
+        sichtbareIds = if (sichtbar) sichtbareIds + ids else sichtbareIds - ids.toSet()
+    }
 }
 
 @Composable
