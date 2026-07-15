@@ -1215,41 +1215,28 @@ private fun AnleiheZinswerteZelle(
     istKompakt: Boolean,
 ) {
     val schriftgroesse = if (istKompakt) 7.sp else 8.sp
-    Column(
+    val abweichung = zinsvergleich?.relativeAbweichung
+    val abweichungsfarbe = when {
+        abweichung == null || abs(abweichung) < 0.05 -> LocalContentColor.current
+        abweichung > 0.0 -> Color(0xFF2E7D32)
+        else -> Color(0xFFB3261E)
+    }
+    Text(
+        text = zinsvergleich?.let(::formatiereAnleiheZinsvergleich).orEmpty(),
         modifier = modifier
             .border(0.5.dp, Color(0xFF8D8D8D))
             .padding(horizontal = 3.dp, vertical = if (istKompakt) 1.dp else 3.dp),
-    ) {
-        if (zinsvergleich == null) {
-            Text(
-                text = "",
-                minLines = if (istKompakt) 1 else 3,
-                fontSize = schriftgroesse,
-            )
-        } else {
-            Text(
-                text = "Leitzins: ${zinsvergleich.leitzins.alsProzentwert()}",
-                fontSize = schriftgroesse,
-            )
-            Text(
-                text = "Anleihenzins: ${zinsvergleich.anleihenzins.alsProzentwert()}",
-                fontSize = schriftgroesse,
-            )
-            val abweichung = zinsvergleich.relativeAbweichung
-            val abweichungsfarbe = when {
-                abweichung == null || abs(abweichung) < 0.05 -> LocalContentColor.current
-                abweichung > 0.0 -> Color(0xFF2E7D32)
-                else -> Color(0xFFB3261E)
-            }
-            Text(
-                text = "Abweichung: ${abweichung?.alsAbweichung() ?: "–"}",
-                color = abweichungsfarbe,
-                fontSize = schriftgroesse,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-    }
+        color = abweichungsfarbe,
+        fontSize = schriftgroesse,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+    )
 }
+
+internal fun formatiereAnleiheZinsvergleich(zinsvergleich: AnleiheZinsvergleich): String =
+    "${zinsvergleich.anleihenzins.alsProzentwert()} bei " +
+        "${zinsvergleich.leitzins.alsProzentwert()}: " +
+        (zinsvergleich.relativeAbweichung?.alsAbweichung() ?: "–")
 
 private fun Double.alsProzentwert(): String =
     String.format(Locale.GERMANY, "%.1f %%", this)

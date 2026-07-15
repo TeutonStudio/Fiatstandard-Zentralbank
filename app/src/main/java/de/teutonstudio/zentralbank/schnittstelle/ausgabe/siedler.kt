@@ -83,6 +83,8 @@ import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
+import java.util.Locale
+import kotlin.math.abs
 
 private val spielerKartenMindestbreite = 340.dp
 
@@ -720,9 +722,14 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                             )
                         }
                         zeilen.forEach { eintrag ->
-                            val rohstoffMitAnzahl = eintrag.anzahl?.let { anzahl ->
-                                "${eintrag.rohstoffOderVorgang} ($anzahl Stk)"
-                            } ?: eintrag.rohstoffOderVorgang
+                            val rendite = eintrag.erwarteteAnleihenRenditeProzent
+                            val rohstoffMitAnzahl = if (rendite != null) {
+                                "${eintrag.rohstoffOderVorgang} (${rendite.alsRendite()})"
+                            } else {
+                                eintrag.anzahl?.let { anzahl ->
+                                    "${eintrag.rohstoffOderVorgang} ($anzahl Stk)"
+                                } ?: eintrag.rohstoffOderVorgang
+                            }
                             SpielerAblaufTabellenzeile(
                                 runde = eintrag.runde.toString(),
                                 geschaeftspartner = eintrag.geschaeftspartner,
@@ -733,6 +740,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                                 } else {
                                     Color(0xFFD2E2CE)
                                 },
+                                vorgangsfarbe = rendite?.renditeFarbe(),
                                 beiRundenKlick = beiRundenKlick,
                             )
                         }
@@ -752,6 +760,7 @@ private fun SpielerAblaufTabellenzeile(
     istKopfzeile: Boolean = false,
     beiRundenKlick: (() -> Unit)? = null,
     istKompakt: Boolean = false,
+    vorgangsfarbe: Color? = null,
 ) {
     CompositionLocalProvider(LocalContentColor provides hintergrund.lesbareSchriftfarbe()) {
         Row(
@@ -779,6 +788,7 @@ private fun SpielerAblaufTabellenzeile(
                 textAlign = TextAlign.Start,
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
+                textfarbe = vorgangsfarbe,
             )
             TabellenZelle(
                 text = preis,
@@ -886,6 +896,7 @@ private fun TabellenZelle(
     istKopfzeile: Boolean = false,
     beiKlick: (() -> Unit)? = null,
     istKompakt: Boolean = false,
+    textfarbe: Color? = null,
 ) {
     val zellenModifier = if (beiKlick == null) modifier else modifier.clickable(onClick = beiKlick)
     Text(
@@ -908,7 +919,23 @@ private fun TabellenZelle(
         textAlign = textAlign,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        color = textfarbe ?: LocalContentColor.current,
     )
+}
+
+private fun Float.alsRendite(): String {
+    val normalisiert = if (abs(this) < 0.05f) 0f else this
+    return if (normalisiert == 0f) {
+        "0,0 %"
+    } else {
+        String.format(Locale.GERMANY, "%+.1f %%", normalisiert)
+    }
+}
+
+private fun Float.renditeFarbe(): Color? = when {
+    this >= 0.05f -> Color(0xFF2E7D32)
+    this <= -0.05f -> Color(0xFFB3261E)
+    else -> null
 }
 
 

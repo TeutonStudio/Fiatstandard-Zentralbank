@@ -435,6 +435,18 @@ class SpielFinanzdatenTest {
         assertEquals(listOf(-12, -40, 2, 42), ablauf.map { eintrag -> eintrag.preis.toIntOderNull() })
         assertEquals(3, ablauf.first().anzahl)
         assertEquals("lehm", ablauf.first().rohstoffOderVorgang)
+        assertEquals(
+            10f,
+            ablauf.first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_ERWORBEN }
+                .erwarteteAnleihenRenditeProzent ?: Float.NaN,
+            0.001f,
+        )
+        assertEquals(
+            0f,
+            ablauf.first { eintrag -> eintrag.art == SpielerAblaufArt.ANLEIHE_VERKAUFT }
+                .erwarteteAnleihenRenditeProzent ?: Float.NaN,
+            0.001f,
+        )
     }
 
     @Test

@@ -513,6 +513,12 @@ open class Spiel(
                         "Anleihe erworben"
                     },
                     preis = eintrag.saldo,
+                    erwarteteAnleihenRenditeProzent = anleihen
+                        .firstOrNull { anzeige -> anzeige.anleihe == handel.anleihe }
+                        ?.erwarteteRenditeProzent(
+                            handelsrunde = eintrag.runde,
+                            kaufpreis = handel.preis,
+                        ),
                 )
                 else -> null
             }
@@ -893,7 +899,25 @@ data class SpielerAblaufEintrag(
     val anzahl: Int?,
     val rohstoffOderVorgang: String,
     val preis: Zahlungsmittel,
+    val erwarteteAnleihenRenditeProzent: Float? = null,
 )
+
+private fun AnleiheAnzeige.erwarteteRenditeProzent(
+    handelsrunde: Int,
+    kaufpreis: Zahlungsmittel,
+): Float? {
+    if (kaufpreis <= Zahlungsmittel()) return null
+
+    val erwarteteZahlungen = erhalteAblauf()
+        .filter { eintrag ->
+            eintrag.runde >= handelsrunde &&
+                (eintrag.art == AnleiheAblaufArt.ZINS ||
+                    eintrag.art == AnleiheAblaufArt.RUECKKAUF)
+        }
+        .summeGeld { eintrag -> eintrag.betrag }
+
+    return (erwarteteZahlungen / kaufpreis - 1f) * 100f
+}
 
 data class Ausgabenplan(
     val runde: Int,

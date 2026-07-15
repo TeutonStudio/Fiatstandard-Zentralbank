@@ -25,6 +25,7 @@ class AnleiheZinsvergleichTest {
         assertEquals(2.0, vergleich.leitzins, 0.001)
         assertEquals(7.5, vergleich.anleihenzins, 0.001)
         assertEquals(275.0, vergleich.relativeAbweichung ?: Double.NaN, 0.001)
+        assertEquals("7,5 % bei 2,0 %: +275,0 %", formatiereAnleiheZinsvergleich(vergleich))
     }
 
     @Test
