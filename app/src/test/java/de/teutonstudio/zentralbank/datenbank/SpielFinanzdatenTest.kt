@@ -542,7 +542,7 @@ class SpielFinanzdatenTest {
     }
 
     @Test
-    fun aussenhandelVeraendertGlobalesSpielerBarvermoegenUndWirdNachRohstoffBilanziert() {
+    fun aussenhandelVeraendertSpielerBarvermoegenUndGlobalesBarvermoegenBleibtErhalten() {
         val spiel = neuesSpiel(
             anna to 100.toZahlungsmittel(),
             bernd to 50.toZahlungsmittel(),
@@ -562,7 +562,8 @@ class SpielFinanzdatenTest {
             konfliktDaten = emptySet(),
         )
 
-        assertEquals(170, spiel.globalesBarvermögen[1].toIntOderNull())
+        assertEquals(170, spiel.spielerBarvermögen[1].toIntOderNull())
+        assertEquals(150, spiel.globalesBarvermögen[1].toIntOderNull())
         assertEquals(
             20,
             spiel.aussenhandelsbilanzNachRohstoff[1]
@@ -591,7 +592,8 @@ class SpielFinanzdatenTest {
             konfliktDaten = emptySet(),
         )
 
-        assertEquals(163, spiel.globalesBarvermögen[2].toIntOderNull())
+        assertEquals(163, spiel.spielerBarvermögen[2].toIntOderNull())
+        assertEquals(150, spiel.globalesBarvermögen[2].toIntOderNull())
         assertEquals(
             20,
             spiel.aussenhandelsbilanzNachRohstoff[2]
@@ -737,6 +739,7 @@ class SpielFinanzdatenTest {
             kombinierteSchulden,
             spiel.spielerKombinierteSchulden[runde].getValue(anna).toIntOderNull(),
         )
+        assertEquals(globalesBarvermögen, spiel.spielerBarvermögen[runde].toIntOderNull())
         assertEquals(globalesBarvermögen, spiel.globalesBarvermögen[runde].toIntOderNull())
     }
 }

@@ -250,7 +250,15 @@ open class Spiel(
     public val spielerSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSchuldenZurRunde(idx,it) } }
     public val spielerZinsschulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerZinsschuldenZurRunde(idx,it) } }
     public val spielerKombinierteSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerKombinierteSchuldenZurRunde(idx,it) } }
-    public val globalesBarvermögen: List<Zahlungsmittel> get() = spielerSaldo.map { runde -> runde.values.summeGeld { it } }
+    public val spielerBarvermögen: List<Zahlungsmittel> get() =
+        spielerSaldo.map { runde -> runde.values.summeGeld { it } }
+    public val globalesBarvermögen: List<Zahlungsmittel> get() {
+        val barvermögenOhneAusland = spielerBarvermögen
+        return List(aktuelleRunde) { runde ->
+            barvermögenOhneAusland[runde] +
+                handel.erhalteSaldoZurRunde(runde).getOrDefault(Ausland, Zahlungsmittel())
+        }
+    }
     public val globaleSchulden: List<Zahlungsmittel> get() = spielerSchulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleZinsschulden: List<Zahlungsmittel> get() = spielerZinsschulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleKombinierteSchulden: List<Zahlungsmittel> get() = spielerKombinierteSchulden.map { runde -> runde.values.summeGeld { it } }

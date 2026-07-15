@@ -57,7 +57,7 @@ class ZahlungsmittelCharacterizationTest {
             TestSpiel.spielerStringListe,
         )
         assertTrue(TestSpiel.marktpreise.isNotEmpty())
-        assertTrue(TestSpiel.globalesBarvermögen.distinct().size > 1)
+        assertTrue(TestSpiel.spielerBarvermögen.distinct().size > 1)
         assertTrue(
             TestSpiel.aussenhandelsbilanzGesamt.any { bilanz ->
                 bilanz != Zahlungsmittel()

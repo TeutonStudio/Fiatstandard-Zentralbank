@@ -425,6 +425,7 @@ private fun GlobalBalanceChart(
     yAchsenExponent: Float,
     onYAchsenExponentChange: (Float) -> Unit,
 ) {
+    val spielerBarvermögen = spiel.spielerBarvermögen.map { it.toIntOderNull() ?: 0 }
     val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
     val globaleSchulden = spiel.globaleKombinierteSchulden.map { it.toIntOderNull() ?: 0 }
     val zinsgewinne = spiel.bankZinsgewinne.map { it.toIntOderNull() ?: 0 }
@@ -438,8 +439,13 @@ private fun GlobalBalanceChart(
     val modelProducer = remember { CartesianChartModelProducer() }
     val legende = listOf(
         DiagrammLegendenEintrag(
+            id = "spieler-barvermoegen",
+            bezeichnung = "Spieler-Barvermögen (ohne Ausland)",
+            farbe = Color(0xFF90A4AE),
+        ),
+        DiagrammLegendenEintrag(
             id = "global-barvermoegen",
-            bezeichnung = "Globales Barvermögen",
+            bezeichnung = "Globales Barvermögen (mit Ausland)",
             farbe = Color(0xFF607D8B),
         ),
         DiagrammLegendenEintrag(
@@ -454,9 +460,10 @@ private fun GlobalBalanceChart(
         ),
     )
     val reihen = listOf(
-        legende[0] to globalesBarvermögen,
-        legende[1] to globaleSchulden,
-        legende[2] to zinsgewinne,
+        legende[0] to spielerBarvermögen,
+        legende[1] to globalesBarvermögen,
+        legende[2] to globaleSchulden,
+        legende[3] to zinsgewinne,
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
     val sichtbareReihen = reihen.filter { (eintrag, _) ->
