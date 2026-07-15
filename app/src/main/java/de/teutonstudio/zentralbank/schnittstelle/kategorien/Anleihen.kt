@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.Grid
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -63,6 +66,7 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import de.teutonstudio.zentralbank.datenbank.Anleihe
+import de.teutonstudio.zentralbank.datenbank.AnleiheAblaufArt
 import de.teutonstudio.zentralbank.datenbank.AnleiheAnzeige
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Runde
@@ -100,6 +104,40 @@ private val anleiheFaelligFarbe = Color(0xFFD8C28F)
 private val anleiheOffenFarbe = Color(0xFF9EB5C7)
 private val anleiheAbgelaufenFarbe = Color(0xFFC7C7C7)
 private const val MAX_Y_ACHSE_EXPONENT = 5f
+
+private data class SchuldenDiagrammReihe(
+    val eintrag: DiagrammLegendenEintrag,
+    val runden: List<Int>,
+    val werte: List<Int>,
+)
+
+internal data class AnleiheZinsvergleich(
+    val leitzins: Double,
+    val anleihenzins: Double,
+    val relativeAbweichung: Double?,
+)
+
+internal fun berechneAnleiheZinsvergleich(
+    anleihe: Anleihe,
+    leitzins: Float,
+): AnleiheZinsvergleich {
+    val nennwert = anleihe.sondervermögen.toDoubleOderNull()
+    val anleihenzins = if (nennwert == 0.0) {
+        0.0
+    } else {
+        anleihe.unvermögen.toDoubleOderNull() / nennwert * 100.0
+    }
+    val relativeAbweichung = if (leitzins == 0f) {
+        null
+    } else {
+        (anleihenzins / leitzins.toDouble() - 1.0) * 100.0
+    }
+    return AnleiheZinsvergleich(
+        leitzins = leitzins.toDouble(),
+        anleihenzins = anleihenzins,
+        relativeAbweichung = relativeAbweichung,
+    )
+}
 
 private val relevanceStrings = listOf(
     "gezahlte",
@@ -215,41 +253,24 @@ fun Header(
     onChangeView: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    var isBilanzExpanded by remember { mutableStateOf(true) }
     var yAchsenExponent by remember { mutableFloatStateOf(1f) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = ModiPad5.clickable {
-                isBilanzExpanded = !isBilanzExpanded
-            }
-        ) {
-            if (isBilanzExpanded) {
-                if (showManagementView) {
-                    ManagementChart(
-                        selectedPlayer = ausgewählterSpieler,
-                        selectedRound = selectedRound,
-                        aktuelleRunde = spiel.aktuelleRunde,
-                        spielerBauSaldo = spielerBauSaldo,
-                        anleihen = spiel.anleihen,
-                    )
-                } else {
-                    BalanceChart(
-                        spiel = spiel,
-                        ausgewählterSpieler = ausgewählterSpieler,
-                        yAchsenExponent = yAchsenExponent,
-                        onYAchsenExponentChange = { yAchsenExponent = it },
-                    )
-                }
-            } else {
-                Card(modifier = ModiPad5) {
-                    Text(
-                        text = "Anleihenbilanz",
-                        fontSize = 40.sp,
-                        modifier = ModiPad5,
-                    )
-                }
-            }
+        if (showManagementView) {
+            ManagementChart(
+                selectedPlayer = ausgewählterSpieler,
+                selectedRound = selectedRound,
+                aktuelleRunde = spiel.aktuelleRunde,
+                spielerBauSaldo = spielerBauSaldo,
+                anleihen = spiel.anleihen,
+            )
+        } else {
+            BalanceChart(
+                spiel = spiel,
+                ausgewählterSpieler = ausgewählterSpieler,
+                yAchsenExponent = yAchsenExponent,
+                onYAchsenExponentChange = { yAchsenExponent = it },
+            )
         }
 
         HeaderControls(
@@ -305,7 +326,8 @@ private fun BalanceChart(
         return
     }
 
-    val runden = List(spiel.aktuelleRunde) { it }
+    val historischeRunden = List(spiel.aktuelleRunde) { it }
+    val schuldenRunden = spiel.schuldenProjektionsrunden
     val modelProducer = remember { CartesianChartModelProducer() }
     val spieler = spiel.spielerListe.firstOrNull { it.name == ausgewählterSpieler }
     val spielerFarbe = erhalteSpielerFarben(spiel.spielerListe)[spieler] ?: Color.LightGray
@@ -337,31 +359,52 @@ private fun BalanceChart(
         ),
     )
     val reihen = listOf(
-        legende[0] to spiel.spielerSaldo.toY(ausgewählterSpieler),
-        legende[1] to spiel.spielerMarktwert.toY(ausgewählterSpieler),
-        legende[2] to spiel.spielerSchulden.toY(ausgewählterSpieler),
-        legende[3] to spiel.spielerZinsschulden.toY(ausgewählterSpieler),
-        legende[4] to spiel.spielerKombinierteSchulden.toY(ausgewählterSpieler),
+        SchuldenDiagrammReihe(
+            legende[0],
+            historischeRunden,
+            spiel.spielerSaldo.toY(ausgewählterSpieler),
+        ),
+        SchuldenDiagrammReihe(
+            legende[1],
+            historischeRunden,
+            spiel.spielerMarktwert.toY(ausgewählterSpieler),
+        ),
+        SchuldenDiagrammReihe(
+            legende[2],
+            schuldenRunden,
+            spiel.spielerSchuldenMitProjektion.toY(ausgewählterSpieler),
+        ),
+        SchuldenDiagrammReihe(
+            legende[3],
+            schuldenRunden,
+            spiel.spielerZinsschuldenMitProjektion.toY(ausgewählterSpieler),
+        ),
+        SchuldenDiagrammReihe(
+            legende[4],
+            schuldenRunden,
+            spiel.spielerKombinierteSchuldenMitProjektion.toY(ausgewählterSpieler),
+        ),
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
-    val sichtbareReihen = reihen.filter { (eintrag, _) ->
-        legendenStatus.istSichtbar(eintrag.id)
+    val sichtbareReihen = reihen.filter { reihe ->
+        legendenStatus.istSichtbar(reihe.eintrag.id)
     }
     val maximalbetrag = sichtbareReihen
-        .flatMap { (_, werte) -> werte }
+        .flatMap { reihe -> reihe.werte }
         .maxOfOrNull { wert -> abs(wert.toDouble()) }
         ?: 0.0
 
-    LaunchedEffect(runden, sichtbareReihen, yAchsenExponent, maximalbetrag) {
+    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag) {
         if (sichtbareReihen.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    sichtbareReihen.forEach { (_, werte) ->
+                    sichtbareReihen.forEach { reihe ->
                         seriesMitGepunkteterAktuellerRunde(
-                            x = runden,
-                            y = werte.map { wert ->
+                            x = reihe.runden,
+                            y = reihe.werte.map { wert ->
                                 wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
                             },
+                            aktuelleRundeX = spiel.aktuelleRunde - 1,
                         )
                     }
                 }
@@ -383,7 +426,7 @@ private fun BalanceChart(
                         rememberLineCartesianLayer(
                             lineProvider = LineCartesianLayer.LineProvider.series(
                                 rememberLinienMitGepunkteterAktuellerRunde(
-                                    sichtbareReihen.map { (eintrag, _) -> eintrag }
+                                    sichtbareReihen.map { reihe -> reihe.eintrag }
                                 )
                             )
                         ),
@@ -421,11 +464,13 @@ private fun GlobalBalanceChart(
 ) {
     val spielerBarvermögen = spiel.spielerBarvermögen.map { it.toIntOderNull() ?: 0 }
     val globalesBarvermögen = spiel.globalesBarvermögen.map { it.toIntOderNull() ?: 0 }
-    val globaleSchulden = spiel.globaleKombinierteSchulden.map { it.toIntOderNull() ?: 0 }
+    val globaleSchulden = spiel.globaleKombinierteSchuldenMitProjektion
+        .map { it.toIntOderNull() ?: 0 }
     val zinsgewinne = spiel.bankZinsgewinne.map { it.toIntOderNull() ?: 0 }
-    val x = globalesBarvermögen.indices.toList()
+    val historischeRunden = globalesBarvermögen.indices.toList()
+    val schuldenRunden = spiel.schuldenProjektionsrunden
 
-    if (x.isEmpty()) {
+    if (historischeRunden.isEmpty()) {
         EmptyInfoCard("Keine globalen Bilanzwerte vorhanden.")
         return
     }
@@ -454,30 +499,31 @@ private fun GlobalBalanceChart(
         ),
     )
     val reihen = listOf(
-        legende[0] to spielerBarvermögen,
-        legende[1] to globalesBarvermögen,
-        legende[2] to globaleSchulden,
-        legende[3] to zinsgewinne,
+        SchuldenDiagrammReihe(legende[0], historischeRunden, spielerBarvermögen),
+        SchuldenDiagrammReihe(legende[1], historischeRunden, globalesBarvermögen),
+        SchuldenDiagrammReihe(legende[2], schuldenRunden, globaleSchulden),
+        SchuldenDiagrammReihe(legende[3], historischeRunden, zinsgewinne),
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
-    val sichtbareReihen = reihen.filter { (eintrag, _) ->
-        legendenStatus.istSichtbar(eintrag.id)
+    val sichtbareReihen = reihen.filter { reihe ->
+        legendenStatus.istSichtbar(reihe.eintrag.id)
     }
     val maximalbetrag = sichtbareReihen
-        .flatMap { (_, werte) -> werte }
+        .flatMap { reihe -> reihe.werte }
         .maxOfOrNull { wert -> abs(wert.toDouble()) }
         ?: 0.0
 
-    LaunchedEffect(x, sichtbareReihen, yAchsenExponent, maximalbetrag) {
+    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag) {
         if (sichtbareReihen.isNotEmpty()) {
             modelProducer.runTransaction {
                 lineSeries {
-                    sichtbareReihen.forEach { (_, werte) ->
+                    sichtbareReihen.forEach { reihe ->
                         seriesMitGepunkteterAktuellerRunde(
-                            x = x,
-                            y = werte.map { wert ->
+                            x = reihe.runden,
+                            y = reihe.werte.map { wert ->
                                 wert.aufExponentielleAchse(yAchsenExponent, maximalbetrag)
                             },
+                            aktuelleRundeX = spiel.aktuelleRunde - 1,
                         )
                     }
                 }
@@ -499,7 +545,7 @@ private fun GlobalBalanceChart(
                         rememberLineCartesianLayer(
                             lineProvider = LineCartesianLayer.LineProvider.series(
                                 rememberLinienMitGepunkteterAktuellerRunde(
-                                    sichtbareReihen.map { (eintrag, _) -> eintrag }
+                                    sichtbareReihen.map { reihe -> reihe.eintrag }
                                 )
                             )
                         ),
@@ -922,10 +968,11 @@ fun AnleihenRegister(
         AblaufDialog(
             titel = "Anleihenablauf · ${eintrag.schuldiger.name} · " +
                 eintrag.sondervermoegen.zuMark(),
-            breitenAnteil = 0.58f,
+            breitenAnteil = 0.72f,
             onDismiss = { geoeffneteAnleihe = null },
         ) {
             AnleiheAblauf(
+                spiel = spiel,
                 aktuelleRunde = eingabeRunde,
                 eintrag = eintrag,
             )
@@ -996,6 +1043,7 @@ private fun AnleiheCard(
 
 @Composable
 private fun AnleiheAblauf(
+    spiel: Spiel,
     aktuelleRunde: Int,
     eintrag: AnleiheAnzeige,
 ) {
@@ -1022,7 +1070,8 @@ private fun AnleiheAblauf(
     ) {
         Text(
             text = "Vollständiger Ablauf bis zur Tilgung in Runde ${eintrag.faelligkeit} · " +
-                "Runde antippen zum Ein-/Ausklappen",
+                "Runde antippen zum Ein-/Ausklappen\n" +
+                "Für zukünftige Runden wird der aktuelle Leitzins fortgeschrieben.",
             modifier = Modifier.fillMaxWidth().padding(bottom = 5.dp),
             textAlign = TextAlign.Center,
         )
@@ -1065,8 +1114,18 @@ private fun AnleiheAblauf(
             } else {
                 ereignisse.forEach { ereignis ->
                     val zahlungsempfaenger = ereignis.zahlungsempfaenger
+                    val zinsvergleich = if (ereignis.art == AnleiheAblaufArt.HANDEL) {
+                        null
+                    } else {
+                        berechneAnleiheZinsvergleich(
+                            anleihe = eintrag.anleihe,
+                            leitzins = spiel.leitzinssatz(ereignis.runde)
+                                ?: spiel.aktuellerLeitzinssatz,
+                        )
+                    }
                     AnleiheAblaufTabellenzeile(
                         runde = ereignis.runde.toString(),
+                        zinsvergleich = zinsvergleich,
                         zahlungsempfaenger = if (zeigeBuchungssatz) {
                             ereignis.buchungssatz
                         } else {
@@ -1088,6 +1147,7 @@ private fun AnleiheAblaufTabellenzeile(
     zahlungsempfaenger: String,
     betrag: String,
     hintergrund: Color,
+    zinsvergleich: AnleiheZinsvergleich? = null,
     istKopfzeile: Boolean = false,
     beiRundenKlick: (() -> Unit)? = null,
     buchungssatzSchalterAktiv: Boolean? = null,
@@ -1098,39 +1158,108 @@ private fun AnleiheAblaufTabellenzeile(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(IntrinsicSize.Min)
                 .background(hintergrund),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnleiheTabellenZelle(
                 text = runde,
-                modifier = Modifier.weight(0.6f),
+                modifier = Modifier.weight(0.5f).fillMaxHeight(),
                 istKopfzeile = istKopfzeile,
                 beiKlick = beiRundenKlick,
                 istKompakt = istKompakt,
             )
+            if (istKopfzeile) {
+                AnleiheTabellenZelle(
+                    text = "Zinswerte",
+                    modifier = Modifier.weight(1.2f).fillMaxHeight(),
+                    istKopfzeile = true,
+                )
+            } else {
+                AnleiheZinswerteZelle(
+                    zinsvergleich = zinsvergleich,
+                    modifier = Modifier.weight(1.2f).fillMaxHeight(),
+                    istKompakt = istKompakt,
+                )
+            }
             if (buchungssatzSchalterAktiv != null && beiBuchungssatzAenderung != null) {
                 AnleiheBuchungssatzKopfzelle(
                     text = zahlungsempfaenger,
                     aktiv = buchungssatzSchalterAktiv,
                     beiAenderung = beiBuchungssatzAenderung,
-                    modifier = Modifier.weight(1.4f),
+                    modifier = Modifier.weight(1.4f).fillMaxHeight(),
                 )
             } else {
                 AnleiheTabellenZelle(
                     text = zahlungsempfaenger,
-                    modifier = Modifier.weight(1.4f),
+                    modifier = Modifier.weight(1.4f).fillMaxHeight(),
                     istKopfzeile = istKopfzeile,
                     istKompakt = istKompakt,
                 )
             }
             AnleiheTabellenZelle(
                 text = betrag,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
                 textAlign = TextAlign.End,
                 istKopfzeile = istKopfzeile,
                 istKompakt = istKompakt,
             )
         }
+    }
+}
+
+@Composable
+private fun AnleiheZinswerteZelle(
+    zinsvergleich: AnleiheZinsvergleich?,
+    modifier: Modifier,
+    istKompakt: Boolean,
+) {
+    val schriftgroesse = if (istKompakt) 7.sp else 8.sp
+    Column(
+        modifier = modifier
+            .border(0.5.dp, Color(0xFF8D8D8D))
+            .padding(horizontal = 3.dp, vertical = if (istKompakt) 1.dp else 3.dp),
+    ) {
+        if (zinsvergleich == null) {
+            Text(
+                text = "",
+                minLines = if (istKompakt) 1 else 3,
+                fontSize = schriftgroesse,
+            )
+        } else {
+            Text(
+                text = "Leitzins: ${zinsvergleich.leitzins.alsProzentwert()}",
+                fontSize = schriftgroesse,
+            )
+            Text(
+                text = "Anleihenzins: ${zinsvergleich.anleihenzins.alsProzentwert()}",
+                fontSize = schriftgroesse,
+            )
+            val abweichung = zinsvergleich.relativeAbweichung
+            val abweichungsfarbe = when {
+                abweichung == null || abs(abweichung) < 0.05 -> LocalContentColor.current
+                abweichung > 0.0 -> Color(0xFF2E7D32)
+                else -> Color(0xFFB3261E)
+            }
+            Text(
+                text = "Abweichung: ${abweichung?.alsAbweichung() ?: "–"}",
+                color = abweichungsfarbe,
+                fontSize = schriftgroesse,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+private fun Double.alsProzentwert(): String =
+    String.format(Locale.GERMANY, "%.1f %%", this)
+
+private fun Double.alsAbweichung(): String {
+    val normalisiert = if (abs(this) < 0.05) 0.0 else this
+    return if (normalisiert == 0.0) {
+        "0,0 %"
+    } else {
+        String.format(Locale.GERMANY, "%+.1f %%", normalisiert)
     }
 }
 

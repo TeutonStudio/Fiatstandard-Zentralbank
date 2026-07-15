@@ -85,13 +85,10 @@ import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRu
 
 @Composable
 fun SpielerBilanz(
-    //spielerListe: List<Spieler>,
     spielerSaldo: List<Map<Spieler, Zahlungsmittel>>,
-    isBilanzExpanded: MutableState<Boolean> = remember { mutableStateOf(true) }
 ) {
     val spielerListe = spielerSaldo.first().keys.toList()
-    if (isBilanzExpanded.value) {
-        Card(modifier = ModiPad5.clickable { isBilanzExpanded.value = !isBilanzExpanded.value }) {
+    Card(modifier = ModiPad5) {
             //val spielerNamen = spielerListe.map { it.erhalteNamen() }
             val spielerFarben = erhalteSpielerFarben(spielerListe)
 
@@ -187,15 +184,6 @@ fun SpielerBilanz(
                 }
 
             }
-        }
-    } else {
-        Card(modifier = ModiPad5.clickable { isBilanzExpanded.value = !isBilanzExpanded.value }) {
-            Text(
-                text = "Spielerbilanz",
-                fontSize = 40.sp,
-                modifier = ModiPad5
-            )
-        }
     }
 }
 

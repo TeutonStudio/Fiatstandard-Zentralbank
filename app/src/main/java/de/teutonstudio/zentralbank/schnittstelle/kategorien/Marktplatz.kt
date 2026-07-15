@@ -158,8 +158,6 @@ fun zeigeMarktplatz(
     onTrade: (HandelsDaten) -> Unit = {},
     onWarenkorbAendern: (Map<Rohstoffe, Int>) -> Unit = {},
 ) {
-    val isBilanzExpanded = remember { mutableStateOf(true) }
-
     var marktpreisKategorie by remember { mutableStateOf(MarktpreisKategorie.HANDELSGUETER) }
     var handelsdifferenzEinheit by remember {
         mutableStateOf(HandelsdifferenzEinheit.STUECK)
@@ -301,12 +299,10 @@ fun zeigeMarktplatz(
                     }
                 }
 
-                val bilanzModifier = ModiPad5.clickable { isBilanzExpanded.value = !isBilanzExpanded.value }
+                val bilanzModifier = ModiPad5
+                val linien = rememberLinienMitGepunkteterAktuellerRunde(sichtbareLegende)
 
-                if (isBilanzExpanded.value) {
-                    val linien = rememberLinienMitGepunkteterAktuellerRunde(sichtbareLegende)
-
-                    Column {
+                Column {
                         Row(
                             modifier = ModiPad5.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -475,15 +471,6 @@ fun zeigeMarktplatz(
                                 langerKlickBeschreibung = "Spieler oder Ausland auswählen",
                             )
                         }
-                    }
-                } else {
-                    Card(modifier = bilanzModifier) {
-                        Text(
-                            text = "Marktbilanz",
-                            fontSize = 40.sp,
-                            modifier = ModiPad5
-                        )
-                    }
                 }
             }
         } else {

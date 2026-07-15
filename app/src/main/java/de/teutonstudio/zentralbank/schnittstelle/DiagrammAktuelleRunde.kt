@@ -20,22 +20,26 @@ import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 fun LineCartesianLayerModel.BuilderScope.seriesMitGepunkteterAktuellerRunde(
     x: Collection<Number>,
     y: Collection<Number>,
+    aktuelleRundeX: Number? = null,
 ) {
     require(x.size == y.size) { "X- und Y-Werte müssen gleich lang sein." }
     if (x.isEmpty()) return
 
     val xWerte = x.toList()
     val yWerte = y.toList()
-    val historischeAnzahl = (xWerte.size - 1).coerceAtLeast(1)
-    val aktuelleAnzahl = xWerte.size.coerceAtMost(2)
+    val aktuelleRunde = (aktuelleRundeX ?: xWerte.last()).toDouble()
+    val aktuellerIndex = xWerte.indexOfLast { wert -> wert.toDouble() <= aktuelleRunde }
+    require(aktuellerIndex >= 0) { "Die aktuelle Runde muss innerhalb der X-Werte liegen." }
+    val historischeAnzahl = aktuellerIndex.coerceAtLeast(1)
+    val gepunkteterStart = (aktuellerIndex - 1).coerceAtLeast(0)
 
     series(
         x = xWerte.take(historischeAnzahl),
         y = yWerte.take(historischeAnzahl),
     )
     series(
-        x = xWerte.takeLast(aktuelleAnzahl),
-        y = yWerte.takeLast(aktuelleAnzahl),
+        x = xWerte.drop(gepunkteterStart),
+        y = yWerte.drop(gepunkteterStart),
     )
 }
 

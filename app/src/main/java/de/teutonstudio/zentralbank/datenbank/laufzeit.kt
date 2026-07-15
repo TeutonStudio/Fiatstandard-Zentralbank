@@ -246,10 +246,66 @@ open class Spiel(
             spieler.erhalteBauSaldoZurRunde(idx).zuKosten() * bewertungspreise
         }
     }
+
+    private fun projizierteSchuldenstaende(): List<Schuldenstand> {
+        val bestehendeAnleihen = anleihen
+        val letzteRunde = maxOf(
+            aktuelleRunde - 1,
+            bestehendeAnleihen.maxOfOrNull { anleihe -> anleihe.faelligkeit }
+                ?: aktuelleRunde - 1,
+        )
+        if (aktuelleRunde > letzteRunde) return emptyList()
+
+        return (aktuelleRunde..letzteRunde).map { runde ->
+            val kapital = spielerListe
+                .associate { spieler -> (spieler as JuristischePerson) to Zahlungsmittel() }
+                .toMutableMap()
+            val zinsen = kapital.toMutableMap()
+
+            bestehendeAnleihen
+                .filter { anleihe -> runde in anleihe.emittiert until anleihe.faelligkeit }
+                .forEach { anleihe ->
+                    val schuldiger = anleihe.schuldiger
+                    kapital[schuldiger] = kapital.getOrDefault(schuldiger, Zahlungsmittel()) +
+                        anleihe.sondervermoegen
+                    val verbleibendeZinsrunden =
+                        (anleihe.faelligkeit - runde - 1).coerceAtLeast(0)
+                    zinsen[schuldiger] = zinsen.getOrDefault(schuldiger, Zahlungsmittel()) +
+                        anleihe.unvermoegen * verbleibendeZinsrunden
+                }
+
+            Schuldenstand(kapital = kapital, zinsen = zinsen)
+        }
+    }
+
     public val spielerSaldo: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSaldoZurRunde(idx,it) } }
     public val spielerSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerSchuldenZurRunde(idx,it) } }
     public val spielerZinsschulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerZinsschuldenZurRunde(idx,it) } }
     public val spielerKombinierteSchulden: List<Map<Spieler, Zahlungsmittel>> get() = List(aktuelleRunde) { idx -> spielerListe.associateWith { handel.erhalteSpielerKombinierteSchuldenZurRunde(idx,it) } }
+    public val letzteSchuldenProjektionsrunde: Int get() = maxOf(
+        aktuelleRunde - 1,
+        anleihen.maxOfOrNull { anleihe -> anleihe.faelligkeit } ?: aktuelleRunde - 1,
+    )
+    public val schuldenProjektionsrunden: List<Int> get() =
+        (0..letzteSchuldenProjektionsrunde).toList()
+    public val spielerSchuldenMitProjektion: List<Map<Spieler, Zahlungsmittel>> get() =
+        spielerSchulden + projizierteSchuldenstaende().map { schuldenstand ->
+            spielerListe.associateWith { spieler ->
+                schuldenstand.kapital.getOrDefault(spieler, Zahlungsmittel())
+            }
+        }
+    public val spielerZinsschuldenMitProjektion: List<Map<Spieler, Zahlungsmittel>> get() =
+        spielerZinsschulden + projizierteSchuldenstaende().map { schuldenstand ->
+            spielerListe.associateWith { spieler ->
+                schuldenstand.zinsen.getOrDefault(spieler, Zahlungsmittel())
+            }
+        }
+    public val spielerKombinierteSchuldenMitProjektion: List<Map<Spieler, Zahlungsmittel>> get() =
+        spielerSchuldenMitProjektion.zip(spielerZinsschuldenMitProjektion) { kapital, zinsen ->
+            spielerListe.associateWith { spieler ->
+                kapital.getValue(spieler) + zinsen.getValue(spieler)
+            }
+        }
     public val spielerBarvermögen: List<Zahlungsmittel> get() =
         spielerSaldo.map { runde -> runde.values.summeGeld { it } }
     public val globalesBarvermögen: List<Zahlungsmittel> get() {
@@ -262,6 +318,10 @@ open class Spiel(
     public val globaleSchulden: List<Zahlungsmittel> get() = spielerSchulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleZinsschulden: List<Zahlungsmittel> get() = spielerZinsschulden.map { runde -> runde.values.summeGeld { it } }
     public val globaleKombinierteSchulden: List<Zahlungsmittel> get() = spielerKombinierteSchulden.map { runde -> runde.values.summeGeld { it } }
+    public val globaleKombinierteSchuldenMitProjektion: List<Zahlungsmittel> get() =
+        spielerKombinierteSchuldenMitProjektion.map { runde ->
+            runde.values.summeGeld { schulden -> schulden }
+        }
     public val bankZinsgewinne: List<Zahlungsmittel> get() {
         val bankZinsen = anleihen
             .flatMap { anleihe -> anleihe.erhalteAblauf() }

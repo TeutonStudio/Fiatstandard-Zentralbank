@@ -129,6 +129,45 @@ class SpielFinanzdatenTest {
     }
 
     @Test
+    fun schuldprojektionEndetInDerLetztenFaelligkeitsrundeBeiNull() {
+        val spiel = neuesSpiel(
+            anna to 100.toZahlungsmittel(),
+            bernd to 50.toZahlungsmittel(),
+        )
+        val anleihe = Anleihe(
+            schuldiger = anna,
+            sondervermögen = 80.toZahlungsmittel(),
+            unvermögen = 6.toZahlungsmittel(),
+            laufzeit = 2,
+        )
+        spiel.neueRundenDatenDefinieren(
+            spielerDaten = emptyMap(),
+            handelDaten = setOf(
+                Anleihenhandel(
+                    besitzer = anna,
+                    erwerber = bernd,
+                    anleihe = anleihe,
+                    preis = 80.toZahlungsmittel(),
+                )
+            ),
+            konfliktDaten = emptySet(),
+        )
+
+        assertEquals(4, spiel.letzteSchuldenProjektionsrunde)
+        assertEquals(listOf(0, 1, 2, 3, 4), spiel.schuldenProjektionsrunden)
+        assertEquals(
+            listOf(0, 92, 86, 80, 0),
+            spiel.globaleKombinierteSchuldenMitProjektion.map { it.toIntOderNull() },
+        )
+        assertEquals(
+            listOf(0, 92, 86, 80, 0),
+            spiel.spielerKombinierteSchuldenMitProjektion.map { runde ->
+                runde.getValue(anna).toIntOderNull()
+            },
+        )
+    }
+
+    @Test
     fun marktwertNutztBauwerksbestandUndRohstoffpreiseDerVorherigenRunde() {
         val annaMitBahn = Spieler("Anna", mapOf(Handelslinie.LAND to 1))
         val spiel = neuesSpiel(
