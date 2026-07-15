@@ -14,6 +14,20 @@ val ganzzahligerStueckAchsenItemPlacer = VerticalAxis.ItemPlacer.step(
     step = { 1.0 },
 )
 
+fun richtungsAchsenFormatter(
+    positiveRichtung: String,
+    negativeRichtung: String,
+    einheit: String,
+) = CartesianValueFormatter { _, value, _ ->
+    val richtung = when {
+        value > 0.0 -> positiveRichtung
+        value < 0.0 -> negativeRichtung
+        else -> null
+    }
+    val beschriftung = "${abs(value).alsAchsenwert()} $einheit"
+    if (richtung == null) beschriftung else "$richtung $beschriftung"
+}
+
 private fun einheitenAchsenFormatter(einheit: String) =
     CartesianValueFormatter { _, value, _ ->
         "${value.alsAchsenwert()} $einheit"

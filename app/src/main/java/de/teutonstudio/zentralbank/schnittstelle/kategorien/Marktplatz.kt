@@ -39,7 +39,6 @@ import com.patrykandpatrick.vico.compose.cartesian.Zoom
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
@@ -79,9 +78,7 @@ import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPla
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegendenStatus
-import java.util.Locale
-import kotlin.math.abs
-import kotlin.math.roundToLong
+import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
 
 private enum class MarktpreisKategorie(val titel: String) {
     HANDELSGUETER("Alle Handelsgüter"),
@@ -135,7 +132,7 @@ private fun List<List<Int>>.zuLinienChart(): CartesianChartModel =
 }
 
 @Composable
-private fun List<Map<Rohstoffe, Int>>.zuDifferenzChart(
+private fun List<Map<Rohstoffe, Int>>.zuStueckDifferenzChart(
     rohstoffe: List<Rohstoffe>,
 ): CartesianChartModel = remember(this, rohstoffe) {
     CartesianChartModel(
@@ -152,23 +149,6 @@ private fun List<Map<Rohstoffe, Int>>.zuDifferenzChart(
 
 private fun <A> List<Map<A, Zahlungsmittel>>.werteFuer(arg: A): List<Int> =
     map { werte -> werte[arg]?.toIntOderNull() ?: 0 }
-
-private fun handelsdifferenzAchsenFormatter(
-    einheit: HandelsdifferenzEinheit,
-) = CartesianValueFormatter { _, value, _ ->
-    val betrag = abs(value)
-    val gerundet = betrag.roundToLong()
-    val betragText = if (abs(betrag - gerundet) < 0.0001) {
-        gerundet.toString()
-    } else {
-        String.format(Locale.GERMANY, "%.1f", betrag)
-    }
-    when {
-        value > 0.0 -> "Export $betragText ${einheit.achsenEinheit}"
-        value < 0.0 -> "Import $betragText ${einheit.achsenEinheit}"
-        else -> "0 ${einheit.achsenEinheit}"
-    }
-}
 
 @Composable
 fun zeigeMarktplatz(
@@ -301,15 +281,20 @@ fun zeigeMarktplatz(
 
                         MarktpreisKategorie.HANDELSDIFFERENZ -> ausgewaehlteHandelsperson
                             ?.let { person ->
-                                val differenz = when (handelsdifferenzEinheit) {
-                                    HandelsdifferenzEinheit.STUECK ->
-                                        spiel.erhalteRohstoffHandelsstueckDifferenz(person)
-                                    HandelsdifferenzEinheit.MARK ->
-                                        spiel.erhalteRohstoffHandelsmarkDifferenz(person)
+                                val ausgewaehlteRohstoffe = sichtbareIndizes.map(rohstoffe::get)
+                                when (handelsdifferenzEinheit) {
+                                    HandelsdifferenzEinheit.STUECK -> spiel
+                                        .erhalteRohstoffHandelsstueckDifferenz(person)
+                                        .zuStueckDifferenzChart(ausgewaehlteRohstoffe)
+
+                                    HandelsdifferenzEinheit.MARK -> {
+                                        val differenz = spiel
+                                            .erhalteRohstoffHandelsmarkDifferenz(person)
+                                        ausgewaehlteRohstoffe.map { rohstoff ->
+                                            differenz.map { runde -> runde[rohstoff] ?: 0 }
+                                        }.zuLinienChart()
+                                    }
                                 }
-                                differenz.zuDifferenzChart(
-                                    sichtbareIndizes.map(rohstoffe::get)
-                                )
                             }
                     }
                 }
@@ -368,7 +353,10 @@ fun zeigeMarktplatz(
                                 modifier = ModiPad5,
                             )
                         } else {
-                            if (marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ) {
+                            if (
+                                marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ &&
+                                handelsdifferenzEinheit == HandelsdifferenzEinheit.STUECK
+                            ) {
                                 CartesianChartHost(
                                     modifier = bilanzModifier,
                                     chart = rememberCartesianChart(
@@ -383,8 +371,10 @@ fun zeigeMarktplatz(
                                             )
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
-                                            valueFormatter = handelsdifferenzAchsenFormatter(
-                                                handelsdifferenzEinheit
+                                            valueFormatter = richtungsAchsenFormatter(
+                                                positiveRichtung = "Verkauf",
+                                                negativeRichtung = "Einkauf",
+                                                einheit = handelsdifferenzEinheit.achsenEinheit,
                                             ),
                                             itemPlacer = if (
                                                 handelsdifferenzEinheit ==
@@ -411,7 +401,18 @@ fun zeigeMarktplatz(
                                             lineProvider = series(*linien.toTypedArray())
                                         ),
                                         endAxis = VerticalAxis.rememberEnd(
-                                            valueFormatter = markAchsenFormatter,
+                                            valueFormatter = if (
+                                                marktpreisKategorie ==
+                                                MarktpreisKategorie.HANDELSDIFFERENZ
+                                            ) {
+                                                richtungsAchsenFormatter(
+                                                    positiveRichtung = "Verkauf",
+                                                    negativeRichtung = "Einkauf",
+                                                    einheit = HandelsdifferenzEinheit.MARK.achsenEinheit,
+                                                )
+                                            } else {
+                                                markAchsenFormatter
+                                            },
                                         ),
                                         bottomAxis = HorizontalAxis.rememberBottom(),
                                     ),

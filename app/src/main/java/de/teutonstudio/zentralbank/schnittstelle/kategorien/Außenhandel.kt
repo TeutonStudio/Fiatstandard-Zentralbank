@@ -53,9 +53,8 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
-import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
-import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
 
 private data class HafenTarif(
     val bezeichnung: String,
@@ -123,12 +122,10 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
         BilanzEinheit.STUECK -> spiel.aussenhandelsbilanzStueckNachRohstoff
     }
 
-    val gesamtWerte = when (einheit) {
-        BilanzEinheit.PREIS -> spiel.aussenhandelsbilanzGesamt.map { saldo ->
-            saldo.toIntOderNull() ?: 0
-        }
-
-        BilanzEinheit.STUECK -> spiel.aussenhandelsbilanzStueckGesamt
+    val gesamtWerte = if (einheit == BilanzEinheit.PREIS) {
+        spiel.aussenhandelsbilanzGesamt.map { saldo -> saldo.toIntOderNull() ?: 0 }
+    } else {
+        emptyList()
     }
 
     val sichtbareReihen = buildList {
@@ -138,9 +135,11 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                 add(eintrag to werteNachRohstoff.map { bilanz -> bilanz[rohstoff] ?: 0 })
             }
         }
-        val gesamtEintrag = legende.last()
-        if (legendenStatus.istSichtbar(gesamtEintrag.id)) {
-            add(gesamtEintrag to gesamtWerte)
+        if (einheit == BilanzEinheit.PREIS) {
+            val gesamtEintrag = legende.last()
+            if (legendenStatus.istSichtbar(gesamtEintrag.id)) {
+                add(gesamtEintrag to gesamtWerte)
+            }
         }
     }
 
@@ -232,11 +231,15 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                                 )
                             )
                         },
-                        startAxis = VerticalAxis.rememberStart(
-                            valueFormatter = when (einheit) {
-                                BilanzEinheit.PREIS -> markAchsenFormatter
-                                BilanzEinheit.STUECK -> stueckAchsenFormatter
-                            },
+                        endAxis = VerticalAxis.rememberEnd(
+                            valueFormatter = richtungsAchsenFormatter(
+                                positiveRichtung = "Export",
+                                negativeRichtung = "Import",
+                                einheit = when (einheit) {
+                                    BilanzEinheit.PREIS -> "M"
+                                    BilanzEinheit.STUECK -> "Stk"
+                                },
+                            ),
                             itemPlacer = if (einheit == BilanzEinheit.STUECK) {
                                 ganzzahligerStueckAchsenItemPlacer
                             } else {
@@ -252,7 +255,11 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
             }
 
             UmschaltbareDiagrammLegende(
-                eintraege = legende,
+                eintraege = if (einheit == BilanzEinheit.PREIS) {
+                    legende
+                } else {
+                    legende.dropLast(1)
+                },
                 status = legendenStatus,
             )
         }

@@ -393,7 +393,7 @@ private fun BalanceChart(
                                 }
                             )
                         ),
-                        startAxis = VerticalAxis.rememberStart(
+                        endAxis = VerticalAxis.rememberEnd(
                             valueFormatter = exponentiellerMarkAchsenFormatter(
                                 exponent = yAchsenExponent,
                                 maximalbetrag = maximalbetrag,
@@ -520,7 +520,7 @@ private fun GlobalBalanceChart(
                                 }
                             )
                         ),
-                        startAxis = VerticalAxis.rememberStart(
+                        endAxis = VerticalAxis.rememberEnd(
                             valueFormatter = exponentiellerMarkAchsenFormatter(
                                 exponent = yAchsenExponent,
                                 maximalbetrag = maximalbetrag,
@@ -677,7 +677,7 @@ private fun ManagementChart(
                                 }
                             )
                         ),
-                        startAxis = VerticalAxis.rememberStart(
+                        endAxis = VerticalAxis.rememberEnd(
                             valueFormatter = stueckAchsenFormatter,
                             itemPlacer = ganzzahligerStueckAchsenItemPlacer,
                         ),
