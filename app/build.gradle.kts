@@ -41,6 +41,8 @@ android {
 dependencies {
     implementation(project(":domain"))
     implementation(libs.material)
+    implementation(libs.sceneview)
+    implementation(libs.filament.android)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.pdf.viewer.fragment)

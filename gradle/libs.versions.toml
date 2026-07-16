@@ -24,6 +24,8 @@ ui = "1.11.1"
 foundationLayout = "1.11.2"
 appcompat = "1.7.1"
 material = "1.12.0"
+sceneview = "4.18.0"
+filament = "1.71.5"
 
 [libraries]
 androidx-compose-ui-viewbinding = { module = "androidx.compose.ui:ui-viewbinding" }
@@ -64,6 +66,8 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
 androidx-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+sceneview = { group = "io.github.sceneview", name = "sceneview", version.ref = "sceneview" }
+filament-android = { group = "com.google.android.filament", name = "filament-android", version.ref = "filament" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 
