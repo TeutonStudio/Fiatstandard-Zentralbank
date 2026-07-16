@@ -109,7 +109,8 @@ noch nicht vollständig ausdrückt.
 
 ## `GameViewModel`
 
-`datenbank/GameViewModel.kt` hat 1.335 Zeilen und erbt von
+`datenbank/GameViewModel.kt` hat nach Entfernung des auskommentierten Altblocks
+739 Zeilen und erbt von
 `AndroidViewModel`. Es übernimmt gleichzeitig:
 
 - Erzeugung und Laden der Room-Datenbank,
@@ -124,8 +125,8 @@ noch nicht vollständig ausdrückt.
 - Handel und Anleihenhandel,
 - globale Fehlermeldungen.
 
-Der Abschnitt ab ungefähr Zeile 736 besteht überwiegend aus auskommentiertem
-Altcode. Drei leere Konfliktmethoden werden noch von der Navigation aufgerufen;
+Der frühere, knapp 600 Zeilen lange auskommentierte DAO-/Cache-Block ist
+entfernt. Drei leere Konfliktmethoden werden noch von der Navigation aufgerufen;
 ihre Entfernung wäre deshalb ohne gleichzeitige Bereichsmigration nicht sicher.
 `vernichteSpiel` ist ein produktiv verdrahteter `TODO()`.
 

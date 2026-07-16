@@ -1,5 +1,43 @@
 # Umbau-Log
 
+## 17.07.2026 - GameViewModel-Altcode bereinigt
+
+Durchgeführte Änderungen:
+
+- Knapp 600 Zeilen vollständig auskommentierter früherer DAO-, Cache-, Saldo-,
+  Marktpreis- und Anleihenberechnungen aus `GameViewModel` entfernt.
+- Die nur aus diesem Altblock referenzierte Methode
+  `ladeAktuellesSpielNeu()` entfernt.
+- `GameViewModel.kt` von 1.335 auf 739 Zeilen verkleinert.
+
+Architekturentscheidung:
+
+- Die produktiv verdrahteten leeren Konfliktmethoden bleiben bis zur
+  Konfliktbereichsmigration bestehen.
+- `vernichteSpiel` bleibt als dokumentiertes offenes Problem bestehen. Eine
+  Implementierung ohne Löschbestätigung und ohne geklärten Lebenszyklus eines
+  möglicherweise geladenen Spielstands wäre in dieser Bereinigung nicht sicher.
+
+Entfernte Altstruktur:
+
+- Direkte, nicht mehr kompilierte DAO-Zugriffe und veraltete Zwischenspeicher-
+  Berechnungen im Kommentarblock.
+
+Verbleibende Übergangslösung:
+
+- Das aktive `GameViewModel` bündelt weiterhin Room-Rekonstruktion,
+  Legacy-Synchronisation und Sitzungsablauf.
+
+Ausgeführte Tests:
+
+- `./gradlew test assembleDebug` erfolgreich.
+
+Offene Probleme:
+
+- Persistenzgrenze und `SpielSitzung` sind noch nicht extrahiert.
+- Konfliktaktionen und Löschen eines Spielstands benötigen einen vollständigen
+  vertikalen Schnitt statt weiterer Stubs.
+
 ## 17.07.2026 - Spielablauf und Regelwerke getrennt
 
 Durchgeführte Änderungen:
