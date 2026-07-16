@@ -1,5 +1,50 @@
 # Umbau-Log
 
+## 17.07.2026 - Fachmodul deutsch strukturiert
+
+Durchgeführte Änderungen:
+
+- Das technisch weiterhin `:domain` genannte Modul unter der fachlichen
+  Paketwurzel `de.teutonstudio.zentralbank.fachlogik` gegliedert.
+- Modelltypen nach `modell`, Ereignisse nach `ereignis`, Ablauf nach `ablauf`,
+  Zugauswertung nach `auswertung` und Regeln nach `regelwerk` verschoben.
+- Zentrale Typen umbenannt: `GameState` zu `SpielZustand`, `GameEvent` zu
+  `SpielEreignis`, `GameEngine` zu `SpielAblauf`, `Reducer` zu
+  `SpielRegelwerk` und `ZugAutomat` zu `ZugAuswertung`.
+- App-Zuordnungen und Flow-Namen auf `SpielZustand` sowie
+  `SpielUebersichtZustand` umgestellt.
+- Alle produktiven Aufrufer und Tests ohne parallele Kompatibilitätsaliase
+  migriert.
+
+Architekturentscheidung:
+
+- Der Gradle-Modulname bleibt `:domain`; eine Umbenennung ist für die fachliche
+  Paketgrenze nicht erforderlich.
+- `ZugAuswertung` enthält nur lesende Phasen- und Schrittauswertungen. Die
+  eigentlichen Zustandsübergänge verbleiben bis zur nächsten Etappe im
+  `SpielRegelwerk`.
+
+Entfernte Altstruktur:
+
+- Englische Fachpaketwurzel und die zentralen englischen Typnamen wurden ohne
+  Übergangsfassaden entfernt.
+
+Verbleibende Übergangslösung:
+
+- `GameViewModel` und das App-Paket `schnittstelle.domain` behalten vorerst ihre
+  Legacy-Namen beziehungsweise Lage.
+- `SpielRegelwerk` ist trotz neuem Namen noch monolithisch; `SpielAblauf`
+  berechnet den Zustand noch durch vollständiges Falten.
+
+Ausgeführte Tests:
+
+- `./gradlew test assembleDebug` erfolgreich.
+
+Offene Probleme:
+
+- Teilregelwerke und gecachter Ablauf folgen in der nächsten Etappe.
+- Formatierung von `Geld` und `Basispunkte` liegt noch im Fachmodell.
+
 ## 17.07.2026 - Architektur neu bewertet und Ziel festgelegt
 
 Durchgeführte Änderungen:

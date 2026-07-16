@@ -1,7 +1,7 @@
 package de.teutonstudio.zentralbank.schnittstelle.domain
 
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 
 data class SpielerAnzeige(
     val name: String,
@@ -10,7 +10,7 @@ data class SpielerAnzeige(
     val bauteile: Int,
 )
 
-fun GameState.zuSpielerAnzeigen(): List<SpielerAnzeige> {
+fun SpielZustand.zuSpielerAnzeigen(): List<SpielerAnzeige> {
     return spieler.map { it.zuSpielerAnzeige() }
 }
 

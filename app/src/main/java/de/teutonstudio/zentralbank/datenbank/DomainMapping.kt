@@ -1,21 +1,21 @@
 package de.teutonstudio.zentralbank.datenbank
 
-import de.teutonstudio.zentralbank.domain.AnleiheId
-import de.teutonstudio.zentralbank.domain.Basispunkte
-import de.teutonstudio.zentralbank.domain.BauteilTyp
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.Rohstoff
-import de.teutonstudio.zentralbank.domain.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import kotlin.math.roundToInt
-import de.teutonstudio.zentralbank.domain.Anleihe as DomainAnleihe
-import de.teutonstudio.zentralbank.domain.Spieler as DomainSpieler
+import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe as FachAnleihe
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler as FachSpieler
 
-fun Zahlungsmittel.zuDomainGeld(): Geld = Geld.mark(toIntOderNull().toLong())
+fun Zahlungsmittel.zuGeld(): Geld = Geld.mark(toIntOderNull().toLong())
 
 fun Float.zuBasispunkte(): Basispunkte = Basispunkte((this * Basispunkte.BASISPUNKTE_PRO_PROZENT).roundToInt())
 
-fun Rohstoffe.zuDomainRohstoff(): Rohstoff = when (this) {
+fun Rohstoffe.zuRohstoff(): Rohstoff = when (this) {
     Rohstoffe.NAHRUNG -> Rohstoff.NAHRUNG
     Rohstoffe.LEHM -> Rohstoff.LEHM
     Rohstoffe.ZIEGEL -> Rohstoff.ZIEGEL
@@ -28,7 +28,7 @@ fun Rohstoffe.zuDomainRohstoff(): Rohstoff = when (this) {
     Rohstoffe.EISEN -> Rohstoff.EISEN
 }
 
-fun Bauteil.zuDomainBauteilTyp(): BauteilTyp = when (this) {
+fun Bauteil.zuBauteilTyp(): BauteilTyp = when (this) {
     Handelslinie.LAND -> BauteilTyp.EISENBAHNLINIE
     Handelslinie.SEE -> BauteilTyp.FRACHTSCHIFF
     Verwaltungsstandort.BAHNHOF -> BauteilTyp.BAHNHOF
@@ -48,7 +48,7 @@ fun Bauteil.zuDomainBauteilTyp(): BauteilTyp = when (this) {
     Wirtschaftsregionen.EISENMINE -> BauteilTyp.EISENMINE
 }
 
-fun Spiel.zuDomainGameState(): GameState {
+fun Spiel.zuSpielZustand(): SpielZustand {
     val spielerIds = spielerListe.associateWith { SpielerId(it.name) }
     val anleiheIds = anleihen.associateWith { anzeige ->
         AnleiheId(
@@ -66,15 +66,15 @@ fun Spiel.zuDomainGameState(): GameState {
         .mapValues { (_, werte) -> werte.mapNotNull { anleiheIds[it] } }
     val spielerNamen = spielerIds.keys.map { it.name }.toSet()
 
-    return GameState(
+    return SpielZustand(
         spieler = spielerListe.map { spieler ->
-            DomainSpieler(
+            FachSpieler(
                 id = spielerIds.getValue(spieler),
                 name = spieler.name,
-                geldkonto = spielerSaldo.lastOrNull()?.get(spieler)?.zuDomainGeld() ?: Geld.NULL,
+                geldkonto = spielerSaldo.lastOrNull()?.get(spieler)?.zuGeld() ?: Geld.NULL,
                 anleihen = anleihenNachBesitzer[spieler.name].orEmpty(),
                 bauteile = spieler.erhalteBauSaldoZurRunde()
-                    .mapKeys { (bauteil, _) -> bauteil.zuDomainBauteilTyp() }
+                    .mapKeys { (bauteil, _) -> bauteil.zuBauteilTyp() }
                     .filterValues { it != 0 },
             )
         },
@@ -84,7 +84,7 @@ fun Spiel.zuDomainGameState(): GameState {
             .values
             .flatten(),
         warenkorb = warenkorb
-            .mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
+            .mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
             .filterValues { it != 0 },
         anleihen = anleihen.mapNotNull { anzeige ->
             val id = anleiheIds[anzeige] ?: return@mapNotNull null
@@ -92,17 +92,17 @@ fun Spiel.zuDomainGameState(): GameState {
                 .firstOrNull { (spieler, _) -> spieler.name == anzeige.schuldiger.name }
                 ?.value
                 ?: return@mapNotNull null
-            id to DomainAnleihe(
+            id to FachAnleihe(
                 id = id,
                 emittent = emittentId,
-                nennwert = anzeige.sondervermoegen.zuDomainGeld(),
+                nennwert = anzeige.sondervermoegen.zuGeld(),
                 zinsBasispunkte = anzeige.anleihe.erhalteZinssatz() * 100,
                 laufzeitRunden = anzeige.laufzeit,
             )
         }.toMap(),
         marktpreise = aktuelleMarktpreise
-            .mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
-            .mapValues { (_, preis) -> preis.zuDomainGeld() },
+            .mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
+            .mapValues { (_, preis) -> preis.zuGeld() },
         leitzins = aktuellerLeitzinssatz.zuBasispunkte(),
         rundenzähler = (aktuelleRunde - 1).coerceAtLeast(0),
         aktiverSpieler = spielerListe.firstOrNull()?.let { spielerIds.getValue(it) },

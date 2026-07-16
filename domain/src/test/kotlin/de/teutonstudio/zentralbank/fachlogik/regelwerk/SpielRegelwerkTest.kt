@@ -1,31 +1,31 @@
-package de.teutonstudio.zentralbank.domain.engine
+package de.teutonstudio.zentralbank.fachlogik.regelwerk
 
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.Konflikt
-import de.teutonstudio.zentralbank.domain.KontoId
-import de.teutonstudio.zentralbank.domain.Rohstoff
-import de.teutonstudio.zentralbank.domain.Spieler
-import de.teutonstudio.zentralbank.domain.SpielerId
-import de.teutonstudio.zentralbank.domain.Anleihe
-import de.teutonstudio.zentralbank.domain.AnleiheId
-import de.teutonstudio.zentralbank.domain.BauteilTyp
-import de.teutonstudio.zentralbank.domain.events.GameEvent
-import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
-import de.teutonstudio.zentralbank.domain.zug.Phase
-import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
-import de.teutonstudio.zentralbank.domain.zug.ZugStatus
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
+import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
+import de.teutonstudio.zentralbank.fachlogik.ereignis.TransaktionsGrund
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ReducerTest {
+class SpielRegelwerkTest {
     private val annaId = SpielerId("Anna")
     private val berndId = SpielerId("Bernd")
     private val anleiheId = AnleiheId("anna-1")
 
-    private fun startState(): GameState = GameState(
+    private fun startState(): SpielZustand = SpielZustand(
         spieler = listOf(
             Spieler(
                 id = annaId,
@@ -56,9 +56,9 @@ class ReducerTest {
 
     @Test
     fun warenkorbAenderungErsetztZusammensetzungUndEntferntNullmengen() {
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.WarenkorbGeaendert(
+            SpielEreignis.WarenkorbGeaendert(
                 mapOf(
                     Rohstoff.HOLZ to 4,
                     Rohstoff.STAHL to 0,
@@ -71,9 +71,9 @@ class ReducerTest {
 
     @Test
     fun warenkorbAenderungLehntNegativeMengenAb() {
-        val result = Reducer.reduce(
+        val result = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.WarenkorbGeaendert(mapOf(Rohstoff.HOLZ to -1)),
+            SpielEreignis.WarenkorbGeaendert(mapOf(Rohstoff.HOLZ to -1)),
         )
 
         assertTrue(result.isFailure)
@@ -81,9 +81,9 @@ class ReducerTest {
 
     @Test
     fun rohstoffEinnahmeErhoehtBestand() {
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.RohstoffEinnahme(annaId, mapOf(Rohstoff.HOLZ to 3)),
+            SpielEreignis.RohstoffEinnahme(annaId, mapOf(Rohstoff.HOLZ to 3)),
         ).getOrThrow()
 
         assertEquals(5, state.spieler.first { it.id == annaId }.rohstoffe[Rohstoff.HOLZ])
@@ -91,9 +91,9 @@ class ReducerTest {
 
     @Test
     fun rohstoffAusgabeLehntNegativenBestandAb() {
-        val result = Reducer.reduce(
+        val result = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.RohstoffAusgabe(berndId, mapOf(Rohstoff.HOLZ to 1)),
+            SpielEreignis.RohstoffAusgabe(berndId, mapOf(Rohstoff.HOLZ to 1)),
         )
 
         assertTrue(result.isFailure)
@@ -102,9 +102,9 @@ class ReducerTest {
     @Test
     fun transaktionIstSummenneutral() {
         val start = startState()
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             start,
-            GameEvent.Transaktion(
+            SpielEreignis.Transaktion(
                 von = KontoId.Spieler(annaId),
                 an = KontoId.Spieler(berndId),
                 betrag = Geld.mark(3),
@@ -119,9 +119,9 @@ class ReducerTest {
 
     @Test
     fun transaktionLehntUnterdeckungAb() {
-        val result = Reducer.reduce(
+        val result = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.Transaktion(
+            SpielEreignis.Transaktion(
                 von = KontoId.Spieler(berndId),
                 an = KontoId.Bank,
                 betrag = Geld.mark(6),
@@ -135,9 +135,9 @@ class ReducerTest {
     @Test
     fun rohstoffHandelVerschiebtRohstoffUndGeldSummenneutral() {
         val start = startState()
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             start,
-            GameEvent.RohstoffHandel(
+            SpielEreignis.RohstoffHandel(
                 kaeufer = berndId,
                 verkaeufer = annaId,
                 rohstoff = Rohstoff.HOLZ,
@@ -156,9 +156,9 @@ class ReducerTest {
     @Test
     fun anleiheVerkauftVerschiebtAnleiheUndGeldSummenneutral() {
         val start = startState()
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             start,
-            GameEvent.AnleiheVerkauft(
+            SpielEreignis.AnleiheVerkauft(
                 anleihe = anleiheId,
                 verkaeufer = annaId,
                 kaeufer = KontoId.Spieler(berndId),
@@ -184,9 +184,9 @@ class ReducerTest {
                 }
             },
         )
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             start,
-            GameEvent.AnleiheFaellig(anleiheId),
+            SpielEreignis.AnleiheFaellig(anleiheId),
         ).getOrThrow()
 
         assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
@@ -199,9 +199,9 @@ class ReducerTest {
 
     @Test
     fun expansionVerbrauchtRohstoffeUndErhoehtBauteilbestand() {
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.Expansion(
+            SpielEreignis.Expansion(
                 spieler = annaId,
                 bauteil = BauteilTyp.EISENBAHNLINIE,
             ),
@@ -215,9 +215,9 @@ class ReducerTest {
 
     @Test
     fun kriegErklaertUndBeendetKonflikt() {
-        val imKrieg = Reducer.reduce(
+        val imKrieg = SpielRegelwerk.reduce(
             startState(),
-            GameEvent.KriegErklaert(
+            SpielEreignis.KriegErklaert(
                 aggressor = annaId,
                 verteidiger = berndId,
             ),
@@ -225,9 +225,9 @@ class ReducerTest {
 
         assertEquals(1, imKrieg.konflikte.size)
 
-        val frieden = Reducer.reduce(
+        val frieden = SpielRegelwerk.reduce(
             imKrieg,
-            GameEvent.KriegBeendet(
+            SpielEreignis.KriegBeendet(
                 spielerA = berndId,
                 spielerB = annaId,
             ),
@@ -240,7 +240,7 @@ class ReducerTest {
     fun schuldenstrichBautAbZahltSpieleranleihenFrischAusUndUeberspringtAktionen() {
         val bankAnleihe = AnleiheId("anna-bank")
         val spielerAnleihe = AnleiheId("anna-player")
-        val start = GameState(
+        val start = SpielZustand(
             spieler = listOf(
                 Spieler(
                     id = annaId,
@@ -286,9 +286,9 @@ class ReducerTest {
             ),
         )
 
-        val state = Reducer.reduce(
+        val state = SpielRegelwerk.reduce(
             start,
-            GameEvent.Schuldenstrich(annaId, entfernteBahnwege = 3),
+            SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 3),
         ).getOrThrow()
 
         val anna = state.spieler.first { it.id == annaId }
@@ -310,7 +310,7 @@ class ReducerTest {
 
     @Test
     fun schuldenstrichImKriegWirdAbgelehnt() {
-        val result = Reducer.reduce(
+        val result = SpielRegelwerk.reduce(
             startState().copy(
                 bankAnleihen = listOf(anleiheId),
                 konflikte = setOf(Konflikt(annaId, berndId)),
@@ -321,7 +321,7 @@ class ReducerTest {
                     erledigteSchritte = setOf(SchrittTyp.ROHSTOFF_AUSGABEN),
                 ),
             ),
-            GameEvent.Schuldenstrich(annaId, entfernteBahnwege = 0),
+            SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 0),
         )
 
         assertTrue(result.isFailure)
@@ -358,9 +358,9 @@ class ReducerTest {
             annaZugBeenden(state)
         }
 
-        val handel = Reducer.reduce(
+        val handel = SpielRegelwerk.reduce(
             faellig,
-            GameEvent.RohstoffHandel(
+            SpielEreignis.RohstoffHandel(
                 kaeufer = annaId,
                 verkaeufer = berndId,
                 rohstoff = Rohstoff.HOLZ,
@@ -371,9 +371,9 @@ class ReducerTest {
 
         assertTrue(handel.isFailure)
 
-        val nachSchuldenstrich = Reducer.reduce(
+        val nachSchuldenstrich = SpielRegelwerk.reduce(
             faellig,
-            GameEvent.Schuldenstrich(annaId, entfernteBahnwege = 1),
+            SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 1),
         ).getOrThrow()
 
         val anna = nachSchuldenstrich.spieler.first { it.id == annaId }
@@ -388,7 +388,7 @@ class ReducerTest {
     @Test
     fun ueberschuldungZaehltNurBankgehalteneAnleihen() {
         val anleihe = AnleiheId("spieler-anleihe")
-        val state = GameState(
+        val state = SpielZustand(
             spieler = listOf(
                 Spieler(
                     id = annaId,
@@ -422,7 +422,7 @@ class ReducerTest {
             zugStatus = ZugStatus(annaId, Phase.Aktionen),
         )
 
-        val nachZugende = Reducer.reduce(state, GameEvent.ZugBeendet).getOrThrow()
+        val nachZugende = SpielRegelwerk.reduce(state, SpielEreignis.ZugBeendet).getOrThrow()
 
         assertTrue(nachZugende.ueberschuldungen.isEmpty())
     }
@@ -441,30 +441,30 @@ class ReducerTest {
 
     @Test
     fun schrittPhaseUndZugendeWechselnAktivenSpieler() {
-        val nachSchritt = Reducer.reduce(
+        val nachSchritt = SpielRegelwerk.reduce(
             startState().copy(
                 aktiverSpieler = annaId,
                 zugStatus = ZugStatus(annaId, Phase.Einnahmen),
             ),
-            GameEvent.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_EINNAHMEN),
+            SpielEreignis.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_EINNAHMEN),
         ).getOrThrow()
 
-        val ausgaben = Reducer.reduce(
+        val ausgaben = SpielRegelwerk.reduce(
             nachSchritt,
-            GameEvent.PhaseAbgeschlossen(Phase.Einnahmen),
+            SpielEreignis.PhaseAbgeschlossen(Phase.Einnahmen),
         ).getOrThrow()
 
         val ausgabenFertig = listOf(
-            GameEvent.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_AUSGABEN),
-            GameEvent.SchrittAbgeschlossen(SchrittTyp.FINANZ_AUSGABEN),
-        ).fold(ausgaben) { state, event -> Reducer.reduce(state, event).getOrThrow() }
+            SpielEreignis.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_AUSGABEN),
+            SpielEreignis.SchrittAbgeschlossen(SchrittTyp.FINANZ_AUSGABEN),
+        ).fold(ausgaben) { state, event -> SpielRegelwerk.reduce(state, event).getOrThrow() }
 
-        val aktionen = Reducer.reduce(
+        val aktionen = SpielRegelwerk.reduce(
             ausgabenFertig,
-            GameEvent.PhaseAbgeschlossen(Phase.Ausgaben),
+            SpielEreignis.PhaseAbgeschlossen(Phase.Ausgaben),
         ).getOrThrow()
 
-        val naechsterSpieler = Reducer.reduce(aktionen, GameEvent.ZugBeendet).getOrThrow()
+        val naechsterSpieler = SpielRegelwerk.reduce(aktionen, SpielEreignis.ZugBeendet).getOrThrow()
 
         assertEquals(berndId, naechsterSpieler.aktiverSpieler)
         assertEquals(Phase.Einnahmen, naechsterSpieler.zugStatus?.phase)
@@ -473,7 +473,7 @@ class ReducerTest {
     @Test
     fun neueRundeBeginntErstNachdemJederSpielerEinmalAmZugWar() {
         val claraId = SpielerId("Clara")
-        var state = GameState(
+        var state = SpielZustand(
             spieler = listOf(
                 Spieler(annaId, "Anna"),
                 Spieler(berndId, "Bernd"),
@@ -484,20 +484,20 @@ class ReducerTest {
             zugStatus = ZugStatus(annaId, Phase.Aktionen),
         )
 
-        state = Reducer.reduce(state, GameEvent.ZugBeendet).getOrThrow()
+        state = SpielRegelwerk.reduce(state, SpielEreignis.ZugBeendet).getOrThrow()
         assertEquals(berndId, state.aktiverSpieler)
         assertEquals(2, state.rundenzähler)
 
-        state = Reducer.reduce(
+        state = SpielRegelwerk.reduce(
             state.copy(zugStatus = ZugStatus(berndId, Phase.Aktionen)),
-            GameEvent.ZugBeendet,
+            SpielEreignis.ZugBeendet,
         ).getOrThrow()
         assertEquals(claraId, state.aktiverSpieler)
         assertEquals(2, state.rundenzähler)
 
-        state = Reducer.reduce(
+        state = SpielRegelwerk.reduce(
             state.copy(zugStatus = ZugStatus(claraId, Phase.Aktionen)),
-            GameEvent.ZugBeendet,
+            SpielEreignis.ZugBeendet,
         ).getOrThrow()
         assertEquals(annaId, state.aktiverSpieler)
         assertEquals(3, state.rundenzähler)
@@ -506,12 +506,12 @@ class ReducerTest {
 
     @Test
     fun phasenfremderSchrittWirdAbgelehnt() {
-        val result = Reducer.reduce(
+        val result = SpielRegelwerk.reduce(
             startState().copy(
                 aktiverSpieler = annaId,
                 zugStatus = ZugStatus(annaId, Phase.Einnahmen),
             ),
-            GameEvent.RohstoffHandel(
+            SpielEreignis.RohstoffHandel(
                 kaeufer = annaId,
                 verkaeufer = berndId,
                 rohstoff = Rohstoff.HOLZ,
@@ -523,9 +523,9 @@ class ReducerTest {
         assertTrue(result.isFailure)
     }
 
-    private fun ueberschuldeterAnnaZug(): GameState {
+    private fun ueberschuldeterAnnaZug(): SpielZustand {
         val anleihe = AnleiheId("bank-anleihe")
-        return GameState(
+        return SpielZustand(
             spieler = listOf(
                 Spieler(
                     id = annaId,
@@ -560,13 +560,13 @@ class ReducerTest {
         )
     }
 
-    private fun annaZugBeenden(state: GameState): GameState {
-        return Reducer.reduce(
+    private fun annaZugBeenden(state: SpielZustand): SpielZustand {
+        return SpielRegelwerk.reduce(
             state.copy(
                 aktiverSpieler = annaId,
                 zugStatus = ZugStatus(annaId, Phase.Aktionen),
             ),
-            GameEvent.ZugBeendet,
+            SpielEreignis.ZugBeendet,
         ).getOrThrow()
     }
 }

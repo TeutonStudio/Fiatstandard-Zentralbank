@@ -1,18 +1,18 @@
 package de.teutonstudio.zentralbank.schnittstelle.domain
 
-import de.teutonstudio.zentralbank.domain.AnleiheId
-import de.teutonstudio.zentralbank.domain.BauteilTyp
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.Spieler
-import de.teutonstudio.zentralbank.domain.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SpielerAnzeigeTest {
     @Test
     fun spielerAnzeigeVerdichtetDomainSpieler() {
-        val state = GameState(
+        val state = SpielZustand(
             spieler = listOf(
                 Spieler(
                     id = SpielerId("anna"),

@@ -1,33 +1,33 @@
-package de.teutonstudio.zentralbank.domain.events
+package de.teutonstudio.zentralbank.fachlogik.ereignis
 
-import de.teutonstudio.zentralbank.domain.AnleiheId
-import de.teutonstudio.zentralbank.domain.BauteilTyp
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.KontoId
-import de.teutonstudio.zentralbank.domain.Rohstoff
-import de.teutonstudio.zentralbank.domain.SpielerId
-import de.teutonstudio.zentralbank.domain.zug.Phase
-import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import kotlinx.serialization.Serializable
 
 @Serializable
-sealed interface GameEvent {
+sealed interface SpielEreignis {
     @Serializable
     data class WarenkorbGeaendert(
         val warenkorb: Map<Rohstoff, Int>,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class RohstoffEinnahme(
         val spieler: SpielerId,
         val mengen: Map<Rohstoff, Int>,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class RohstoffAusgabe(
         val spieler: SpielerId,
         val mengen: Map<Rohstoff, Int>,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class Transaktion(
@@ -35,7 +35,7 @@ sealed interface GameEvent {
         val an: KontoId,
         val betrag: Geld,
         val grund: TransaktionsGrund,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class AnleiheGekauft(
@@ -43,7 +43,7 @@ sealed interface GameEvent {
         val kaeufer: SpielerId,
         val verkaeufer: KontoId,
         val preis: Geld,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class AnleiheVerkauft(
@@ -51,12 +51,12 @@ sealed interface GameEvent {
         val verkaeufer: SpielerId,
         val kaeufer: KontoId,
         val preis: Geld,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class AnleiheFaellig(
         val anleihe: AnleiheId,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class RohstoffHandel(
@@ -65,44 +65,44 @@ sealed interface GameEvent {
         val rohstoff: Rohstoff,
         val menge: Int,
         val preis: Geld,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class Expansion(
         val spieler: SpielerId,
         val bauteil: BauteilTyp,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class KriegErklaert(
         val aggressor: SpielerId,
         val verteidiger: SpielerId,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class KriegBeendet(
         val spielerA: SpielerId,
         val spielerB: SpielerId,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class Schuldenstrich(
         val spieler: SpielerId,
         val entfernteBahnwege: Int,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class SchrittAbgeschlossen(
         val schritt: SchrittTyp,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
     data class PhaseAbgeschlossen(
         val phase: Phase,
-    ) : GameEvent
+    ) : SpielEreignis
 
     @Serializable
-    data object ZugBeendet : GameEvent
+    data object ZugBeendet : SpielEreignis
 }
 
 @Serializable

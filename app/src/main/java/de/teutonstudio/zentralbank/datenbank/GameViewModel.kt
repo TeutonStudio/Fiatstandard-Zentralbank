@@ -6,14 +6,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.engine.GameEngine
-import de.teutonstudio.zentralbank.domain.events.GameEvent
-import de.teutonstudio.zentralbank.domain.zug.Phase
-import de.teutonstudio.zentralbank.domain.zug.SchrittZustand
-import de.teutonstudio.zentralbank.domain.zug.ZugAutomat
-import de.teutonstudio.zentralbank.schnittstelle.domain.GameUiState
-import de.teutonstudio.zentralbank.schnittstelle.domain.zuGameUiState
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.ablauf.SpielAblauf
+import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ZugAuswertung
+import de.teutonstudio.zentralbank.schnittstelle.domain.SpielUebersichtZustand
+import de.teutonstudio.zentralbank.schnittstelle.domain.zuSpielUebersichtZustand
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,16 +47,16 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     private val _spielDatenListe = MutableStateFlow<Map<SpielDaten,List<SpeicherDaten>>>(emptyMap())
     private val _spielSpeicher = MutableStateFlow<Map<SpielDaten,Pair<Int,List<String>>>>(emptyMap())
-    private val _domainState = MutableStateFlow<GameState?>(null)
-    private val _domainUiState = MutableStateFlow<GameUiState?>(null)
-    private val _domainFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    private var gameEngine: GameEngine? = null
+    private val _spielZustand = MutableStateFlow<SpielZustand?>(null)
+    private val _spielUebersicht = MutableStateFlow<SpielUebersichtZustand?>(null)
+    private val _spielFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private var spielAblauf: SpielAblauf? = null
 
     val spielDatenListe: StateFlow<Map<SpielDaten,List<SpeicherDaten>>> = _spielDatenListe.asStateFlow()
     val spielSpeicher: StateFlow<Map<SpielDaten,Pair<Int,List<String>>>> = _spielSpeicher.asStateFlow()
-    val domainState: StateFlow<GameState?> = _domainState.asStateFlow()
-    val domainUiState: StateFlow<GameUiState?> = _domainUiState.asStateFlow()
-    val domainFehler: SharedFlow<String> = _domainFehler.asSharedFlow()
+    val spielZustand: StateFlow<SpielZustand?> = _spielZustand.asStateFlow()
+    val spielUebersicht: StateFlow<SpielUebersichtZustand?> = _spielUebersicht.asStateFlow()
+    val spielFehler: SharedFlow<String> = _spielFehler.asSharedFlow()
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
     lateinit var aktuellesSpiel: Spiel
@@ -66,15 +66,15 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private fun setzeAktuellesSpiel(spiel: Spiel, daten: Pair<SpielDaten,List<SpeicherDaten>>) {
         aktuellesSpiel = spiel
         aktuelleDaten = daten
-        val startzustand = spiel.zuDomainGameState()
-        gameEngine = GameEngine(startzustand)
-        aktualisiereDomainState(startzustand)
+        val startzustand = spiel.zuSpielZustand()
+        spielAblauf = SpielAblauf(startzustand)
+        aktualisiereSpielZustand(startzustand)
     }
 
-    fun onEvent(event: GameEvent) {
-        val engine = gameEngine
+    fun ereignisAnwenden(event: SpielEreignis) {
+        val engine = spielAblauf
         if (engine == null) {
-            _domainFehler.tryEmit("Kein Spiel geladen.")
+            _spielFehler.tryEmit("Kein Spiel geladen.")
             return
         }
 
@@ -82,40 +82,40 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         engine.apply(event)
             .onSuccess { state -> uebernehmeEventErgebnis(vorher, state) }
             .onFailure { throwable ->
-                _domainFehler.tryEmit(throwable.message ?: "Domain-Event wurde abgelehnt.")
+                _spielFehler.tryEmit(throwable.message ?: "Spielereignis wurde abgelehnt.")
             }
     }
 
     fun naechsterZugabschnitt() {
-        val state = gameEngine?.state
+        val state = spielAblauf?.state
         val zug = state?.zugStatus
         if (state == null || zug == null) {
-            _domainFehler.tryEmit("Kein Zug aktiv.")
+            _spielFehler.tryEmit("Kein Zug aktiv.")
             return
         }
 
         when (zug.phase) {
             Phase.Einnahmen,
             Phase.Ausgaben -> {
-                val schrittEvents = ZugAutomat.schritte(state)
+                val schrittEvents = ZugAuswertung.schritte(state)
                     .filter { schritt ->
                         schritt.typ.pflicht && schritt.zustand == SchrittZustand.VERFUEGBAR
                     }
-                    .map { schritt -> GameEvent.SchrittAbgeschlossen(schritt.typ) }
-                wendeEventsAn(schrittEvents + GameEvent.PhaseAbgeschlossen(zug.phase))
+                    .map { schritt -> SpielEreignis.SchrittAbgeschlossen(schritt.typ) }
+                wendeEventsAn(schrittEvents + SpielEreignis.PhaseAbgeschlossen(zug.phase))
             }
             Phase.Aktionen -> beendeZug()
         }
     }
 
     fun beendeZug() {
-        wendeEventsAn(listOf(GameEvent.ZugBeendet))
+        wendeEventsAn(listOf(SpielEreignis.ZugBeendet))
     }
 
-    private fun wendeEventsAn(events: List<GameEvent>) {
-        val engine = gameEngine
+    private fun wendeEventsAn(events: List<SpielEreignis>) {
+        val engine = spielAblauf
         if (engine == null) {
-            _domainFehler.tryEmit("Kein Spiel geladen.")
+            _spielFehler.tryEmit("Kein Spiel geladen.")
             return
         }
 
@@ -123,28 +123,28 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         for (event in events) {
             val ergebnis = engine.apply(event)
             if (ergebnis.isFailure) {
-                aktualisiereDomainState(engine.state)
+                aktualisiereSpielZustand(engine.state)
                 val fehler = ergebnis.exceptionOrNull()
-                _domainFehler.tryEmit(fehler?.message ?: "Zug konnte nicht fortgesetzt werden.")
+                _spielFehler.tryEmit(fehler?.message ?: "Zug konnte nicht fortgesetzt werden.")
                 return
             }
         }
         uebernehmeEventErgebnis(vorher, engine.state)
     }
 
-    private fun uebernehmeEventErgebnis(vorher: GameState, nachher: GameState) {
+    private fun uebernehmeEventErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
         if (nachher.rundenzähler > vorher.rundenzähler) {
             beginneNaechsteRunde(nachher)
         } else {
-            aktualisiereDomainState(nachher)
+            aktualisiereSpielZustand(nachher)
         }
     }
 
-    private fun beginneNaechsteRunde(nachZugende: GameState) {
+    private fun beginneNaechsteRunde(nachZugende: SpielZustand) {
         try {
             aktuellesSpiel.beginneNaechsteRunde()
         } catch (throwable: Throwable) {
-            _domainFehler.tryEmit(throwable.message ?: "Neue Runde konnte nicht begonnen werden.")
+            _spielFehler.tryEmit(throwable.message ?: "Neue Runde konnte nicht begonnen werden.")
             return
         }
 
@@ -157,14 +157,14 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val neueDatenListe = aktuelleDaten.second + rundenDaten
         aktuelleDaten = spielDaten to neueDatenListe
 
-        val aktuelleWirtschaftsdaten = aktuellesSpiel.zuDomainGameState()
+        val aktuelleWirtschaftsdaten = aktuellesSpiel.zuSpielZustand()
         val synchronisiert = nachZugende.copy(
             marktpreise = aktuelleWirtschaftsdaten.marktpreise,
             leitzins = aktuelleWirtschaftsdaten.leitzins,
             rundenzähler = aktuelleWirtschaftsdaten.rundenzähler,
         )
-        gameEngine = GameEngine(synchronisiert)
-        aktualisiereDomainState(synchronisiert)
+        spielAblauf = SpielAblauf(synchronisiert)
+        aktualisiereSpielZustand(synchronisiert)
 
         _spielSpeicher.update { spiele ->
             spiele + (spielDaten to (rundenIndex to aktuellesSpiel.spielerStringListe))
@@ -180,7 +180,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 datenbankBereit.await()
                 DAO.insertRunde(rundenDaten)
             } catch (throwable: Throwable) {
-                _domainFehler.tryEmit(
+                _spielFehler.tryEmit(
                     throwable.message ?: "Neue Runde konnte nicht gespeichert werden."
                 )
             }
@@ -189,24 +189,24 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {
         if (neuerWarenkorb.values.any { menge -> menge < 0 }) {
-            _domainFehler.tryEmit("Warenkorbmengen dürfen nicht negativ sein.")
+            _spielFehler.tryEmit("Warenkorbmengen dürfen nicht negativ sein.")
             return
         }
 
         val warenkorb = neuerWarenkorb.filterValues { menge -> menge > 0 }.toMap()
-        val engine = gameEngine
+        val engine = spielAblauf
         if (engine == null) {
-            _domainFehler.tryEmit("Kein Spiel geladen.")
+            _spielFehler.tryEmit("Kein Spiel geladen.")
             return
         }
 
         val ergebnis = engine.apply(
-            GameEvent.WarenkorbGeaendert(
-                warenkorb = warenkorb.mapKeys { (rohstoff, _) -> rohstoff.zuDomainRohstoff() }
+            SpielEreignis.WarenkorbGeaendert(
+                warenkorb = warenkorb.mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
             )
         )
         if (ergebnis.isFailure) {
-            _domainFehler.tryEmit(
+            _spielFehler.tryEmit(
                 ergebnis.exceptionOrNull()?.message ?: "Warenkorb konnte nicht geändert werden."
             )
             return
@@ -220,7 +220,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         )
         aktuelleDaten = neueSpielDaten to bisherigeDaten.second
 
-        aktualisiereDomainState(ergebnis.getOrThrow())
+        aktualisiereSpielZustand(ergebnis.getOrThrow())
 
         _spielSpeicher.update { spiele ->
             val übersicht = spiele[bisherigeDaten.first]
@@ -239,7 +239,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 datenbankBereit.await()
                 DAO.updateSpiel(neueSpielDaten)
             } catch (throwable: Throwable) {
-                _domainFehler.tryEmit(
+                _spielFehler.tryEmit(
                     throwable.message ?: "Warenkorb konnte nicht gespeichert werden."
                 )
             }
@@ -284,7 +284,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             aktuellesSpiel.fuegeHandelZurAktuellenRundeHinzu(handel)
             aktuellesSpiel.anleihen.first { anzeige -> anzeige.anleihe === handel.anleihe }
         } catch (throwable: Throwable) {
-            _domainFehler.tryEmit(
+            _spielFehler.tryEmit(
                 throwable.message ?: "Anleihehandel konnte nicht gespeichert werden."
             )
             return false
@@ -305,7 +305,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         aktuelleDaten = spielDaten to neueDatenListe
-        synchronisiereDomainNachLegacyAenderung()
+        synchronisiereSpielZustandNachLegacyAenderung()
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -317,7 +317,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 datenbankBereit.await()
                 DAO.updateAnleiheHandel(aktualisiertesDatum)
             } catch (throwable: Throwable) {
-                _domainFehler.tryEmit(
+                _spielFehler.tryEmit(
                     throwable.message ?: "Anleihehandel konnte nicht gespeichert werden."
                 )
             }
@@ -343,7 +343,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             aktuellesSpiel.fuegeHandelZurAktuellenRundeHinzu(handel)
             speicherdatum()
         } catch (throwable: Throwable) {
-            _domainFehler.tryEmit(throwable.message ?: fehlermeldung)
+            _spielFehler.tryEmit(throwable.message ?: fehlermeldung)
             return false
         }
 
@@ -351,7 +351,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val neueDatenListe = aktuelleDaten.second + datum
         aktuelleDaten = spielDaten to neueDatenListe
 
-        synchronisiereDomainNachLegacyAenderung()
+        synchronisiereSpielZustandNachLegacyAenderung()
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -364,34 +364,34 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 datenbankBereit.await()
                 speichern(datum)
             } catch (throwable: Throwable) {
-                _domainFehler.tryEmit(throwable.message ?: fehlermeldung)
+                _spielFehler.tryEmit(throwable.message ?: fehlermeldung)
             }
         }
         return true
     }
 
-    private fun synchronisiereDomainNachLegacyAenderung() {
-        val bisherigerDomainZustand = gameEngine?.state
-        val abgebildeterDomainZustand = aktuellesSpiel.zuDomainGameState()
-        val domainZustand = if (bisherigerDomainZustand == null) {
-            abgebildeterDomainZustand
+    private fun synchronisiereSpielZustandNachLegacyAenderung() {
+        val bisherigerSpielZustand = spielAblauf?.state
+        val abgebildeterSpielZustand = aktuellesSpiel.zuSpielZustand()
+        val spielZustand = if (bisherigerSpielZustand == null) {
+            abgebildeterSpielZustand
         } else {
-            abgebildeterDomainZustand.copy(
-                rundenzähler = bisherigerDomainZustand.rundenzähler,
-                aktiverSpieler = bisherigerDomainZustand.aktiverSpieler,
-                zugStatus = bisherigerDomainZustand.zugStatus,
-                schuldenstriche = bisherigerDomainZustand.schuldenstriche,
-                ueberschuldungen = bisherigerDomainZustand.ueberschuldungen,
+            abgebildeterSpielZustand.copy(
+                rundenzähler = bisherigerSpielZustand.rundenzähler,
+                aktiverSpieler = bisherigerSpielZustand.aktiverSpieler,
+                zugStatus = bisherigerSpielZustand.zugStatus,
+                schuldenstriche = bisherigerSpielZustand.schuldenstriche,
+                ueberschuldungen = bisherigerSpielZustand.ueberschuldungen,
             )
         }
-        gameEngine = GameEngine(domainZustand)
-        aktualisiereDomainState(domainZustand)
+        spielAblauf = SpielAblauf(spielZustand)
+        aktualisiereSpielZustand(spielZustand)
     }
 
-    private fun aktualisiereDomainState(state: GameState) {
+    private fun aktualisiereSpielZustand(state: SpielZustand) {
         aktuellesSpielOderNull?.aktualisiereAktivenSpieler(state.zugStatus?.spieler?.wert)
-        _domainState.value = state
-        _domainUiState.value = state.zuGameUiState()
+        _spielZustand.value = state
+        _spielUebersicht.value = state.zuSpielUebersichtZustand()
     }
 
     init {
@@ -456,7 +456,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 ladeSpielDaten(daten)
                 withContext(Dispatchers.Main) { nachLaden() }
             } catch (throwable: Throwable) {
-                _domainFehler.emit(
+                _spielFehler.emit(
                     throwable.message?.let { "Spielstand konnte nicht geladen werden: $it" }
                         ?: "Spielstand konnte nicht geladen werden."
                 )

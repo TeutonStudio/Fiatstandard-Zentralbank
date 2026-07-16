@@ -1,24 +1,24 @@
 package de.teutonstudio.zentralbank.schnittstelle.domain
 
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Spieler
-import de.teutonstudio.zentralbank.domain.SpielerId
-import de.teutonstudio.zentralbank.domain.zug.Phase
-import de.teutonstudio.zentralbank.domain.zug.ZugStatus
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class GameUiStateTest {
+class SpielUebersichtZustandTest {
     @Test
-    fun gameUiStateKombiniertZugUndSpieler() {
+    fun spielUebersichtKombiniertZugUndSpieler() {
         val anna = SpielerId("anna")
-        val state = GameState(
+        val state = SpielZustand(
             spieler = listOf(Spieler(anna, "Anna")),
             aktiverSpieler = anna,
             zugStatus = ZugStatus(anna, Phase.Einnahmen),
         )
 
-        val uiState = state.zuGameUiState()
+        val uiState = state.zuSpielUebersichtZustand()
 
         assertEquals(
             "Runde 0 · Leitzins 0,00 %\nAnna: Einnahmen abschließen",

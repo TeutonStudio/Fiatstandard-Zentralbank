@@ -19,7 +19,7 @@ import androidx.navigation.compose.rememberNavController
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.datenbank.Spiel
-import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AusgabenDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
@@ -75,7 +75,7 @@ fun Navigation(viewModel: GameViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(viewModel) {
-        viewModel.domainFehler.collect { meldung ->
+        viewModel.spielFehler.collect { meldung ->
             snackbarHostState.showSnackbar(meldung)
         }
     }
@@ -115,8 +115,8 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.Game.route) {
             MitAktuellemSpiel(viewModel, navController) { spiel ->
-                val domainUiState = viewModel.domainUiState.collectAsState().value
-                val domainState = viewModel.domainState.collectAsState().value
+                val spielUebersicht = viewModel.spielUebersicht.collectAsState().value
+                val spielZustand = viewModel.spielZustand.collectAsState().value
                 Spielmenü(
                     { navController.navigate(route = Screen.PlayerSaldo.route) },
                     { navController.navigate(route = Screen.DebtSaldo.route) },
@@ -126,15 +126,15 @@ fun Navigation(viewModel: GameViewModel) {
                     { navController.navigate(route = Screen.NewCredit.route) },
                     viewModel::naechsterZugabschnitt,
                     spiel = spiel,
-                    aktiverSpielerName = domainState?.zugStatus?.spieler?.wert,
-                    zugText = domainUiState?.zug?.text ?: "Kein Zug aktiv",
+                    aktiverSpielerName = spielZustand?.zugStatus?.spieler?.wert,
+                    zugText = spielUebersicht?.zug?.text ?: "Kein Zug aktiv",
                 )
-                val zugStatus = domainState?.zugStatus
+                val zugStatus = spielZustand?.zugStatus
                 if (zugStatus?.phase == Phase.Ausgaben) {
                     AusgabenDialog(
                         plan = spiel.erhalteAusgabenplan(
                             spielerName = zugStatus.spieler.wert,
-                            runde = domainState.rundenzähler,
+                            runde = spielZustand.rundenzähler,
                         ),
                         onClose = viewModel::naechsterZugabschnitt,
                     )
@@ -221,7 +221,7 @@ fun Navigation(viewModel: GameViewModel) {
             MitAktuellemSpiel(viewModel, navController) { spiel ->
                 AnleiheDialog(
                     spiel = spiel,
-                    aktuellerSpielerName = viewModel.domainState.collectAsState().value
+                    aktuellerSpielerName = viewModel.spielZustand.collectAsState().value
                         ?.zugStatus?.spieler?.wert
                         ?: spiel.spielerStringListe.firstOrNull().orEmpty(),
                     onDismiss = { navController.popBackStack() },

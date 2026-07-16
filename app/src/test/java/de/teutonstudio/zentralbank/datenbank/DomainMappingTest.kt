@@ -1,9 +1,9 @@
 package de.teutonstudio.zentralbank.datenbank
 
-import de.teutonstudio.zentralbank.domain.BauteilTyp
-import de.teutonstudio.zentralbank.domain.Basispunkte
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,12 +11,12 @@ import org.junit.Test
 class DomainMappingTest {
     @Test
     fun zahlungsmittelWirdAlsCentbasiertesDomainGeldAbgebildet() {
-        assertEquals(Geld.cent(12_300), 123.toZahlungsmittel().zuDomainGeld())
+        assertEquals(Geld.cent(12_300), 123.toZahlungsmittel().zuGeld())
     }
 
     @Test
     fun testSpielWirdInDomainStateAbgebildet() {
-        val state = TestSpiel.zuDomainGameState()
+        val state = TestSpiel.zuSpielZustand()
 
         assertEquals(TestSpiel.aktuelleRunde - 1, state.rundenzähler)
         assertEquals(TestSpiel.spielerStringListe, state.spieler.map { it.name })

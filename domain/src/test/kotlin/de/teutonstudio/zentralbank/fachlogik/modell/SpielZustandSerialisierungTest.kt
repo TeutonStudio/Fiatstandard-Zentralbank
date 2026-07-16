@@ -1,16 +1,16 @@
-package de.teutonstudio.zentralbank.domain
+package de.teutonstudio.zentralbank.fachlogik.modell
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class GameStateSerializationTest {
+class SpielZustandSerialisierungTest {
     @Test
-    fun gameStateIstJsonSerialisierbar() {
+    fun spielZustandIstJsonSerialisierbar() {
         val spielerId = SpielerId("Anna")
         val anleiheId = AnleiheId("anna-1")
-        val state = GameState(
+        val state = SpielZustand(
             spieler = listOf(
                 Spieler(
                     id = spielerId,
@@ -41,7 +41,7 @@ class GameStateSerializationTest {
         )
 
         val json = Json.encodeToString(state)
-        val decoded = Json.decodeFromString<GameState>(json)
+        val decoded = Json.decodeFromString<SpielZustand>(json)
 
         assertEquals(state, decoded)
     }

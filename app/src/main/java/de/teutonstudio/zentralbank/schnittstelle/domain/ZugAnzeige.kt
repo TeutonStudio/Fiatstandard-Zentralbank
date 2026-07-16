@@ -1,13 +1,13 @@
 package de.teutonstudio.zentralbank.schnittstelle.domain
 
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.zug.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 
 data class ZugAnzeige(
     val text: String,
 )
 
-fun GameState.zuZugAnzeige(): ZugAnzeige {
+fun SpielZustand.zuZugAnzeige(): ZugAnzeige {
     val kopf = "Runde $rundenzähler · Leitzins ${leitzins.zuProzentString()}"
     val zug = zugStatus ?: return ZugAnzeige(kopf)
     val spielerName = spieler.firstOrNull { it.id == zug.spieler }?.name ?: zug.spieler.wert

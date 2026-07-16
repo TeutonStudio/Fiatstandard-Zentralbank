@@ -1,8 +1,6 @@
-package de.teutonstudio.zentralbank.domain
+package de.teutonstudio.zentralbank.fachlogik.modell
 
 import kotlinx.serialization.Serializable
-import de.teutonstudio.zentralbank.domain.zug.Phase
-import de.teutonstudio.zentralbank.domain.zug.ZugStatus
 
 @JvmInline
 @Serializable
@@ -69,7 +67,7 @@ data class Anleihe(
 }
 
 @Serializable
-data class GameState(
+data class SpielZustand(
     val spieler: List<Spieler>,
     val bankkonto: Geld = Geld.NULL,
     val bankAnleihen: List<AnleiheId> = emptyList(),

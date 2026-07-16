@@ -1,4 +1,4 @@
-package de.teutonstudio.zentralbank.domain
+package de.teutonstudio.zentralbank.fachlogik.modell
 
 import kotlinx.serialization.Serializable
 

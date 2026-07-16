@@ -1,31 +1,35 @@
-package de.teutonstudio.zentralbank.domain.zug
+package de.teutonstudio.zentralbank.fachlogik.auswertung
 
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.Spieler
-import de.teutonstudio.zentralbank.domain.SpielerId
-import de.teutonstudio.zentralbank.domain.Anleihe
-import de.teutonstudio.zentralbank.domain.AnleiheId
-import de.teutonstudio.zentralbank.domain.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class ZugAutomatTest {
+class ZugAuswertungTest {
     private val annaId = SpielerId("Anna")
 
-    private fun state(zugStatus: ZugStatus = ZugStatus(annaId, Phase.Einnahmen)): GameState = GameState(
+    private fun state(zugStatus: ZugStatus = ZugStatus(annaId, Phase.Einnahmen)): SpielZustand = SpielZustand(
         spieler = listOf(Spieler(annaId, "Anna", geldkonto = Geld.mark(1))),
         zugStatus = zugStatus,
     )
 
     @Test
     fun einnahmenPhaseWartetAufRohstoffEinnahmen() {
-        val schritte = ZugAutomat.schritte(state()).associateBy { it.typ }
+        val schritte = ZugAuswertung.schritte(state()).associateBy { it.typ }
 
         assertEquals(SchrittZustand.VERFUEGBAR, schritte.getValue(SchrittTyp.ROHSTOFF_EINNAHMEN).zustand)
-        assertFalse(ZugAutomat.kannPhaseAbschliessen(state()))
+        assertFalse(ZugAuswertung.kannPhaseAbschliessen(state()))
     }
 
     @Test
@@ -38,23 +42,23 @@ class ZugAutomatTest {
             ),
         )
 
-        assertTrue(ZugAutomat.kannPhaseAbschliessen(state))
+        assertTrue(ZugAuswertung.kannPhaseAbschliessen(state))
     }
 
     @Test
     fun ausgabenPhaseIstAutomatischErledigtOhneVerbrauchUndFremdeAnleihen() {
         val state = state(ZugStatus(annaId, Phase.Ausgaben))
 
-        val schritte = ZugAutomat.schritte(state).associateBy { it.typ }
+        val schritte = ZugAuswertung.schritte(state).associateBy { it.typ }
 
         assertEquals(SchrittZustand.ERLEDIGT, schritte.getValue(SchrittTyp.ROHSTOFF_AUSGABEN).zustand)
         assertEquals(SchrittZustand.ERLEDIGT, schritte.getValue(SchrittTyp.FINANZ_AUSGABEN).zustand)
-        assertTrue(ZugAutomat.kannPhaseAbschliessen(state))
+        assertTrue(ZugAuswertung.kannPhaseAbschliessen(state))
     }
 
     @Test
     fun rohstoffAusgabenBleibenOffenBeiVerbrauchendenBauteilen() {
-        val state = GameState(
+        val state = SpielZustand(
             spieler = listOf(
                 Spieler(
                     id = annaId,
@@ -66,17 +70,17 @@ class ZugAutomatTest {
             zugStatus = ZugStatus(annaId, Phase.Ausgaben),
         )
 
-        val schritte = ZugAutomat.schritte(state).associateBy { it.typ }
+        val schritte = ZugAuswertung.schritte(state).associateBy { it.typ }
 
         assertEquals(SchrittZustand.VERFUEGBAR, schritte.getValue(SchrittTyp.ROHSTOFF_AUSGABEN).zustand)
         assertEquals(SchrittZustand.ERLEDIGT, schritte.getValue(SchrittTyp.FINANZ_AUSGABEN).zustand)
-        assertFalse(ZugAutomat.kannPhaseAbschliessen(state))
+        assertFalse(ZugAuswertung.kannPhaseAbschliessen(state))
     }
 
     @Test
     fun finanzAusgabenBleibenOffenBeiFremdgehaltenerEigenerAnleihe() {
         val anleiheId = AnleiheId("anna-1")
-        val state = GameState(
+        val state = SpielZustand(
             spieler = listOf(
                 Spieler(annaId, "Anna", geldkonto = Geld.mark(10)),
                 Spieler(
@@ -98,10 +102,10 @@ class ZugAutomatTest {
             zugStatus = ZugStatus(annaId, Phase.Ausgaben),
         )
 
-        val schritte = ZugAutomat.schritte(state).associateBy { it.typ }
+        val schritte = ZugAuswertung.schritte(state).associateBy { it.typ }
 
         assertEquals(SchrittZustand.ERLEDIGT, schritte.getValue(SchrittTyp.ROHSTOFF_AUSGABEN).zustand)
         assertEquals(SchrittZustand.VERFUEGBAR, schritte.getValue(SchrittTyp.FINANZ_AUSGABEN).zustand)
-        assertFalse(ZugAutomat.kannPhaseAbschliessen(state))
+        assertFalse(ZugAuswertung.kannPhaseAbschliessen(state))
     }
 }

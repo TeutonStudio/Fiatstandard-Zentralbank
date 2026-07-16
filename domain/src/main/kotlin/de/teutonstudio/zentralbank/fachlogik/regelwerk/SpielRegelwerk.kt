@@ -1,63 +1,63 @@
-package de.teutonstudio.zentralbank.domain.engine
+package de.teutonstudio.zentralbank.fachlogik.regelwerk
 
-import de.teutonstudio.zentralbank.domain.AnleiheId
-import de.teutonstudio.zentralbank.domain.Anleihe
-import de.teutonstudio.zentralbank.domain.BauteilTyp
-import de.teutonstudio.zentralbank.domain.GameState
-import de.teutonstudio.zentralbank.domain.Geld
-import de.teutonstudio.zentralbank.domain.Konflikt
-import de.teutonstudio.zentralbank.domain.KontoId
-import de.teutonstudio.zentralbank.domain.Rohstoff
-import de.teutonstudio.zentralbank.domain.Schuldenstrich
-import de.teutonstudio.zentralbank.domain.Spieler
-import de.teutonstudio.zentralbank.domain.SpielerId
-import de.teutonstudio.zentralbank.domain.UeberschuldungsStatus
-import de.teutonstudio.zentralbank.domain.events.GameEvent
-import de.teutonstudio.zentralbank.domain.events.TransaktionsGrund
-import de.teutonstudio.zentralbank.domain.zug.Phase
-import de.teutonstudio.zentralbank.domain.zug.SchrittTyp
-import de.teutonstudio.zentralbank.domain.zug.SchrittZustand
-import de.teutonstudio.zentralbank.domain.zug.ZugAutomat
-import de.teutonstudio.zentralbank.domain.zug.ZugStatus
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
+import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.Schuldenstrich
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.UeberschuldungsStatus
+import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
+import de.teutonstudio.zentralbank.fachlogik.ereignis.TransaktionsGrund
+import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ZugAuswertung
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 
-object Reducer {
-    fun reduce(state: GameState, event: GameEvent): Result<GameState> {
+object SpielRegelwerk {
+    fun reduce(state: SpielZustand, event: SpielEreignis): Result<SpielZustand> {
         return runCatching {
             state.pruefeZugGate(event)
             when (event) {
-                is GameEvent.WarenkorbGeaendert -> state.warenkorbAendern(event.warenkorb)
-                is GameEvent.RohstoffEinnahme -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = 1)
-                is GameEvent.RohstoffAusgabe -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = -1)
-                is GameEvent.Transaktion -> state.bucheTransaktion(event.von, event.an, event.betrag)
-                is GameEvent.RohstoffHandel -> state.bucheRohstoffHandel(event)
-                is GameEvent.AnleiheGekauft -> state.bucheAnleiheGekauft(event)
-                is GameEvent.AnleiheVerkauft -> state.bucheAnleiheVerkauft(event)
-                is GameEvent.AnleiheFaellig -> state.bucheAnleiheFaellig(event)
-                is GameEvent.Expansion -> state.bucheExpansion(event)
-                is GameEvent.KriegErklaert -> state.bucheKriegErklaert(event)
-                is GameEvent.KriegBeendet -> state.bucheKriegBeendet(event)
-                is GameEvent.Schuldenstrich -> state.bucheSchuldenstrich(event)
-                is GameEvent.SchrittAbgeschlossen -> state.schrittAbschliessen(event)
-                is GameEvent.PhaseAbgeschlossen -> state.phaseAbschliessen(event)
-                GameEvent.ZugBeendet -> state.zugBeenden()
+                is SpielEreignis.WarenkorbGeaendert -> state.warenkorbAendern(event.warenkorb)
+                is SpielEreignis.RohstoffEinnahme -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = 1)
+                is SpielEreignis.RohstoffAusgabe -> state.bucheRohstoffe(event.spieler, event.mengen, faktor = -1)
+                is SpielEreignis.Transaktion -> state.bucheTransaktion(event.von, event.an, event.betrag)
+                is SpielEreignis.RohstoffHandel -> state.bucheRohstoffHandel(event)
+                is SpielEreignis.AnleiheGekauft -> state.bucheAnleiheGekauft(event)
+                is SpielEreignis.AnleiheVerkauft -> state.bucheAnleiheVerkauft(event)
+                is SpielEreignis.AnleiheFaellig -> state.bucheAnleiheFaellig(event)
+                is SpielEreignis.Expansion -> state.bucheExpansion(event)
+                is SpielEreignis.KriegErklaert -> state.bucheKriegErklaert(event)
+                is SpielEreignis.KriegBeendet -> state.bucheKriegBeendet(event)
+                is SpielEreignis.Schuldenstrich -> state.bucheSchuldenstrich(event)
+                is SpielEreignis.SchrittAbgeschlossen -> state.schrittAbschliessen(event)
+                is SpielEreignis.PhaseAbgeschlossen -> state.phaseAbschliessen(event)
+                SpielEreignis.ZugBeendet -> state.zugBeenden()
             }
         }
     }
 }
 
-private fun GameState.pruefeZugGate(event: GameEvent) {
-    if (event is GameEvent.WarenkorbGeaendert) return
+private fun SpielZustand.pruefeZugGate(event: SpielEreignis) {
+    if (event is SpielEreignis.WarenkorbGeaendert) return
 
     val zug = zugStatus ?: return
     val faelligerSchuldenstrich = faelligerSchuldenstrichSpieler()
     if (faelligerSchuldenstrich != null) {
-        require(event is GameEvent.Schuldenstrich && event.spieler == faelligerSchuldenstrich) {
+        require(event is SpielEreignis.Schuldenstrich && event.spieler == faelligerSchuldenstrich) {
             "Zuerst muss der faellige Schuldenstrich fuer ${faelligerSchuldenstrich.wert} gebucht werden."
         }
         return
     }
     val schritt = event.schrittTyp() ?: return
-    val info = ZugAutomat.schritte(this).first { it.typ == schritt }
+    val info = ZugAuswertung.schritte(this).first { it.typ == schritt }
     require(info.zustand == SchrittZustand.VERFUEGBAR) {
         info.begruendung ?: "Schritt $schritt ist nicht verfuegbar."
     }
@@ -68,77 +68,77 @@ private fun GameState.pruefeZugGate(event: GameEvent) {
     }
 }
 
-private fun GameEvent.schrittTyp(): SchrittTyp? = when (this) {
-    is GameEvent.WarenkorbGeaendert -> null
-    is GameEvent.RohstoffEinnahme -> SchrittTyp.ROHSTOFF_EINNAHMEN
-    is GameEvent.RohstoffAusgabe -> SchrittTyp.ROHSTOFF_AUSGABEN
-    is GameEvent.Transaktion -> when (grund) {
+private fun SpielEreignis.schrittTyp(): SchrittTyp? = when (this) {
+    is SpielEreignis.WarenkorbGeaendert -> null
+    is SpielEreignis.RohstoffEinnahme -> SchrittTyp.ROHSTOFF_EINNAHMEN
+    is SpielEreignis.RohstoffAusgabe -> SchrittTyp.ROHSTOFF_AUSGABEN
+    is SpielEreignis.Transaktion -> when (grund) {
         TransaktionsGrund.ROHSTOFFHANDEL -> SchrittTyp.ROHSTOFF_HANDEL
         TransaktionsGrund.ANLEIHENHANDEL -> SchrittTyp.ANLEIHEN_HANDEL
         else -> SchrittTyp.FINANZ_AUSGABEN
     }
-    is GameEvent.AnleiheGekauft -> SchrittTyp.ANLEIHEN_HANDEL
-    is GameEvent.AnleiheVerkauft -> SchrittTyp.ANLEIHEN_HANDEL
-    is GameEvent.AnleiheFaellig -> SchrittTyp.ANLEIHEN_HANDEL
-    is GameEvent.RohstoffHandel -> SchrittTyp.ROHSTOFF_HANDEL
-    is GameEvent.Expansion -> SchrittTyp.EXPANSION
-    is GameEvent.KriegErklaert -> SchrittTyp.KRIEG
-    is GameEvent.KriegBeendet -> SchrittTyp.KRIEG
-    is GameEvent.Schuldenstrich -> SchrittTyp.FINANZ_AUSGABEN
-    is GameEvent.SchrittAbgeschlossen,
-    is GameEvent.PhaseAbgeschlossen,
-    GameEvent.ZugBeendet -> null
+    is SpielEreignis.AnleiheGekauft -> SchrittTyp.ANLEIHEN_HANDEL
+    is SpielEreignis.AnleiheVerkauft -> SchrittTyp.ANLEIHEN_HANDEL
+    is SpielEreignis.AnleiheFaellig -> SchrittTyp.ANLEIHEN_HANDEL
+    is SpielEreignis.RohstoffHandel -> SchrittTyp.ROHSTOFF_HANDEL
+    is SpielEreignis.Expansion -> SchrittTyp.EXPANSION
+    is SpielEreignis.KriegErklaert -> SchrittTyp.KRIEG
+    is SpielEreignis.KriegBeendet -> SchrittTyp.KRIEG
+    is SpielEreignis.Schuldenstrich -> SchrittTyp.FINANZ_AUSGABEN
+    is SpielEreignis.SchrittAbgeschlossen,
+    is SpielEreignis.PhaseAbgeschlossen,
+    SpielEreignis.ZugBeendet -> null
 }
 
-private fun GameEvent.primaererSpieler(): SpielerId? = when (this) {
-    is GameEvent.WarenkorbGeaendert -> null
-    is GameEvent.RohstoffEinnahme -> spieler
-    is GameEvent.RohstoffAusgabe -> spieler
-    is GameEvent.Transaktion -> when (von) {
+private fun SpielEreignis.primaererSpieler(): SpielerId? = when (this) {
+    is SpielEreignis.WarenkorbGeaendert -> null
+    is SpielEreignis.RohstoffEinnahme -> spieler
+    is SpielEreignis.RohstoffAusgabe -> spieler
+    is SpielEreignis.Transaktion -> when (von) {
         is KontoId.Spieler -> von.id
         KontoId.Bank -> (an as? KontoId.Spieler)?.id
     }
-    is GameEvent.AnleiheGekauft -> kaeufer
-    is GameEvent.AnleiheVerkauft -> verkaeufer
-    is GameEvent.RohstoffHandel -> kaeufer
-    is GameEvent.Expansion -> spieler
-    is GameEvent.KriegErklaert -> aggressor
-    is GameEvent.KriegBeendet -> spielerA
-    is GameEvent.Schuldenstrich -> spieler
-    is GameEvent.AnleiheFaellig,
-    is GameEvent.SchrittAbgeschlossen,
-    is GameEvent.PhaseAbgeschlossen,
-    GameEvent.ZugBeendet -> null
+    is SpielEreignis.AnleiheGekauft -> kaeufer
+    is SpielEreignis.AnleiheVerkauft -> verkaeufer
+    is SpielEreignis.RohstoffHandel -> kaeufer
+    is SpielEreignis.Expansion -> spieler
+    is SpielEreignis.KriegErklaert -> aggressor
+    is SpielEreignis.KriegBeendet -> spielerA
+    is SpielEreignis.Schuldenstrich -> spieler
+    is SpielEreignis.AnleiheFaellig,
+    is SpielEreignis.SchrittAbgeschlossen,
+    is SpielEreignis.PhaseAbgeschlossen,
+    SpielEreignis.ZugBeendet -> null
 }
 
-private fun GameState.warenkorbAendern(warenkorb: Map<Rohstoff, Int>): GameState {
+private fun SpielZustand.warenkorbAendern(warenkorb: Map<Rohstoff, Int>): SpielZustand {
     require(warenkorb.values.all { menge -> menge >= 0 }) {
         "Warenkorbmengen duerfen nicht negativ sein."
     }
     return copy(warenkorb = warenkorb.filterValues { menge -> menge > 0 })
 }
 
-private fun GameState.schrittAbschliessen(event: GameEvent.SchrittAbgeschlossen): GameState {
+private fun SpielZustand.schrittAbschliessen(event: SpielEreignis.SchrittAbgeschlossen): SpielZustand {
     val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
-    val info = ZugAutomat.schritte(this).first { it.typ == event.schritt }
+    val info = ZugAuswertung.schritte(this).first { it.typ == event.schritt }
     require(info.zustand == SchrittZustand.VERFUEGBAR || info.zustand == SchrittZustand.ERLEDIGT) {
         info.begruendung ?: "Schritt ist nicht verfuegbar."
     }
     return copy(zugStatus = zug.copy(erledigteSchritte = zug.erledigteSchritte + event.schritt))
 }
 
-private fun GameState.phaseAbschliessen(event: GameEvent.PhaseAbgeschlossen): GameState {
+private fun SpielZustand.phaseAbschliessen(event: SpielEreignis.PhaseAbgeschlossen): SpielZustand {
     val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
     require(zug.phase == event.phase) { "Falsche Phase: aktueller Zug ist in ${zug.phase}." }
-    require(ZugAutomat.kannPhaseAbschliessen(this)) { "Nicht alle Pflichtschritte der Phase sind erledigt." }
-    val naechstePhase = ZugAutomat.naechstePhase(zug.phase)
+    require(ZugAuswertung.kannPhaseAbschliessen(this)) { "Nicht alle Pflichtschritte der Phase sind erledigt." }
+    val naechstePhase = ZugAuswertung.naechstePhase(zug.phase)
         ?: error("Aktions-Phase wird mit ZugBeendet abgeschlossen.")
     return copy(zugStatus = ZugStatus(zug.spieler, naechstePhase))
 }
 
-private fun GameState.zugBeenden(): GameState {
+private fun SpielZustand.zugBeenden(): SpielZustand {
     val zug = zugStatus ?: error("Es ist kein Zug aktiv.")
-    require(ZugAutomat.kannZugBeenden(this)) { "Zug kann erst in der Aktions-Phase beendet werden." }
+    require(ZugAuswertung.kannZugBeenden(this)) { "Zug kann erst in der Aktions-Phase beendet werden." }
     val nachPruefung = aktualisiereUeberschuldung(zug.spieler)
     return if (nachPruefung.istSchuldenstrichFaellig(zug.spieler)) {
         nachPruefung
@@ -147,7 +147,7 @@ private fun GameState.zugBeenden(): GameState {
     }
 }
 
-private fun GameState.naechsterZug(aktuellerSpieler: SpielerId): GameState {
+private fun SpielZustand.naechsterZug(aktuellerSpieler: SpielerId): SpielZustand {
     val aktuellerIndex = spieler.indexOfFirst { it.id == aktuellerSpieler }
     require(aktuellerIndex >= 0) { "Aktiver Spieler ist unbekannt." }
     val naechsterSpieler = spieler[(aktuellerIndex + 1) % spieler.size]
@@ -159,7 +159,7 @@ private fun GameState.naechsterZug(aktuellerSpieler: SpielerId): GameState {
     )
 }
 
-private fun GameState.bucheSchuldenstrich(event: GameEvent.Schuldenstrich): GameState {
+private fun SpielZustand.bucheSchuldenstrich(event: SpielEreignis.Schuldenstrich): SpielZustand {
     require(event.entfernteBahnwege >= 0) { "Entfernte Bahnwege duerfen nicht negativ sein." }
     val schuldner = spieler.firstOrNull { it.id == event.spieler }
         ?: error("Unbekannter Spieler: ${event.spieler.wert}")
@@ -219,7 +219,7 @@ private fun GameState.bucheSchuldenstrich(event: GameEvent.Schuldenstrich): Game
     }
 }
 
-private fun GameState.aktualisiereUeberschuldung(spielerId: SpielerId): GameState {
+private fun SpielZustand.aktualisiereUeberschuldung(spielerId: SpielerId): SpielZustand {
     val schuldensumme = bankgehalteneSchuldensumme(spielerId)
     val marktwert = marktwert(spielerId)
     val istImFrieden = konflikte.none { it.spielerA == spielerId || it.spielerB == spielerId }
@@ -245,15 +245,15 @@ private fun GameState.aktualisiereUeberschuldung(spielerId: SpielerId): GameStat
     )
 }
 
-private fun GameState.faelligerSchuldenstrichSpieler(): SpielerId? {
+private fun SpielZustand.faelligerSchuldenstrichSpieler(): SpielerId? {
     return ueberschuldungen.firstOrNull { it.schuldenstrichFaellig }?.spieler
 }
 
-private fun GameState.istSchuldenstrichFaellig(spielerId: SpielerId): Boolean {
+private fun SpielZustand.istSchuldenstrichFaellig(spielerId: SpielerId): Boolean {
     return ueberschuldungen.any { it.spieler == spielerId && it.schuldenstrichFaellig }
 }
 
-private fun GameState.bankgehalteneSchuldensumme(spielerId: SpielerId): Geld {
+private fun SpielZustand.bankgehalteneSchuldensumme(spielerId: SpielerId): Geld {
     return anleihen.values
         .filter { anleihe -> anleihe.emittent == spielerId && anleihe.id in bankAnleihen }
         .fold(Geld.NULL) { summe, anleihe -> summe + anleihe.offeneSchuldMitZinsen() }
@@ -267,7 +267,7 @@ private fun Anleihe.zinszahlung(): Geld {
     return Geld.cent(nennwert.cent * zinsBasispunkte / 10_000L)
 }
 
-private fun GameState.marktwert(spielerId: SpielerId): Geld {
+private fun SpielZustand.marktwert(spielerId: SpielerId): Geld {
     val spieler = spieler.firstOrNull { it.id == spielerId }
         ?: error("Unbekannter Spieler: ${spielerId.wert}")
     return spieler.bauteile.entries.fold(Geld.NULL) { summe, (bauteil, menge) ->
@@ -309,7 +309,7 @@ private fun Map<BauteilTyp, Int>.nachSchuldenstrich(entfernteBahnwege: Int): Map
     return neu.filterValues { it > 0 }
 }
 
-private fun GameState.bucheExpansion(event: GameEvent.Expansion): GameState {
+private fun SpielZustand.bucheExpansion(event: SpielEreignis.Expansion): SpielZustand {
     val nachKosten = bucheRohstoffe(
         spieler = event.spieler,
         mengen = event.bauteil.kosten,
@@ -322,7 +322,7 @@ private fun GameState.bucheExpansion(event: GameEvent.Expansion): GameState {
     }
 }
 
-private fun GameState.bucheKriegErklaert(event: GameEvent.KriegErklaert): GameState {
+private fun SpielZustand.bucheKriegErklaert(event: SpielEreignis.KriegErklaert): SpielZustand {
     require(event.aggressor != event.verteidiger) { "Ein Spieler kann sich nicht selbst Krieg erklaeren." }
     require(spieler.any { it.id == event.aggressor }) { "Unbekannter Spieler: ${event.aggressor.wert}" }
     require(spieler.any { it.id == event.verteidiger }) { "Unbekannter Spieler: ${event.verteidiger.wert}" }
@@ -332,13 +332,13 @@ private fun GameState.bucheKriegErklaert(event: GameEvent.KriegErklaert): GameSt
     return copy(konflikte = konflikte + Konflikt(event.aggressor, event.verteidiger))
 }
 
-private fun GameState.bucheKriegBeendet(event: GameEvent.KriegBeendet): GameState {
+private fun SpielZustand.bucheKriegBeendet(event: SpielEreignis.KriegBeendet): SpielZustand {
     val konflikt = konflikte.firstOrNull { it.betrifft(event.spielerA, event.spielerB) }
         ?: error("Zwischen diesen Spielern besteht kein Krieg.")
     return copy(konflikte = konflikte - konflikt)
 }
 
-private fun GameState.bucheAnleiheGekauft(event: GameEvent.AnleiheGekauft): GameState {
+private fun SpielZustand.bucheAnleiheGekauft(event: SpielEreignis.AnleiheGekauft): SpielZustand {
     require(event.preis > Geld.NULL) { "Anleihepreis muss positiv sein." }
     require(event.anleihe in anleihen.keys) { "Unbekannte Anleihe: ${event.anleihe.wert}" }
 
@@ -353,7 +353,7 @@ private fun GameState.bucheAnleiheGekauft(event: GameEvent.AnleiheGekauft): Game
     )
 }
 
-private fun GameState.bucheAnleiheVerkauft(event: GameEvent.AnleiheVerkauft): GameState {
+private fun SpielZustand.bucheAnleiheVerkauft(event: SpielEreignis.AnleiheVerkauft): SpielZustand {
     require(event.preis > Geld.NULL) { "Anleihepreis muss positiv sein." }
     require(event.anleihe in anleihen.keys) { "Unbekannte Anleihe: ${event.anleihe.wert}" }
 
@@ -368,7 +368,7 @@ private fun GameState.bucheAnleiheVerkauft(event: GameEvent.AnleiheVerkauft): Ga
     )
 }
 
-private fun GameState.bucheAnleiheFaellig(event: GameEvent.AnleiheFaellig): GameState {
+private fun SpielZustand.bucheAnleiheFaellig(event: SpielEreignis.AnleiheFaellig): SpielZustand {
     val anleihe = anleihen[event.anleihe]
         ?: error("Unbekannte Anleihe: ${event.anleihe.wert}")
     val besitzer = anleiheBesitzer(event.anleihe)
@@ -382,7 +382,7 @@ private fun GameState.bucheAnleiheFaellig(event: GameEvent.AnleiheFaellig): Game
         .let { state -> state.copy(anleihen = state.anleihen - event.anleihe) }
 }
 
-private fun GameState.bucheRohstoffHandel(event: GameEvent.RohstoffHandel): GameState {
+private fun SpielZustand.bucheRohstoffHandel(event: SpielEreignis.RohstoffHandel): SpielZustand {
     require(event.menge > 0) { "Rohstoffhandelsmenge muss positiv sein." }
     require(event.preis > Geld.NULL) { "Rohstoffhandelspreis muss positiv sein." }
 
@@ -403,11 +403,11 @@ private fun GameState.bucheRohstoffHandel(event: GameEvent.RohstoffHandel): Game
         )
 }
 
-private fun GameState.bucheRohstoffe(
+private fun SpielZustand.bucheRohstoffe(
     spieler: SpielerId,
     mengen: Map<Rohstoff, Int>,
     faktor: Int,
-): GameState {
+): SpielZustand {
     require(mengen.isNotEmpty()) { "Rohstoffbuchung darf nicht leer sein." }
     require(mengen.values.all { it > 0 }) { "Rohstoffmengen muessen positiv sein." }
 
@@ -428,36 +428,36 @@ private fun GameState.bucheRohstoffe(
     }
 }
 
-private fun GameState.verschiebeAnleihe(
+private fun SpielZustand.verschiebeAnleihe(
     anleihe: AnleiheId,
     von: KontoId,
     an: KontoId,
-): GameState {
+): SpielZustand {
     require(von != an) { "Anleihe-Sender und Empfaenger muessen verschieden sein." }
     val ohne = entferneAnleiheVonKonto(anleihe, von)
     return ohne.fuegeAnleiheZuKonto(anleihe, an)
 }
 
-private fun GameState.anleiheBesitzer(
+private fun SpielZustand.anleiheBesitzer(
     anleihe: AnleiheId,
 ): KontoId? {
     if (anleihe in bankAnleihen) return KontoId.Bank
     return spieler.firstOrNull { anleihe in it.anleihen }?.let { KontoId.Spieler(it.id) }
 }
 
-private fun GameState.entferneAnleihe(
+private fun SpielZustand.entferneAnleihe(
     anleihe: AnleiheId,
-): GameState {
+): SpielZustand {
     return copy(
         bankAnleihen = bankAnleihen - anleihe,
         spieler = spieler.map { spieler -> spieler.copy(anleihen = spieler.anleihen - anleihe) },
     )
 }
 
-private fun GameState.entferneAnleiheVonKonto(
+private fun SpielZustand.entferneAnleiheVonKonto(
     anleihe: AnleiheId,
     konto: KontoId,
-): GameState {
+): SpielZustand {
     return when (konto) {
         KontoId.Bank -> {
             require(anleihe in bankAnleihen) { "Bank besitzt Anleihe ${anleihe.wert} nicht." }
@@ -470,10 +470,10 @@ private fun GameState.entferneAnleiheVonKonto(
     }
 }
 
-private fun GameState.fuegeAnleiheZuKonto(
+private fun SpielZustand.fuegeAnleiheZuKonto(
     anleihe: AnleiheId,
     konto: KontoId,
-): GameState {
+): SpielZustand {
     require(anleiheBesitzer(anleihe) == null) { "Anleihe ${anleihe.wert} hat bereits einen Besitzer." }
     return when (konto) {
         KontoId.Bank -> copy(bankAnleihen = bankAnleihen + anleihe)
@@ -483,11 +483,11 @@ private fun GameState.fuegeAnleiheZuKonto(
     }
 }
 
-private fun GameState.bucheTransaktion(
+private fun SpielZustand.bucheTransaktion(
     von: KontoId,
     an: KontoId,
     betrag: Geld,
-): GameState {
+): SpielZustand {
     require(betrag > Geld.NULL) { "Transaktionsbetrag muss positiv sein." }
     require(von != an) { "Sender und Empfaenger muessen verschieden sein." }
 
@@ -495,7 +495,7 @@ private fun GameState.bucheTransaktion(
     return nachAbzug.kontoAendern(an, betrag)
 }
 
-private fun GameState.kontoAendern(konto: KontoId, delta: Geld): GameState {
+private fun SpielZustand.kontoAendern(konto: KontoId, delta: Geld): SpielZustand {
     return when (konto) {
         KontoId.Bank -> {
             val neu = bankkonto + delta
@@ -510,10 +510,10 @@ private fun GameState.kontoAendern(konto: KontoId, delta: Geld): GameState {
     }
 }
 
-private fun GameState.updateSpieler(
+private fun SpielZustand.updateSpieler(
     spielerId: SpielerId,
     update: (Spieler) -> Spieler,
-): GameState {
+): SpielZustand {
     var gefunden = false
     val neueSpieler = spieler.map { spieler ->
         if (spieler.id == spielerId) {
@@ -527,6 +527,6 @@ private fun GameState.updateSpieler(
     return copy(spieler = neueSpieler)
 }
 
-fun GameState.geldsumme(): Geld {
+fun SpielZustand.geldsumme(): Geld {
     return spieler.fold(bankkonto) { summe, spieler -> summe + spieler.geldkonto }
 }
