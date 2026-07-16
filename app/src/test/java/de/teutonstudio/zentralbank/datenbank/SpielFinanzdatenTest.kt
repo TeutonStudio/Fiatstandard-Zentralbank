@@ -506,7 +506,7 @@ class SpielFinanzdatenTest {
             eintrag.art == SpielerAblaufArt.ANLEIHE_EMITTIERT
         }
         assertEquals("Anleihe emittiert", emission.rohstoffOderVorgang)
-        assertEquals("2 Runden je 2 Mark", emission.anleihenAnzeigeZusatz)
+        assertEquals("2 Runden je 2 ℳ", emission.anleihenAnzeigeZusatz)
         assertNull(emission.erwarteteAnleihenRenditeProzent)
         assertEquals(
             listOf(-2, -2),

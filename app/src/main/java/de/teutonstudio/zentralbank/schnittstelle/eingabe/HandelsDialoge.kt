@@ -234,7 +234,7 @@ fun HandelDialog(
                 if (handelsgut is HandelsgutAuswahl.Rohstoff) {
                     Zahlenfeld("Menge (Stk)", menge) { menge = it }
                 }
-                Zahlenfeld("Gesamtpreis (Mark)", gesamtpreis) { gesamtpreis = it }
+                Zahlenfeld("Gesamtpreis (ℳ)", gesamtpreis) { gesamtpreis = it }
                 letzterMarktpreis?.let { marktpreis ->
                     val bezug = if (handelsgut is HandelsgutAuswahl.Rohstoff) " je Stück" else ""
                     Text(
@@ -451,8 +451,8 @@ fun AnleiheDialog(
                         PersonenAuswahl("Erster Erwerber", moeglicheKaeufer, erwerber) {
                             erwerber = it
                         }
-                        Zahlenfeld("Sondervermögen / Nennwert (Mark)", nennwert) { nennwert = it }
-                        Zahlenfeld("Unvermögen / Zahlung je Runde (Mark)", zins) { zins = it }
+                        Zahlenfeld("Sondervermögen / Nennwert (ℳ)", nennwert) { nennwert = it }
+                        Zahlenfeld("Unvermögen / Zahlung je Runde (ℳ)", zins) { zins = it }
                         Zahlenfeld("Laufzeit (Runden)", laufzeit) { laufzeit = it }
                         Text(
                             text = "Zinsen werden ab der nächsten Runde bis einschließlich " +
@@ -474,9 +474,9 @@ fun AnleiheDialog(
                         }
                         Zahlenfeld(
                             if (vorgang == AnleiheVorgang.VERKAUF) {
-                                "Verkaufspreis (Mark)"
+                                "Verkaufspreis (ℳ)"
                             } else {
-                                "Rückkaufpreis (Mark)"
+                                "Rückkaufpreis (ℳ)"
                             },
                             preis,
                         ) { preis = it }

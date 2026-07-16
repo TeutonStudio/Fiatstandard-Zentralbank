@@ -27,7 +27,7 @@ class SpielerAnzeigeTest {
         val anzeige = state.zuSpielerAnzeigen().single()
 
         assertEquals("Anna", anzeige.name)
-        assertEquals("12,00 Mark", anzeige.geld)
+        assertEquals("12,00 ℳ", anzeige.geld)
         assertEquals(2, anzeige.anleihen)
         assertEquals(3, anzeige.bauteile)
     }

@@ -3,18 +3,15 @@ package de.teutonstudio.zentralbank.schnittstelle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.withStyle
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
-import de.teutonstudio.zentralbank.R
+import de.teutonstudio.zentralbank.schnittstelle.theme.MarkZeichenSchrift
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
 private const val MARK_ZEICHEN = "ℳ"
-private val markZeichenSchrift = FontFamily(Font(R.font.zentralbank_mark_symbol))
 
 val markAchsenFormatter = einheitenAchsenFormatter(MARK_ZEICHEN)
 val stueckAchsenFormatter = CartesianValueFormatter { _, value, _ ->
@@ -47,7 +44,7 @@ private fun einheitenAchsenFormatter(einheit: String) =
 internal fun markBeschriftung(beschriftung: String): AnnotatedString = buildAnnotatedString {
     append(beschriftung)
     append(' ')
-    withStyle(SpanStyle(fontFamily = markZeichenSchrift)) {
+    withStyle(SpanStyle(fontFamily = MarkZeichenSchrift)) {
         append(MARK_ZEICHEN)
     }
 }

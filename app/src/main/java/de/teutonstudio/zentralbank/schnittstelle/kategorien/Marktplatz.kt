@@ -104,7 +104,7 @@ private enum class HandelsdifferenzEinheit(
     val achsenEinheit: String,
 ) {
     STUECK("Stk", "Stk"),
-    MARK("Mark", "ℳ"),
+    MARK("ℳ", "ℳ"),
 }
 
 private val warenkorbMarktfarbe = Color(0xFF75658A)
@@ -533,7 +533,7 @@ fun zeigeMarktplatz(
 
                     val art = if(isBuying.value) "Kauf" else "Verkauf"
                     Text(
-                        text = "$art von ${gewählterRohstoff?.str ?: "?"} für %.2f Mark je".format(inputPrice.floatValue),
+                        text = "$art von ${gewählterRohstoff?.str ?: "?"} für %.2f ℳ je".format(inputPrice.floatValue),
                         fontSize = 15.sp
                     )
 

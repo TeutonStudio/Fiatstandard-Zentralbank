@@ -598,7 +598,7 @@ private fun baueZahlungsmittel(
      * Erstellt ein Zahlungsmittel direkt aus dem Vektor a.
      *
      * Beispiel:
-     * listOf(5, 2) = 5 Mark + 2 * 1000 Mark = 2005 Mark
+     * listOf(5, 2) = 5 ℳ + 2 * 1000 ℳ = 2005 ℳ
      *//*
     constructor(vonTausendPotenzListe: List<Int>) : this(
         1,
@@ -616,7 +616,7 @@ private fun baueZahlungsmittel(
      *     1 to 2
      * )
      *
-     * = 2500 Mark
+     * = 2500 ℳ
      *//*
     constructor(einheiten: Map<Int, Int>) : this(
         1,
@@ -655,7 +655,7 @@ private fun baueZahlungsmittel(
 
     val erhalteString: String
         get() {
-            if (istNull) return "0 Mark"
+            if (istNull) return "0 ℳ"
 
             val text = betrag
                 .mapIndexedNotNull { index, menge ->
@@ -667,7 +667,7 @@ private fun baueZahlungsmittel(
                 }
                 .reversed()
                 .joinToString(" + ")
-                .ifEmpty { "0 Mark" }
+                .ifEmpty { "0 ℳ" }
 
             return if (istNegativ) "-$text" else text
         }
@@ -818,7 +818,7 @@ private fun baueZahlungsmittel(
 
     fun divMod(other: Zahlungsmittel): Division {
         require(!other.istNull) {
-            "Division durch 0 Mark"
+            "Division durch 0 ℳ"
         }
 
         if (this.istNull) {
@@ -841,7 +841,7 @@ private fun baueZahlungsmittel(
     }
 
     *//**
-     * Division mit Rundung auf die nächste ganze Mark.
+     * Division mit Rundung auf die nächste ganze ℳ.
      *
      * Beispiel:
      * 5 / 2 = 3
@@ -1058,16 +1058,16 @@ private fun baueZahlungsmittel(
         val ONE = Zahlungsmittel(1, listOf(1))
 
         private val WÄHRUNGS_EINHEITEN = listOf(
-            "Mark" to "ℳ",
-            "Tausend Mark" to "Tsd ℳ",
-            "Million Mark" to "Mio ℳ",
-            "Milliarde Mark" to "Mia ℳ",
-            "Billion Mark" to "Bio ℳ",
-            "Billiarde Mark" to "Bia ℳ",
-            "Trillion Mark" to "Trio ℳ",
-            "Trilliarde Mark" to "Tria ℳ",
-            "Quadrillion Mark" to "Qrio ℳ",
-            "Quadrilliarde Mark" to "Qria ℳ"
+            "ℳ" to "ℳ",
+            "Tausend ℳ" to "Tsd ℳ",
+            "Million ℳ" to "Mio ℳ",
+            "Milliarde ℳ" to "Mia ℳ",
+            "Billion ℳ" to "Bio ℳ",
+            "Billiarde ℳ" to "Bia ℳ",
+            "Trillion ℳ" to "Trio ℳ",
+            "Trilliarde ℳ" to "Tria ℳ",
+            "Quadrillion ℳ" to "Qrio ℳ",
+            "Quadrilliarde ℳ" to "Qria ℳ"
         )
 
         fun finanzQuote(
@@ -1618,7 +1618,7 @@ private fun baueZahlungsmittel(
 
         private fun waehrungsEinheit(index: Int): String {
             return WÄHRUNGS_EINHEITEN.getOrNull(index)?.first
-                ?: "10^${index * 3} Mark"
+                ?: "10^${index * 3} ℳ"
         }
     }
 }*/

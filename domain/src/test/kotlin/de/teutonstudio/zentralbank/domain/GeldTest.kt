@@ -22,7 +22,7 @@ class GeldTest {
 
     @Test
     fun formatiertAlsMarkMitZweiCentstellen() {
-        assertEquals("12,34 Mark", Geld.cent(1234).zuMarkString())
-        assertEquals("-12,34 Mark", Geld.cent(-1234).zuMarkString())
+        assertEquals("12,34 ℳ", Geld.cent(1234).zuMarkString())
+        assertEquals("-12,34 ℳ", Geld.cent(-1234).zuMarkString())
     }
 }

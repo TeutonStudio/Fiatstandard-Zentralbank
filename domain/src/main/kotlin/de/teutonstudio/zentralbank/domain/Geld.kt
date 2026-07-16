@@ -29,7 +29,7 @@ value class Geld private constructor(
         val absolut = cent.absoluteValue
         val mark = absolut / CENT_PRO_MARK
         val centRest = absolut % CENT_PRO_MARK
-        return "$vorzeichen$mark,${centRest.toString().padStart(2, '0')} Mark"
+        return "$vorzeichen$mark,${centRest.toString().padStart(2, '0')} ℳ"
     }
 
     companion object {

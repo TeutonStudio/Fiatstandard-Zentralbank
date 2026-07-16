@@ -69,7 +69,7 @@ val Bauteil.farbe: Color get() = when (this) {
     Wirtschaftsregionen.EISENMINE -> Color(0xFF7B634B)
 }
 fun Int.zuZinssatz(): String = "$this %"
-fun Zahlungsmittel.zuMark(): String = "${toIntOderNull()} Mark"
+fun Zahlungsmittel.zuMark(): String = "${toIntOderNull()} ℳ"
 fun <V> Bauteil.Companion.associateWith(valueSelector: (Bauteil) -> V): Map<Bauteil,V> = entries.associateWith(valueSelector)
 
 val Bauteil.Companion.entries: Iterable<Bauteil>
