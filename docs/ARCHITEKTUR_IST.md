@@ -1,248 +1,225 @@
 # Architektur-Ist
 
-Stand: Etappe 0 des Umbaus aus `Umbau.md`.
+Stand: 17.07.2026, Branch `codex/deutsche-architektur`.
 
-## Projektstruktur
+## Kurzfassung
 
-- `:app` ist aktuell das einzige Gradle-Modul.
-- Paketwurzel: `de.teutonstudio.zentralbank`.
-- UI: Jetpack Compose im App-Modul.
-- Persistenz: Room im App-Modul.
-- Domain-/Regellogik: ebenfalls im App-Modul unter `datenbank/`, nicht von Android getrennt.
-- Reines Domain-Modul `:domain` existiert noch nicht.
-- Netzwerk-Modul existiert noch nicht.
+Die Anwendung besteht aus den Gradle-Modulen `:app` und `:domain`. Das Modul
+`:domain` ist bereits ein reines Kotlin/JVM-Modul ohne Android-, Compose- oder
+Room-Abhängigkeit und wird von `:app` produktiv verwendet. Die Migration ist
+jedoch nur teilweise vollzogen: Das alte veränderliche `Spiel` bleibt die
+maßgebliche Datenquelle für große Teile der Oberfläche und der Speicherung,
+während ein unveränderlicher `GameState` parallel für Zuglogik und erste
+Darstellungszustände geführt wird.
 
-## Einstieg und Navigation
+Damit bestehen für eine laufende Partie weiterhin drei Darstellungen:
 
-- `MainActivity` erstellt `GameViewModel` mit `GameViewModelFactory(application)` und ruft `Navigation(viewModel)` im Compose-Theme auf.
-- `Navigation.kt` definiert die Routen:
-  - `main_screen`
-  - `new_game`
-  - `load_game`
-  - `game`
-  - `edit_round`
-  - `player_saldo`
-  - `debt_saldo`
-  - `market_saldo`
-  - `foreign_saldo`
-  - `price_index`
-  - `new_trade`
-  - `new_credit`
-  - `new_build`
-- Einige Routen enthalten noch auskommentierte oder leere Implementierungen, besonders `NewTrade`, `NewCredit` und `NewBuild`.
+1. `datenbank.Spiel` mit veränderlichen Listen und berechneten Caches,
+2. `domain.GameState` mit Ereignisverlauf in `GameEngine`,
+3. Room-Entitäten und der zusätzliche Cache `aktuelleDaten` im `GameViewModel`.
 
-## Screens und wichtige Composables
+`GameViewModel` synchronisiert diese Darstellungen in beide Richtungen nur
+teilweise. Das ist derzeit das größte Konsistenzrisiko.
 
-### Kategorien
+## Module und Abhängigkeiten
 
-- `Hauptmenü.kt`
-  - `SpielCard`
-  - `Hauptmenü`
-- `SpielErstellen.kt`
-  - `SpielErstellen`
-  - hält lokale Eingabeschritte mit `remember`, `mutableStateMapOf`, `mutableStateListOf`.
-- `SpielLaden.kt`
-  - `SpielLaden`
-  - hält lokale Auswahl mit `remember`.
-- `Spielmenü.kt`
-  - `Spielmenü`
-- `NeueRunde.kt`
-  - `NeueRunde`
-- `Marktplatz.kt`
-  - `zeigeHafenPreis`
-  - `zeigeMarktplatz`
-  - hält lokale UI-/Dialogzustände für Handel, Chartauswahl und Eingaben.
-- `Außenhandel.kt`
-  - `zeigeAussenhandel`
-- `Anleihen.kt`
-  - `AnleihenRegister`
-  - mehrere Chart-, Header- und Karten-Composables.
+### `:domain`
 
-### Ausgabe
+- Kotlin/JVM 17, Coroutines und Kotlin Serialization.
+- Keine Android-, Compose- oder Room-Imports.
+- Aktuelle Paketwurzel: `de.teutonstudio.zentralbank.domain`.
+- Enthält `GameState`, Geld- und Fachtypen, `GameEvent`, `Reducer`,
+  `GameEngine` und `ZugAutomat`.
+- Enthält schnelle JVM-Tests für Geld, Serialisierung, Regeln, Ereignisablauf
+  und Zugphasen.
 
-- `Handbuch.kt`
-  - `zeigeHandbuch`
-- `PDF.kt`
-  - `PdfAnzeige`
-  - `PdfAnzeigeMitLinks`
-- `bauteil.kt`
-  - `zeigeBauteil`
-  - `zeigeBauteilPreis`
-- `rohstoff.kt`
-  - `bauteilIcon`
-  - `zeigeRohstoff`
-- `siedler.kt`
-  - `SpielerBilanz`
-  - `zeigeSpieler`
-  - `spielerAuswahl`
-  - `zeigeSpielerDaten`
-- `anleihe.kt`
-  - `zeigeAnleihe`
-- `handel.kt`
-  - `ZeigeHandel`
+### `:app`
 
-### Eingabe und Vorlagen
+- Android-Anwendung mit Compose, Navigation, Room und Vico-Diagrammen.
+- Hängt von `:domain` ab.
+- Enthält gleichzeitig UI, Room-Entitäten, DAOs, Rekonstruktion von
+  Spielständen und das alte Laufzeitmodell.
 
-- `steuerung.kt`
-  - `Titel`
-  - `SteuerContainer`
-- `runde.kt`
-  - `definiereRunde`
-  - `definiereLeitzinssatz`
-  - `bearbeiteRunde`
-- `spieler.kt`
-  - `SpielerAnzahlAuswahl`
-  - `SpielerDaten`
-  - `definiereSpieler`
-- `warenkorb.kt`
-  - `definiereRohstoffMenge`
-  - `definiereWarenkorb`
-- `bauteile.kt`
-  - `definiereBauteilMenge`
-  - `definiereBauteile`
-- `Rohstoff.kt`
-  - `wähleRohstoff`
-- `anleihe.kt`
-  - `definiereRunde`
-  - `wähleLaufzeit`
-  - `definiereAnleihe`
-- `zahlungsmittel.kt`
-  - `ZahlungsmittelEingabe`
-- `zins.kt`
-  - `ZinsEingabe`
-- `zentralbank.kt`
-  - `definiereLeitzinsatzZiele`
-- `StiftCard.kt`
-  - `StiftCard`
-- `ImageCard.kt`
-  - `ImageCard`
-- `vorlagen.kt`
-  - allgemeine Layout- und Textbausteine wie `TextCard`, `GridByOrientation`, `FlowByOrientation`, `Titel`, `markBy`.
+Der technische Modulname `:domain` ist in Gradle und Build-Automatisierung
+bereits etabliert. Fachlich entspricht dieses Modul dem künftigen Bereich
+`fachlogik`; eine sofortige Gradle-Modulumbenennung bringt keinen fachlichen
+Nutzen, würde aber alle Build-Verweise berühren.
 
-## Zustandshaltung
+## Fachmodell und Zustandsänderungen
 
-### ViewModel
+### Neuer Zustand
 
-- `GameViewModel` liegt unter `datenbank/verwalter.kt` und erbt von `AndroidViewModel`.
-- Persistenzzugriff läuft über `ZentralbankSpeicher`.
-- Exponierte Flows:
-  - `spielDatenListe: StateFlow<Map<SpielDaten, List<SpeicherDaten>>>`
-  - `spielSpeicher: StateFlow<Map<SpielDaten, Pair<Int, List<String>>>>`
-- Zusätzlich werden `lateinit var aktuelleDaten` und `lateinit var aktuellesSpiel` als mutable aktueller Spielzustand gehalten.
-- Das ViewModel initialisiert Room, lädt gespeicherte Spiele und fügt zusätzlich `TestSpiel` in die Speicherliste ein.
+`GameState` ist eine serialisierbare Data Class mit ausschließlich `val` und
+Kotlin-Schnittstellen für unveränderliche Listen, Maps und Sets. Der Zustand
+enthält unter anderem:
 
-### Persistenz
+- Spieler und Konten,
+- Rohstoffe und Warenkorb,
+- Anleihen und deren Besitzer,
+- Konflikte und Überschuldungsstatus,
+- aktuelle Marktpreise und Leitzins,
+- Runde, aktiven Spieler und Zugstatus.
 
-- Room-Entities in `datenbank/database.kt`:
-  - `SpielDaten`
-  - `SpielerDaten`
-  - `BauteilDaten`
-  - `KontrolleDaten`
-  - `RundeDaten`
-  - `HandelsDaten`
-  - `AnleiheDaten`
-  - `VertragsDaten`
-- DAOs und Speicherfassade in `datenbank/DataAccessObject.kt`.
-- `AppDatabase` wird in `datenbank/erzeuger.kt` als Singleton mit `Room.databaseBuilder` erzeugt.
-- Savegame ist aktuell Tabellenzustand, kein Event-Log.
+Der Geldtyp `Geld` speichert Cent als `Long`. Fachlogik verwendet damit keine
+binären Gleitkommazahlen für Geldbeträge. `Basispunkte` hält Zinssätze als
+Ganzzahl. Die Methoden `zuMarkString()` und `zuProzentString()` liegen derzeit
+noch im Fachmodul und vermischen Fachwert und deutsche UI-Formatierung.
 
-### Laufzeitmodell
+### Ereignisse und Regeln
 
-- Zentrale Klassen in `datenbank/laufzeit.kt`:
-  - `Spiel`
-  - `Runde`
-  - `JuristischePerson`
-  - `Geschäftsbank`
-  - `Ausland`
-  - `Spieler`
-  - `Handelsregister`
-  - `Handel`
-  - `Anleihenhandel`
-  - `Anleihe`
-  - `RohstoffHandel`
-  - `Kriegsregister`
-  - `Vertrag`
-  - `KonfliktStatus`
-- `Spiel`, `Spieler`, `Handelsregister` und `Kriegsregister` verwenden intern mutable Listen und Cache-Listen.
-- Zustandsänderungen passieren über `neueRundenDatenDefinieren(...)`; es gibt noch keinen Reducer und keine validierten Events.
+`GameEvent` deckt Warenkorb, Rohstoffbuchungen, Transaktionen, Anleihenhandel,
+Rohstoffhandel, Expansion, Krieg, Schuldenstrich und Zugübergänge ab.
 
-### UI-lokaler Zustand
+`Reducer.kt` umfasst 532 Zeilen und enthält aktuell alle Regeln in einer Datei:
 
-- Viele Eingabe- und Auswahlzustände liegen direkt in Composables über `remember`, `mutableStateOf`, `mutableIntStateOf`, `mutableFloatStateOf`, `mutableStateMapOf` und `mutableStateListOf`.
-- Beispiele:
-  - Spielanlage: Spieler, Warenkorb, Zentralbankziele, Bauwerke.
-  - Spiel laden: gewählter Spielstand.
-  - Marktplatz: Kauf-/Verkaufsdialoge, Rohstoff, Preis, Menge, Spieler.
-  - Spieleransicht: Kriegs-/Militär-/Friedensauswahl.
-  - Anleihenregister: Filter und Verwaltungsansicht.
+- Zugfreigaben,
+- Rohstoffbestände,
+- Geldtransaktionen,
+- Anleihenbesitz und Fälligkeit,
+- Handel,
+- Expansion,
+- Konflikte,
+- Überschuldung und Schuldenstrich,
+- Phasen- und Spielerwechsel.
 
-## Geld, Rohstoffe und Zahlen
+Die Regeln sind Android-frei und gut getestet, fachlich aber nicht getrennt.
 
-- Geld wird fachlich mit `Zahlungsmittel` modelliert (`datenbank/zahlungsmittel.kt`).
-- `Zahlungsmittel` speichert intern Vorzeichen plus Stellenliste in Basis `1000`; es ist noch kein `Long` in kleinster Einheit.
-- In Persistenz werden Geldbeträge überwiegend als `String` gespeichert (`preis`, `sondervermogen`, `unvermogen`).
-- `Float` wird für Zinssätze, Inflation und UI-Eingaben verwendet:
-  - `SpielDaten.inflationsziel`, `nAbweichung`, `sAbweichung`
-  - `RundeDaten.leitzinssatz`
-  - `Spiel.nächsterZinssatz`, `erhaltePreisinflationZurRunde`, `erhalteZinssatzSchritte`
-  - mehrere Eingabe-Composables mit `MutableFloatState`
-- Rohstoffe sind `enum class Rohstoffe` mit `str` und Compose-`Color`.
-- Rohstoffmengen sind aktuell `Int` bzw. `EnumMap<Rohstoffe, Int>`.
+### Ablauf
 
-## Rundenwechsel
+`GameEngine` hält angewandte und zurückgenommene Ereignisse. Der aktuelle
+Zustand wird bei jedem Zugriff auf `state` vollständig aus dem Startzustand und
+allen angewandten Ereignissen neu gefaltet. Auch `apply`, `undo` und `redo`
+greifen auf diesen Getter zu. Die Kosten wachsen daher mit jedem Ereignis und
+werden zusätzlich durch UI-Abfragen ausgelöst.
 
-- Der aktuelle Ablauf ist rundenbasiert, aber nicht als Spielerzug-Zustandsautomat modelliert.
-- `Spiel.aktuelleRunde` ist `runden.size`.
-- `Spiel.neueRundenDatenDefinieren(...)` hängt eine neue Runde an und übergibt pro Runde:
-  - Bau-/Kontrolldaten pro Spieler
-  - Handelsdaten
-  - Konfliktdaten
-- `bearbeiteRunde(...)` sammelt UI-Eingaben für neue Rundendaten; die Anbindung an Persistenz ist noch nicht vollständig.
-- Es gibt keinen expliziten aktiven Spieler, keine Phasen `Einnahmen/Ausgaben/Aktionen`, keine erledigten Schritte und keine Sperrlogik.
+## Altes Laufzeitmodell
 
-## Abhängigkeiten
+`datenbank/laufzeit.kt` enthält weiterhin das große Modell `Spiel` sowie
+`Spieler`, `Handelsregister`, `Kriegsregister`, `Anleihe` und weitere Typen.
+Das Modell führt Rundenlisten, veränderliche Caches und zahlreiche abgeleitete
+Zeitreihen. Es wird von Marktplatz, Anleihen, Außenhandel, Spieleransicht,
+Dialogen und Navigation direkt gelesen.
 
-Aktuelle App-Abhängigkeiten aus `app/build.gradle.kts`:
+Dieses Modell ist ein Übergangsmodell. Neue Fachregeln dürfen nicht darauf
+aufgebaut werden. Eine sofortige Entfernung ist noch nicht möglich, weil der
+neue `GameState` historische Markt-, Handels-, Bau- und Anleihenprojektionen
+noch nicht vollständig ausdrückt.
 
-- Android/Material:
-  - `com.google.android.material:material`
-  - `androidx.appcompat:appcompat`
-  - `androidx.core:core-ktx`
-  - `androidx.fragment:fragment-ktx`
-- Compose:
-  - Compose BOM
-  - Activity Compose
-  - Material 3
-  - Material 3 adaptive navigation suite
-  - UI, UI graphics, UI tooling preview, UI viewbinding
-  - Foundation layout
-  - Navigation Compose
-- Persistenz:
-  - Room runtime
-  - Room KTX
-  - Room compiler via KSP
-- Sonstiges:
-  - AndroidX PDF Viewer Fragment
-  - Vico Compose/View Charting
-  - `com.cheonjaeung.compose.grid:grid`
-- Tests:
-  - JUnit 4
-  - AndroidX JUnit
-  - Espresso
-  - Compose UI Test
+## `GameViewModel`
 
-Der Versionskatalog enthält jetzt vorbereitete Einträge für:
+`datenbank/GameViewModel.kt` hat 1.335 Zeilen und erbt von
+`AndroidViewModel`. Es übernimmt gleichzeitig:
 
-- `org.jetbrains.kotlin.jvm`
-- `org.jetbrains.kotlin.plugin.serialization`
-- `kotlinx-coroutines-core`
-- `kotlinx-serialization-json`
+- Erzeugung und Laden der Room-Datenbank,
+- Koordination über `ZentralbankSpeicher`,
+- Cache aller Room-Datensätze,
+- Rekonstruktion des alten `Spiel` aus acht Entitätstypen,
+- Halten von `aktuellesSpiel` und `aktuelleDaten`,
+- Halten von `GameEngine`, `domainState` und `domainUiState`,
+- Anwenden von Domain-Ereignissen,
+- Synchronisierung von Legacy-Änderungen zurück in `GameState`,
+- Rundenwechsel und Teilpersistenz,
+- Handel und Anleihenhandel,
+- globale Fehlermeldungen.
 
-## Technische Risiken für Etappe 1
+Der Abschnitt ab ungefähr Zeile 736 besteht überwiegend aus auskommentiertem
+Altcode. Drei leere Konfliktmethoden werden noch von der Navigation aufgerufen;
+ihre Entfernung wäre deshalb ohne gleichzeitige Bereichsmigration nicht sicher.
+`vernichteSpiel` ist ein produktiv verdrahteter `TODO()`.
 
-- `Rohstoffe` hängt aktuell wegen `Color` an Compose; ein reines Domain-Modul muss Farbe/Visualisierung vom Rohstofftyp trennen.
-- `Zahlungsmittel` ist nicht `Long`-basiert. Die Umstellung sollte mit Charakterisierungstests abgesichert werden.
-- `Spiel`, `Spieler`, `Handelsregister` und `Kriegsregister` sind mutable und cachebasiert; Extraktion in immutable `GameState` ist keine reine Dateiverschiebung.
-- `AnleiheDaten` speichert den ersten Erwerber nicht; beim Laden wird aktuell "Zentralbank" als Standard angenommen.
-- Einige ViewModel-Aktionen sind Stubs (`vernichteSpiel`, Kriegsfunktionen) oder in der Navigation auskommentiert.
-- `Rohstoffe` und `Bauteil` verwenden Umlaute in Bezeichnern; Umbenennungen sollten vermieden werden, solange kein konkreter Nutzen entsteht.
+Die Methode `synchronisiereDomainNachLegacyAenderung()` bildet das mutierte
+Legacy-Spiel erneut ab und übernimmt anschließend ausgewählte Felder aus dem
+bisherigen Domain-Zustand. Dabei wird der Ereignisverlauf verworfen. Dies ist
+eine konkrete Stelle, an der mehrere Wahrheiten zusammengeführt statt
+vermieden werden.
+
+## Persistenz
+
+Room liegt vollständig in `:app`. `AppDatabase` enthält acht Entitätstypen:
+
+- `SpielDaten`,
+- `SpielerDaten`,
+- `BauteilDaten`,
+- `KontrolleDaten`,
+- `RundeDaten`,
+- `HandelsDaten`,
+- `AnleiheDaten`,
+- `VertragsDaten`.
+
+`ZentralbankSpeicher` koordiniert acht DAOs und kapselt bereits einen Teil der
+Room-Transaktionen. Seine Schnittstelle verwendet jedoch ausschließlich
+Room-/Legacy-Typen und ist deshalb noch keine fachliche `SpielAblage`.
+
+Der gespeicherte Stand ist ein Satz historischer Tabellenzeilen, kein
+serialisierter `GameState` und kein Ereignisverlauf. Die Rekonstruktion befindet
+sich im `GameViewModel`; insbesondere alte Anleihendatensätze benötigen eine
+Kompatibilitätsannahme über den ersten Besitzer.
+
+## Navigation und Oberfläche
+
+`Navigation.kt` erhält ein konkretes `GameViewModel` und reicht für fast alle
+Spielbereiche das vollständige Legacy-`Spiel` weiter. Sie liest zusätzlich
+`domainState` und `domainUiState` für Zuganzeige und Ausgabendialog. Navigation,
+Sitzungszustand und Bereichszustände sind damit noch nicht getrennt.
+
+### Marktplatz
+
+`Marktplatz.kt` hat 642 Zeilen. Die zentrale Composable erhält das vollständige
+`Spiel` und bereitet darin unter anderem auf:
+
+- Marktpreis- und Warenkorbzeitreihen,
+- Handelsdifferenzen,
+- Bauwerkbewertungen,
+- Diagrammreihen und Legenden,
+- Kauf-/Verkaufseingaben und Dialogzustände.
+
+Der Warenkorb wird bereits über einen Callback geändert. Der restliche Bereich
+ist noch keine Route/Bildschirm-Trennung und hängt für historische Daten am
+Legacy-Modell. Auskommentierte Handelsaufrufe zeigen eine unvollständige
+frühere Anbindung.
+
+### Anleihen
+
+`Anleihen.kt` hat 1.674 Zeilen und enthält Fachauswertungen, Projektionen,
+Diagrammaufbereitung, Filterzustände, Tabellen und Dialoge in einer Datei.
+Geld wird dort teilweise für Diagramme in `Double` umgerechnet; die eigentlichen
+Bestände bleiben im Legacy-Typ `Zahlungsmittel`. Der Bereich erhält ebenfalls
+das vollständige `Spiel`.
+
+## Tests und Ausgangsprüfung
+
+Vor Beginn dieser Überarbeitung waren erfolgreich:
+
+- `./gradlew test`
+- `./gradlew assembleDebug`
+
+Vorhandene Domain-Tests prüfen unter anderem gültige und ungültige Ereignisse,
+Geldsummenneutralität, Rohstoffänderungen, Zugphasen, Rückgängig/Wiederholen,
+Anleihen, Expansion, Konflikte, Überschuldung und Serialisierung. App-Tests
+decken Teile der Legacy-Finanzberechnungen, Zuordnungen und Anzeigen ab.
+
+Es fehlen noch Tests einer fachlichen Ablageschnittstelle, einer zentralen
+Spielsitzung und state-hoisted Bereichs-ViewModels.
+
+## Festgestellte Regelverletzungen und Risiken
+
+- Das Legacy-`Spiel` und `GameState` sind gleichzeitig produktive Wahrheiten.
+- `GameViewModel` rekonstruiert und koordiniert Persistenz direkt.
+- Der Ereignisverlauf geht bei Legacy-Synchronisation und Rundenbeginn verloren.
+- `GameEngine.state` faltet den gesamten Verlauf bei jedem Zugriff.
+- Compose-Bereiche berechnen umfangreiche fachliche Auswertungen aus `Spiel`.
+- `Reducer` ist fachlich monolithisch.
+- Formatierungsmethoden liegen im Fachmodul.
+- `GameViewModel.vernichteSpiel` ist trotz produktivem Aufrufer nicht
+  implementiert.
+- Die vorhandene Room-Struktur kann einen vollständigen `SpielZustand` samt
+  Ereignisverlauf nicht verlustfrei speichern.
+- Eine vorschnelle Marktplatz-Migration würde historische Zeitreihen verlieren
+  oder eine neue vierte Zwischenwahrheit erzeugen.
+
+## Lokaler Git-Hinweis
+
+Zu Beginn lag bereits eine nicht zugehörige Änderung vor:
+`app/BEREINIGUNGSPLAN.md` ist im Index als leere neue Datei vorgemerkt und im
+Arbeitsbaum gelöscht (`AD`). Diese Änderung wird im Umbau weder wiederhergestellt
+noch gestaged oder committed.

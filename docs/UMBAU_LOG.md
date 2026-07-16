@@ -1,5 +1,52 @@
 # Umbau-Log
 
+## 17.07.2026 - Architektur neu bewertet und Ziel festgelegt
+
+Durchgeführte Änderungen:
+
+- Veraltete Ist-Dokumentation an den tatsächlich vorhandenen Stand mit den
+  Modulen `:app` und `:domain` angepasst.
+- `GameViewModel`, Legacy-`Spiel`, `GameState`, Ereignisse, Reducer,
+  `GameEngine`, Domain-Zuordnung, Navigation, Marktplatz, Anleihen sowie
+  Room-Entitäten und DAO-Fassade untersucht.
+- `docs/ARCHITEKTUR_ZIEL.md` mit Zielpaketen, Verantwortlichkeiten,
+  Abhängigkeitsrichtung, Benennungen und Migrationsreihenfolge angelegt.
+
+Architekturentscheidung:
+
+- Der Gradle-Modulname `:domain` bleibt vorerst bestehen; fachlich und in der
+  künftigen Paketwurzel heißt das Modul `fachlogik`.
+- `Geld` bleibt als präziser Long-basierter Fachtyp erhalten.
+- `GameViewModel` wird nicht vorzeitig nur kosmetisch umbenannt. Eine
+  `SpielSitzung` entsteht erst zusammen mit einer echten `SpielAblage`.
+- Alte Room-Stände sollen später als importierter Startzustand behandelt
+  werden; ein nicht vorhandener Ereignisverlauf wird nicht rekonstruiert oder
+  erfunden.
+
+Entfernte Altstruktur:
+
+- In dieser Dokumentationsetappe wurde noch kein produktiver Code entfernt.
+
+Verbleibende Übergangslösung:
+
+- Legacy-`Spiel`, `GameState` und Room-Daten sind noch parallele Darstellungen.
+- Die Marktplatz- und Anleihenoberfläche benötigt historische Daten aus dem
+  Legacy-Modell.
+
+Ausgeführte Tests:
+
+- `./gradlew test` erfolgreich.
+- `./gradlew assembleDebug` erfolgreich.
+
+Offene Probleme:
+
+- `GameEngine` faltet den gesamten Verlauf bei jedem Zustandszugriff.
+- `Reducer` bündelt alle Regelbereiche in einer Datei.
+- Die konkrete Persistenzmigration zu `SpielAblage` benötigt ein versioniertes,
+  nicht-destruktives Room-Schema.
+- `GameViewModel.vernichteSpiel` ist ein produktiv verdrahteter `TODO()`;
+  Konfliktmethoden sind produktiv verdrahtete leere Methoden.
+
 ## Etappe 0 - Bestandsaufnahme & Absicherung
 
 - Architektur-Ist dokumentiert: Screens/Composables, Zustandshaltung, Persistenz, Geld-/Rohstofftypen, Rundenwechsel und Abhängigkeiten.
