@@ -110,7 +110,7 @@ noch nicht vollständig ausdrückt.
 ## `GameViewModel`
 
 `datenbank/GameViewModel.kt` hat nach Entfernung des auskommentierten Altblocks
-739 Zeilen und erbt von
+753 Zeilen und erbt von
 `AndroidViewModel`. Es übernimmt gleichzeitig:
 
 - Erzeugung und Laden der Room-Datenbank,
@@ -126,9 +126,9 @@ noch nicht vollständig ausdrückt.
 - globale Fehlermeldungen.
 
 Der frühere, knapp 600 Zeilen lange auskommentierte DAO-/Cache-Block ist
-entfernt. Drei leere Konfliktmethoden werden noch von der Navigation aufgerufen;
-ihre Entfernung wäre deshalb ohne gleichzeitige Bereichsmigration nicht sicher.
-`vernichteSpiel` ist ein produktiv verdrahteter `TODO()`.
+entfernt. Noch nicht migrierte Lösch- und Konfliktaktionen melden ausdrücklich,
+dass die jeweilige Bereichsmigration fehlt; sie crashen nicht und führen keine
+stille oder inkonsistente Teilmutation aus.
 
 Die Methode `synchronisiereSpielZustandNachLegacyAenderung()` bildet das mutierte
 Legacy-Spiel erneut ab und übernimmt anschließend ausgewählte Felder aus dem
@@ -212,8 +212,8 @@ Spielsitzung und state-hoisted Bereichs-ViewModels.
 - Der Ereignisverlauf geht bei Legacy-Synchronisation und Rundenbeginn verloren.
 - Compose-Bereiche berechnen umfangreiche fachliche Auswertungen aus `Spiel`.
 - Formatierungsmethoden liegen im Fachmodul.
-- `GameViewModel.vernichteSpiel` ist trotz produktivem Aufrufer nicht
-  implementiert.
+- Löschen und Konfliktaktionen sind bis zu ihren vollständigen vertikalen
+  Migrationen gesperrt.
 - Die vorhandene Room-Struktur kann einen vollständigen `SpielZustand` samt
   Ereignisverlauf nicht verlustfrei speichern.
 - Eine vorschnelle Marktplatz-Migration würde historische Zeitreihen verlieren

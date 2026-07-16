@@ -151,15 +151,15 @@ fun Navigation(viewModel: GameViewModel) {
                         ausgewähltesBauwerk = it
                     }, { spieler, bauteil, wahr ->
                     }, { (aggressor,verteidiger) ->
-                        viewModel.declareWar(aggressor,verteidiger)
+                        viewModel.kriegErklaeren(aggressor,verteidiger)
                     }, { (aggressor,verteidiger) ->
                         if (aggressor.second >= verteidiger.second) { // Sieg
-                            viewModel.declareMilitary(aggressor.first,aggressor.second)
+                            viewModel.militaerergebnisErfassen(aggressor.first,aggressor.second)
                         } else { // Niederlage
-                            viewModel.declareMilitary(verteidiger.first,verteidiger.second)
+                            viewModel.militaerergebnisErfassen(verteidiger.first,verteidiger.second)
                         }
                     }, { (aggressor,verteidiger) ->
-                        viewModel.declarePeace(aggressor,verteidiger)
+                        viewModel.friedenSchliessen(aggressor,verteidiger)
                     } )
                 }
             }

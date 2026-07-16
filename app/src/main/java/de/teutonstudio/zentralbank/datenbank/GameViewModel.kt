@@ -445,7 +445,9 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     public val vernichteSpiel = { it: SpielDaten -> vernichteSpiel(it) }
     private fun vernichteSpiel(daten: SpielDaten) {
-        TODO()
+        _spielFehler.tryEmit(
+            "Spielstand ${daten.spielID} kann erst nach der Ablagemigration sicher gelöscht werden.",
+        )
     }
 
     public val ladeSpiel = { daten: SpielDaten, nachLaden: () -> Unit ->
@@ -733,7 +735,19 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         } ?: error("Unbekannte Vertragsart: $text")
     }
 
-    fun declareWar(aggressor: String, verteidiger: String) {}
-    fun declareMilitary(first: String, second: Int) {}
-    fun declarePeace(aggressor: String, verteidiger: String) {}
+    fun kriegErklaeren(aggressor: String, verteidiger: String) {
+        meldeAusstehendeKonfliktMigration("Kriegserklärung $aggressor gegen $verteidiger")
+    }
+
+    fun militaerergebnisErfassen(spieler: String, staerke: Int) {
+        meldeAusstehendeKonfliktMigration("Militärergebnis $spieler mit Stärke $staerke")
+    }
+
+    fun friedenSchliessen(spielerA: String, spielerB: String) {
+        meldeAusstehendeKonfliktMigration("Friedensschluss $spielerA mit $spielerB")
+    }
+
+    private fun meldeAusstehendeKonfliktMigration(aktion: String) {
+        _spielFehler.tryEmit("$aktion ist bis zur Konfliktbereichsmigration nicht verfügbar.")
+    }
 }

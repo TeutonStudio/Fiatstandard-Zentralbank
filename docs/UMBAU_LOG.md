@@ -8,15 +8,17 @@ Durchgeführte Änderungen:
   Marktpreis- und Anleihenberechnungen aus `GameViewModel` entfernt.
 - Die nur aus diesem Altblock referenzierte Methode
   `ladeAktuellesSpielNeu()` entfernt.
-- `GameViewModel.kt` von 1.335 auf 739 Zeilen verkleinert.
+- `GameViewModel.kt` von 1.335 auf 753 Zeilen verkleinert; die zusätzlichen
+  Übergangsmeldungen sind produktiver Code.
+- Das crashende Lösch-`TODO` und drei stille Konflikt-No-ops durch explizite
+  Übergangsmeldungen ersetzt; die öffentlichen Konfliktmethoden deutsch benannt.
 
 Architekturentscheidung:
 
-- Die produktiv verdrahteten leeren Konfliktmethoden bleiben bis zur
-  Konfliktbereichsmigration bestehen.
-- `vernichteSpiel` bleibt als dokumentiertes offenes Problem bestehen. Eine
-  Implementierung ohne Löschbestätigung und ohne geklärten Lebenszyklus eines
-  möglicherweise geladenen Spielstands wäre in dieser Bereinigung nicht sicher.
+- Konflikt- und Löschaktionen bleiben bis zur jeweiligen Bereichsmigration
+  fachlich gesperrt. Eine Teilimplementierung würde Legacy- und Fachzustand
+  auseinanderlaufen lassen; Löschen benötigt zusätzlich Bestätigung und einen
+  geklärten Lebenszyklus für den möglicherweise geladenen Spielstand.
 
 Entfernte Altstruktur:
 
@@ -35,8 +37,8 @@ Ausgeführte Tests:
 Offene Probleme:
 
 - Persistenzgrenze und `SpielSitzung` sind noch nicht extrahiert.
-- Konfliktaktionen und Löschen eines Spielstands benötigen einen vollständigen
-  vertikalen Schnitt statt weiterer Stubs.
+- Konfliktaktionen und Löschen eines Spielstands benötigen weiterhin einen
+  vollständigen vertikalen Schnitt; bis dahin erhalten Benutzer eine Meldung.
 
 ## 17.07.2026 - Spielablauf und Regelwerke getrennt
 
