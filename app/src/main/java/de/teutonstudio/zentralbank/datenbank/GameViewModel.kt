@@ -71,25 +71,25 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         aktualisiereSpielZustand(startzustand)
     }
 
-    fun ereignisAnwenden(event: SpielEreignis) {
-        val engine = spielAblauf
-        if (engine == null) {
+    fun ereignisAnwenden(ereignis: SpielEreignis) {
+        val ablauf = spielAblauf
+        if (ablauf == null) {
             _spielFehler.tryEmit("Kein Spiel geladen.")
             return
         }
 
-        val vorher = engine.state
-        engine.apply(event)
-            .onSuccess { state -> uebernehmeEventErgebnis(vorher, state) }
+        val vorher = ablauf.zustand
+        ablauf.ereignisAnwenden(ereignis)
+            .onSuccess { zustand -> uebernehmeEreignisErgebnis(vorher, zustand) }
             .onFailure { throwable ->
                 _spielFehler.tryEmit(throwable.message ?: "Spielereignis wurde abgelehnt.")
             }
     }
 
     fun naechsterZugabschnitt() {
-        val state = spielAblauf?.state
-        val zug = state?.zugStatus
-        if (state == null || zug == null) {
+        val zustand = spielAblauf?.zustand
+        val zug = zustand?.zugStatus
+        if (zustand == null || zug == null) {
             _spielFehler.tryEmit("Kein Zug aktiv.")
             return
         }
@@ -97,42 +97,44 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         when (zug.phase) {
             Phase.Einnahmen,
             Phase.Ausgaben -> {
-                val schrittEvents = ZugAuswertung.schritte(state)
+                val schrittEreignisse = ZugAuswertung.schritte(zustand)
                     .filter { schritt ->
                         schritt.typ.pflicht && schritt.zustand == SchrittZustand.VERFUEGBAR
                     }
                     .map { schritt -> SpielEreignis.SchrittAbgeschlossen(schritt.typ) }
-                wendeEventsAn(schrittEvents + SpielEreignis.PhaseAbgeschlossen(zug.phase))
+                wendeEreignisseAn(
+                    schrittEreignisse + SpielEreignis.PhaseAbgeschlossen(zug.phase),
+                )
             }
             Phase.Aktionen -> beendeZug()
         }
     }
 
     fun beendeZug() {
-        wendeEventsAn(listOf(SpielEreignis.ZugBeendet))
+        wendeEreignisseAn(listOf(SpielEreignis.ZugBeendet))
     }
 
-    private fun wendeEventsAn(events: List<SpielEreignis>) {
-        val engine = spielAblauf
-        if (engine == null) {
+    private fun wendeEreignisseAn(ereignisse: List<SpielEreignis>) {
+        val ablauf = spielAblauf
+        if (ablauf == null) {
             _spielFehler.tryEmit("Kein Spiel geladen.")
             return
         }
 
-        val vorher = engine.state
-        for (event in events) {
-            val ergebnis = engine.apply(event)
+        val vorher = ablauf.zustand
+        for (ereignis in ereignisse) {
+            val ergebnis = ablauf.ereignisAnwenden(ereignis)
             if (ergebnis.isFailure) {
-                aktualisiereSpielZustand(engine.state)
+                aktualisiereSpielZustand(ablauf.zustand)
                 val fehler = ergebnis.exceptionOrNull()
                 _spielFehler.tryEmit(fehler?.message ?: "Zug konnte nicht fortgesetzt werden.")
                 return
             }
         }
-        uebernehmeEventErgebnis(vorher, engine.state)
+        uebernehmeEreignisErgebnis(vorher, ablauf.zustand)
     }
 
-    private fun uebernehmeEventErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
+    private fun uebernehmeEreignisErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
         if (nachher.rundenzähler > vorher.rundenzähler) {
             beginneNaechsteRunde(nachher)
         } else {
@@ -194,13 +196,13 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
 
         val warenkorb = neuerWarenkorb.filterValues { menge -> menge > 0 }.toMap()
-        val engine = spielAblauf
-        if (engine == null) {
+        val ablauf = spielAblauf
+        if (ablauf == null) {
             _spielFehler.tryEmit("Kein Spiel geladen.")
             return
         }
 
-        val ergebnis = engine.apply(
+        val ergebnis = ablauf.ereignisAnwenden(
             SpielEreignis.WarenkorbGeaendert(
                 warenkorb = warenkorb.mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
             )
@@ -371,7 +373,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
 
     private fun synchronisiereSpielZustandNachLegacyAenderung() {
-        val bisherigerSpielZustand = spielAblauf?.state
+        val bisherigerSpielZustand = spielAblauf?.zustand
         val abgebildeterSpielZustand = aktuellesSpiel.zuSpielZustand()
         val spielZustand = if (bisherigerSpielZustand == null) {
             abgebildeterSpielZustand
@@ -388,10 +390,10 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         aktualisiereSpielZustand(spielZustand)
     }
 
-    private fun aktualisiereSpielZustand(state: SpielZustand) {
-        aktuellesSpielOderNull?.aktualisiereAktivenSpieler(state.zugStatus?.spieler?.wert)
-        _spielZustand.value = state
-        _spielUebersicht.value = state.zuSpielUebersichtZustand()
+    private fun aktualisiereSpielZustand(zustand: SpielZustand) {
+        aktuellesSpielOderNull?.aktualisiereAktivenSpieler(zustand.zugStatus?.spieler?.wert)
+        _spielZustand.value = zustand
+        _spielUebersicht.value = zustand.zuSpielUebersichtZustand()
     }
 
     init {

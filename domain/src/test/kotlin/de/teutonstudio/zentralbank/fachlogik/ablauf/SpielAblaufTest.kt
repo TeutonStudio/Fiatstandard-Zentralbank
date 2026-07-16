@@ -1,41 +1,71 @@
 package de.teutonstudio.zentralbank.fachlogik.ablauf
 
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
-import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpielAblaufTest {
     private val annaId = SpielerId("Anna")
-
-    private fun spielAblauf(): SpielAblauf = SpielAblauf(
-        SpielZustand(
-            spieler = listOf(
-                Spieler(
-                    id = annaId,
-                    name = "Anna",
-                    geldkonto = Geld.mark(1),
-                ),
+    private val startzustand = SpielZustand(
+        spieler = listOf(
+            Spieler(
+                id = annaId,
+                name = "Anna",
+                geldkonto = Geld.mark(1),
             ),
         ),
     )
+    private val holzEinnahme = SpielEreignis.RohstoffEinnahme(
+        spieler = annaId,
+        mengen = mapOf(Rohstoff.HOLZ to 2),
+    )
 
     @Test
-    fun anwendenRueckgaengigUndWiederholenPflegenEreignisverlauf() {
-        val engine = spielAblauf()
-        val event = SpielEreignis.RohstoffEinnahme(annaId, mapOf(Rohstoff.HOLZ to 2))
+    fun anwendenAktualisiertDenGecachtenZustandUndEreignisverlauf() {
+        val ablauf = SpielAblauf(startzustand)
 
-        engine.apply(event).getOrThrow()
-        assertEquals(2, engine.state.spieler.single().rohstoffe[Rohstoff.HOLZ])
+        val folgezustand = ablauf.ereignisAnwenden(holzEinnahme).getOrThrow()
 
-        engine.undo()
-        assertEquals(null, engine.state.spieler.single().rohstoffe[Rohstoff.HOLZ])
+        assertSame(folgezustand, ablauf.zustand)
+        assertEquals(2, ablauf.zustand.spieler.single().rohstoffe[Rohstoff.HOLZ])
+        assertEquals(listOf(holzEinnahme), ablauf.ereignisVerlauf.angewandteEreignisse)
+        assertTrue(ablauf.ereignisVerlauf.wiederholbareEreignisse.isEmpty())
+    }
 
-        engine.redo().getOrThrow()
-        assertEquals(2, engine.state.spieler.single().rohstoffe[Rohstoff.HOLZ])
+    @Test
+    fun ladenRueckgaengigUndWiederholenRekonstruierenKonsistent() {
+        val ablauf = SpielAblauf(startzustand, listOf(holzEinnahme))
+        assertEquals(2, ablauf.zustand.spieler.single().rohstoffe[Rohstoff.HOLZ])
+
+        ablauf.rueckgaengig()
+        assertEquals(null, ablauf.zustand.spieler.single().rohstoffe[Rohstoff.HOLZ])
+        assertEquals(listOf(holzEinnahme), ablauf.ereignisVerlauf.wiederholbareEreignisse)
+
+        ablauf.wiederholen().getOrThrow()
+        assertEquals(2, ablauf.zustand.spieler.single().rohstoffe[Rohstoff.HOLZ])
+        assertTrue(ablauf.integritaetPruefen().isSuccess)
+    }
+
+    @Test
+    fun neuesEreignisVerwirftWiederholbarenVerlauf() {
+        val ablauf = SpielAblauf(startzustand, listOf(holzEinnahme))
+        ablauf.rueckgaengig()
+
+        ablauf.ereignisAnwenden(
+            SpielEreignis.RohstoffEinnahme(
+                spieler = annaId,
+                mengen = mapOf(Rohstoff.KOHLE to 1),
+            ),
+        ).getOrThrow()
+
+        assertTrue(ablauf.ereignisVerlauf.wiederholbareEreignisse.isEmpty())
+        assertTrue(ablauf.wiederholen().isFailure)
     }
 }

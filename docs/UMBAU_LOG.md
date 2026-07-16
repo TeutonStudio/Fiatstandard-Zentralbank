@@ -1,5 +1,61 @@
 # Umbau-Log
 
+## 17.07.2026 - Spielablauf und Regelwerke getrennt
+
+Durchgeführte Änderungen:
+
+- `SpielAblauf` hält den aktuellen `SpielZustand` jetzt als Cache; das Anwenden
+  eines Ereignisses berechnet nur den Folgezustand.
+- `EreignisVerlauf` für angewandte und wiederholbare Ereignisse eingeführt.
+- Vollständige Rekonstruktion auf Laden mit Verlauf, Rückgängig und explizite
+  Integritätsprüfung begrenzt; Wiederholen arbeitet inkrementell.
+- Monolithisches Regelwerk in Zug-, Rohstoff-, Finanz-, Anleihen-, Handels-,
+  Expansions-, Konflikt-, Insolvenz- und Spielerregeln aufgeteilt.
+- `SpielRegelwerk` auf Prüfung und Delegation reduziert.
+- `FinanzAuswertung`, `MarktAuswertung` und `AnleihenAuswertung` ergänzt und
+  bestehende Schulden-/Marktwertberechnungen dorthin verschoben.
+- App-Aufrufer auf die deutschen Ablaufmethoden `ereignisAnwenden()` und
+  `zustand` umgestellt.
+
+Architekturentscheidung:
+
+- Wiederholen faltet nicht vollständig, obwohl dies zulässig wäre, sondern
+  wendet genau das nächste Ereignis auf den Cache an.
+- `SpielerRegelwerk` ist intern, weil es keine UI- oder Ablaufschnittstelle ist,
+  sondern die validierte gemeinsame Zustandsoperation der Teilregelwerke.
+- `EreignisErgebnis` wurde nicht als zusätzlicher Hülltyp eingeführt; `Result`
+  trägt bereits Erfolg oder konkreten Regelfehler und vermeidet eine leere
+  Abstraktion.
+
+Entfernte Altstruktur:
+
+- Vollständiges Falten bei jedem Zustandszugriff entfernt.
+- Englische Ablaufmethoden und die Log-Eigenschaften `state`, `apply`, `undo`,
+  `redo`, `eventLog` und `redoLog` entfernt.
+- Das 532-zeilige Sammelregelwerk entfernt.
+
+Verbleibende Übergangslösung:
+
+- Legacy-Synchronisation und Rundenbeginn erzeugen weiterhin einen neuen
+  `SpielAblauf` und verlieren dadurch den bisherigen Ereignisverlauf.
+- Die neue Markt- und Anleihenauswertung deckt den aktuellen Fachzustand ab;
+  historische Diagrammreihen stammen weiterhin aus dem Legacy-Modell.
+
+Ausgeführte Tests:
+
+- `./gradlew :domain:test :app:compileDebugKotlin` erfolgreich.
+- `./gradlew test assembleDebug` erfolgreich.
+- Neue Tests prüfen Cache-Identität, Laden mit Verlauf, Rückgängig,
+  Wiederholen, Integrität, Marktpreise, Bauteil-/Spielermarktwert,
+  Anleihenzins und Gesamtschuld.
+
+Offene Probleme:
+
+- Eine Ablageschnittstelle samt versioniertem Room-Format fehlt noch.
+- Rückgängig/Wiederholen ist im Ablauf implementiert, aber noch nicht über eine
+  `SpielSitzung` an die Android-Oberfläche angebunden.
+- Historische Marktdaten fehlen noch im `SpielZustand`.
+
 ## 17.07.2026 - Fachmodul deutsch strukturiert
 
 Durchgeführte Änderungen:

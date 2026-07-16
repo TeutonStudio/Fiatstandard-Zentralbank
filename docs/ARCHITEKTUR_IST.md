@@ -9,13 +9,13 @@ Die Anwendung besteht aus den Gradle-Modulen `:app` und `:domain`. Das Modul
 Room-Abhängigkeit und wird von `:app` produktiv verwendet. Die Migration ist
 jedoch nur teilweise vollzogen: Das alte veränderliche `Spiel` bleibt die
 maßgebliche Datenquelle für große Teile der Oberfläche und der Speicherung,
-während ein unveränderlicher `GameState` parallel für Zuglogik und erste
+während ein unveränderlicher `SpielZustand` parallel für Zuglogik und erste
 Darstellungszustände geführt wird.
 
 Damit bestehen für eine laufende Partie weiterhin drei Darstellungen:
 
 1. `datenbank.Spiel` mit veränderlichen Listen und berechneten Caches,
-2. `domain.GameState` mit Ereignisverlauf in `GameEngine`,
+2. `fachlogik.modell.SpielZustand` mit Ereignisverlauf in `SpielAblauf`,
 3. Room-Entitäten und der zusätzliche Cache `aktuelleDaten` im `GameViewModel`.
 
 `GameViewModel` synchronisiert diese Darstellungen in beide Richtungen nur
@@ -27,9 +27,9 @@ teilweise. Das ist derzeit das größte Konsistenzrisiko.
 
 - Kotlin/JVM 17, Coroutines und Kotlin Serialization.
 - Keine Android-, Compose- oder Room-Imports.
-- Aktuelle Paketwurzel: `de.teutonstudio.zentralbank.domain`.
-- Enthält `GameState`, Geld- und Fachtypen, `GameEvent`, `Reducer`,
-  `GameEngine` und `ZugAutomat`.
+- Fachliche Paketwurzel: `de.teutonstudio.zentralbank.fachlogik`.
+- Enthält `SpielZustand`, Geld- und Fachtypen, `SpielEreignis`, fachliche
+  Teilregelwerke, `SpielAblauf` und benannte Auswertungen.
 - Enthält schnelle JVM-Tests für Geld, Serialisierung, Regeln, Ereignisablauf
   und Zugphasen.
 
@@ -49,7 +49,7 @@ Nutzen, würde aber alle Build-Verweise berühren.
 
 ### Neuer Zustand
 
-`GameState` ist eine serialisierbare Data Class mit ausschließlich `val` und
+`SpielZustand` ist eine serialisierbare Data Class mit ausschließlich `val` und
 Kotlin-Schnittstellen für unveränderliche Listen, Maps und Sets. Der Zustand
 enthält unter anderem:
 
@@ -67,30 +67,32 @@ noch im Fachmodul und vermischen Fachwert und deutsche UI-Formatierung.
 
 ### Ereignisse und Regeln
 
-`GameEvent` deckt Warenkorb, Rohstoffbuchungen, Transaktionen, Anleihenhandel,
+`SpielEreignis` deckt Warenkorb, Rohstoffbuchungen, Transaktionen, Anleihenhandel,
 Rohstoffhandel, Expansion, Krieg, Schuldenstrich und Zugübergänge ab.
 
-`Reducer.kt` umfasst 532 Zeilen und enthält aktuell alle Regeln in einer Datei:
+`SpielRegelwerk` koordiniert nur noch. Die Regeln sind aufgeteilt in:
 
-- Zugfreigaben,
-- Rohstoffbestände,
-- Geldtransaktionen,
-- Anleihenbesitz und Fälligkeit,
-- Handel,
-- Expansion,
-- Konflikte,
-- Überschuldung und Schuldenstrich,
-- Phasen- und Spielerwechsel.
+- `ZugRegelwerk`,
+- `RohstoffRegelwerk`,
+- `FinanzRegelwerk`,
+- `AnleihenRegelwerk`,
+- `HandelsRegelwerk`,
+- `ExpansionsRegelwerk`,
+- `KonfliktRegelwerk`,
+- `InsolvenzRegelwerk`.
 
-Die Regeln sind Android-frei und gut getestet, fachlich aber nicht getrennt.
+Ein internes `SpielerRegelwerk` bündelt die von mehreren Bereichen benötigte,
+validierte Ersetzung eines Spielers im unveränderlichen Zustand. Lesende
+Berechnungen liegen in `FinanzAuswertung`, `MarktAuswertung`,
+`AnleihenAuswertung` und `ZugAuswertung`.
 
 ### Ablauf
 
-`GameEngine` hält angewandte und zurückgenommene Ereignisse. Der aktuelle
-Zustand wird bei jedem Zugriff auf `state` vollständig aus dem Startzustand und
-allen angewandten Ereignissen neu gefaltet. Auch `apply`, `undo` und `redo`
-greifen auf diesen Getter zu. Die Kosten wachsen daher mit jedem Ereignis und
-werden zusätzlich durch UI-Abfragen ausgelöst.
+`SpielAblauf` hält angewandte und zurückgenommene Ereignisse in einem
+`EreignisVerlauf`. Der aktuelle `SpielZustand` wird gecacht. Ein neues Ereignis
+berechnet nur den Folgezustand. Vollständiges Falten erfolgt bei Initialisierung
+mit einem Verlauf, bei Rückgängig und bei expliziter Integritätsprüfung;
+Wiederholen wendet nur das nächste Ereignis auf den Cache an.
 
 ## Altes Laufzeitmodell
 
@@ -102,7 +104,7 @@ Dialogen und Navigation direkt gelesen.
 
 Dieses Modell ist ein Übergangsmodell. Neue Fachregeln dürfen nicht darauf
 aufgebaut werden. Eine sofortige Entfernung ist noch nicht möglich, weil der
-neue `GameState` historische Markt-, Handels-, Bau- und Anleihenprojektionen
+neue `SpielZustand` historische Markt-, Handels-, Bau- und Anleihenprojektionen
 noch nicht vollständig ausdrückt.
 
 ## `GameViewModel`
@@ -115,9 +117,9 @@ noch nicht vollständig ausdrückt.
 - Cache aller Room-Datensätze,
 - Rekonstruktion des alten `Spiel` aus acht Entitätstypen,
 - Halten von `aktuellesSpiel` und `aktuelleDaten`,
-- Halten von `GameEngine`, `domainState` und `domainUiState`,
-- Anwenden von Domain-Ereignissen,
-- Synchronisierung von Legacy-Änderungen zurück in `GameState`,
+- Halten von `SpielAblauf`, `spielZustand` und `spielUebersicht`,
+- Anwenden von `SpielEreignis`,
+- Synchronisierung von Legacy-Änderungen zurück in `SpielZustand`,
 - Rundenwechsel und Teilpersistenz,
 - Handel und Anleihenhandel,
 - globale Fehlermeldungen.
@@ -127,7 +129,7 @@ Altcode. Drei leere Konfliktmethoden werden noch von der Navigation aufgerufen;
 ihre Entfernung wäre deshalb ohne gleichzeitige Bereichsmigration nicht sicher.
 `vernichteSpiel` ist ein produktiv verdrahteter `TODO()`.
 
-Die Methode `synchronisiereDomainNachLegacyAenderung()` bildet das mutierte
+Die Methode `synchronisiereSpielZustandNachLegacyAenderung()` bildet das mutierte
 Legacy-Spiel erneut ab und übernimmt anschließend ausgewählte Felder aus dem
 bisherigen Domain-Zustand. Dabei wird der Ereignisverlauf verworfen. Dies ist
 eine konkrete Stelle, an der mehrere Wahrheiten zusammengeführt statt
@@ -151,7 +153,7 @@ Room-Transaktionen. Seine Schnittstelle verwendet jedoch ausschließlich
 Room-/Legacy-Typen und ist deshalb noch keine fachliche `SpielAblage`.
 
 Der gespeicherte Stand ist ein Satz historischer Tabellenzeilen, kein
-serialisierter `GameState` und kein Ereignisverlauf. Die Rekonstruktion befindet
+serialisierter `SpielZustand` und kein Ereignisverlauf. Die Rekonstruktion befindet
 sich im `GameViewModel`; insbesondere alte Anleihendatensätze benötigen eine
 Kompatibilitätsannahme über den ersten Besitzer.
 
@@ -159,7 +161,7 @@ Kompatibilitätsannahme über den ersten Besitzer.
 
 `Navigation.kt` erhält ein konkretes `GameViewModel` und reicht für fast alle
 Spielbereiche das vollständige Legacy-`Spiel` weiter. Sie liest zusätzlich
-`domainState` und `domainUiState` für Zuganzeige und Ausgabendialog. Navigation,
+`spielZustand` und `spielUebersicht` für Zuganzeige und Ausgabendialog. Navigation,
 Sitzungszustand und Bereichszustände sind damit noch nicht getrennt.
 
 ### Marktplatz
@@ -193,9 +195,10 @@ Vor Beginn dieser Überarbeitung waren erfolgreich:
 - `./gradlew test`
 - `./gradlew assembleDebug`
 
-Vorhandene Domain-Tests prüfen unter anderem gültige und ungültige Ereignisse,
+Vorhandene Fachtests prüfen unter anderem gültige und ungültige Ereignisse,
 Geldsummenneutralität, Rohstoffänderungen, Zugphasen, Rückgängig/Wiederholen,
-Anleihen, Expansion, Konflikte, Überschuldung und Serialisierung. App-Tests
+Anleihen, Expansion, Konflikte, Überschuldung, Ablaufcache, Markt- und
+Anleihenauswertungen sowie Serialisierung. App-Tests
 decken Teile der Legacy-Finanzberechnungen, Zuordnungen und Anzeigen ab.
 
 Es fehlen noch Tests einer fachlichen Ablageschnittstelle, einer zentralen
@@ -203,12 +206,10 @@ Spielsitzung und state-hoisted Bereichs-ViewModels.
 
 ## Festgestellte Regelverletzungen und Risiken
 
-- Das Legacy-`Spiel` und `GameState` sind gleichzeitig produktive Wahrheiten.
+- Das Legacy-`Spiel` und `SpielZustand` sind gleichzeitig produktive Wahrheiten.
 - `GameViewModel` rekonstruiert und koordiniert Persistenz direkt.
 - Der Ereignisverlauf geht bei Legacy-Synchronisation und Rundenbeginn verloren.
-- `GameEngine.state` faltet den gesamten Verlauf bei jedem Zugriff.
 - Compose-Bereiche berechnen umfangreiche fachliche Auswertungen aus `Spiel`.
-- `Reducer` ist fachlich monolithisch.
 - Formatierungsmethoden liegen im Fachmodul.
 - `GameViewModel.vernichteSpiel` ist trotz produktivem Aufrufer nicht
   implementiert.

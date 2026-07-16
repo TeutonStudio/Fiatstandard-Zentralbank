@@ -12,6 +12,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.ereignis.TransaktionsGrund
+import de.teutonstudio.zentralbank.fachlogik.auswertung.FinanzAuswertung
 import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
@@ -56,7 +57,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun warenkorbAenderungErsetztZusammensetzungUndEntferntNullmengen() {
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.WarenkorbGeaendert(
                 mapOf(
@@ -71,7 +72,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun warenkorbAenderungLehntNegativeMengenAb() {
-        val result = SpielRegelwerk.reduce(
+        val result = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.WarenkorbGeaendert(mapOf(Rohstoff.HOLZ to -1)),
         )
@@ -81,7 +82,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun rohstoffEinnahmeErhoehtBestand() {
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.RohstoffEinnahme(annaId, mapOf(Rohstoff.HOLZ to 3)),
         ).getOrThrow()
@@ -91,7 +92,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun rohstoffAusgabeLehntNegativenBestandAb() {
-        val result = SpielRegelwerk.reduce(
+        val result = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.RohstoffAusgabe(berndId, mapOf(Rohstoff.HOLZ to 1)),
         )
@@ -102,7 +103,7 @@ class SpielRegelwerkTest {
     @Test
     fun transaktionIstSummenneutral() {
         val start = startState()
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             start,
             SpielEreignis.Transaktion(
                 von = KontoId.Spieler(annaId),
@@ -112,14 +113,14 @@ class SpielRegelwerkTest {
             ),
         ).getOrThrow()
 
-        assertEquals(start.geldsumme(), state.geldsumme())
+        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
         assertEquals(Geld.mark(7), state.spieler.first { it.id == annaId }.geldkonto)
         assertEquals(Geld.mark(8), state.spieler.first { it.id == berndId }.geldkonto)
     }
 
     @Test
     fun transaktionLehntUnterdeckungAb() {
-        val result = SpielRegelwerk.reduce(
+        val result = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.Transaktion(
                 von = KontoId.Spieler(berndId),
@@ -135,7 +136,7 @@ class SpielRegelwerkTest {
     @Test
     fun rohstoffHandelVerschiebtRohstoffUndGeldSummenneutral() {
         val start = startState()
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             start,
             SpielEreignis.RohstoffHandel(
                 kaeufer = berndId,
@@ -146,7 +147,7 @@ class SpielRegelwerkTest {
             ),
         ).getOrThrow()
 
-        assertEquals(start.geldsumme(), state.geldsumme())
+        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
         assertEquals(1, state.spieler.first { it.id == annaId }.rohstoffe[Rohstoff.HOLZ])
         assertEquals(1, state.spieler.first { it.id == berndId }.rohstoffe[Rohstoff.HOLZ])
         assertEquals(Geld.mark(12), state.spieler.first { it.id == annaId }.geldkonto)
@@ -156,7 +157,7 @@ class SpielRegelwerkTest {
     @Test
     fun anleiheVerkauftVerschiebtAnleiheUndGeldSummenneutral() {
         val start = startState()
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             start,
             SpielEreignis.AnleiheVerkauft(
                 anleihe = anleiheId,
@@ -166,7 +167,7 @@ class SpielRegelwerkTest {
             ),
         ).getOrThrow()
 
-        assertEquals(start.geldsumme(), state.geldsumme())
+        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
         assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
         assertTrue(anleiheId in state.spieler.first { it.id == berndId }.anleihen)
         assertEquals(Geld.mark(14), state.spieler.first { it.id == annaId }.geldkonto)
@@ -184,14 +185,14 @@ class SpielRegelwerkTest {
                 }
             },
         )
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             start,
             SpielEreignis.AnleiheFaellig(anleiheId),
         ).getOrThrow()
 
         assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
         assertTrue(anleiheId !in state.spieler.first { it.id == berndId }.anleihen)
-        assertEquals(start.geldsumme(), state.geldsumme())
+        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
         assertEquals(Geld.mark(2), state.spieler.first { it.id == annaId }.geldkonto)
         assertEquals(Geld.mark(13), state.spieler.first { it.id == berndId }.geldkonto)
         assertEquals(0, state.anleihen.values.count { it.id == anleiheId })
@@ -199,7 +200,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun expansionVerbrauchtRohstoffeUndErhoehtBauteilbestand() {
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.Expansion(
                 spieler = annaId,
@@ -215,7 +216,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun kriegErklaertUndBeendetKonflikt() {
-        val imKrieg = SpielRegelwerk.reduce(
+        val imKrieg = SpielRegelwerk.wendeAn(
             startState(),
             SpielEreignis.KriegErklaert(
                 aggressor = annaId,
@@ -225,7 +226,7 @@ class SpielRegelwerkTest {
 
         assertEquals(1, imKrieg.konflikte.size)
 
-        val frieden = SpielRegelwerk.reduce(
+        val frieden = SpielRegelwerk.wendeAn(
             imKrieg,
             SpielEreignis.KriegBeendet(
                 spielerA = berndId,
@@ -286,7 +287,7 @@ class SpielRegelwerkTest {
             ),
         )
 
-        val state = SpielRegelwerk.reduce(
+        val state = SpielRegelwerk.wendeAn(
             start,
             SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 3),
         ).getOrThrow()
@@ -310,7 +311,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun schuldenstrichImKriegWirdAbgelehnt() {
-        val result = SpielRegelwerk.reduce(
+        val result = SpielRegelwerk.wendeAn(
             startState().copy(
                 bankAnleihen = listOf(anleiheId),
                 konflikte = setOf(Konflikt(annaId, berndId)),
@@ -358,7 +359,7 @@ class SpielRegelwerkTest {
             annaZugBeenden(state)
         }
 
-        val handel = SpielRegelwerk.reduce(
+        val handel = SpielRegelwerk.wendeAn(
             faellig,
             SpielEreignis.RohstoffHandel(
                 kaeufer = annaId,
@@ -371,7 +372,7 @@ class SpielRegelwerkTest {
 
         assertTrue(handel.isFailure)
 
-        val nachSchuldenstrich = SpielRegelwerk.reduce(
+        val nachSchuldenstrich = SpielRegelwerk.wendeAn(
             faellig,
             SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 1),
         ).getOrThrow()
@@ -422,7 +423,7 @@ class SpielRegelwerkTest {
             zugStatus = ZugStatus(annaId, Phase.Aktionen),
         )
 
-        val nachZugende = SpielRegelwerk.reduce(state, SpielEreignis.ZugBeendet).getOrThrow()
+        val nachZugende = SpielRegelwerk.wendeAn(state, SpielEreignis.ZugBeendet).getOrThrow()
 
         assertTrue(nachZugende.ueberschuldungen.isEmpty())
     }
@@ -441,7 +442,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun schrittPhaseUndZugendeWechselnAktivenSpieler() {
-        val nachSchritt = SpielRegelwerk.reduce(
+        val nachSchritt = SpielRegelwerk.wendeAn(
             startState().copy(
                 aktiverSpieler = annaId,
                 zugStatus = ZugStatus(annaId, Phase.Einnahmen),
@@ -449,7 +450,7 @@ class SpielRegelwerkTest {
             SpielEreignis.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_EINNAHMEN),
         ).getOrThrow()
 
-        val ausgaben = SpielRegelwerk.reduce(
+        val ausgaben = SpielRegelwerk.wendeAn(
             nachSchritt,
             SpielEreignis.PhaseAbgeschlossen(Phase.Einnahmen),
         ).getOrThrow()
@@ -457,14 +458,14 @@ class SpielRegelwerkTest {
         val ausgabenFertig = listOf(
             SpielEreignis.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_AUSGABEN),
             SpielEreignis.SchrittAbgeschlossen(SchrittTyp.FINANZ_AUSGABEN),
-        ).fold(ausgaben) { state, event -> SpielRegelwerk.reduce(state, event).getOrThrow() }
+        ).fold(ausgaben) { state, event -> SpielRegelwerk.wendeAn(state, event).getOrThrow() }
 
-        val aktionen = SpielRegelwerk.reduce(
+        val aktionen = SpielRegelwerk.wendeAn(
             ausgabenFertig,
             SpielEreignis.PhaseAbgeschlossen(Phase.Ausgaben),
         ).getOrThrow()
 
-        val naechsterSpieler = SpielRegelwerk.reduce(aktionen, SpielEreignis.ZugBeendet).getOrThrow()
+        val naechsterSpieler = SpielRegelwerk.wendeAn(aktionen, SpielEreignis.ZugBeendet).getOrThrow()
 
         assertEquals(berndId, naechsterSpieler.aktiverSpieler)
         assertEquals(Phase.Einnahmen, naechsterSpieler.zugStatus?.phase)
@@ -484,18 +485,18 @@ class SpielRegelwerkTest {
             zugStatus = ZugStatus(annaId, Phase.Aktionen),
         )
 
-        state = SpielRegelwerk.reduce(state, SpielEreignis.ZugBeendet).getOrThrow()
+        state = SpielRegelwerk.wendeAn(state, SpielEreignis.ZugBeendet).getOrThrow()
         assertEquals(berndId, state.aktiverSpieler)
         assertEquals(2, state.rundenzähler)
 
-        state = SpielRegelwerk.reduce(
+        state = SpielRegelwerk.wendeAn(
             state.copy(zugStatus = ZugStatus(berndId, Phase.Aktionen)),
             SpielEreignis.ZugBeendet,
         ).getOrThrow()
         assertEquals(claraId, state.aktiverSpieler)
         assertEquals(2, state.rundenzähler)
 
-        state = SpielRegelwerk.reduce(
+        state = SpielRegelwerk.wendeAn(
             state.copy(zugStatus = ZugStatus(claraId, Phase.Aktionen)),
             SpielEreignis.ZugBeendet,
         ).getOrThrow()
@@ -506,7 +507,7 @@ class SpielRegelwerkTest {
 
     @Test
     fun phasenfremderSchrittWirdAbgelehnt() {
-        val result = SpielRegelwerk.reduce(
+        val result = SpielRegelwerk.wendeAn(
             startState().copy(
                 aktiverSpieler = annaId,
                 zugStatus = ZugStatus(annaId, Phase.Einnahmen),
@@ -561,7 +562,7 @@ class SpielRegelwerkTest {
     }
 
     private fun annaZugBeenden(state: SpielZustand): SpielZustand {
-        return SpielRegelwerk.reduce(
+        return SpielRegelwerk.wendeAn(
             state.copy(
                 aktiverSpieler = annaId,
                 zugStatus = ZugStatus(annaId, Phase.Aktionen),

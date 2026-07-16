@@ -8,42 +8,59 @@ class SpielAblauf(
     val startzustand: SpielZustand,
     ereignisse: List<SpielEreignis> = emptyList(),
 ) {
-    private val angewandteEvents = ereignisse.toMutableList()
-    private val rueckgaengigGemacht = mutableListOf<SpielEreignis>()
+    private val angewandteEreignisse = ereignisse.toMutableList()
+    private val wiederholbareEreignisse = mutableListOf<SpielEreignis>()
+    private var aktuellerZustand = rekonstruiere(angewandteEreignisse)
 
-    val eventLog: List<SpielEreignis>
-        get() = angewandteEvents.toList()
+    val zustand: SpielZustand
+        get() = aktuellerZustand
 
-    val redoLog: List<SpielEreignis>
-        get() = rueckgaengigGemacht.toList()
+    val ereignisVerlauf: EreignisVerlauf
+        get() = EreignisVerlauf(
+            angewandteEreignisse = angewandteEreignisse.toList(),
+            wiederholbareEreignisse = wiederholbareEreignisse.toList(),
+        )
 
-    val state: SpielZustand
-        get() = falte(angewandteEvents)
+    fun ereignisAnwenden(ereignis: SpielEreignis): Result<SpielZustand> =
+        SpielRegelwerk.wendeAn(aktuellerZustand, ereignis).onSuccess { folgezustand ->
+            aktuellerZustand = folgezustand
+            angewandteEreignisse += ereignis
+            wiederholbareEreignisse.clear()
+        }
 
-    fun apply(event: SpielEreignis): Result<SpielZustand> {
-        return SpielRegelwerk.reduce(state, event).onSuccess {
-            angewandteEvents += event
-            rueckgaengigGemacht.clear()
+    fun rueckgaengig(): SpielZustand {
+        require(angewandteEreignisse.isNotEmpty()) {
+            "Es gibt kein Ereignis zum Zuruecknehmen."
+        }
+        wiederholbareEreignisse += angewandteEreignisse.removeLast()
+        aktuellerZustand = rekonstruiere(angewandteEreignisse)
+        return aktuellerZustand
+    }
+
+    fun wiederholen(): Result<SpielZustand> {
+        val ereignis = wiederholbareEreignisse.removeLastOrNull()
+            ?: return Result.failure(
+                IllegalStateException("Es gibt kein Ereignis zum Wiederholen."),
+            )
+        return SpielRegelwerk.wendeAn(aktuellerZustand, ereignis)
+            .onSuccess { folgezustand ->
+                aktuellerZustand = folgezustand
+                angewandteEreignisse += ereignis
+            }
+            .onFailure {
+                wiederholbareEreignisse += ereignis
+            }
+    }
+
+    fun integritaetPruefen(): Result<Unit> = runCatching {
+        val rekonstruierterZustand = rekonstruiere(angewandteEreignisse)
+        check(rekonstruierterZustand == aktuellerZustand) {
+            "Der gecachte Spielzustand weicht vom Ereignisverlauf ab."
         }
     }
 
-    fun undo(): SpielZustand {
-        require(angewandteEvents.isNotEmpty()) { "Es gibt kein Event zum Zuruecknehmen." }
-        rueckgaengigGemacht += angewandteEvents.removeLast()
-        return state
-    }
-
-    fun redo(): Result<SpielZustand> {
-        val event = rueckgaengigGemacht.removeLastOrNull()
-            ?: return Result.failure(IllegalStateException("Es gibt kein Event zum Wiederholen."))
-        return SpielRegelwerk.reduce(state, event)
-            .onSuccess { angewandteEvents += event }
-            .onFailure { rueckgaengigGemacht += event }
-    }
-
-    private fun falte(events: List<SpielEreignis>): SpielZustand {
-        return events.fold(startzustand) { state, event ->
-            SpielRegelwerk.reduce(state, event).getOrThrow()
+    private fun rekonstruiere(ereignisse: List<SpielEreignis>): SpielZustand =
+        ereignisse.fold(startzustand) { zustand, ereignis ->
+            SpielRegelwerk.wendeAn(zustand, ereignis).getOrThrow()
         }
-    }
 }
