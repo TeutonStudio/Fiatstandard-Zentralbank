@@ -109,7 +109,7 @@ fun Navigation(viewModel: GameViewModel) {
                     viewModel.vernichteSpiel,
                     viewModel.ladeSpiel,
                     Screen.Game.navigiere(navController),
-                    viewModel.spielSpeicher.collectAsState().value
+                    viewModel.spielstaende.collectAsState().value
                 )
             }
 

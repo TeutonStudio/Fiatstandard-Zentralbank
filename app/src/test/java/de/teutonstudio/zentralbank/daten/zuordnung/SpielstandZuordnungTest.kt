@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.daten.zuordnung
 
+import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -46,5 +47,16 @@ class SpielstandZuordnungTest {
             "Spielstand 42 verwendet die nicht unterstützte Formatversion 99.",
             fehler.message,
         )
+    }
+
+    @Test
+    fun bestehenderRoomDatensatzBleibtAlsLegacySpielRekonstruierbar() {
+        val (spielDaten, fachDaten) = TestSpiel.zuSpeicherDaten()
+
+        val rekonstruiert = fachDaten.zuLegacySpiel(spielDaten)
+
+        assertEquals(TestSpiel.spielerStringListe, rekonstruiert.spielerStringListe)
+        assertEquals(TestSpiel.aktuelleRunde, rekonstruiert.aktuelleRunde)
+        assertEquals(TestSpiel.warenkorb, rekonstruiert.warenkorb)
     }
 }

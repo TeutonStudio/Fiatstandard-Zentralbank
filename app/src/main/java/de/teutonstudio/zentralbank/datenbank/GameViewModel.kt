@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 
+import de.teutonstudio.zentralbank.daten.RaumSpielAblage
+import de.teutonstudio.zentralbank.daten.zuordnung.zuLegacySpiel
 import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -14,6 +16,9 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
 import de.teutonstudio.zentralbank.fachlogik.auswertung.ZugAuswertung
+import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
+import de.teutonstudio.zentralbank.fachlogik.schnittstelle.SpielAblage
+import de.teutonstudio.zentralbank.fachlogik.schnittstelle.SpielstandUebersicht
 import de.teutonstudio.zentralbank.schnittstelle.domain.SpielUebersichtZustand
 import de.teutonstudio.zentralbank.schnittstelle.domain.zuSpielUebersichtZustand
 import kotlinx.coroutines.CompletableDeferred
@@ -24,14 +29,16 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 
 
-
-private const val AUSLAND = "-ausland-"
 
 class GameViewModel(application: Application): AndroidViewModel(application) {
     class GameViewModelFactory(private val application: Application): ViewModelProvider.Factory {
@@ -44,18 +51,22 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    private lateinit var DAO: ZentralbankSpeicher
+    private lateinit var legacySpeicher: ZentralbankSpeicher
+    private lateinit var spielAblage: SpielAblage
     private val datenbankBereit = CompletableDeferred<Unit>()
+    private val ablageSperre = Mutex()
+    private val naechsteAblageAenderung = AtomicLong()
+    private val letzteAblageAenderung = mutableMapOf<Long, Long>()
 
     private val _spielDatenListe = MutableStateFlow<Map<SpielDaten,List<SpeicherDaten>>>(emptyMap())
-    private val _spielSpeicher = MutableStateFlow<Map<SpielDaten,Pair<Int,List<String>>>>(emptyMap())
+    private val _spielstaende = MutableStateFlow<List<SpielstandUebersicht>>(emptyList())
     private val _spielZustand = MutableStateFlow<SpielZustand?>(null)
     private val _spielUebersicht = MutableStateFlow<SpielUebersichtZustand?>(null)
     private val _spielFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private var spielAblauf: SpielAblauf? = null
+    private var ausLegacyDatenImportiert = false
 
-    val spielDatenListe: StateFlow<Map<SpielDaten,List<SpeicherDaten>>> = _spielDatenListe.asStateFlow()
-    val spielSpeicher: StateFlow<Map<SpielDaten,Pair<Int,List<String>>>> = _spielSpeicher.asStateFlow()
+    val spielstaende: StateFlow<List<SpielstandUebersicht>> = _spielstaende.asStateFlow()
     val spielZustand: StateFlow<SpielZustand?> = _spielZustand.asStateFlow()
     val spielUebersicht: StateFlow<SpielUebersichtZustand?> = _spielUebersicht.asStateFlow()
     val spielFehler: SharedFlow<String> = _spielFehler.asSharedFlow()
@@ -65,12 +76,19 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     val aktuellesSpielOderNull: Spiel?
         get() = if (::aktuellesSpiel.isInitialized) aktuellesSpiel else null
 
-    private fun setzeAktuellesSpiel(spiel: Spiel, daten: Pair<SpielDaten,List<SpeicherDaten>>) {
+    private fun setzeAktuellesSpiel(
+        spiel: Spiel,
+        daten: Pair<SpielDaten, List<SpeicherDaten>>,
+        gespeichertesSpiel: GespeichertesSpiel? = null,
+    ) {
         aktuellesSpiel = spiel
         aktuelleDaten = daten
-        val startzustand = spiel.zuSpielZustand()
-        spielAblauf = SpielAblauf(startzustand)
-        aktualisiereSpielZustand(startzustand)
+        val ablauf = gespeichertesSpiel?.let { gespeichert ->
+            SpielAblauf(gespeichert.startzustand, gespeichert.ereignisse)
+        } ?: SpielAblauf(spiel.zuSpielZustand())
+        ausLegacyDatenImportiert = gespeichertesSpiel?.ausLegacyDatenImportiert ?: false
+        spielAblauf = ablauf
+        aktualisiereSpielZustand(ablauf.zustand)
     }
 
     fun ereignisAnwenden(ereignis: SpielEreignis) {
@@ -142,6 +160,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         } else {
             aktualisiereSpielZustand(nachher)
         }
+        speichereAktuellenFachSpielstand()
     }
 
     private fun beginneNaechsteRunde(nachZugende: SpielZustand) {
@@ -168,11 +187,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             rundenzähler = aktuelleWirtschaftsdaten.rundenzähler,
         )
         spielAblauf = SpielAblauf(synchronisiert)
+        ausLegacyDatenImportiert = true
         aktualisiereSpielZustand(synchronisiert)
-
-        _spielSpeicher.update { spiele ->
-            spiele + (spielDaten to (rundenIndex to aktuellesSpiel.spielerStringListe))
-        }
 
         if (spielDaten.spielID == (-1).toLong()) return
 
@@ -182,7 +198,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                DAO.insertRunde(rundenDaten)
+                legacySpeicher.insertRunde(rundenDaten)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Neue Runde konnte nicht gespeichert werden."
@@ -225,12 +241,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         aktuelleDaten = neueSpielDaten to bisherigeDaten.second
 
         aktualisiereSpielZustand(ergebnis.getOrThrow())
-
-        _spielSpeicher.update { spiele ->
-            val übersicht = spiele[bisherigeDaten.first]
-                ?: ((aktuellesSpiel.aktuelleRunde - 1) to aktuellesSpiel.spielerStringListe)
-            (spiele - bisherigeDaten.first) + (neueSpielDaten to übersicht)
-        }
+        speichereAktuellenFachSpielstand()
 
         if (neueSpielDaten.spielID == (-1).toLong()) return
 
@@ -241,7 +252,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                DAO.updateSpiel(neueSpielDaten)
+                legacySpeicher.updateSpiel(neueSpielDaten)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Warenkorb konnte nicht gespeichert werden."
@@ -259,7 +270,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                     handel,
                 ).copy(spielID = aktuelleDaten.first.spielID)
             },
-            speichern = DAO::insertHandel,
+            speichern = legacySpeicher::insertHandel,
             fehlermeldung = "Handel konnte nicht gespeichert werden.",
         )
 
@@ -272,7 +283,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                     mapOf((aktuellesSpiel.aktuelleRunde - 1) to handel),
                 ).copy(spielID = aktuelleDaten.first.spielID)
             },
-            speichern = DAO::insertAnleihe,
+            speichern = legacySpeicher::insertAnleihe,
             fehlermeldung = "Anleihe konnte nicht gespeichert werden.",
         )
 
@@ -319,7 +330,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                DAO.updateAnleiheHandel(aktualisiertesDatum)
+                legacySpeicher.updateAnleiheHandel(aktualisiertesDatum)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Anleihehandel konnte nicht gespeichert werden."
@@ -389,7 +400,9 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             )
         }
         spielAblauf = SpielAblauf(spielZustand)
+        ausLegacyDatenImportiert = true
         aktualisiereSpielZustand(spielZustand)
+        speichereAktuellenFachSpielstand()
     }
 
     private fun aktualisiereSpielZustand(zustand: SpielZustand) {
@@ -398,68 +411,115 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         _spielUebersicht.value = zustand.zuSpielUebersichtZustand()
     }
 
+    private fun speichereAktuellenFachSpielstand() {
+        val ablauf = spielAblauf ?: return
+        val spielId = aktuelleDaten.first.spielID
+        if (spielId < 0) return
+        val zuSpeicherndesSpiel = GespeichertesSpiel(
+            id = spielId,
+            startzustand = ablauf.startzustand,
+            ereignisse = ablauf.ereignisVerlauf.angewandteEreignisse,
+            ausLegacyDatenImportiert = ausLegacyDatenImportiert,
+        )
+        val aenderungsNummer = naechsteAblageAenderung.incrementAndGet()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                datenbankBereit.await()
+                ablageAendern(spielId, aenderungsNummer) {
+                    spielSpeichern(zuSpeicherndesSpiel)
+                }
+            } catch (throwable: Throwable) {
+                _spielFehler.tryEmit(
+                    throwable.message ?: "Spielstand konnte nicht gespeichert werden.",
+                )
+            }
+        }
+    }
+
+    private suspend fun ablageAendern(
+        spielId: Long,
+        aenderungsNummer: Long,
+        aenderung: suspend SpielAblage.() -> Unit,
+    ) {
+        ablageSperre.withLock {
+            val letzteNummer = letzteAblageAenderung[spielId] ?: Long.MIN_VALUE
+            if (aenderungsNummer < letzteNummer) return@withLock
+            spielAblage.aenderung()
+            letzteAblageAenderung[spielId] = aenderungsNummer
+        }
+    }
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val datenbank = AppDatabase.erhalteDatenbank(application.applicationContext).first()
-                DAO = ZentralbankSpeicher(datenbank)
+                legacySpeicher = ZentralbankSpeicher(datenbank)
+                spielAblage = RaumSpielAblage(datenbank)
                 datenbankBereit.complete(Unit)
 
-                _spielDatenListe.value = DAO.observeAlleNachSpiel().first()
-                _spielSpeicher.value = erhalteSpielSpeicher()
-                _spielSpeicher.update { // Testdaten
-                    it + (TestSpiel.zuSpeicherDaten().first to
-                        ((TestSpiel.aktuelleRunde - 1) to TestSpiel.spielerStringListe))
+                launch {
+                    legacySpeicher.observeAlleNachSpiel().collect { spiele ->
+                        _spielDatenListe.value = spiele
+                    }
                 }
-
+                spielAblage.spielstaendeBeobachten().collect { spielstaende ->
+                    _spielstaende.value = spielstaende + SpielstandUebersicht(
+                        id = -1,
+                        spielerNamen = TestSpiel.spielerStringListe,
+                        runde = TestSpiel.aktuelleRunde - 1,
+                        ausLegacyDatenImportiert = true,
+                    )
+                }
             } catch (throwable: Throwable) {
                 if (!datenbankBereit.isCompleted) { datenbankBereit.completeExceptionally(throwable) }
-                throw throwable
+                _spielFehler.tryEmit(
+                    throwable.message ?: "Spielstände konnten nicht geladen werden.",
+                )
             }
         }
     }
-    suspend fun erhalteSpielSpeicher(): Map<SpielDaten,Pair<Int,List<String>>> {
-        fun List<SpeicherDaten>.erhalteRunde(): Int = this.filterIsInstance<RundeDaten>().maxByOrNull { it.index }?.index?:0
-        fun List<SpeicherDaten>.erhalteSpieler(): List<String> = this.filterIsInstance<SpielerDaten>().map { it.spielerName }
-        fun List<SpeicherDaten>.erhalteRelevantes(): Pair<Int,List<String>> = Pair(this.erhalteRunde(),this.erhalteSpieler())
-        return _spielDatenListe.value.map { it.key to it.value.erhalteRelevantes() }.toMap()
-    }
 
-    public  val erstelleSpiel = { it: Spiel -> erstelleSpiel(it)}
+    val erstelleSpiel = { spiel: Spiel -> erstelleSpiel(spiel) }
     private fun erstelleSpiel(spiel: Spiel) {
         viewModelScope.launch {
             val daten = spiel.zuSpeicherDaten()
-            val gameID = withContext(Dispatchers.IO) { DAO.insertSpielSatz(daten) }
+            datenbankBereit.await()
+            val gameID = withContext(Dispatchers.IO) { legacySpeicher.insertSpielSatz(daten) }
             if (gameID != (-1).toLong()) {
                 val gespeicherteDaten = daten.first.copy(spielID = gameID) to daten.second
                 setzeAktuellesSpiel(spiel, gespeicherteDaten)
-
-                _spielDatenListe.update {
-                    it + gespeicherteDaten
-                }
-
-                _spielSpeicher.update {
-                    it + (gespeicherteDaten.first to Pair(spiel.aktuelleRunde - 1,spiel.spielerStringListe))
-                }
-            } else { println("GameID macht Probleme") }
+                speichereAktuellenFachSpielstand()
+            } else {
+                _spielFehler.tryEmit("Spielstand konnte nicht angelegt werden.")
+            }
         }
     }
 
-    public val vernichteSpiel = { it: SpielDaten -> vernichteSpiel(it) }
-    private fun vernichteSpiel(daten: SpielDaten) {
-        _spielFehler.tryEmit(
-            "Spielstand ${daten.spielID} kann erst nach der Ablagemigration sicher gelöscht werden.",
-        )
-    }
-
-    public val ladeSpiel = { daten: SpielDaten, nachLaden: () -> Unit ->
-        ladeSpiel(daten, nachLaden)
-    }
-    private fun ladeSpiel(daten: SpielDaten, nachLaden: () -> Unit) {
+    val vernichteSpiel = { id: Long -> vernichteSpiel(id) }
+    private fun vernichteSpiel(id: Long) {
+        val aenderungsNummer = naechsteAblageAenderung.incrementAndGet()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                ladeSpielDaten(daten)
+                ablageAendern(id, aenderungsNummer) {
+                    spielLoeschen(id)
+                }
+            } catch (throwable: Throwable) {
+                _spielFehler.emit(
+                    throwable.message ?: "Spielstand $id konnte nicht gelöscht werden.",
+                )
+            }
+        }
+    }
+
+    val ladeSpiel = { id: Long, nachLaden: () -> Unit ->
+        ladeSpiel(id, nachLaden)
+    }
+    private fun ladeSpiel(id: Long, nachLaden: () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                datenbankBereit.await()
+                ladeSpielDaten(id)
                 withContext(Dispatchers.Main) { nachLaden() }
             } catch (throwable: Throwable) {
                 _spielFehler.emit(
@@ -469,272 +529,28 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         }
     }
-    private suspend fun ladeSpielDaten(daten: SpielDaten) {
-        if (daten.spielID == (-1).toLong()) {
+    private suspend fun ladeSpielDaten(id: Long) {
+        if (id == -1L) {
             val testDaten = TestSpiel.zuSpeicherDaten()
-            setzeAktuellesSpiel(testDaten.second.zuSpiel(testDaten.first), testDaten)
+            setzeAktuellesSpiel(testDaten.second.zuLegacySpiel(testDaten.first), testDaten)
             return
         }
-        val alles = _spielDatenListe.value[daten].orEmpty()
-        setzeAktuellesSpiel(alles.zuSpiel(daten), daten to alles)
-    }
-
-    private fun List<SpeicherDaten>.zuSpiel(daten: SpielDaten): Spiel {
-        val runden = filterIsInstance<RundeDaten>()
-            .sortedBy { it.index }
-            .map { Runde(it.index, it.leitzinssatz) }
-            .toMutableList()
-
-        require(runden.isNotEmpty()) {
-            "Spiel ${daten.spielID} enthält keine Rundendaten."
-        }
-
-        require(runden.map { it.index } == runden.indices.toList()) {
-            "Rundendaten von Spiel ${daten.spielID} sind nicht lückenlos bei 0 beginnend."
-        }
-
-        val rundenAnzahl = runden.size
-
-        val bauDaten = filterIsInstance<BauteilDaten>()
-        val kontrollDaten = filterIsInstance<KontrolleDaten>()
-
-        val spieler = filterIsInstance<SpielerDaten>()
-            .sortedBy { it.spielerID }
-            .map { spielerDaten ->
-                val gebaut = MutableList<Map<out Bauteil, Int>>(rundenAnzahl) { emptyMap() }
-                val kontrolle = MutableList<Map<Wirtschaftsregionen, Int>>(rundenAnzahl) { emptyMap() }
-
-                bauDaten
-                    .filter { it.erbauer == spielerDaten.spielerName }
-                    .groupBy { it.runde }
-                    .forEach { (runde, einträge) ->
-                        require(runde in gebaut.indices) {
-                            "Baudaten für unbekannte Runde $runde bei ${spielerDaten.spielerName}."
-                        }
-
-                        gebaut[runde] = einträge
-                            .groupBy { it.bauteil.zuBauteilOderFehler() }
-                            .mapValues { (_, werte) -> werte.sumOf { it.delta } }
-                    }
-
-                kontrollDaten
-                    .filter { it.besatzer == spielerDaten.spielerName }
-                    .groupBy { it.runde }
-                    .forEach { (runde, einträge) ->
-                        require(runde in kontrolle.indices) {
-                            "Kontrolldaten für unbekannte Runde $runde bei ${spielerDaten.spielerName}."
-                        }
-
-                        kontrolle[runde] = einträge
-                            .groupBy { it.region.zuWirtschaftsregionOderFehler() }
-                            .mapValues { (_, werte) -> werte.sumOf { it.delta } }
-                    }
-
-                Spieler(
-                    name = spielerDaten.spielerName,
-                    gebaut = gebaut,
-                    kontrolle = kontrolle
-                )
-            }
-
-        val handelsEinträge = MutableList<Set<Handel>>(rundenAnzahl) { emptySet() }
-
-        filterIsInstance<HandelsDaten>().forEach { daten ->
-            require(daten.runde in handelsEinträge.indices) {
-                "Handelsdaten für unbekannte Runde ${daten.runde}."
-            }
-
-            val handel = RohstoffHandel(
-                besitzer = findeJuristischePerson(daten.besitzer, spieler),
-                erwerber = findeJuristischePerson(daten.erwerber, spieler),
-                betrag = daten.preis.toZahlungsmittel(),
-                anzahl = daten.menge,
-                rohstoff = daten.rohstoff.zuRohstoffOderFehler()
+        val gespeichertesSpiel = spielAblage.spielLaden(id)
+            ?: error("Spielstand $id wurde nicht gefunden.")
+        val (spielDaten, legacyDaten) = _spielDatenListe.value.entries
+            .firstOrNull { (spiel, _) -> spiel.spielID == id }
+            ?.let { (spiel, daten) -> spiel to daten }
+            ?: error(
+                "Spielstand $id besitzt keine Legacy-Daten für die noch nicht migrierte Oberfläche.",
             )
-
-            handelsEinträge[daten.runde] = handelsEinträge[daten.runde] + handel
-        }
-
-        filterIsInstance<AnleiheDaten>().forEach { daten ->
-            require(daten.emittiert in handelsEinträge.indices) {
-                "Anleihedaten für unbekannte Emissionsrunde ${daten.emittiert}."
-            }
-
-            val anleihe = Anleihe(
-                schuldiger = findeJuristischePerson(daten.emittent, spieler),
-                sondervermögen = daten.sondervermogen.toZahlungsmittel(),
-                unvermögen = daten.unvermogen.toZahlungsmittel(),
-                laufzeit = daten.laufzeit
-            )
-
-            val neuesFormat = daten.handel
-                .split("|")
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .map { it.split("#") }
-
-            if (neuesFormat.isNotEmpty() && neuesFormat.all { it.size == 4 }) {
-                neuesFormat
-                    .map { teile ->
-                        GespeicherterAnleihehandel(
-                            besitzer = teile[0],
-                            erwerber = teile[1],
-                            preis = teile[2].toZahlungsmittel(),
-                            runde = teile[3].toInt(),
-                        )
-                    }
-                    .sortedBy { it.runde }
-                    .forEach { eintrag ->
-                        require(eintrag.runde in handelsEinträge.indices) {
-                            "Anleihehandel für unbekannte Runde ${eintrag.runde}."
-                        }
-                        handelsEinträge[eintrag.runde] = handelsEinträge[eintrag.runde] +
-                            Anleihenhandel(
-                                besitzer = findeJuristischePerson(eintrag.besitzer, spieler),
-                                erwerber = findeJuristischePerson(eintrag.erwerber, spieler),
-                                anleihe = anleihe,
-                                preis = eintrag.preis,
-                            )
-                    }
-            } else {
-                // Kompatibilität mit alten Datensätzen: Dort fehlen der erste
-                // Erwerber und jeweils der vorherige Besitzer.
-                var aktuellerBesitzer: JuristischePerson = Geschäftsbank
-                handelsEinträge[daten.emittiert] = handelsEinträge[daten.emittiert] +
-                    Anleihenhandel(
-                        besitzer = anleihe.schuldiger,
-                        erwerber = aktuellerBesitzer,
-                        anleihe = anleihe,
-                        preis = anleihe.sondervermögen,
-                    )
-
-                daten.handel
-                    .split("/")
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .map { eintrag ->
-                        val teile = eintrag.split("#")
-                        require(teile.size == 3) {
-                            "Ungültiger Anleihe-Handelseintrag: $eintrag"
-                        }
-                        GespeicherterAnleihehandel(
-                            besitzer = aktuellerBesitzer.name,
-                            erwerber = teile[0],
-                            preis = teile[1].toIntOrNull()?.toZahlungsmittel()
-                                ?: teile[1].toZahlungsmittel(),
-                            runde = teile[2].toInt(),
-                        )
-                    }
-                    .sortedBy { it.runde }
-                    .forEach { eintrag ->
-                        require(eintrag.runde in handelsEinträge.indices) {
-                            "Anleihehandel für unbekannte Runde ${eintrag.runde}."
-                        }
-                        val erwerber = findeJuristischePerson(eintrag.erwerber, spieler)
-                        handelsEinträge[eintrag.runde] = handelsEinträge[eintrag.runde] +
-                            Anleihenhandel(
-                                besitzer = aktuellerBesitzer,
-                                erwerber = erwerber,
-                                anleihe = anleihe,
-                                preis = eintrag.preis,
-                            )
-                        aktuellerBesitzer = erwerber
-                    }
-            }
-        }
-
-        val vertragsEinträge = MutableList<Set<Vertrag>>(rundenAnzahl) { emptySet() }
-
-        filterIsInstance<VertragsDaten>().forEach { daten ->
-            require(daten.runde in vertragsEinträge.indices) {
-                "Vertragsdaten für unbekannte Runde ${daten.runde}."
-            }
-
-            val vertrag = Vertrag(
-                vertragsannehmer = listOf(daten.vertragsannehmer),
-                vertragsanbieter = listOf(daten.vertragsanbieter),
-                vertragsart = daten.vertragsart.zuVertragsartOderFehler()
-            )
-
-            vertragsEinträge[daten.runde] = vertragsEinträge[daten.runde] + vertrag
-        }
-
-        return Spiel(
-            runden = runden,
-            spieler = spieler,
-            warenkorb = daten.warenkorb.zuWarenkorb(),
-            inflationsziel = Triple(
-                daten.inflationsziel,
-                daten.nAbweichung,
-                daten.sAbweichung
-            ),
-            handel = Handelsregister(handelsEinträge),
-            konflikt = Kriegsregister(vertragsEinträge)
+        setzeAktuellesSpiel(
+            spiel = legacyDaten.zuLegacySpiel(spielDaten),
+            daten = spielDaten to legacyDaten,
+            gespeichertesSpiel = gespeichertesSpiel,
         )
-    }
-
-    private fun String.zuWarenkorb(): Map<Rohstoffe, Int> {
-        if (isBlank()) return emptyMap()
-
-        return split("/")
-            .filter { it.isNotBlank() }
-            .associate { eintrag ->
-                val teile = eintrag.split("#")
-
-                require(teile.size == 2) {
-                    "Ungültiger Warenkorb-Eintrag: $eintrag"
-                }
-
-                teile[0].zuRohstoffOderFehler() to teile[1].toInt()
-            }
-    }
-
-    private data class GespeicherterAnleihehandel(
-        val besitzer: String,
-        val erwerber: String,
-        val preis: Zahlungsmittel,
-        val runde: Int,
-    )
-
-    private fun findeJuristischePerson(
-        name: String,
-        spieler: List<Spieler>,
-    ): JuristischePerson = spieler.firstOrNull { it.name == name } ?: when (name) {
-        Ausland.name, AUSLAND -> Ausland
-        Geschäftsbank.name, "Zentralbank" -> Geschäftsbank
-        else -> error("Unbekannte juristische Person: $name")
-    }
-
-    private fun String.zuRohstoffOderFehler(): Rohstoffe {
-        val text = trim()
-
-        return Rohstoffe.entries.firstOrNull {
-            it.name == text || it.str == text
-        } ?: error("Unbekannter Rohstoff: $text")
-    }
-
-    private fun String.zuBauteilOderFehler(): Bauteil {
-        val text = trim()
-
-        return Bauteil.fromString(text)
-            ?: Bauteil.entries.firstOrNull { it.toString() == text }
-            ?: error("Unbekanntes Bauteil: $text")
-    }
-
-    private fun String.zuWirtschaftsregionOderFehler(): Wirtschaftsregionen {
-        val text = trim()
-
-        return Wirtschaftsregionen.entries.firstOrNull {
-            it.name == text || it.str == text
-        } ?: error("Unbekannte Wirtschaftsregion: $text")
-    }
-
-    private fun String.zuVertragsartOderFehler(): Vertragsart {
-        val text = trim()
-
-        return Vertragsart.entries.firstOrNull {
-            it.name == text || it.str == text
-        } ?: error("Unbekannte Vertragsart: $text")
+        if (gespeichertesSpiel.ausLegacyDatenImportiert) {
+            spielAblage.spielSpeichern(gespeichertesSpiel)
+        }
     }
 
     fun kriegErklaeren(aggressor: String, verteidiger: String) {
