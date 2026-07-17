@@ -40,14 +40,14 @@ class KartenAblageTest {
     }
 
     @Test
-    fun AlteEigeneRasterkarteWirdMitGeneriertemSerializerAlsHexagonGeladen() = runBlocking {
+    fun VeralteteEigeneRasterkarteWirdIgnoriert() = runBlocking {
         val kontext = ApplicationProvider.getApplicationContext<android.content.Context>()
         val verzeichnis = File(kontext.filesDir, "karten/eigene").apply { mkdirs() }
-        val alteKarte = File(verzeichnis, "legacy-serializer-test.json")
+        val alteKarte = File(verzeichnis, "veraltetes-format-test.json")
         alteKarte.writeText(
             """{
                 "formatVersion": 2,
-                "id": "eigene-legacy-serializer-test",
+                "id": "eigene-veraltetes-format-test",
                 "name": "Alte Rasterkarte",
                 "zeilen": 2,
                 "spalten": 3,
@@ -61,13 +61,11 @@ class KartenAblageTest {
         )
 
         try {
-            val geladen = KartenAblage(kontext).alleKartenLaden().single { eintrag ->
-                eintrag.vorlage.id == "eigene-legacy-serializer-test"
-            }
+            val geladen = KartenAblage(kontext).alleKartenLaden()
 
-            assertEquals(1, geladen.vorlage.gelaendefelder.size)
-            assertTrue(geladen.vorlage.hexagon.radius > 0)
-            assertTrue(geladen.migrationsHinweise.single().contains("Formats 3"))
+            assertTrue(geladen.none { eintrag ->
+                eintrag.vorlage.id == "eigene-veraltetes-format-test"
+            })
         } finally {
             alteKarte.delete()
         }

@@ -41,7 +41,6 @@ class SpielAblageVertragTest {
                     id = 7,
                     spielerNamen = listOf("Anna"),
                     runde = 0,
-                    ausLegacyDatenImportiert = false,
                 ),
             ),
             ablage.spielstaendeBeobachten().first(),

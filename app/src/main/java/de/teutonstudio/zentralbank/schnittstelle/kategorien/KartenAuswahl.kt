@@ -145,7 +145,6 @@ fun KartenAuswahl(
         KartenEditorDialog(
             ausgangsvorlage = eintrag.vorlage,
             ablage = ablage,
-            migrationsHinweise = eintrag.migrationsHinweise,
             beiAbbruch = { editorEintrag = null },
             beiGespeichert = { karte ->
                 eintraege = (eintraege.filterNot { it.vorlage.id == karte.id } +
@@ -195,13 +194,6 @@ private fun KartenListe(
                             "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke",
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    if (eintrag.migrationsHinweise.isNotEmpty()) {
-                        Text(
-                            "Altes Format · beim Bearbeiten als Kopie speichern",
-                            color = MaterialTheme.colorScheme.tertiary,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    }
                 }
             }
         }
@@ -241,6 +233,7 @@ private fun KartenVorschau(
             Spielbrett3D(
                 modell = karte.zu3DModell(),
                 modifier = Modifier.weight(1f).fillMaxWidth(),
+                statischeVorschau = true,
             )
         }
     }

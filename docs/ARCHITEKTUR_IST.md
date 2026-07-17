@@ -128,21 +128,21 @@ Spielstandrekonstruktion 571 Zeilen und erbt von
 - globale Fehlermeldungen.
 
 Der frühere, knapp 600 Zeilen lange auskommentierte DAO-/Cache-Block ist
-entfernt. Die weitere 260-zeilige Rekonstruktion liegt nun in
+entfernt. Die Zuordnung der Wirtschaftstabellen liegt in
 `daten/zuordnung/SpielstandZuordnung.kt`. Spielstände werden nach Bestätigung
-transaktional gelöscht. Noch nicht migrierte Konfliktaktionen melden
-ausdrücklich, dass die Bereichsmigration fehlt.
+transaktional gelöscht. Noch nicht verfügbare Konfliktaktionen melden dies
+ausdrücklich.
 
-Die Methode `synchronisiereSpielZustandNachLegacyAenderung()` bildet das mutierte
-Legacy-Spiel erneut ab und übernimmt anschließend ausgewählte Felder aus dem
+Die Methode `synchronisiereSpielZustandNachTabellenAenderung()` bildet das mutierte
+Tabellenspiel erneut ab und übernimmt anschließend ausgewählte Felder aus dem
 bisherigen Domain-Zustand. Dabei wird der Ereignisverlauf verworfen. Dies ist
 eine konkrete Stelle, an der mehrere Wahrheiten zusammengeführt statt
 vermieden werden.
 
 ## Persistenz
 
-Room liegt vollständig in `:app`. `AppDatabase` verwendet Schema-Version 2.
-Neben den acht Legacy-Entitätstypen
+Room liegt vollständig in `:app`. `AppDatabase` verwendet Schema-Version 4.
+Neben den acht Wirtschaftstabellen
 
 - `SpielDaten`,
 - `SpielerDaten`,
@@ -154,24 +154,22 @@ Neben den acht Legacy-Entitätstypen
 - `VertragsDaten`
 
 existiert `SpielstandEntitaet` in der Tabelle `FachSpielstand`. Sie speichert
-versioniert den Startzustand, den angewandten Ereignisverlauf und die Kennung,
-ob der Zustand ohne vollständigen Verlauf aus Legacy-Daten stammt. Die
-Migration 1→2 legt diese Tabelle an und erhält alle bestehenden Tabellen;
-`fallbackToDestructiveMigration` ist entfernt.
+versioniert den Startzustand und den angewandten Ereignisverlauf. Es gibt keine
+Schema- oder Datenmigration für ältere Speicherstände; bei einer veralteten
+Room-Version wird die Datenbank vollständig neu angelegt.
 
 Die Android-freie Schnittstelle `SpielAblage` definiert Beobachten, Laden,
 Speichern und Löschen mit `SpielstandUebersicht` und `GespeichertesSpiel`.
-`RaumSpielAblage` implementiert sie in `:app`, bevorzugt das kanonische Format
-und kann vorhandene Legacy-Tabellen als gekennzeichneten Startzustand lesen.
+`RaumSpielAblage` implementiert sie in `:app` und liest ausschließlich das
+kanonische `FachSpielstand`-Format. Reine Altbestände aus den Wirtschaftstabellen
+werden nicht importiert.
 Die Ladeoberfläche verwendet nur noch `SpielstandUebersicht` und keine
 Room-Entitäten.
 
-`ZentralbankSpeicher` bleibt als Übergangsfassade für noch nicht migrierte
-Legacy-Schreibvorgänge bestehen. Die Zuordnung alter Tabellenzeilen befindet
-sich im Datenbereich; insbesondere alte Anleihendatensätze benötigen weiterhin
-eine dokumentierte Kompatibilitätsannahme über den ersten Besitzer. Neue
-fachliche Speicherungen erhalten Startzustand und Ereignisse. Gleichzeitig
-gestartete Speicheraufträge werden pro Spielstand geordnet.
+`ZentralbankSpeicher` bleibt als Tabellenfassade für die derzeit von der
+Oberfläche benötigten Wirtschaftsdaten bestehen. Neue fachliche Speicherungen
+erhalten Startzustand und Ereignisse. Gleichzeitig gestartete Speicheraufträge
+werden pro Spielstand geordnet.
 
 ## Navigation und Oberfläche
 

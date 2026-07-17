@@ -5,6 +5,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import org.junit.Assert.assertEquals
@@ -27,6 +29,25 @@ class SpielErstellenTest {
 
         composeTestRule
             .onNodeWithText("Spieler Anzahl: ")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun kartenauswahlLaedtAktuellesFormatMitStatischerVorschau() {
+        composeTestRule.setContent {
+            SpielErstellen(
+                nachAbbruch = {},
+                erstelleSpiel = { _, _ -> },
+                nachAbschluß = {},
+                seite = remember { mutableIntStateOf(4) },
+            )
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText("Inselreich").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule
+            .onNodeWithContentDescription("Vorschau des 3D-Spielbretts")
             .assertIsDisplayed()
     }
 

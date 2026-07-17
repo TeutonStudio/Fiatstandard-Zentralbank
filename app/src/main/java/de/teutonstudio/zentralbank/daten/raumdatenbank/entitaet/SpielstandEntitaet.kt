@@ -10,5 +10,4 @@ data class SpielstandEntitaet(
     val formatVersion: Int,
     val startzustandJson: String,
     val ereignisseJson: String,
-    val ausLegacyDatenImportiert: Boolean,
 )

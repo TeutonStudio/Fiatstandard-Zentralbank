@@ -59,7 +59,6 @@ internal enum class KartenWerkzeug(val beschriftung: String) {
 fun KartenEditorDialog(
     ausgangsvorlage: KartenVorlage,
     ablage: KartenAblage,
-    migrationsHinweise: List<String> = emptyList(),
     beiAbbruch: () -> Unit,
     beiGespeichert: (KartenVorlage) -> Unit,
 ) {
@@ -113,23 +112,6 @@ fun KartenEditorDialog(
                         "Wasser bleibt transparent.",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                if (migrationsHinweise.isNotEmpty()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = MaterialTheme.shapes.small,
-                    ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            Text("Hinweis zur alten Karte", style = MaterialTheme.typography.titleSmall)
-                            migrationsHinweise.forEach { hinweis ->
-                                Text("• $hinweis", style = MaterialTheme.typography.bodySmall)
-                            }
-                            Text(
-                                "Das Original bleibt erhalten; gespeichert wird eine neue Geländevorlage.",
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
                 BoxWithConstraints(modifier = Modifier.weight(1f)) {
                     val breiteAnsicht = maxWidth >= 840.dp
                     val werkzeuge: @Composable (Modifier) -> Unit = { modifier ->
@@ -211,7 +193,6 @@ fun KartenEditorDialog(
                                 runCatching {
                                     ablage.eigeneKarteSpeichern(
                                         vorlage = entwurf.copy(name = name.trim()),
-                                        alsNeueKopie = migrationsHinweise.isNotEmpty(),
                                     )
                                 }.onSuccess(beiGespeichert).onFailure { fehler ->
                                     wirdGespeichert = false

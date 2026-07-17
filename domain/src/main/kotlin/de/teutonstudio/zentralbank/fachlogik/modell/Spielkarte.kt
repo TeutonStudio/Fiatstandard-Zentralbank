@@ -10,7 +10,7 @@ const val AKTUELLE_KARTEN_FORMAT_VERSION = 3
  *
  * Der Radius ist die Seitenlänge des Hexagons in Dreieckskanten. Ein Hexagon mit Radius 1
  * enthält sechs Dreiecke, eines mit Radius n genau 6 * n² Dreiecke. [zentrum] ist immer eine
- * echte Ecke des Dreiecksgitters und erlaubt verlustfreie Migration älterer Kartenkoordinaten.
+ * echte Ecke des Dreiecksgitters.
  */
 @Serializable
 data class KartenHexagon(
@@ -83,12 +83,6 @@ data class Spielkarte(
         hexagon = hexagon,
         gelaendefelder = gelaendefelder,
     )
-
-    fun aufAktuellesFormat(): Spielkarte = also {
-        require(formatVersion == AKTUELLE_KARTEN_FORMAT_VERSION) {
-            "Karten vor Format 3 müssen vor dem Domain-Deserialisieren migriert werden."
-        }
-    }
 }
 
 @Serializable

@@ -31,7 +31,6 @@ class SpielstandZuordnungTest {
                 mengen = mapOf(Rohstoff.LEHM to 3),
             ),
         ),
-        ausLegacyDatenImportiert = true,
     )
 
     @Test
@@ -58,10 +57,10 @@ class SpielstandZuordnungTest {
     }
 
     @Test
-    fun bestehenderRoomDatensatzBleibtAlsLegacySpielRekonstruierbar() {
+    fun tabellendatenWerdenAlsSpielRekonstruiert() {
         val (spielDaten, fachDaten) = TestSpiel.zuSpeicherDaten()
 
-        val rekonstruiert = fachDaten.zuLegacySpiel(spielDaten)
+        val rekonstruiert = fachDaten.zuSpiel(spielDaten)
 
         assertEquals(TestSpiel.spielerStringListe, rekonstruiert.spielerStringListe)
         assertEquals(TestSpiel.aktuelleRunde, rekonstruiert.aktuelleRunde)

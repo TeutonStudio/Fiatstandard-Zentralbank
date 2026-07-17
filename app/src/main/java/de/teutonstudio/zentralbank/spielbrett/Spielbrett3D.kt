@@ -95,8 +95,9 @@ fun Spielbrett3D(
         rememberBetrachtungsTransformationsStatus(),
     kameraInteraktionsModus: KameraInteraktionsModus = KameraInteraktionsModus.DREHEN,
     onDreieckBeruehrt: ((DreieckTreffer) -> Unit)? = null,
+    statischeVorschau: Boolean = false,
 ) {
-    if (LocalInspectionMode.current) {
+    if (LocalInspectionMode.current || statischeVorschau) {
         SpielbrettVorschau(
             modell = modell,
             transformation = betrachtungsStatus.transformation,
@@ -551,9 +552,9 @@ private fun io.github.sceneview.loaders.MaterialLoader.doppelseitigesMaterial(
 }
 
 /**
- * LayoutLib kann Filaments native Engine nicht starten. Diese Vorschau projiziert deshalb exakt
- * dieselbe berechnete Brettgeometrie mit Compose Canvas aus [transformation] in eine schraege
- * Ansicht. Sie wird nur im Inspection Mode verwendet; auf einem Gerät rendert SceneView.
+ * Diese Vorschau projiziert dieselbe berechnete Brettgeometrie mit Compose Canvas aus
+ * [transformation] in eine schräge Ansicht. Sie wird im Inspection Mode sowie für kleine,
+ * nicht interaktive Kartenvorschauen verwendet; interaktive Ansichten rendern mit SceneView.
  */
 @Composable
 private fun SpielbrettVorschau(

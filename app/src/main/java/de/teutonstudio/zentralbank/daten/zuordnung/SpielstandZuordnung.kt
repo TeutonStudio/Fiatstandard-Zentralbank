@@ -34,17 +34,10 @@ import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
-import de.teutonstudio.zentralbank.fachlogik.modell.AKTUELLE_KARTEN_FORMAT_VERSION
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
-import de.teutonstudio.zentralbank.fachlogik.modell.rechteckAlsHexagon
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 private const val AKTUELLE_FORMAT_VERSION = 1
 private const val AUSLAND_KENNUNG = "-ausland-"
@@ -62,57 +55,21 @@ fun GespeichertesSpiel.zuEntitaet(): SpielstandEntitaet = SpielstandEntitaet(
     formatVersion = AKTUELLE_FORMAT_VERSION,
     startzustandJson = spielstandJson.encodeToString(SpielZustand.serializer(), startzustand),
     ereignisseJson = spielstandJson.encodeToString(ereignisListe, ereignisse),
-    ausLegacyDatenImportiert = ausLegacyDatenImportiert,
 )
 
 fun SpielstandEntitaet.zuGespeichertemSpiel(): GespeichertesSpiel {
     require(formatVersion == AKTUELLE_FORMAT_VERSION) {
         "Spielstand $spielId verwendet die nicht unterstützte Formatversion $formatVersion."
     }
-    val startzustand = spielstandJson.decodeFromString(
-        SpielZustand.serializer(),
-        migriereEingebetteteKarte(startzustandJson),
-    )
+    val startzustand = spielstandJson.decodeFromString(SpielZustand.serializer(), startzustandJson)
     return GespeichertesSpiel(
         id = spielId,
         startzustand = startzustand,
         ereignisse = spielstandJson.decodeFromString(ereignisListe, ereignisseJson),
-        ausLegacyDatenImportiert = ausLegacyDatenImportiert,
     )
 }
 
-private fun migriereEingebetteteKarte(text: String): String {
-    val wurzel = spielstandJson.parseToJsonElement(text).jsonObject
-    val alteKarte = wurzel["karte"]?.jsonObject ?: return text
-    val version = alteKarte["formatVersion"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1
-    if (version == AKTUELLE_KARTEN_FORMAT_VERSION) return text
-    require(version in 1 until AKTUELLE_KARTEN_FORMAT_VERSION) {
-        "Nicht unterstützte Kartenformatversion: $version."
-    }
-    val startZeile = alteKarte["startZeile"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-    val startSpalte = alteKarte["startSpalte"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-    val zeilen = alteKarte.getValue("zeilen").jsonPrimitive.content.toInt()
-    val spalten = alteKarte.getValue("spalten").jsonPrimitive.content.toInt()
-    val hexagon = rechteckAlsHexagon(startZeile, startSpalte, zeilen, spalten)
-    val neueKarte = JsonObject(
-        alteKarte
-            .filterKeys { it !in setOf("zeilen", "spalten", "startZeile", "startSpalte", "spezialfelder") }
-            .toMutableMap()
-            .apply {
-                put(
-                    "formatVersion",
-                    spielstandJson.encodeToJsonElement(Int.serializer(), AKTUELLE_KARTEN_FORMAT_VERSION),
-                )
-                put(
-                    "hexagon",
-                    spielstandJson.encodeToJsonElement(KartenHexagon.serializer(), hexagon),
-                )
-            },
-    )
-    return JsonObject(wurzel.toMutableMap().apply { put("karte", neueKarte) }).toString()
-}
-
-fun List<SpeicherDaten>.zuLegacySpiel(
+fun List<SpeicherDaten>.zuSpiel(
     daten: SpielDaten,
     karte: Spielkarte? = null,
 ): Spiel {

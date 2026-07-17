@@ -10,7 +10,6 @@ data class SpielstandUebersicht(
     val id: Long,
     val spielerNamen: List<String>,
     val runde: Int,
-    val ausLegacyDatenImportiert: Boolean,
 )
 
 @Serializable
@@ -18,7 +17,6 @@ data class GespeichertesSpiel(
     val id: Long,
     val startzustand: SpielZustand,
     val ereignisse: List<SpielEreignis> = emptyList(),
-    val ausLegacyDatenImportiert: Boolean = false,
 ) {
     fun aktuellerZustand(): SpielZustand = SpielAblauf(startzustand, ereignisse).zustand
 
@@ -28,7 +26,6 @@ data class GespeichertesSpiel(
             id = id,
             spielerNamen = zustand.spieler.map { spieler -> spieler.name },
             runde = zustand.rundenzähler,
-            ausLegacyDatenImportiert = ausLegacyDatenImportiert,
         )
     }
 }

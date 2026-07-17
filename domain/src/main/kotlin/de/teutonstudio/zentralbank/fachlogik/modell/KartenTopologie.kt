@@ -73,31 +73,6 @@ fun KartenHexagon.felder(): List<KartenFeld> {
     }
 }
 
-/** Umschließt einen alten rechteckigen Rasterausschnitt verlustfrei mit einem Hexagon. */
-fun rechteckAlsHexagon(
-    startZeile: Int,
-    startSpalte: Int,
-    zeilen: Int,
-    spalten: Int,
-): KartenHexagon {
-    require(zeilen > 0 && spalten > 0) { "Der alte Kartenausschnitt muss positiv sein." }
-    val endZeile = Math.addExact(startZeile, zeilen - 1)
-    val endSpalte = Math.addExact(startSpalte, spalten - 1)
-    val mittelZeile = startZeile + (zeilen - 1) / 2
-    val mittelSpalte = startSpalte + (spalten - 1) / 2
-    val zentrum = KartenFeld(mittelZeile, mittelSpalte, DreieckHaelfte.UNTEN).ecken().first()
-    val eckFelder = buildList {
-        listOf(startZeile, endZeile).forEach { zeile ->
-            listOf(startSpalte, endSpalte).forEach { spalte ->
-                DreieckHaelfte.entries.forEach { haelfte ->
-                    add(KartenFeld(zeile, spalte, haelfte))
-                }
-            }
-        }
-    }
-    return KartenHexagon(zentrum).mitMindestradiusFuer(eckFelder)
-}
-
 /** Liefert die geometrisch möglichen Nachbarfelder; Positionen außerhalb sind Wasser. */
 fun angrenzendeFelder(ecke: KartenEcke): List<KartenFeld> {
     val ungefaehreZeile = Math.floorDiv(ecke.y, 2)

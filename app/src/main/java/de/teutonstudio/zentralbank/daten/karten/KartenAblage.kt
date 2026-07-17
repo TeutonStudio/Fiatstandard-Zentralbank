@@ -2,10 +2,7 @@ package de.teutonstudio.zentralbank.daten.karten
 
 import android.content.Context
 import de.teutonstudio.zentralbank.fachlogik.modell.AKTUELLE_KARTEN_FORMAT_VERSION
-import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
-import de.teutonstudio.zentralbank.fachlogik.modell.rechteckAlsHexagon
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -14,7 +11,6 @@ import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -28,10 +24,7 @@ enum class KartenQuelle {
 data class KartenEintrag(
     val vorlage: KartenVorlage,
     val quelle: KartenQuelle,
-    val migrationsHinweise: List<String> = emptyList(),
-) {
-    val mussAlsKopieGespeichertWerden: Boolean get() = migrationsHinweise.isNotEmpty()
-}
+)
 
 class KartenAblage(context: Context) {
     private val anwendungskontext = context.applicationContext
@@ -61,7 +54,11 @@ class KartenAblage(context: Context) {
             ?.listFiles { datei -> datei.isFile && datei.extension == "json" }
             .orEmpty()
             .sortedBy { datei -> datei.name }
-            .map { datei -> datei.readText().zuKartenEintrag(KartenQuelle.EIGENE_KARTE) }
+            .mapNotNull { datei ->
+                val text = datei.readText()
+                text.takeIf { it.kartenFormatVersion() == AKTUELLE_KARTEN_FORMAT_VERSION }
+                    ?.zuKartenEintrag(KartenQuelle.EIGENE_KARTE)
+            }
 
         (vorlagen + eigeneKarten).sortedWith(
             compareBy<KartenEintrag>(KartenEintrag::quelle)
@@ -71,9 +68,8 @@ class KartenAblage(context: Context) {
 
     suspend fun eigeneKarteSpeichern(
         vorlage: KartenVorlage,
-        alsNeueKopie: Boolean = false,
     ): KartenVorlage = withContext(Dispatchers.IO) {
-        val gespeicherteVorlage = if (!alsNeueKopie && vorlage.id.startsWith(EIGENE_ID_PRAEFIX)) {
+        val gespeicherteVorlage = if (vorlage.id.startsWith(EIGENE_ID_PRAEFIX)) {
             vorlage.copy(formatVersion = AKTUELLE_KARTEN_FORMAT_VERSION)
         } else {
             vorlage.copy(
@@ -96,40 +92,22 @@ class KartenAblage(context: Context) {
     }
 
     private fun String.zuKartenEintrag(quelle: KartenQuelle): KartenEintrag {
-        val objekt = json.parseToJsonElement(this).jsonObject
-        val version = objekt["formatVersion"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1
-        return when (version) {
-            1, 2 -> {
-                val alt = json.decodeFromString<AlteKartenVorlage>(this)
-                KartenEintrag(
-                    vorlage = KartenVorlage(
-                        id = alt.id,
-                        name = alt.name,
-                        hexagon = rechteckAlsHexagon(
-                            startZeile = alt.startZeile,
-                            startSpalte = alt.startSpalte,
-                            zeilen = alt.zeilen,
-                            spalten = alt.spalten,
-                        ),
-                        gelaendefelder = alt.landfelder,
-                    ),
-                    quelle = quelle,
-                    migrationsHinweise = listOf(
-                        "Kartenformat $version wurde verlustfrei in ein radiusbasiertes " +
-                            "Hexagon des Formats 3 eingelesen.",
-                    ) + alt.spezialfelder.map { spezialfeld ->
-                        "${spezialfeld.name} (${spezialfeld.typ}) wurde nicht als Spielbelegung " +
-                            "übernommen; bitte im Spielmodus regelkonform platzieren."
-                    },
-                )
-            }
-            AKTUELLE_KARTEN_FORMAT_VERSION -> KartenEintrag(
-                vorlage = json.decodeFromString<KartenVorlage>(this),
-                quelle = quelle,
-            )
-            else -> error("Nicht unterstützte Kartenformatversion: $version.")
+        val version = kartenFormatVersion()
+        require(version == AKTUELLE_KARTEN_FORMAT_VERSION) {
+            "Nicht unterstützte Kartenformatversion: ${version ?: "nicht angegeben"}."
         }
+        return KartenEintrag(
+            vorlage = json.decodeFromString<KartenVorlage>(this),
+            quelle = quelle,
+        )
     }
+
+    private fun String.kartenFormatVersion(): Int? =
+        json.parseToJsonElement(this)
+            .jsonObject["formatVersion"]
+            ?.jsonPrimitive
+            ?.content
+            ?.toIntOrNull()
 
     companion object {
         private const val VORLAGEN_PFAD = "karten/vorlagen"
@@ -137,23 +115,3 @@ class KartenAblage(context: Context) {
         private const val EIGENE_ID_PRAEFIX = "eigene-"
     }
 }
-
-@Serializable
-private data class AlteKartenVorlage(
-    val id: String,
-    val name: String,
-    val zeilen: Int,
-    val spalten: Int,
-    val startZeile: Int = 0,
-    val startSpalte: Int = 0,
-    val landfelder: List<GelaendeFeld> = emptyList(),
-    val spezialfelder: List<AltesSpezialfeld> = emptyList(),
-)
-
-@Serializable
-private data class AltesSpezialfeld(
-    val id: String,
-    val name: String,
-    val typ: String,
-    val positionen: List<KartenFeld>,
-)

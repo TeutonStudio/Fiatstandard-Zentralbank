@@ -1,5 +1,23 @@
 # Umbau-Log
 
+## 17.07.2026 - Altformatmigrationen entfernt
+
+Durchgeführte Änderungen:
+
+- Kartenablage auf das aktuelle radiusbasierte Hexagonformat beschränkt;
+  veraltete eigene Kartendateien werden ignoriert.
+- Karten- und Spielstanddecoder für frühere Rasterformate entfernt.
+- Room-Migrationsklassen und der Import reiner Altbestände entfernt; Schema 4
+  wird bei älteren Datenbanken destruktiv neu angelegt.
+- Die Kartenauswahl nutzt eine statische Compose-Vorschau, damit dort keine
+  native Filament-Engine gestartet wird.
+
+Ausgeführte Tests:
+
+- Domain- und App-Unit-Tests sowie Android-Testkompilierung erfolgreich.
+- Fünf gezielte Instrumentierungstests für Spielanlage und Kartenablage auf
+  Android 15 erfolgreich.
+
 ## 17.07.2026 - Spielablage extrahiert (Architektur-Etappe 3)
 
 Durchgeführte Änderungen:

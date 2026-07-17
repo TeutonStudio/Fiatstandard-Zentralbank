@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 
 import de.teutonstudio.zentralbank.daten.RaumSpielAblage
-import de.teutonstudio.zentralbank.daten.zuordnung.zuLegacySpiel
+import de.teutonstudio.zentralbank.daten.zuordnung.zuSpiel
 import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -52,7 +52,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    private lateinit var legacySpeicher: ZentralbankSpeicher
+    private lateinit var tabellenSpeicher: ZentralbankSpeicher
     private lateinit var spielAblage: SpielAblage
     private val datenbankBereit = CompletableDeferred<Unit>()
     private val ablageSperre = Mutex()
@@ -65,7 +65,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private val _spielUebersicht = MutableStateFlow<SpielUebersichtZustand?>(null)
     private val _spielFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private var spielAblauf: SpielAblauf? = null
-    private var ausLegacyDatenImportiert = false
 
     val spielstaende: StateFlow<List<SpielstandUebersicht>> = _spielstaende.asStateFlow()
     val spielZustand: StateFlow<SpielZustand?> = _spielZustand.asStateFlow()
@@ -87,7 +86,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val ablauf = gespeichertesSpiel?.let { gespeichert ->
             SpielAblauf(gespeichert.startzustand, gespeichert.ereignisse)
         } ?: SpielAblauf(spiel.zuSpielZustand())
-        ausLegacyDatenImportiert = gespeichertesSpiel?.ausLegacyDatenImportiert ?: false
         spielAblauf = ablauf
         aktualisiereSpielZustand(ablauf.zustand)
     }
@@ -229,7 +227,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             rundenzähler = aktuelleWirtschaftsdaten.rundenzähler,
         )
         spielAblauf = SpielAblauf(synchronisiert)
-        ausLegacyDatenImportiert = true
         aktualisiereSpielZustand(synchronisiert)
 
         if (spielDaten.spielID == (-1).toLong()) return
@@ -240,7 +237,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                legacySpeicher.insertRunde(rundenDaten)
+                tabellenSpeicher.insertRunde(rundenDaten)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Neue Runde konnte nicht gespeichert werden."
@@ -294,7 +291,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                legacySpeicher.updateSpiel(neueSpielDaten)
+                tabellenSpeicher.updateSpiel(neueSpielDaten)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Warenkorb konnte nicht gespeichert werden."
@@ -312,7 +309,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                     handel,
                 ).copy(spielID = aktuelleDaten.first.spielID)
             },
-            speichern = legacySpeicher::insertHandel,
+            speichern = tabellenSpeicher::insertHandel,
             fehlermeldung = "Handel konnte nicht gespeichert werden.",
         )
 
@@ -325,7 +322,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                     mapOf((aktuellesSpiel.aktuelleRunde - 1) to handel),
                 ).copy(spielID = aktuelleDaten.first.spielID)
             },
-            speichern = legacySpeicher::insertAnleihe,
+            speichern = tabellenSpeicher::insertAnleihe,
             fehlermeldung = "Anleihe konnte nicht gespeichert werden.",
         )
 
@@ -362,7 +359,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         aktuelleDaten = spielDaten to neueDatenListe
-        synchronisiereSpielZustandNachLegacyAenderung()
+        synchronisiereSpielZustandNachTabellenAenderung()
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -372,7 +369,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 datenbankBereit.await()
-                legacySpeicher.updateAnleiheHandel(aktualisiertesDatum)
+                tabellenSpeicher.updateAnleiheHandel(aktualisiertesDatum)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Anleihehandel konnte nicht gespeichert werden."
@@ -408,7 +405,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val neueDatenListe = aktuelleDaten.second + datum
         aktuelleDaten = spielDaten to neueDatenListe
 
-        synchronisiereSpielZustandNachLegacyAenderung()
+        synchronisiereSpielZustandNachTabellenAenderung()
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -427,7 +424,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         return true
     }
 
-    private fun synchronisiereSpielZustandNachLegacyAenderung() {
+    private fun synchronisiereSpielZustandNachTabellenAenderung() {
         val bisherigerSpielZustand = spielAblauf?.zustand
         val abgebildeterSpielZustand = aktuellesSpiel.zuSpielZustand()
         val spielZustand = if (bisherigerSpielZustand == null) {
@@ -444,7 +441,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             )
         }
         spielAblauf = SpielAblauf(spielZustand)
-        ausLegacyDatenImportiert = true
         aktualisiereSpielZustand(spielZustand)
         speichereAktuellenFachSpielstand()
     }
@@ -463,7 +459,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             id = spielId,
             startzustand = ablauf.startzustand,
             ereignisse = ablauf.ereignisVerlauf.angewandteEreignisse,
-            ausLegacyDatenImportiert = ausLegacyDatenImportiert,
         )
         val aenderungsNummer = naechsteAblageAenderung.incrementAndGet()
         viewModelScope.launch(Dispatchers.IO) {
@@ -497,12 +492,12 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val datenbank = AppDatabase.erhalteDatenbank(application.applicationContext).first()
-                legacySpeicher = ZentralbankSpeicher(datenbank)
+                tabellenSpeicher = ZentralbankSpeicher(datenbank)
                 spielAblage = RaumSpielAblage(datenbank)
                 datenbankBereit.complete(Unit)
 
                 launch {
-                    legacySpeicher.observeAlleNachSpiel().collect { spiele ->
+                    tabellenSpeicher.observeAlleNachSpiel().collect { spiele ->
                         _spielDatenListe.value = spiele
                     }
                 }
@@ -511,7 +506,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                         id = -1,
                         spielerNamen = TestSpiel.spielerStringListe,
                         runde = TestSpiel.aktuelleRunde - 1,
-                        ausLegacyDatenImportiert = true,
                     )
                 }
             } catch (throwable: Throwable) {
@@ -529,7 +523,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 val daten = spiel.zuSpeicherDaten()
                 datenbankBereit.await()
                 val gameID = withContext(Dispatchers.IO) {
-                    legacySpeicher.insertSpielSatz(daten)
+                    tabellenSpeicher.insertSpielSatz(daten)
                 }
                 if (gameID <= 0) {
                     _spielFehler.emit("Spielstand konnte nicht angelegt werden.")
@@ -588,43 +582,40 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             val testDaten = TestSpiel.zuSpeicherDaten().let { (spiel, daten) ->
                 spiel.copy(spielID = -1) to daten
             }
-            setzeAktuellesSpiel(testDaten.second.zuLegacySpiel(testDaten.first), testDaten)
+            setzeAktuellesSpiel(testDaten.second.zuSpiel(testDaten.first), testDaten)
             return
         }
         val gespeichertesSpiel = spielAblage.spielLaden(id)
             ?: error("Spielstand $id wurde nicht gefunden.")
-        val (spielDaten, legacyDaten) = _spielDatenListe.value.entries
+        val (spielDaten, tabellenDaten) = _spielDatenListe.value.entries
             .firstOrNull { (spiel, _) -> spiel.spielID == id }
             ?.let { (spiel, daten) -> spiel to daten }
             ?: error(
-                "Spielstand $id besitzt keine Legacy-Daten für die noch nicht migrierte Oberfläche.",
+                "Spielstand $id besitzt keine Wirtschaftsdaten für die Oberfläche.",
             )
         setzeAktuellesSpiel(
-            spiel = legacyDaten.zuLegacySpiel(
+            spiel = tabellenDaten.zuSpiel(
                 daten = spielDaten,
                 karte = gespeichertesSpiel.startzustand.karte,
             ),
-            daten = spielDaten to legacyDaten,
+            daten = spielDaten to tabellenDaten,
             gespeichertesSpiel = gespeichertesSpiel,
         )
-        if (gespeichertesSpiel.ausLegacyDatenImportiert) {
-            spielAblage.spielSpeichern(gespeichertesSpiel)
-        }
     }
 
     fun kriegErklaeren(aggressor: String, verteidiger: String) {
-        meldeAusstehendeKonfliktMigration("Kriegserklärung $aggressor gegen $verteidiger")
+        meldeNichtVerfuegbarenKonfliktbereich("Kriegserklärung $aggressor gegen $verteidiger")
     }
 
     fun militaerergebnisErfassen(spieler: String, staerke: Int) {
-        meldeAusstehendeKonfliktMigration("Militärergebnis $spieler mit Stärke $staerke")
+        meldeNichtVerfuegbarenKonfliktbereich("Militärergebnis $spieler mit Stärke $staerke")
     }
 
     fun friedenSchliessen(spielerA: String, spielerB: String) {
-        meldeAusstehendeKonfliktMigration("Friedensschluss $spielerA mit $spielerB")
+        meldeNichtVerfuegbarenKonfliktbereich("Friedensschluss $spielerA mit $spielerB")
     }
 
-    private fun meldeAusstehendeKonfliktMigration(aktion: String) {
-        _spielFehler.tryEmit("$aktion ist bis zur Konfliktbereichsmigration nicht verfügbar.")
+    private fun meldeNichtVerfuegbarenKonfliktbereich(aktion: String) {
+        _spielFehler.tryEmit("$aktion ist im Konfliktbereich noch nicht verfügbar.")
     }
 }

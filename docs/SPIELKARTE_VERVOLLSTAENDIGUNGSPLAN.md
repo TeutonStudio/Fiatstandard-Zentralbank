@@ -320,34 +320,19 @@ Weltkoordinaten:
 
 Ein Treffer außerhalb des zulässigen Abstands führt zu keiner Änderung.
 
-## Speicherung und Migration
+## Speicherung
 
-1. Das Kartenformat wird von Version 1 auf Version 2 angehoben.
-2. Ein eigener Decoder erkennt Version 1, statt im Konstruktor nur exakt die
-   aktuelle Version zu akzeptieren.
-3. Gelände, Kartenname, ID, Ursprung und Ausdehnung werden verlustfrei in eine
-   `KartenVorlage` übernommen.
-4. Alte `Spezialfeld`-Einträge werden niemals automatisch in Spielbelegungen
-   umgewandelt: Ein alter Hafen hat weder eine regelkonforme Ecke noch einen
-   Besitzer; eine Stadt kennt die Anleitung nicht.
-5. Beim ersten Öffnen einer solchen Karte zeigt die App die betroffenen Namen und
-   Positionen an. Das Original bleibt erhalten. Eine neue Version kann als reine
-   Geländevorlage gespeichert und anschließend im Spielmodus regelkonform belegt
-   werden.
-6. Die gebündelte Vorlage `inselreich.json` wird bewusst auf das neue Format
-   übertragen und enthält danach nur Gelände.
-7. Eine ausgewählte Vorlage wird beim Spielstart mit neuer Spiel-ID und leerer
+1. Karten werden ausschließlich im aktuellen, radiusbasierten Hexagonformat
+   gespeichert und geladen.
+2. Veraltete eigene Kartendateien werden ignoriert und weder deserialisiert noch
+   verändert. Gebündelte Vorlagen müssen das aktuelle Format besitzen.
+3. Die gebündelte Vorlage `inselreich.json` enthält ausschließlich Gelände im
+   aktuellen Format.
+4. Eine ausgewählte Vorlage wird beim Spielstart mit neuer Spiel-ID und leerer
    Belegung in den `SpielZustand` kopiert. Spätere Kartenänderungen werden nur als
    Spielereignisse gespeichert, nicht zurück in die Vorlagendatei geschrieben.
-8. Bestehende Spielstände ohne Belegung laden weiterhin mit leerer Belegung.
-9. Startzustand und Kartenereignisse bleiben über Speichern, Laden, Rückgängig und
+5. Startzustand und Kartenereignisse bleiben über Speichern, Laden, Rückgängig und
    Wiederholen rekonstruierbar.
-
-Die Migration erhält keine zusätzliche Room-Tabelle, solange die vollständige
-Spielkarte im serialisierten `SpielZustand` und die Änderungen im Ereignisverlauf
-liegen. Die vorhandene bekannte Unterbrechung des Ereignisverlaufs bei
-Legacy-Synchronisierung darf für neue Kartenaktionen nicht als zweiter
-Schreibweg verwendet werden.
 
 ## Abgleich von Anleitung und bestehendem Fachmodell
 
@@ -375,16 +360,16 @@ Feldbelegung können vorher vollständig umgesetzt werden.
 - [x] Nachbarschaft, Randfälle, Abstand und Konvertierung zentral testen.
 - [x] `KartenVorlage` und leere `KartenBelegung` modellieren.
 - [x] `Spielkarte` als Grundlage plus Belegung in `SpielZustand` integrieren.
-- [x] Format-2-Serialisierung und Version-1-Importer bereitstellen.
+- [x] Aktuelles Hexagonformat serialisieren und veraltete Formate ausschließen.
 
 **Abnahme:** Jede physische Ecke und Kante hat unabhängig vom Ausgangsdreieck
-genau eine stabile Kennung; alte reine Geländekarten laden unverändert.
+genau eine stabile Kennung; gespeicherte Karten verwenden nur das aktuelle Format.
 
 ### Etappe 2 – Baumodus bereinigen
 
 - [x] Moduswahl und getrennte Werkzeuglisten einführen.
 - [x] Baumodus auf Wasser und Geländetypen beschränken.
-- [x] Spezialfeldwerkzeuge entfernen und Migrationshinweis darstellen.
+- [x] Spezialfeldwerkzeuge und Altformat-Hinweise entfernen.
 - [x] Rückgängig/Wiederholen für den Vorlagenentwurf ergänzen.
 - [x] Warnung vor verlustbehaftetem Verkleinern ergänzen.
 
@@ -444,7 +429,7 @@ maßgebliche Quelle und benötigen keine manuell parallel gepflegten Bauteilmeng
 ### Domain-JVM-Tests
 
 - Serialisierungs-Rundreise von Vorlage, Belegung und allen Ortsarten.
-- Migration einer Version-1-Karte einschließlich Spezialfeld-Warnung.
+- Veraltete eigene Karten werden ohne Deserialisierung ignoriert.
 - Eindeutigkeit von Ecken und Kanten auch bei negativen Koordinaten.
 - Nachbarschaften an Innenpunkten und Kartenrändern.
 - Schiene nur zwischen zwei Geländefeldern.
@@ -487,7 +472,7 @@ Die Spielkarte gilt als vervollständigt, wenn:
 - jede Spieländerung über den Ereignisablauf gespeichert sowie rückgängig und
   wiederholbar ist,
 - Vorlagen und laufende Partien nicht gegenseitig verändert werden,
-- alte Karten und Spielstände kontrolliert migriert werden,
+- ausschließlich aktuelle Karten- und Spielstandformate geladen werden,
 - die 3D-Ansicht Typ, Besitzer und Zustand verständlich darstellt,
 - Domain-, App- und Instrumentierungstests die beschriebenen Kernabläufe
   abdecken,
