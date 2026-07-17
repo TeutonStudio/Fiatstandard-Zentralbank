@@ -16,7 +16,8 @@ Damit bestehen für eine laufende Partie weiterhin drei Darstellungen:
 
 1. `datenbank.Spiel` mit veränderlichen Listen und berechneten Caches,
 2. `fachlogik.modell.SpielZustand` mit Ereignisverlauf in `SpielAblauf`,
-3. Room-Entitäten und der zusätzliche Cache `aktuelleDaten` im `GameViewModel`.
+3. der kanonische Room-Spielstand sowie Legacy-Entitäten und der zusätzliche
+   Cache `aktuelleDaten` im `GameViewModel`.
 
 `GameViewModel` synchronisiert diese Darstellungen in beide Richtungen nur
 teilweise. Das ist derzeit das größte Konsistenzrisiko.
@@ -29,7 +30,8 @@ teilweise. Das ist derzeit das größte Konsistenzrisiko.
 - Keine Android-, Compose- oder Room-Imports.
 - Fachliche Paketwurzel: `de.teutonstudio.zentralbank.fachlogik`.
 - Enthält `SpielZustand`, Geld- und Fachtypen, `SpielEreignis`, fachliche
-  Teilregelwerke, `SpielAblauf` und benannte Auswertungen.
+  Teilregelwerke, `SpielAblauf`, benannte Auswertungen und die Android-freie
+  Schnittstelle `SpielAblage`.
 - Enthält schnelle JVM-Tests für Geld, Serialisierung, Regeln, Ereignisablauf
   und Zugphasen.
 
@@ -109,26 +111,27 @@ noch nicht vollständig ausdrückt.
 
 ## `GameViewModel`
 
-`datenbank/GameViewModel.kt` hat nach Entfernung des auskommentierten Altblocks
-753 Zeilen und erbt von
+`datenbank/GameViewModel.kt` hat nach Entfernung von Altcode und ausgelagerter
+Spielstandrekonstruktion 571 Zeilen und erbt von
 `AndroidViewModel`. Es übernimmt gleichzeitig:
 
 - Erzeugung und Laden der Room-Datenbank,
-- Koordination über `ZentralbankSpeicher`,
-- Cache aller Room-Datensätze,
-- Rekonstruktion des alten `Spiel` aus acht Entitätstypen,
+- Übergangsschreibzugriffe über `ZentralbankSpeicher`,
+- einen internen Cache der Legacy-Room-Datensätze,
+- Laden, Speichern und Löschen über `SpielAblage`,
 - Halten von `aktuellesSpiel` und `aktuelleDaten`,
 - Halten von `SpielAblauf`, `spielZustand` und `spielUebersicht`,
 - Anwenden von `SpielEreignis`,
 - Synchronisierung von Legacy-Änderungen zurück in `SpielZustand`,
-- Rundenwechsel und Teilpersistenz,
+- Rundenwechsel und parallele Legacy-Persistenz,
 - Handel und Anleihenhandel,
 - globale Fehlermeldungen.
 
 Der frühere, knapp 600 Zeilen lange auskommentierte DAO-/Cache-Block ist
-entfernt. Noch nicht migrierte Lösch- und Konfliktaktionen melden ausdrücklich,
-dass die jeweilige Bereichsmigration fehlt; sie crashen nicht und führen keine
-stille oder inkonsistente Teilmutation aus.
+entfernt. Die weitere 260-zeilige Rekonstruktion liegt nun in
+`daten/zuordnung/SpielstandZuordnung.kt`. Spielstände werden nach Bestätigung
+transaktional gelöscht. Noch nicht migrierte Konfliktaktionen melden
+ausdrücklich, dass die Bereichsmigration fehlt.
 
 Die Methode `synchronisiereSpielZustandNachLegacyAenderung()` bildet das mutierte
 Legacy-Spiel erneut ab und übernimmt anschließend ausgewählte Felder aus dem
@@ -138,7 +141,8 @@ vermieden werden.
 
 ## Persistenz
 
-Room liegt vollständig in `:app`. `AppDatabase` enthält acht Entitätstypen:
+Room liegt vollständig in `:app`. `AppDatabase` verwendet Schema-Version 2.
+Neben den acht Legacy-Entitätstypen
 
 - `SpielDaten`,
 - `SpielerDaten`,
@@ -147,16 +151,27 @@ Room liegt vollständig in `:app`. `AppDatabase` enthält acht Entitätstypen:
 - `RundeDaten`,
 - `HandelsDaten`,
 - `AnleiheDaten`,
-- `VertragsDaten`.
+- `VertragsDaten`
 
-`ZentralbankSpeicher` koordiniert acht DAOs und kapselt bereits einen Teil der
-Room-Transaktionen. Seine Schnittstelle verwendet jedoch ausschließlich
-Room-/Legacy-Typen und ist deshalb noch keine fachliche `SpielAblage`.
+existiert `SpielstandEntitaet` in der Tabelle `FachSpielstand`. Sie speichert
+versioniert den Startzustand, den angewandten Ereignisverlauf und die Kennung,
+ob der Zustand ohne vollständigen Verlauf aus Legacy-Daten stammt. Die
+Migration 1→2 legt diese Tabelle an und erhält alle bestehenden Tabellen;
+`fallbackToDestructiveMigration` ist entfernt.
 
-Der gespeicherte Stand ist ein Satz historischer Tabellenzeilen, kein
-serialisierter `SpielZustand` und kein Ereignisverlauf. Die Rekonstruktion befindet
-sich im `GameViewModel`; insbesondere alte Anleihendatensätze benötigen eine
-Kompatibilitätsannahme über den ersten Besitzer.
+Die Android-freie Schnittstelle `SpielAblage` definiert Beobachten, Laden,
+Speichern und Löschen mit `SpielstandUebersicht` und `GespeichertesSpiel`.
+`RaumSpielAblage` implementiert sie in `:app`, bevorzugt das kanonische Format
+und kann vorhandene Legacy-Tabellen als gekennzeichneten Startzustand lesen.
+Die Ladeoberfläche verwendet nur noch `SpielstandUebersicht` und keine
+Room-Entitäten.
+
+`ZentralbankSpeicher` bleibt als Übergangsfassade für noch nicht migrierte
+Legacy-Schreibvorgänge bestehen. Die Zuordnung alter Tabellenzeilen befindet
+sich im Datenbereich; insbesondere alte Anleihendatensätze benötigen weiterhin
+eine dokumentierte Kompatibilitätsannahme über den ersten Besitzer. Neue
+fachliche Speicherungen erhalten Startzustand und Ereignisse. Gleichzeitig
+gestartete Speicheraufträge werden pro Spielstand geordnet.
 
 ## Navigation und Oberfläche
 
@@ -202,20 +217,24 @@ Anleihen, Expansion, Konflikte, Überschuldung, Ablaufcache, Markt- und
 Anleihenauswertungen sowie Serialisierung. App-Tests
 decken Teile der Legacy-Finanzberechnungen, Zuordnungen und Anzeigen ab.
 
-Es fehlen noch Tests einer fachlichen Ablageschnittstelle, einer zentralen
-Spielsitzung und state-hoisted Bereichs-ViewModels.
+Ein Ablagevertragstest prüft Beobachten, Speichern, Laden und Löschen; weitere
+Tests sichern JSON-/Room-Rundlauf, Formatversionsfehler und die
+Legacy-Rekonstruktion. Es fehlen noch Tests einer zentralen Spielsitzung und
+state-hoisted Bereichs-ViewModels.
 
 ## Festgestellte Regelverletzungen und Risiken
 
 - Das Legacy-`Spiel` und `SpielZustand` sind gleichzeitig produktive Wahrheiten.
-- `GameViewModel` rekonstruiert und koordiniert Persistenz direkt.
+- `GameViewModel` schreibt für nicht migrierte Bereiche weiterhin parallel in
+  die Legacy-Fassade, obwohl Laden, Speichern und Löschen bereits über
+  `SpielAblage` laufen.
 - Der Ereignisverlauf geht bei Legacy-Synchronisation und Rundenbeginn verloren.
 - Compose-Bereiche berechnen umfangreiche fachliche Auswertungen aus `Spiel`.
 - Formatierungsmethoden liegen im Fachmodul.
-- Löschen und Konfliktaktionen sind bis zu ihren vollständigen vertikalen
-  Migrationen gesperrt.
-- Die vorhandene Room-Struktur kann einen vollständigen `SpielZustand` samt
-  Ereignisverlauf nicht verlustfrei speichern.
+- Konfliktaktionen sind bis zu ihrer vollständigen vertikalen Migration
+  gesperrt.
+- Legacy-Tabellen können keinen ursprünglichen Ereignisverlauf liefern; ein
+  solcher Stand bleibt deshalb als Import ohne vollständigen Verlauf markiert.
 - Eine vorschnelle Marktplatz-Migration würde historische Zeitreihen verlieren
   oder eine neue vierte Zwischenwahrheit erzeugen.
 

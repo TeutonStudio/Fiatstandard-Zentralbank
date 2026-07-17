@@ -1,5 +1,78 @@
 # Umbau-Log
 
+## 17.07.2026 - Spielablage extrahiert (Architektur-Etappe 3)
+
+Durchgeführte Änderungen:
+
+- Android-freie Schnittstelle `SpielAblage` mit `SpielstandUebersicht` und
+  `GespeichertesSpiel` im Fachmodul eingeführt.
+- Room um `SpielstandEntitaet`, `SpielstandDao` und das versionierte
+  `FachSpielstand`-Format erweitert.
+- Datenbankschema von Version 1 auf 2 angehoben und eine nicht-destruktive
+  Migration ergänzt; die destruktive Fallback-Migration entfernt.
+- `RaumSpielAblage` implementiert Beobachten, Laden, Speichern und
+  transaktionales Löschen hinter der Fachschnittstelle.
+- Vorhandene achtteilige Room-Spielstände werden weiterhin gelesen und als
+  Startzustand ohne erfundenen Ereignisverlauf gekennzeichnet.
+- Fachmodell- und Spielstandzuordnung in `daten/zuordnung` gebündelt.
+- `GameViewModel` auf fachliche Spielstandsübersichten sowie Laden, Speichern
+  und Löschen über `SpielAblage` umgestellt. Gleichzeitig gestartete
+  Speicheraufträge können keinen neueren Stand mit einem älteren überschreiben.
+- `SpielLaden` von `SpielDaten` entkoppelt und vor dem dauerhaften Löschen um
+  eine Bestätigung ergänzt.
+
+Architekturentscheidung:
+
+- `GespeichertesSpiel` persistiert den Startzustand und die angewandten
+  Ereignisse. Legacy-Daten werden nicht in einen fiktiven Verlauf
+  zurückübersetzt.
+- Die vorhandenen Tabellen werden in dieser Etappe nicht entfernt. Sie bleiben
+  für die noch nicht migrierte Oberfläche les- und schreibbar; das kanonische
+  Format gewinnt bei gleicher Spiel-ID.
+- `AppDatabase` behält als bestehende Room-Klasse vorerst ihren Namen und ihr
+  Legacy-Paket. Eine kosmetische Umbenennung würde keine Persistenzverantwortung
+  entfernen und wird mit der späteren Datenpaketbereinigung gebündelt.
+
+Entfernte Altstruktur:
+
+- `fallbackToDestructiveMigration` entfernt.
+- Room-Entitäten und die Map `spielSpeicher` aus der Ladeoberfläche entfernt.
+- Rund 260 Zeilen Spielstandrekonstruktion sowie die abgeleitete
+  Speicherübersicht aus `GameViewModel` entfernt.
+- Die bis dahin gesperrte Löschaktion durch eine transaktionale
+  Ablageoperation ersetzt.
+
+Verbleibende Übergangslösung:
+
+- `GameViewModel` ist noch keine `SpielSitzung` und hält weiterhin
+  `aktuellesSpiel`, `aktuelleDaten` und den Legacy-`ZentralbankSpeicher` für
+  nicht migrierte Bereiche.
+- Legacy-Mutationen und der Rundenwechsel setzen den Ereignisverlauf weiterhin
+  zurück. Solche Spielstände tragen nun dauerhaft die Kennung
+  `ausLegacyDatenImportiert`.
+- Die konkrete Room-Klasse heißt weiterhin `AppDatabase`; fachlich liegt die
+  neue Ablage bereits unter `daten/raumdatenbank` und `daten/zuordnung`.
+
+Ausgeführte Tests:
+
+- `./gradlew :domain:test` erfolgreich.
+- `./gradlew :app:testDebugUnitTest` erfolgreich.
+- `./gradlew test` erfolgreich.
+- `./gradlew assembleDebug` erfolgreich.
+- `./gradlew check` erfolgreich.
+- Neue Tests prüfen Ablagevertrag, Speichern/Laden/Löschen,
+  JSON-/Room-Rundlauf, unbekannte Formatversionen und Legacy-Rekonstruktion.
+
+Offene Probleme:
+
+- Die nächste Etappe muss `SpielSitzung` extrahieren und
+  `ZentralbankSpeicher` aus der zentralen Sitzung verdrängen.
+- Eine instrumentierte Room-Migrationsprüfung gegen eine echte
+  Version-1-Datenbank fehlt; SQL, Entity und generierter Room-Code werden
+  derzeit durch Kompilierung und Build geprüft.
+- Historische Markt- und Anleihendaten sind im `SpielZustand` weiterhin nicht
+  vollständig ausgedrückt.
+
 ## 17.07.2026 - GameViewModel-Altcode bereinigt
 
 Durchgeführte Änderungen:

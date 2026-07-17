@@ -26,7 +26,7 @@ Gradle-Migration dasselbe Modul.
 | `GameUiState` | fachlich konkreter Zustand | kein pauschales `UiState`; je Bereich benennen |
 | `Geld` | `Geld` | bereits präzise, `Long`-basiert und kürzer als `GeldBetrag` |
 | `ZugAutomat` | `ZugAuswertung` und `ZugRegelwerk` | Lesen/Entscheiden wird von Zustandsänderungen getrennt |
-| `ZentralbankSpeicher` | Übergangsfassade | erst nach fachlicher Schnittstelle durch `RaumSpielAblage` ablösen |
+| `ZentralbankSpeicher` | Übergangsfassade | nur noch für nicht migrierte Legacy-Schreibwege; fachliche Persistenz liegt in `RaumSpielAblage` |
 
 Die Begriffe `Reduzierer`, `Geschäftslogik`, `Manager`, `Helper`, `Utils` und
 vergleichbar unspezifische Sammelnamen werden nicht verwendet.
@@ -151,12 +151,11 @@ Die Schnittstelle liegt im Fachmodul und kennt nur `SpielstandUebersicht`,
 in `:app`, koordiniert alle DAOs und führt Room-Entitäten über benannte
 Zuordnungen in das Fachmodell über.
 
-Die aktuelle Tabellenstruktur kann nicht verlustfrei in einen vollständigen
-Ereignisverlauf zurückübersetzt werden. Deshalb benötigt die Ablageetappe eine
-explizite Kompatibilitätsstrategie: alte Tabellenstände werden einmalig als
-Startzustand importiert; neue Speicherungen persistieren Zustand plus Verlauf.
-Eine neue Room-Tabelle darf nur mit einer nicht-destruktiven Migration
-eingeführt werden.
+Die Legacy-Tabellenstruktur kann nicht verlustfrei in einen vollständigen
+Ereignisverlauf zurückübersetzt werden. Die umgesetzte Kompatibilitätsstrategie
+liest alte Tabellenstände als gekennzeichneten Startzustand; neue Speicherungen
+persistieren Startzustand plus Verlauf. `FachSpielstand` wurde mit der
+nicht-destruktiven Room-Migration 1→2 eingeführt.
 
 ### `SpielSitzung`
 
@@ -214,6 +213,7 @@ Bereichseinstiege, aber keine DAOs und keine Fachregeln.
    Teilregelwerke zerlegen.
 4. Persistenzformat und nicht-destruktive Room-Migration festlegen;
    `SpielAblage`, `RaumSpielAblage` und Zuordnung gemeinsam integrieren.
+   **Abgeschlossen am 17.07.2026.**
 5. `SpielSitzung` extrahieren und Eventverlauf beim Laden/Speichern erhalten.
 6. Marktplatz-Historie im `SpielZustand` beziehungsweise durch fachliche
    Auswertungen abbilden.
@@ -230,7 +230,8 @@ Bereichseinstiege, aber keine DAOs und keine Fachregeln.
   fachlich deutsch.
 - Das alte `datenbank.Spiel` wird in Code und Dokumentation als Legacy-
   Übergangsmodell behandelt.
-- Die App-seitige Fachmodellzuordnung bleibt bis zur Ablagemigration erhalten.
+- Die App-seitigen Fachmodell- und Legacy-Zuordnungen bleiben bis zur Ablösung
+  aller Legacy-Aufrufer erhalten.
 - Bestehende Navigation und UI bleiben zunächst unverändert, greifen aber nach
   jeder Bereichsmigration nur noch auf den jeweiligen Bereichszustand zu.
 - Alte Room-Spielstände werden nicht rückwirkend als erfundener Ereignisverlauf
@@ -255,8 +256,8 @@ Bereichseinstiege, aber keine DAOs und keine Fachregeln.
 - Historische Diagramme hängen an Caches des Legacy-Modells; ihre Semantik muss
   durch Charakterisierungstests gesichert werden, bevor sie verschoben wird.
 - Anleihen besitzen ein altes und ein neues Speicherformat.
-- `fallbackToDestructiveMigration` darf bei einer Schemaerweiterung nicht als
-  Ersatz für eine echte Migration verwendet werden.
+- Künftige Room-Schemaänderungen müssen die bestehende nicht-destruktive
+  Migrationskette ab Version 1 fortsetzen.
 - Gleichzeitige Legacy- und Domain-Mutationen können beim Fehler zwischen zwei
   Schritten auseinanderlaufen; daher muss jeder vertikale Schnitt beide Wege
   vollständig ersetzen.
