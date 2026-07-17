@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "id": "vorlage-inselreich",
   "name": "Inselreich",
   "zeilen": 8,
@@ -26,33 +26,5 @@
     { "position": { "zeile": 6, "spalte": 1, "haelfte": "OBEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 6, "spalte": 1, "haelfte": "UNTEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 6, "spalte": 2, "haelfte": "UNTEN" }, "gelaende": "EBENE" }
-  ],
-  "spezialfelder": [
-    {
-      "id": "stadt-zentrum",
-      "name": "Zentralstadt",
-      "typ": "STADT",
-      "positionen": [
-        { "zeile": 3, "spalte": 3, "haelfte": "UNTEN" },
-        { "zeile": 3, "spalte": 3, "haelfte": "OBEN" },
-        { "zeile": 3, "spalte": 4, "haelfte": "UNTEN" },
-        { "zeile": 2, "spalte": 4, "haelfte": "UNTEN" },
-        { "zeile": 2, "spalte": 3, "haelfte": "OBEN" },
-        { "zeile": 2, "spalte": 4, "haelfte": "OBEN" }
-      ]
-    },
-    {
-      "id": "hafen-sued",
-      "name": "Südhafen",
-      "typ": "HAFEN",
-      "positionen": [
-        { "zeile": 6, "spalte": 1, "haelfte": "UNTEN" },
-        { "zeile": 6, "spalte": 1, "haelfte": "OBEN" },
-        { "zeile": 6, "spalte": 2, "haelfte": "UNTEN" },
-        { "zeile": 5, "spalte": 2, "haelfte": "UNTEN" },
-        { "zeile": 5, "spalte": 1, "haelfte": "OBEN" },
-        { "zeile": 5, "spalte": 2, "haelfte": "OBEN" }
-      ]
-    }
   ]
 }

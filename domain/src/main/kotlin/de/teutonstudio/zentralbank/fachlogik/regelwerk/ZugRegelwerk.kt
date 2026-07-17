@@ -129,6 +129,18 @@ internal object ZugRegelwerk {
         is SpielEreignis.AnleiheFaellig -> SchrittTyp.ANLEIHEN_HANDEL
         is SpielEreignis.RohstoffHandel -> SchrittTyp.ROHSTOFF_HANDEL
         is SpielEreignis.Expansion -> SchrittTyp.EXPANSION
+        is SpielEreignis.HauptbahnhofPlatziert -> null
+        is SpielEreignis.EckGebaeudeGebaut,
+        is SpielEreignis.EckGebaeudeAufgewertet,
+        is SpielEreignis.SchieneGebaut,
+        is SpielEreignis.NeutraleAnlageErrichtet,
+        is SpielEreignis.KartenBelegungEntfernt,
+        is SpielEreignis.KartenBauwerkZustandGeaendert,
+        is SpielEreignis.FeldAnlagenZustandGeaendert -> SchrittTyp.EXPANSION
+        is SpielEreignis.SeewegEingerichtet,
+        is SpielEreignis.SeewegEntfernt -> SchrittTyp.EXPANSION
+        is SpielEreignis.KriegsEinheitEingesetzt,
+        is SpielEreignis.KriegsEinheitEntfernt -> SchrittTyp.KRIEG
         is SpielEreignis.KriegErklaert,
         is SpielEreignis.KriegBeendet -> SchrittTyp.KRIEG
         is SpielEreignis.Schuldenstrich -> SchrittTyp.FINANZ_AUSGABEN
@@ -149,6 +161,18 @@ internal object ZugRegelwerk {
         is SpielEreignis.AnleiheVerkauft -> ereignis.verkaeufer
         is SpielEreignis.RohstoffHandel -> ereignis.kaeufer
         is SpielEreignis.Expansion -> ereignis.spieler
+        is SpielEreignis.HauptbahnhofPlatziert -> ereignis.spieler
+        is SpielEreignis.EckGebaeudeGebaut -> ereignis.spieler
+        is SpielEreignis.EckGebaeudeAufgewertet -> ereignis.spieler
+        is SpielEreignis.SchieneGebaut -> ereignis.spieler
+        is SpielEreignis.NeutraleAnlageErrichtet -> ereignis.errichter
+        is SpielEreignis.KartenBelegungEntfernt -> ereignis.spieler
+        is SpielEreignis.KartenBauwerkZustandGeaendert -> ereignis.spieler
+        is SpielEreignis.FeldAnlagenZustandGeaendert -> ereignis.spieler
+        is SpielEreignis.SeewegEingerichtet -> ereignis.spieler
+        is SpielEreignis.SeewegEntfernt -> ereignis.spieler
+        is SpielEreignis.KriegsEinheitEingesetzt -> ereignis.spieler
+        is SpielEreignis.KriegsEinheitEntfernt -> ereignis.spieler
         is SpielEreignis.KriegErklaert -> ereignis.aggressor
         is SpielEreignis.KriegBeendet -> ereignis.spielerA
         is SpielEreignis.Schuldenstrich -> ereignis.spieler

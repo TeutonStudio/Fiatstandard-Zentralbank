@@ -10,7 +10,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
@@ -32,7 +32,7 @@ fun SpielErstellen(
     erstelleSpiel: (daten: Spiel, nachErstellen: () -> Unit) -> Unit,
     nachAbschluß: () -> Unit,
     seite: MutableIntState = remember { mutableIntStateOf(1) },
-    vorbelegteKarte: Spielkarte? = null,
+    vorbelegteKarte: KartenVorlage? = null,
 ) {
     val spieler = remember { mutableStateMapOf(
         "Spieler 1" to 100.toZahlungsmittel(),
@@ -96,7 +96,7 @@ fun SpielErstellen(
                         inflationsziel = zentralbankZiele[1],
                         normaleAbweichung = zentralbankZiele[2],
                         starkeAbweichung = zentralbankZiele[3],
-                        karte = karte.copy(id = "spiel-${UUID.randomUUID()}"),
+                        karte = karte.alsSpielkarte(spielId = "spiel-${UUID.randomUUID()}"),
                     )
                     LaunchedEffect(Unit) {
                         erstelleSpiel(daten, nachAbschluß)

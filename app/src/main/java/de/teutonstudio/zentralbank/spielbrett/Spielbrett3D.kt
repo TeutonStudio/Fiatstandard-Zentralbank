@@ -35,6 +35,7 @@ import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.utils.screenToRay
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
@@ -46,6 +47,7 @@ private const val OBERFLAECHEN_ABSTAND = 0.004f
 private const val WASSER_MINDEST_SICHTWEITE = 10_000f
 private const val BRETT_RAND = 0.35f
 private const val KAMERA_FOKUS_HOEHE = AUFLAGEN_HOEHE * 0.2f
+private const val OBJEKT_BASIS_HOEHE = AUFLAGEN_HOEHE + 0.03f
 
 private val WasserFarbe = Color(0xFF1565A8)
 private val WasserRasterHell = Color(0xFF1976B9)
@@ -60,7 +62,7 @@ private val GrundFarbeDunkel = WasserRasterDunkel
  *
  * Die Grundflaeche besteht aus gleichseitigen Dreiecken mit der geometrischen Hoehe 2.
  * Jede [DreieckAuflage] wird als deckungsgleiches dreiseitiges Prisma dargestellt. Land und
- * Spezialfelder liegen dabei auf getrennten visuellen Ebenen. Ziehen dreht die Kamera, eine
+ * Geländeauflagen liegen dabei auf getrennten visuellen Ebenen. Ziehen dreht die Kamera, eine
  * Zwei-Finger-Geste verschiebt sie und Pinch zoomt.
  *
  * [betrachtungsStatus] enthaelt dieselbe Transformation, die auch die Gesten veraendern. Dadurch
@@ -162,6 +164,20 @@ fun Spielbrett3D(
                 color = typ.farbe,
                 metallic = typ.metallisch,
                 roughness = typ.rauheit,
+            )
+        }
+    }
+    val verwendeteObjektTypen = (
+        modell.eckObjekte.map(EckObjektAuflage::typ) +
+            modell.kantenObjekte.map(KantenObjektAuflage::typ) +
+            modell.feldObjekte.map(FeldObjektAuflage::typ)
+        ).distinct()
+    val objektMaterialien = remember(materialLoader, verwendeteObjektTypen) {
+        verwendeteObjektTypen.associateWith { typ ->
+            materialLoader.createColorInstance(
+                color = typ.farbe,
+                metallic = if (typ.zustand == ObjektDarstellungsZustand.ZERSTOERT) 0.05f else 0.3f,
+                roughness = if (typ.zustand == ObjektDarstellungsZustand.AUSGEWAEHLT) 0.25f else 0.62f,
             )
         }
     }
@@ -274,7 +290,100 @@ fun Spielbrett3D(
                 )
             }
         }
+
+        modell.kantenObjekte.forEach { objekt ->
+            val anfang = geometrie.punkt(objekt.position.anfang)
+            val ende = geometrie.punkt(objekt.position.ende)
+            if (anfang != null && ende != null) {
+                key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
+                    val deltaX = ende.x - anfang.x
+                    val deltaZ = ende.z - anfang.z
+                    val laenge = hypot(deltaX, deltaZ)
+                    val markierung = objekt.typ.form == SpielObjektForm.MARKIERUNG
+                    val seeweg = objekt.typ.form == SpielObjektForm.FRACHTSCHIFF
+                    CubeNode(
+                        size = Size(
+                            x = laenge,
+                            y = if (markierung || seeweg) 0.10f else 0.16f,
+                            z = if (markierung) 0.16f else if (seeweg) 0.08f else 0.12f,
+                        ),
+                        materialInstance = objektMaterialien.getValue(objekt.typ),
+                        position = Position(
+                            x = (anfang.x + ende.x) / 2f,
+                            y = OBJEKT_BASIS_HOEHE + if (markierung) 0.08f else 0.12f,
+                            z = (anfang.z + ende.z) / 2f,
+                        ),
+                        rotation = Rotation(
+                            y = -Math.toDegrees(atan2(deltaZ, deltaX).toDouble()).toFloat(),
+                        ),
+                    )
+                }
+            }
+        }
+
+        modell.feldObjekte.forEach { objekt ->
+            key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
+                val mitte = geometrie.dreieck(objekt.position).mittelpunkt
+                val (radius, hoehe, seiten) = objekt.typ.feldAbmessungen()
+                CylinderNode(
+                    radius = radius,
+                    height = hoehe,
+                    sideCount = seiten,
+                    materialInstance = objektMaterialien.getValue(objekt.typ),
+                    position = Position(
+                        x = mitte.x,
+                        y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
+                        z = mitte.z,
+                    ),
+                )
+            }
+        }
+
+        modell.eckObjekte.forEach { objekt ->
+            val punkt = geometrie.punkt(objekt.position)
+            if (punkt != null) {
+                key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
+                    val (radius, hoehe, seiten) = objekt.typ.eckAbmessungen()
+                    CylinderNode(
+                        radius = radius,
+                        height = hoehe,
+                        sideCount = seiten,
+                        materialInstance = objektMaterialien.getValue(objekt.typ),
+                        position = Position(
+                            x = punkt.x,
+                            y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
+                            z = punkt.z,
+                        ),
+                    )
+                }
+            }
+        }
     }
+}
+
+private data class ObjektAbmessungen(
+    val radius: Float,
+    val hoehe: Float,
+    val seiten: Int,
+)
+
+private fun SpielObjektTyp.eckAbmessungen(): ObjektAbmessungen = when (form) {
+    SpielObjektForm.HAUPTBAHNHOF -> ObjektAbmessungen(0.34f, 0.92f, 6)
+    SpielObjektForm.BAHNHOF -> ObjektAbmessungen(0.28f, 0.64f, 4)
+    SpielObjektForm.GROSSBAHNHOF -> ObjektAbmessungen(0.36f, 0.88f, 4)
+    SpielObjektForm.HAFEN -> ObjektAbmessungen(0.30f, 0.54f, 8)
+    SpielObjektForm.GROSSHAFEN -> ObjektAbmessungen(0.39f, 0.72f, 8)
+    SpielObjektForm.MARKIERUNG -> ObjektAbmessungen(0.46f, 0.12f, 12)
+    else -> ObjektAbmessungen(0.28f, 0.55f, 6)
+}
+
+private fun SpielObjektTyp.feldAbmessungen(): ObjektAbmessungen = when (form) {
+    SpielObjektForm.ABBAUEINHEIT -> ObjektAbmessungen(0.32f, 0.46f, 8)
+    SpielObjektForm.GESCHAEFTSBANK -> ObjektAbmessungen(0.36f, 0.58f, 4)
+    SpielObjektForm.PANZER -> ObjektAbmessungen(0.34f, 0.38f, 4)
+    SpielObjektForm.KRIEGSSCHIFF -> ObjektAbmessungen(0.38f, 0.30f, 3)
+    SpielObjektForm.MARKIERUNG -> ObjektAbmessungen(0.50f, 0.08f, 12)
+    else -> ObjektAbmessungen(0.30f, 0.44f, 6)
 }
 
 private class BetrachtungsGesten(
@@ -491,6 +600,7 @@ private fun SpielbrettVorschau(
         val halbeBrettBreite = (geometrie.breite + BRETT_RAND * 2f) / 2f
         val halbeBrettTiefe = (geometrie.tiefe + BRETT_RAND * 2f) / 2f
         val maximaleHoehe = when {
+            modell.eckObjekte.isNotEmpty() -> OBJEKT_BASIS_HOEHE + 0.92f
             modell.auflagen.any { it.ebene == AuflagenEbene.SPEZIAL } ->
                 AUFLAGEN_HOEHE + SPEZIAL_AUFLAGEN_HOEHE
             modell.auflagen.isNotEmpty() -> AUFLAGEN_HOEHE
@@ -645,6 +755,37 @@ private fun SpielbrettVorschau(
                     style = Stroke(width = 1.5.dp.toPx()),
                 )
             }
+
+        modell.kantenObjekte.forEach { objekt ->
+            val anfang = geometrie.punkt(objekt.position.anfang) ?: return@forEach
+            val ende = geometrie.punkt(objekt.position.ende) ?: return@forEach
+            drawLine(
+                color = objekt.typ.farbe,
+                start = VorschauWeltPunkt(anfang.x, OBJEKT_BASIS_HOEHE, anfang.z).alsOffset(),
+                end = VorschauWeltPunkt(ende.x, OBJEKT_BASIS_HOEHE, ende.z).alsOffset(),
+                strokeWidth = if (objekt.typ.form == SpielObjektForm.MARKIERUNG) {
+                    6.dp.toPx()
+                } else {
+                    4.dp.toPx()
+                },
+            )
+        }
+        modell.feldObjekte.forEach { objekt ->
+            val mitte = geometrie.dreieck(objekt.position).mittelpunkt
+            drawCircle(
+                color = objekt.typ.farbe,
+                radius = if (objekt.typ.form == SpielObjektForm.MARKIERUNG) 8.dp.toPx() else 6.dp.toPx(),
+                center = VorschauWeltPunkt(mitte.x, OBJEKT_BASIS_HOEHE, mitte.z).alsOffset(),
+            )
+        }
+        modell.eckObjekte.forEach { objekt ->
+            val punkt = geometrie.punkt(objekt.position) ?: return@forEach
+            drawCircle(
+                color = objekt.typ.farbe,
+                radius = if (objekt.typ.form == SpielObjektForm.MARKIERUNG) 9.dp.toPx() else 7.dp.toPx(),
+                center = VorschauWeltPunkt(punkt.x, OBJEKT_BASIS_HOEHE, punkt.z).alsOffset(),
+            )
+        }
     }
 }
 

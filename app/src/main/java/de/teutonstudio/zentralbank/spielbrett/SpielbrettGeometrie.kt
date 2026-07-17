@@ -1,5 +1,7 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import kotlin.math.sqrt
 
 internal const val GRUNDDREIECK_HOEHE = 2f
@@ -42,7 +44,30 @@ internal data class SpielbrettGeometrie(
             val deltaZ = ecke.z - punkt.z
             deltaX * deltaX + deltaZ * deltaZ
         }
-        return DreieckTreffer(dreieck.position, naechsteEcke)
+        val naechsteKante = dreieck.ecken.indices.minBy { index ->
+            val a = dreieck.ecken[index]
+            val b = dreieck.ecken[(index + 1) % dreieck.ecken.size]
+            quadratischerAbstandZuStrecke(punkt, a, b)
+        }
+        val ecke = dreieck.ecken[naechsteEcke]
+        val eckenAbstand = sqrt(
+            (ecke.x - punkt.x) * (ecke.x - punkt.x) +
+                (ecke.z - punkt.z) * (ecke.z - punkt.z),
+        )
+        val kantenAbstand = sqrt(
+            quadratischerAbstandZuStrecke(
+                punkt,
+                dreieck.ecken[naechsteKante],
+                dreieck.ecken[(naechsteKante + 1) % dreieck.ecken.size],
+            ),
+        )
+        return DreieckTreffer(
+            position = dreieck.position,
+            naechsteEcke = naechsteEcke,
+            naechsteKante = naechsteKante,
+            abstandZurNaechstenEcke = eckenAbstand,
+            abstandZurNaechstenKante = kantenAbstand,
+        )
     }
 
     fun hexagonUm(treffer: DreieckTreffer): List<DreieckPosition> {
@@ -56,6 +81,37 @@ internal data class SpielbrettGeometrie(
                     .thenBy { position -> position.ausrichtung.ordinal },
             )
     }
+
+    fun punkt(ecke: KartenEcke): BrettPunkt? {
+        dreiecke.forEach { dreieck ->
+            val fachEcken = dreieck.position.zuKartenFeld().ecken()
+            val index = fachEcken.indexOf(ecke)
+            if (index >= 0) return dreieck.ecken[index]
+        }
+        return null
+    }
+}
+
+private fun quadratischerAbstandZuStrecke(
+    punkt: BrettPunkt,
+    a: BrettPunkt,
+    b: BrettPunkt,
+): Float {
+    val dx = b.x - a.x
+    val dz = b.z - a.z
+    val laengeQuadrat = dx * dx + dz * dz
+    if (laengeQuadrat <= 0.000001f) {
+        val px = punkt.x - a.x
+        val pz = punkt.z - a.z
+        return px * px + pz * pz
+    }
+    val anteil = (((punkt.x - a.x) * dx + (punkt.z - a.z) * dz) / laengeQuadrat)
+        .coerceIn(0f, 1f)
+    val naechsterX = a.x + anteil * dx
+    val naechsterZ = a.z + anteil * dz
+    val px = punkt.x - naechsterX
+    val pz = punkt.z - naechsterZ
+    return px * px + pz * pz
 }
 
 private fun GrundDreieck.enthaelt(punkt: BrettPunkt): Boolean {

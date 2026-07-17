@@ -16,6 +16,7 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
 import de.teutonstudio.zentralbank.fachlogik.auswertung.ZugAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.SpielAblage
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.SpielstandUebersicht
@@ -106,6 +107,38 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
     }
 
+    fun ereignisRueckgaengig() {
+        val ablauf = spielAblauf
+        if (ablauf == null) {
+            _spielFehler.tryEmit("Kein Spiel geladen.")
+            return
+        }
+        runCatching { ablauf.rueckgaengig() }
+            .onSuccess { zustand ->
+                aktualisiereSpielZustand(zustand)
+                speichereAktuellenFachSpielstand()
+            }
+            .onFailure { fehler ->
+                _spielFehler.tryEmit(fehler.message ?: "Es gibt nichts zum Rückgängigmachen.")
+            }
+    }
+
+    fun ereignisWiederholen() {
+        val ablauf = spielAblauf
+        if (ablauf == null) {
+            _spielFehler.tryEmit("Kein Spiel geladen.")
+            return
+        }
+        ablauf.wiederholen()
+            .onSuccess { zustand ->
+                aktualisiereSpielZustand(zustand)
+                speichereAktuellenFachSpielstand()
+            }
+            .onFailure { fehler ->
+                _spielFehler.tryEmit(fehler.message ?: "Es gibt nichts zum Wiederholen.")
+            }
+    }
+
     fun naechsterZugabschnitt() {
         val zustand = spielAblauf?.zustand
         val zug = zustand?.zugStatus
@@ -117,13 +150,22 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         when (zug.phase) {
             Phase.Einnahmen,
             Phase.Ausgaben -> {
+                val kartenEinnahme = if (zug.phase == Phase.Einnahmen) {
+                    zustand.karte
+                        ?.let { karte -> KartenAuswertung.rohstoffErtrag(karte, zug.spieler) }
+                        ?.takeIf { mengen -> mengen.isNotEmpty() }
+                        ?.let { mengen -> SpielEreignis.RohstoffEinnahme(zug.spieler, mengen) }
+                } else {
+                    null
+                }
                 val schrittEreignisse = ZugAuswertung.schritte(zustand)
                     .filter { schritt ->
                         schritt.typ.pflicht && schritt.zustand == SchrittZustand.VERFUEGBAR
                     }
                     .map { schritt -> SpielEreignis.SchrittAbgeschlossen(schritt.typ) }
                 wendeEreignisseAn(
-                    schrittEreignisse + SpielEreignis.PhaseAbgeschlossen(zug.phase),
+                    listOfNotNull(kartenEinnahme) + schrittEreignisse +
+                        SpielEreignis.PhaseAbgeschlossen(zug.phase),
                 )
             }
             Phase.Aktionen -> beendeZug()
@@ -393,6 +435,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         } else {
             abgebildeterSpielZustand.copy(
                 karte = bisherigerSpielZustand.karte,
+                spielabschnitt = bisherigerSpielZustand.spielabschnitt,
                 rundenzähler = bisherigerSpielZustand.rundenzähler,
                 aktiverSpieler = bisherigerSpielZustand.aktiverSpieler,
                 zugStatus = bisherigerSpielZustand.zugStatus,

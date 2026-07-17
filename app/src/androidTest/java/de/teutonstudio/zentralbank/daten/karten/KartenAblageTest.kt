@@ -2,7 +2,7 @@ package de.teutonstudio.zentralbank.daten.karten
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -19,11 +19,11 @@ class KartenAblageTest {
         val vorlagen = ablage.alleKartenLaden()
 
         assertTrue(vorlagen.any { eintrag ->
-            eintrag.quelle == KartenQuelle.VORLAGE && eintrag.karte.id == "vorlage-inselreich"
+            eintrag.quelle == KartenQuelle.VORLAGE && eintrag.vorlage.id == "vorlage-inselreich"
         })
 
         val gespeichert = ablage.eigeneKarteSpeichern(
-            Spielkarte(
+            KartenVorlage(
                 id = "instrumentierter-entwurf",
                 name = "Instrumentierte Karte",
                 zeilen = 3,
@@ -32,10 +32,10 @@ class KartenAblageTest {
         )
         try {
             val neuGeladen = ablage.alleKartenLaden()
-                .single { eintrag -> eintrag.karte.id == gespeichert.id }
+                .single { eintrag -> eintrag.vorlage.id == gespeichert.id }
 
             assertEquals(KartenQuelle.EIGENE_KARTE, neuGeladen.quelle)
-            assertEquals(gespeichert, neuGeladen.karte)
+            assertEquals(gespeichert, neuGeladen.vorlage)
         } finally {
             File(kontext.filesDir, "karten/eigene/${gespeichert.id}.json").delete()
         }

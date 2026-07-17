@@ -1,16 +1,14 @@
 package de.teutonstudio.zentralbank.spielbrett
 
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
-import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KartenEditorTest {
     @Test
-    fun `Gelaendewerkzeug speichert nur das bearbeitete Landdreieck`() {
+    fun gelaendewerkzeugSpeichertNurDasBearbeiteteDreieck() {
         val karte = leereKarte()
         val treffer = DreieckTreffer(
             DreieckPosition(1, 1, DreieckAusrichtung.UNTEN),
@@ -19,60 +17,38 @@ class KartenEditorTest {
 
         val bearbeitet = karte.wendeWerkzeugAn(treffer, KartenWerkzeug.WALD)
 
-        assertEquals(1, bearbeitet.landfelder.size)
-        assertEquals(GelaendeTyp.WALD, bearbeitet.landfelder.single().gelaende)
-        assertTrue(bearbeitet.spezialfelder.isEmpty())
+        assertEquals(1, bearbeitet.gelaendefelder.size)
+        assertEquals(GelaendeTyp.WALD, bearbeitet.gelaendefelder.single().gelaende)
     }
 
     @Test
-    fun `Spezialwerkzeug legt genau sechs Landdreiecke als Gruppe an`() {
+    fun wasserEntferntNurDasGetroffeneGelaendefeld() {
+        val trefferA = DreieckTreffer(DreieckPosition(1, 1, DreieckAusrichtung.UNTEN), 0)
+        val trefferB = DreieckTreffer(DreieckPosition(1, 1, DreieckAusrichtung.OBEN), 0)
         val karte = leereKarte()
-        val treffer = innererTreffer(karte)
+            .wendeWerkzeugAn(trefferA, KartenWerkzeug.WALD)
+            .wendeWerkzeugAn(trefferB, KartenWerkzeug.GEBIRGE)
 
-        val bearbeitet = karte.wendeWerkzeugAn(
-            treffer = treffer,
-            werkzeug = KartenWerkzeug.STADT,
-            neueSpezialId = { "stadt-1" },
-        )
+        val bearbeitet = karte.wendeWerkzeugAn(trefferA, KartenWerkzeug.WASSER)
 
-        assertEquals(6, bearbeitet.landfelder.size)
-        assertEquals(1, bearbeitet.spezialfelder.size)
-        assertEquals(SpezialfeldTyp.STADT, bearbeitet.spezialfelder.single().typ)
-        assertEquals(6, bearbeitet.spezialfelder.single().positionen.distinct().size)
+        assertEquals(1, bearbeitet.gelaendefelder.size)
+        assertEquals(GelaendeTyp.GEBIRGE, bearbeitet.gelaendefelder.single().gelaende)
     }
 
     @Test
-    fun `Wasser entfernt Land und das darauf liegende Spezialfeld`() {
-        val karte = leereKarte().wendeWerkzeugAn(
-            treffer = innererTreffer(leereKarte()),
-            werkzeug = KartenWerkzeug.HAFEN,
-            neueSpezialId = { "hafen-1" },
-        )
-        val position = karte.spezialfelder.single().positionen.first()
-        val treffer = DreieckTreffer(position.zu3DPosition(), 0)
+    fun verkleinernMeldetUndEntferntFelderAusserhalb() {
+        val karte = leereKarte()
+            .wendeWerkzeugAn(
+                DreieckTreffer(DreieckPosition(3, 3, DreieckAusrichtung.OBEN), 0),
+                KartenWerkzeug.EBENE,
+            )
 
-        val bearbeitet = karte.wendeWerkzeugAn(treffer, KartenWerkzeug.WASSER)
-
-        assertFalse(position in bearbeitet.landNachPosition)
-        assertTrue(bearbeitet.spezialfelder.isEmpty())
+        assertEquals(1, karte.anzahlEntfallenderFelder(2, 2))
+        assertTrue(karte.mitAusdehnung(2, 2).gelaendefelder.isEmpty())
     }
 
     @Test
-    fun `Verkleinern entfernt Felder ausserhalb und unvollstaendige Spezialgruppen`() {
-        val ausgang = leereKarte().wendeWerkzeugAn(
-            treffer = innererTreffer(leereKarte()),
-            werkzeug = KartenWerkzeug.HEXAGON,
-            neueSpezialId = { "hex-1" },
-        )
-
-        val verkleinert = ausgang.mitAusdehnung(1, 1)
-
-        assertTrue(verkleinert.landfelder.all { it.position.zeile == 0 && it.position.spalte == 0 })
-        assertTrue(verkleinert.spezialfelder.isEmpty())
-    }
-
-    @Test
-    fun `Bearbeitungsbereich waechst ohne Limit in alle vier Richtungen`() {
+    fun bearbeitungsbereichWaechstOhneLimitInAlleVierRichtungen() {
         val karte = leereKarte()
             .erweitert(KartenRichtung.NORDEN, 80)
             .erweitert(KartenRichtung.SUEDEN, 90)
@@ -87,26 +63,10 @@ class KartenEditorTest {
         assertEquals(114L, karte.endeSpalteExklusiv)
     }
 
-    private fun leereKarte() = Spielkarte(
+    private fun leereKarte() = KartenVorlage(
         id = "testkarte",
         name = "Testkarte",
         zeilen = 4,
         spalten = 4,
     )
-
-    private fun innererTreffer(karte: Spielkarte): DreieckTreffer {
-        val geometrie = berechneSpielbrettGeometrie(
-            zeilen = karte.zeilen,
-            spalten = karte.spalten,
-            startZeile = karte.startZeile,
-            startSpalte = karte.startSpalte,
-        )
-        return geometrie.dreiecke.asSequence()
-            .flatMap { dreieck ->
-                dreieck.ecken.indices.asSequence().map { ecke ->
-                    DreieckTreffer(dreieck.position, ecke)
-                }
-            }
-            .first { treffer -> geometrie.hexagonUm(treffer).size == 6 }
-    }
 }

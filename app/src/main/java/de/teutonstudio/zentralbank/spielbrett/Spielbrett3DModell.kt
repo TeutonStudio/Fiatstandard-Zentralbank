@@ -2,6 +2,8 @@ package de.teutonstudio.zentralbank.spielbrett
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 
 /**
  * Vollstaendige Beschreibung eines dreieckig tesselierten Spielbretts.
@@ -18,6 +20,9 @@ data class Spielbrett3DModell(
     val startZeile: Int = 0,
     val startSpalte: Int = 0,
     val auflagen: List<DreieckAuflage> = emptyList(),
+    val eckObjekte: List<EckObjektAuflage> = emptyList(),
+    val kantenObjekte: List<KantenObjektAuflage> = emptyList(),
+    val feldObjekte: List<FeldObjektAuflage> = emptyList(),
     val zeigeBearbeitungsRaster: Boolean = false,
 ) {
     init {
@@ -92,6 +97,55 @@ data class DreieckAuflage(
     val ebene: AuflagenEbene = AuflagenEbene.LAND,
 )
 
+@Immutable
+data class SpielObjektTyp(
+    val name: String,
+    val farbe: Color,
+    val form: SpielObjektForm,
+    val zustand: ObjektDarstellungsZustand = ObjektDarstellungsZustand.INTAKT,
+)
+
+enum class SpielObjektForm {
+    HAUPTBAHNHOF,
+    BAHNHOF,
+    GROSSBAHNHOF,
+    HAFEN,
+    GROSSHAFEN,
+    SCHIENE,
+    ABBAUEINHEIT,
+    GESCHAEFTSBANK,
+    FRACHTSCHIFF,
+    PANZER,
+    KRIEGSSCHIFF,
+    MARKIERUNG,
+}
+
+enum class ObjektDarstellungsZustand {
+    INTAKT,
+    BELAGERT,
+    ZERSTOERT,
+    VERLASSEN,
+    AUSGEWAEHLT,
+}
+
+@Immutable
+data class EckObjektAuflage(
+    val position: KartenEcke,
+    val typ: SpielObjektTyp,
+)
+
+@Immutable
+data class KantenObjektAuflage(
+    val position: KartenKante,
+    val typ: SpielObjektTyp,
+)
+
+@Immutable
+data class FeldObjektAuflage(
+    val position: DreieckPosition,
+    val typ: SpielObjektTyp,
+)
+
 enum class AuflagenEbene {
     LAND,
     SPEZIAL,
@@ -106,4 +160,7 @@ enum class KameraInteraktionsModus {
 data class DreieckTreffer(
     val position: DreieckPosition,
     val naechsteEcke: Int,
+    val naechsteKante: Int = 0,
+    val abstandZurNaechstenEcke: Float = 0f,
+    val abstandZurNaechstenKante: Float = 0f,
 )

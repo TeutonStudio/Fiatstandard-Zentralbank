@@ -6,7 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -47,7 +47,7 @@ class SpielErstellenTest {
                 },
                 nachAbschluß = { navigationsAufrufe += 1 },
                 seite = remember { mutableIntStateOf(8) },
-                vorbelegteKarte = Spielkarte(
+                vorbelegteKarte = KartenVorlage(
                     id = "test-vorlage",
                     name = "Testkarte",
                     zeilen = 2,

@@ -31,15 +31,15 @@ import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.daten.karten.KartenAblage
 import de.teutonstudio.zentralbank.daten.karten.KartenEintrag
 import de.teutonstudio.zentralbank.daten.karten.KartenQuelle
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.spielbrett.KartenEditorDialog
 import de.teutonstudio.zentralbank.spielbrett.Spielbrett3D
 import de.teutonstudio.zentralbank.spielbrett.zu3DModell
 
 @Composable
 fun KartenAuswahl(
-    ausgewaehlteKarte: Spielkarte?,
-    beiAuswahl: (Spielkarte) -> Unit,
+    ausgewaehlteKarte: KartenVorlage?,
+    beiAuswahl: (KartenVorlage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val kontext = LocalContext.current
@@ -47,7 +47,7 @@ fun KartenAuswahl(
     var eintraege by remember { mutableStateOf<List<KartenEintrag>>(emptyList()) }
     var wirdGeladen by remember { mutableStateOf(true) }
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
-    var editorKarte by remember { mutableStateOf<Spielkarte?>(null) }
+    var editorEintrag by remember { mutableStateOf<KartenEintrag?>(null) }
 
     LaunchedEffect(ablage) {
         runCatching { ablage.alleKartenLaden() }
@@ -55,7 +55,7 @@ fun KartenAuswahl(
                 eintraege = geladen
                 wirdGeladen = false
                 if (ausgewaehlteKarte == null) {
-                    geladen.firstOrNull()?.karte?.let(beiAuswahl)
+                    geladen.firstOrNull()?.vorlage?.let(beiAuswahl)
                 }
             }
             .onFailure { fehler ->
@@ -82,11 +82,14 @@ fun KartenAuswahl(
             }
             Button(
                 onClick = {
-                    editorKarte = Spielkarte(
-                        id = "neuer-entwurf",
-                        name = "Neue Karte",
-                        zeilen = 8,
-                        spalten = 8,
+                    editorEintrag = KartenEintrag(
+                        vorlage = KartenVorlage(
+                            id = "neuer-entwurf",
+                            name = "Neue Karte",
+                            zeilen = 8,
+                            spalten = 8,
+                        ),
+                        quelle = KartenQuelle.EIGENE_KARTE,
                     )
                 },
             ) {
@@ -107,7 +110,10 @@ fun KartenAuswahl(
             val vorschau: @Composable (Modifier) -> Unit = { vorschauModifier ->
                 KartenVorschau(
                     karte = ausgewaehlteKarte,
-                    beiBearbeiten = { karte -> editorKarte = karte },
+                    beiBearbeiten = { karte ->
+                        editorEintrag = eintraege.firstOrNull { it.vorlage.id == karte.id }
+                            ?: KartenEintrag(karte, KartenQuelle.EIGENE_KARTE)
+                    },
                     modifier = vorschauModifier,
                 )
             }
@@ -137,17 +143,18 @@ fun KartenAuswahl(
         }
     }
 
-    editorKarte?.let { ausgangskarte ->
+    editorEintrag?.let { eintrag ->
         KartenEditorDialog(
-            ausgangskarte = ausgangskarte,
+            ausgangsvorlage = eintrag.vorlage,
             ablage = ablage,
-            beiAbbruch = { editorKarte = null },
+            migrationsHinweise = eintrag.migrationsHinweise,
+            beiAbbruch = { editorEintrag = null },
             beiGespeichert = { karte ->
-                eintraege = (eintraege.filterNot { it.karte.id == karte.id } +
+                eintraege = (eintraege.filterNot { it.vorlage.id == karte.id } +
                     KartenEintrag(karte, KartenQuelle.EIGENE_KARTE))
-                    .sortedBy { it.karte.name.lowercase() }
+                    .sortedBy { it.vorlage.name.lowercase() }
                 beiAuswahl(karte)
-                editorKarte = null
+                editorEintrag = null
             },
         )
     }
@@ -156,19 +163,19 @@ fun KartenAuswahl(
 @Composable
 private fun KartenListe(
     eintraege: List<KartenEintrag>,
-    ausgewaehlteKarte: Spielkarte?,
-    beiAuswahl: (Spielkarte) -> Unit,
+    ausgewaehlteKarte: KartenVorlage?,
+    beiAuswahl: (KartenVorlage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        items(eintraege, key = { eintrag -> "${eintrag.quelle}-${eintrag.karte.id}" }) { eintrag ->
-            val istAusgewaehlt = eintrag.karte.id == ausgewaehlteKarte?.id
+        items(eintraege, key = { eintrag -> "${eintrag.quelle}-${eintrag.vorlage.id}" }) { eintrag ->
+            val istAusgewaehlt = eintrag.vorlage.id == ausgewaehlteKarte?.id
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { beiAuswahl(eintrag.karte) },
+                onClick = { beiAuswahl(eintrag.vorlage) },
                 colors = if (istAusgewaehlt) {
                     CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -179,16 +186,23 @@ private fun KartenListe(
                 },
             ) {
                 Column(modifier = Modifier.padding(10.dp)) {
-                    Text(eintrag.karte.name, style = MaterialTheme.typography.titleMedium)
+                    Text(eintrag.vorlage.name, style = MaterialTheme.typography.titleMedium)
                     Text(
                         if (eintrag.quelle == KartenQuelle.VORLAGE) "Vorlage" else "Eigene Karte",
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Text(
-                        "${eintrag.karte.zeilen} × ${eintrag.karte.spalten} Rauten · " +
-                            "${eintrag.karte.landfelder.size} Landdreiecke",
+                        "${eintrag.vorlage.zeilen} × ${eintrag.vorlage.spalten} Rauten · " +
+                            "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke",
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    if (eintrag.migrationsHinweise.isNotEmpty()) {
+                        Text(
+                            "Altes Format · beim Bearbeiten als Kopie speichern",
+                            color = MaterialTheme.colorScheme.tertiary,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                 }
             }
         }
@@ -197,8 +211,8 @@ private fun KartenListe(
 
 @Composable
 private fun KartenVorschau(
-    karte: Spielkarte?,
-    beiBearbeiten: (Spielkarte) -> Unit,
+    karte: KartenVorlage?,
+    beiBearbeiten: (KartenVorlage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -217,7 +231,7 @@ private fun KartenVorschau(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(karte.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${karte.landfelder.size} Land · ${karte.spezialfelder.size} Spezialfelder",
+                        "${karte.gelaendefelder.size} Geländedreiecke · unbelegte Vorlage",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

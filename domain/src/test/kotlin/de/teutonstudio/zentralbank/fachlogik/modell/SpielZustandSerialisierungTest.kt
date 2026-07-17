@@ -26,7 +26,7 @@ class SpielZustandSerialisierungTest {
                 name = "Annas Insel",
                 zeilen = 4,
                 spalten = 5,
-                landfelder = listOf(
+                gelaendefelder = listOf(
                     Landfeld(
                         KartenDreieck(1, 2, DreieckHaelfte.OBEN),
                         GelaendeTyp.WALD,

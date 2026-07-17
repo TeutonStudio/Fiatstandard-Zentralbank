@@ -28,6 +28,30 @@ object SpielRegelwerk {
                 AnleihenRegelwerk.anleiheFaelligStellen(zustand, ereignis)
             is SpielEreignis.Expansion ->
                 ExpansionsRegelwerk.expandieren(zustand, ereignis)
+            is SpielEreignis.HauptbahnhofPlatziert ->
+                KartenRegelwerk.hauptbahnhofPlatzieren(zustand, ereignis)
+            is SpielEreignis.EckGebaeudeGebaut ->
+                KartenRegelwerk.eckGebaeudeBauen(zustand, ereignis)
+            is SpielEreignis.EckGebaeudeAufgewertet ->
+                KartenRegelwerk.eckGebaeudeAufwerten(zustand, ereignis)
+            is SpielEreignis.SchieneGebaut ->
+                KartenRegelwerk.schieneBauen(zustand, ereignis)
+            is SpielEreignis.NeutraleAnlageErrichtet ->
+                KartenRegelwerk.neutraleAnlageErrichten(zustand, ereignis)
+            is SpielEreignis.KartenBelegungEntfernt ->
+                KartenRegelwerk.belegungEntfernen(zustand, ereignis)
+            is SpielEreignis.KartenBauwerkZustandGeaendert ->
+                KartenRegelwerk.bauwerkZustandAendern(zustand, ereignis)
+            is SpielEreignis.FeldAnlagenZustandGeaendert ->
+                KartenRegelwerk.anlagenZustandAendern(zustand, ereignis)
+            is SpielEreignis.SeewegEingerichtet ->
+                KartenRegelwerk.seewegEinrichten(zustand, ereignis)
+            is SpielEreignis.SeewegEntfernt ->
+                KartenRegelwerk.seewegEntfernen(zustand, ereignis)
+            is SpielEreignis.KriegsEinheitEingesetzt ->
+                KartenRegelwerk.kriegsEinheitEinsetzen(zustand, ereignis)
+            is SpielEreignis.KriegsEinheitEntfernt ->
+                KartenRegelwerk.kriegsEinheitEntfernen(zustand, ereignis)
             is SpielEreignis.KriegErklaert ->
                 KonfliktRegelwerk.kriegErklaeren(zustand, ereignis)
             is SpielEreignis.KriegBeendet ->

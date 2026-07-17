@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,6 +85,24 @@ class SpielbrettGeometrieTest {
 
         assertEquals(dreieck.position, treffer?.position)
         assertTrue(treffer?.naechsteEcke in 0..2)
+    }
+
+    @Test
+    fun `Eck- und Kantenwerkzeuge verlangen einen Treffer nahe am Ziel`() {
+        val geometrie = berechneSpielbrettGeometrie(3, 3)
+        val dreieck = geometrie.dreiecke.first()
+        val mittenTreffer = requireNotNull(geometrie.treffer(dreieck.mittelpunkt))
+        val kantenMitte = BrettPunkt(
+            x = (dreieck.ecken[0].x + dreieck.ecken[1].x) / 2f,
+            z = (dreieck.ecken[0].z + dreieck.ecken[1].z) / 2f,
+        )
+        val kantenTreffer = requireNotNull(geometrie.treffer(kantenMitte))
+        val eckTreffer = requireNotNull(geometrie.treffer(dreieck.ecken[0]))
+
+        assertNull(mittenTreffer.zuKartenOrt(KartenZielModus.ECKE))
+        assertNull(mittenTreffer.zuKartenOrt(KartenZielModus.KANTE))
+        assertTrue(kantenTreffer.zuKartenOrt(KartenZielModus.KANTE) != null)
+        assertTrue(eckTreffer.zuKartenOrt(KartenZielModus.ECKE) != null)
     }
 
     @Test

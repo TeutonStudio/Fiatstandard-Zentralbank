@@ -33,8 +33,7 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielLaden
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
-import de.teutonstudio.zentralbank.spielbrett.Spielbrett3D
-import de.teutonstudio.zentralbank.spielbrett.zu3DModell
+import de.teutonstudio.zentralbank.spielbrett.KartenSpielBildschirm
 
 private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
 
@@ -149,13 +148,16 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.GameMap.route) {
             MitAktuellemSpiel(viewModel, navController) {
-                val karte = viewModel.spielZustand.collectAsState().value?.karte
+                val zustand = viewModel.spielZustand.collectAsState().value
                 Titel(beiZurück = { navController.popBackStack() }) {
-                    if (karte == null) {
-                        Text("Dieser ältere Spielstand enthält noch keine Spielkarte.")
+                    if (zustand == null) {
+                        Text("Der Spielzustand wird geladen.")
                     } else {
-                        Spielbrett3D(
-                            modell = karte.zu3DModell(),
+                        KartenSpielBildschirm(
+                            zustand = zustand,
+                            beiEreignis = viewModel::ereignisAnwenden,
+                            beiRueckgaengig = viewModel::ereignisRueckgaengig,
+                            beiWiederholen = viewModel::ereignisWiederholen,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

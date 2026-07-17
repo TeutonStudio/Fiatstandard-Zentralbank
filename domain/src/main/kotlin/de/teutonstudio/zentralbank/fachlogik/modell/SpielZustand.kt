@@ -70,6 +70,7 @@ data class Anleihe(
 data class SpielZustand(
     val spieler: List<Spieler>,
     val karte: Spielkarte? = null,
+    val spielabschnitt: Spielabschnitt = Spielabschnitt.REGULAER,
     val bankkonto: Geld = Geld.NULL,
     val bankAnleihen: List<AnleiheId> = emptyList(),
     val warenkorb: Map<Rohstoff, Int> = emptyMap(),
@@ -83,3 +84,9 @@ data class SpielZustand(
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
     val zugStatus: ZugStatus? = aktiverSpieler?.let { ZugStatus(it, Phase.Einnahmen) },
 )
+
+@Serializable
+enum class Spielabschnitt {
+    RUNDE_NULL,
+    REGULAER,
+}

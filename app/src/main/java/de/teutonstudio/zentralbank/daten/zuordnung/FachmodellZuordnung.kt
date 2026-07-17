@@ -11,9 +11,11 @@ import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import kotlin.math.roundToInt
 import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe as FachAnleihe
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler as FachSpieler
@@ -75,6 +77,15 @@ fun Spiel.zuSpielZustand(): SpielZustand {
 
     return SpielZustand(
         karte = karte,
+        spielabschnitt = if (
+            karte != null &&
+            aktuelleRunde <= 1 &&
+            karte.belegung.ecken.none { it.typ == EckGebaeudeTyp.HAUPTBAHNHOF }
+        ) {
+            Spielabschnitt.RUNDE_NULL
+        } else {
+            Spielabschnitt.REGULAER
+        },
         spieler = spielerListe.map { spieler ->
             FachSpieler(
                 id = spielerIds.getValue(spieler),

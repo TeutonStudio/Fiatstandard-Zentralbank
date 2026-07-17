@@ -24,7 +24,7 @@ class Spielbrett3DSmokeTest {
             spalten = 3,
             startZeile = -2,
             startSpalte = -2,
-            landfelder = listOf(
+            gelaendefelder = listOf(
                 Landfeld(
                     KartenDreieck(-1, -1, DreieckHaelfte.OBEN),
                     GelaendeTyp.WALD,

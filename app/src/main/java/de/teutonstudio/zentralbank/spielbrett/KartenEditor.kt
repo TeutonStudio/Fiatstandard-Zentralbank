@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -22,8 +23,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,14 +39,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import de.teutonstudio.zentralbank.daten.karten.KartenAblage
+import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenDreieck
-import de.teutonstudio.zentralbank.fachlogik.modell.Landfeld
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
-import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
-import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
-import java.util.UUID
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import kotlinx.coroutines.launch
+
+enum class KartenModus(val beschriftung: String) {
+    BAUEN("Bauen"),
+    SPIELEN("Spielen"),
+}
 
 internal enum class KartenWerkzeug(val beschriftung: String) {
     WASSER("Wasser"),
@@ -51,10 +57,6 @@ internal enum class KartenWerkzeug(val beschriftung: String) {
     GEBIRGE("Gebirge"),
     WUESTE("Wüste"),
     SUMPF("Sumpf"),
-    HEXAGON("Spezial: Hexagon"),
-    STADT("Spezial: Stadt"),
-    HAFEN("Spezial: Hafen"),
-    SPEZIAL_ENTFERNEN("Spezial entfernen"),
 }
 
 internal enum class KartenRichtung(val beschriftung: String) {
@@ -66,18 +68,29 @@ internal enum class KartenRichtung(val beschriftung: String) {
 
 @Composable
 fun KartenEditorDialog(
-    ausgangskarte: Spielkarte,
+    ausgangsvorlage: KartenVorlage,
     ablage: KartenAblage,
+    migrationsHinweise: List<String> = emptyList(),
     beiAbbruch: () -> Unit,
-    beiGespeichert: (Spielkarte) -> Unit,
+    beiGespeichert: (KartenVorlage) -> Unit,
 ) {
-    var entwurf by remember(ausgangskarte) { mutableStateOf(ausgangskarte) }
-    var name by remember(ausgangskarte) { mutableStateOf(ausgangskarte.name) }
+    val verlauf = remember(ausgangsvorlage) { mutableStateListOf(ausgangsvorlage) }
+    var verlaufIndex by remember(ausgangsvorlage) { mutableIntStateOf(0) }
+    val entwurf = verlauf[verlaufIndex]
+    var name by remember(ausgangsvorlage) { mutableStateOf(ausgangsvorlage.name) }
     var werkzeug by remember { mutableStateOf(KartenWerkzeug.EBENE) }
     var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
     var wirdGespeichert by remember { mutableStateOf(false) }
+    var ausstehendeAusdehnung by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val scope = rememberCoroutineScope()
+
+    fun uebernehme(neu: KartenVorlage) {
+        if (neu == entwurf) return
+        while (verlauf.lastIndex > verlaufIndex) verlauf.removeAt(verlauf.lastIndex)
+        verlauf += neu
+        verlaufIndex = verlauf.lastIndex
+    }
 
     Dialog(
         onDismissRequest = beiAbbruch,
@@ -91,7 +104,43 @@ fun KartenEditorDialog(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("3D-Kartenbauer", style = MaterialTheme.typography.headlineSmall)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("3D-Spielkarte", style = MaterialTheme.typography.headlineSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(selected = true, onClick = {}, label = { Text("Bauen") })
+                        FilterChip(
+                            selected = false,
+                            enabled = false,
+                            onClick = {},
+                            label = { Text("Spielen") },
+                        )
+                    }
+                }
+                Text(
+                    "Im Baumodus werden ausschließlich Wasser und Geländefelder verändert.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (migrationsHinweise.isNotEmpty()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text("Hinweis zur alten Karte", style = MaterialTheme.typography.titleSmall)
+                            migrationsHinweise.forEach { hinweis ->
+                                Text("• $hinweis", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text(
+                                "Das Original bleibt erhalten; gespeichert wird eine neue Geländevorlage.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                }
                 BoxWithConstraints(modifier = Modifier.weight(1f)) {
                     val breiteAnsicht = maxWidth >= 840.dp
                     val werkzeuge: @Composable (Modifier) -> Unit = { modifier ->
@@ -100,16 +149,20 @@ fun KartenEditorDialog(
                             name = name,
                             beiName = { name = it },
                             karte = entwurf,
-                            beiErweitern = { richtung ->
-                                entwurf = entwurf.erweitert(richtung)
-                            },
+                            beiErweitern = { richtung -> uebernehme(entwurf.erweitert(richtung)) },
                             beiAusdehnung = { zeilen, spalten ->
-                                entwurf = entwurf.mitAusdehnung(zeilen, spalten)
+                                val entfernt = entwurf.anzahlEntfallenderFelder(zeilen, spalten)
+                                if (entfernt > 0) ausstehendeAusdehnung = zeilen to spalten
+                                else uebernehme(entwurf.mitAusdehnung(zeilen, spalten))
                             },
                             werkzeug = werkzeug,
                             beiWerkzeug = { werkzeug = it },
                             kameraModus = kameraModus,
                             beiKameraModus = { kameraModus = it },
+                            kannRueckgaengig = verlaufIndex > 0,
+                            kannWiederholen = verlaufIndex < verlauf.lastIndex,
+                            beiRueckgaengig = { if (verlaufIndex > 0) verlaufIndex-- },
+                            beiWiederholen = { if (verlaufIndex < verlauf.lastIndex) verlaufIndex++ },
                         )
                     }
                     val editor: @Composable (Modifier) -> Unit = { modifier ->
@@ -119,24 +172,16 @@ fun KartenEditorDialog(
                                 modifier = Modifier.fillMaxSize(),
                                 kameraInteraktionsModus = kameraModus,
                                 onDreieckBeruehrt = { treffer ->
-                                    val bearbeitet = entwurf.wendeWerkzeugAn(
-                                        treffer = treffer,
-                                        werkzeug = werkzeug,
-                                    )
-                                    fehlermeldung = if (bearbeitet == entwurf && werkzeug.istSpezial()) {
-                                        "Das Spezialfeld braucht einen inneren Eckpunkt mit sechs Dreiecken."
-                                    } else {
-                                        null
-                                    }
-                                    entwurf = bearbeitet
+                                    fehlermeldung = null
+                                    uebernehme(entwurf.wendeWerkzeugAn(treffer, werkzeug))
                                 },
                             )
                             Text(
                                 text = when (kameraModus) {
                                     KameraInteraktionsModus.DREHEN ->
-                                        "Tippen: bearbeiten · Ziehen: drehen · Zwei Finger: verschieben/zoomen"
+                                        "Tippen: Gelände bearbeiten · Ziehen: drehen · Zwei Finger: verschieben/zoomen"
                                     KameraInteraktionsModus.VERSCHIEBEN ->
-                                        "Tippen: bearbeiten · Ziehen: Fokus verschieben · Pinch: zoomen"
+                                        "Tippen: Gelände bearbeiten · Ziehen: Fokus verschieben · Pinch: zoomen"
                                 },
                                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                                 style = MaterialTheme.typography.labelSmall,
@@ -157,7 +202,7 @@ fun KartenEditorDialog(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            werkzeuge(Modifier.fillMaxWidth().heightIn(max = 310.dp))
+                            werkzeuge(Modifier.fillMaxWidth().heightIn(max = 330.dp))
                             editor(Modifier.weight(1f).fillMaxWidth())
                         }
                     }
@@ -181,7 +226,10 @@ fun KartenEditorDialog(
                             fehlermeldung = null
                             scope.launch {
                                 runCatching {
-                                    ablage.eigeneKarteSpeichern(entwurf.copy(name = name.trim()))
+                                    ablage.eigeneKarteSpeichern(
+                                        vorlage = entwurf.copy(name = name.trim()),
+                                        alsNeueKopie = migrationsHinweise.isNotEmpty(),
+                                    )
                                 }.onSuccess(beiGespeichert).onFailure { fehler ->
                                     wirdGespeichert = false
                                     fehlermeldung = fehler.message ?: "Karte konnte nicht gespeichert werden."
@@ -195,6 +243,26 @@ fun KartenEditorDialog(
             }
         }
     }
+
+    ausstehendeAusdehnung?.let { (zeilen, spalten) ->
+        val anzahl = entwurf.anzahlEntfallenderFelder(zeilen, spalten)
+        AlertDialog(
+            onDismissRequest = { ausstehendeAusdehnung = null },
+            title = { Text("Kartenbereich verkleinern?") },
+            text = { Text("Dabei werden $anzahl Geländefelder außerhalb des neuen Bereichs entfernt.") },
+            dismissButton = {
+                TextButton(onClick = { ausstehendeAusdehnung = null }) { Text("Abbrechen") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        uebernehme(entwurf.mitAusdehnung(zeilen, spalten))
+                        ausstehendeAusdehnung = null
+                    },
+                ) { Text("Verkleinern") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -202,13 +270,17 @@ private fun KartenWerkzeugleiste(
     modifier: Modifier,
     name: String,
     beiName: (String) -> Unit,
-    karte: Spielkarte,
+    karte: KartenVorlage,
     beiErweitern: (KartenRichtung) -> Unit,
     beiAusdehnung: (Int, Int) -> Unit,
     werkzeug: KartenWerkzeug,
     beiWerkzeug: (KartenWerkzeug) -> Unit,
     kameraModus: KameraInteraktionsModus,
     beiKameraModus: (KameraInteraktionsModus) -> Unit,
+    kannRueckgaengig: Boolean,
+    kannWiederholen: Boolean,
+    beiRueckgaengig: () -> Unit,
+    beiWiederholen: () -> Unit,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -221,6 +293,14 @@ private fun KartenWerkzeugleiste(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = beiRueckgaengig, enabled = kannRueckgaengig) {
+                Text("Rückgängig")
+            }
+            OutlinedButton(onClick = beiWiederholen, enabled = kannWiederholen) {
+                Text("Wiederholen")
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -238,7 +318,7 @@ private fun KartenWerkzeugleiste(
                 modifier = Modifier.weight(1f),
             )
         }
-        Text("Bearbeitungsbereich dynamisch erweitern", style = MaterialTheme.typography.titleSmall)
+        Text("Bearbeitungsbereich erweitern", style = MaterialTheme.typography.titleSmall)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -284,12 +364,11 @@ private fun KartenWerkzeugleiste(
             }
         }
         Text(
-            "Wasser ist die unbegrenzte Grundebene. Land wird nur für gesetzte Dreiecke gespeichert. " +
-                "Spezialfelder belegen die sechs Dreiecke um den beim Tippen nächsten Eckpunkt.",
+            "Wasser ist die unbegrenzte Grundebene. Gespeichert werden nur gesetzte Geländedreiecke.",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            "${karte.landfelder.size} Landdreiecke · ${karte.spezialfelder.size} Spezialfelder",
+            "${karte.gelaendefelder.size} Geländedreiecke",
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -304,146 +383,87 @@ private fun AusdehnungsFeld(
 ) {
     OutlinedTextField(
         value = wert.toString(),
-        onValueChange = { eingabe ->
-            eingabe.toIntOrNull()
-                ?.takeIf { it > 0 }
-                ?.let(beiWert)
-        },
+        onValueChange = { eingabe -> eingabe.toIntOrNull()?.takeIf { it > 0 }?.let(beiWert) },
         modifier = modifier,
         label = { Text(bezeichnung) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        supportingText = { Text("Mindestens 1 · kein festes Maximum") },
+        supportingText = { Text("Mindestens 1") },
     )
 }
 
-internal fun Spielkarte.mitAusdehnung(neueZeilen: Int, neueSpalten: Int): Spielkarte {
+internal fun KartenVorlage.anzahlEntfallenderFelder(neueZeilen: Int, neueSpalten: Int): Int {
+    val neueEndZeile = startZeile.toLong() + neueZeilen
+    val neueEndSpalte = startSpalte.toLong() + neueSpalten
+    return gelaendefelder.count { feld ->
+        feld.position.zeile.toLong() !in startZeile.toLong() until neueEndZeile ||
+            feld.position.spalte.toLong() !in startSpalte.toLong() until neueEndSpalte
+    }
+}
+
+internal fun KartenVorlage.mitAusdehnung(neueZeilen: Int, neueSpalten: Int): KartenVorlage {
     require(neueZeilen > 0)
     require(neueSpalten > 0)
     val neueEndZeile = startZeile.toLong() + neueZeilen
     val neueEndSpalte = startSpalte.toLong() + neueSpalten
-    val land = landfelder.filter { feld ->
-        feld.position.zeile.toLong() in startZeile.toLong() until neueEndZeile &&
-            feld.position.spalte.toLong() in startSpalte.toLong() until neueEndSpalte
-    }
-    val landPositionen = land.mapTo(mutableSetOf(), Landfeld::position)
     return copy(
         zeilen = neueZeilen,
         spalten = neueSpalten,
-        landfelder = land,
-        spezialfelder = spezialfelder.filter { feld ->
-            feld.positionen.all { position -> position in landPositionen }
+        gelaendefelder = gelaendefelder.filter { feld ->
+            feld.position.zeile.toLong() in startZeile.toLong() until neueEndZeile &&
+                feld.position.spalte.toLong() in startSpalte.toLong() until neueEndSpalte
         },
     )
 }
 
-internal fun Spielkarte.erweitert(
+internal fun KartenVorlage.erweitert(
     richtung: KartenRichtung,
     anzahl: Int = 1,
-): Spielkarte {
+): KartenVorlage {
     require(anzahl > 0) { "Es muss um mindestens eine Reihe erweitert werden." }
-    val neueZeilen = when (richtung) {
-        KartenRichtung.NORDEN, KartenRichtung.SUEDEN -> Math.addExact(zeilen, anzahl)
-        KartenRichtung.WESTEN, KartenRichtung.OSTEN -> zeilen
-    }
-    val neueSpalten = when (richtung) {
-        KartenRichtung.WESTEN, KartenRichtung.OSTEN -> Math.addExact(spalten, anzahl)
-        KartenRichtung.NORDEN, KartenRichtung.SUEDEN -> spalten
-    }
-    val neueStartZeile = if (richtung == KartenRichtung.NORDEN) {
-        Math.subtractExact(startZeile, anzahl)
-    } else {
-        startZeile
-    }
-    val neueStartSpalte = if (richtung == KartenRichtung.WESTEN) {
-        Math.subtractExact(startSpalte, anzahl)
-    } else {
-        startSpalte
-    }
     return copy(
-        zeilen = neueZeilen,
-        spalten = neueSpalten,
-        startZeile = neueStartZeile,
-        startSpalte = neueStartSpalte,
+        zeilen = if (richtung in setOf(KartenRichtung.NORDEN, KartenRichtung.SUEDEN)) {
+            Math.addExact(zeilen, anzahl)
+        } else zeilen,
+        spalten = if (richtung in setOf(KartenRichtung.WESTEN, KartenRichtung.OSTEN)) {
+            Math.addExact(spalten, anzahl)
+        } else spalten,
+        startZeile = if (richtung == KartenRichtung.NORDEN) {
+            Math.subtractExact(startZeile, anzahl)
+        } else startZeile,
+        startSpalte = if (richtung == KartenRichtung.WESTEN) {
+            Math.subtractExact(startSpalte, anzahl)
+        } else startSpalte,
     )
 }
 
-internal fun Spielkarte.wendeWerkzeugAn(
+internal fun KartenVorlage.wendeWerkzeugAn(
     treffer: DreieckTreffer,
     werkzeug: KartenWerkzeug,
-    neueSpezialId: () -> String = { "spezial-${UUID.randomUUID()}" },
-): Spielkarte {
-    val position = treffer.position.zuKartenDreieck()
-    if (werkzeug == KartenWerkzeug.WASSER) {
-        return copy(
-            landfelder = landfelder.filterNot { feld -> feld.position == position },
-            spezialfelder = spezialfelder.filterNot { feld -> position in feld.positionen },
-        )
+): KartenVorlage {
+    val position = treffer.position.zuKartenFeld()
+    val gelaende = werkzeug.gelaendeOderNull()
+    if (gelaende == null) {
+        return copy(gelaendefelder = gelaendefelder.filterNot { feld -> feld.position == position })
     }
-    if (werkzeug == KartenWerkzeug.SPEZIAL_ENTFERNEN) {
-        return copy(spezialfelder = spezialfelder.filterNot { feld -> position in feld.positionen })
-    }
-
-    werkzeug.gelaendeOderNull()?.let { gelaende ->
-        val land = landNachPosition.toMutableMap().apply { put(position, gelaende) }
-        return copy(landfelder = land.zuSortiertenLandfeldern())
-    }
-
-    val spezialTyp = werkzeug.spezialOderNull() ?: return this
-    val positionen = berechneSpielbrettGeometrie(
-        zeilen = zeilen,
-        spalten = spalten,
-        startZeile = startZeile,
-        startSpalte = startSpalte,
-    )
-        .kartenHexagonUm(treffer)
-    if (positionen.size != 6) return this
-
-    val land = landNachPosition.toMutableMap()
-    positionen.forEach { spezialPosition -> land.putIfAbsent(spezialPosition, GelaendeTyp.EBENE) }
-    val ohneUeberlappung = spezialfelder.filter { feld ->
-        feld.positionen.none(positionen::contains)
-    }
-    return copy(
-        landfelder = land.zuSortiertenLandfeldern(),
-        spezialfelder = ohneUeberlappung + Spezialfeld(
-            id = neueSpezialId(),
-            name = spezialTyp.anzeigeName(),
-            typ = spezialTyp,
-            positionen = positionen,
-        ),
-    )
+    val land = landNachPosition.toMutableMap().apply { put(position, gelaende) }
+    return copy(gelaendefelder = land.zuSortiertenGelaendefeldern())
 }
 
 private fun KartenWerkzeug.gelaendeOderNull(): GelaendeTyp? = when (this) {
+    KartenWerkzeug.WASSER -> null
     KartenWerkzeug.EBENE -> GelaendeTyp.EBENE
     KartenWerkzeug.WALD -> GelaendeTyp.WALD
     KartenWerkzeug.GEBIRGE -> GelaendeTyp.GEBIRGE
     KartenWerkzeug.WUESTE -> GelaendeTyp.WUESTE
     KartenWerkzeug.SUMPF -> GelaendeTyp.SUMPF
-    else -> null
 }
 
-private fun KartenWerkzeug.spezialOderNull(): SpezialfeldTyp? = when (this) {
-    KartenWerkzeug.HEXAGON -> SpezialfeldTyp.HEXAGON
-    KartenWerkzeug.STADT -> SpezialfeldTyp.STADT
-    KartenWerkzeug.HAFEN -> SpezialfeldTyp.HAFEN
-    else -> null
-}
-
-private fun KartenWerkzeug.istSpezial(): Boolean = spezialOderNull() != null
-
-private fun SpezialfeldTyp.anzeigeName(): String = when (this) {
-    SpezialfeldTyp.HEXAGON -> "Spezial-Hexagon"
-    SpezialfeldTyp.STADT -> "Stadt"
-    SpezialfeldTyp.HAFEN -> "Hafen"
-}
-
-private fun Map<KartenDreieck, GelaendeTyp>.zuSortiertenLandfeldern(): List<Landfeld> =
+private fun Map<KartenFeld, GelaendeTyp>.zuSortiertenGelaendefeldern(): List<GelaendeFeld> =
     entries
         .sortedWith(
-            compareBy<Map.Entry<KartenDreieck, GelaendeTyp>> { it.key.zeile }
+            compareBy<Map.Entry<KartenFeld, GelaendeTyp>> { it.key.zeile }
                 .thenBy { it.key.spalte }
                 .thenBy { it.key.haelfte.ordinal },
         )
-        .map { (position, gelaende) -> Landfeld(position, gelaende) }
+        .map { (position, gelaende) -> GelaendeFeld(position, gelaende) }

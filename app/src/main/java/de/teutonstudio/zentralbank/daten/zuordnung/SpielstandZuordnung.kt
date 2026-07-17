@@ -61,9 +61,12 @@ fun SpielstandEntitaet.zuGespeichertemSpiel(): GespeichertesSpiel {
     require(formatVersion == AKTUELLE_FORMAT_VERSION) {
         "Spielstand $spielId verwendet die nicht unterstützte Formatversion $formatVersion."
     }
+    val startzustand = spielstandJson.decodeFromString(SpielZustand.serializer(), startzustandJson)
     return GespeichertesSpiel(
         id = spielId,
-        startzustand = spielstandJson.decodeFromString(SpielZustand.serializer(), startzustandJson),
+        startzustand = startzustand.copy(
+            karte = startzustand.karte?.aufAktuellesFormat(),
+        ),
         ereignisse = spielstandJson.decodeFromString(ereignisListe, ereignisseJson),
         ausLegacyDatenImportiert = ausLegacyDatenImportiert,
     )

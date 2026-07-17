@@ -1,14 +1,65 @@
 package de.teutonstudio.zentralbank.fachlogik.modell
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
-const val AKTUELLE_KARTEN_FORMAT_VERSION = 1
+const val AKTUELLE_KARTEN_FORMAT_VERSION = 2
 
 /**
- * Dünn besetztes Kartenmodell: Wasser ist die unendliche Grundebene und wird nicht gespeichert.
- * Nur Dreiecke mit einer Landauflage sowie mehrteilige Spezialfelder belegen Speicherplatz.
- * [startZeile]/[startSpalte] und die Ausdehnung beschreiben lediglich den aktuell im Editor
- * sichtbaren Bereich. Dieser kann ohne fachliche Obergrenze in jede Richtung erweitert werden.
+ * Wiederverwendbare, unbelegte Grundlage einer Spielkarte.
+ *
+ * Wasser ist die unendliche Grundebene und wird nicht gespeichert. Der beschriebene Bereich ist
+ * der im Kartenbauer sichtbare Ausschnitt; nur gesetzte [gelaendefelder] belegen Speicherplatz.
+ */
+@Serializable
+data class KartenVorlage(
+    val formatVersion: Int = AKTUELLE_KARTEN_FORMAT_VERSION,
+    val id: String,
+    val name: String,
+    val zeilen: Int,
+    val spalten: Int,
+    val startZeile: Int = 0,
+    val startSpalte: Int = 0,
+    @SerialName("landfelder")
+    val gelaendefelder: List<GelaendeFeld> = emptyList(),
+) {
+    init {
+        pruefeKartenGrundlage(
+            formatVersion = formatVersion,
+            id = id,
+            name = name,
+            zeilen = zeilen,
+            spalten = spalten,
+            startZeile = startZeile,
+            startSpalte = startSpalte,
+            gelaendefelder = gelaendefelder,
+        )
+    }
+
+    val landfelder: List<GelaendeFeld> get() = gelaendefelder
+    val landNachPosition: Map<KartenFeld, GelaendeTyp>
+        get() = gelaendefelder.associate { feld -> feld.position to feld.gelaende }
+    val endeZeileExklusiv: Long get() = startZeile.toLong() + zeilen
+    val endeSpalteExklusiv: Long get() = startSpalte.toLong() + spalten
+
+    fun alsSpielkarte(spielId: String = id): Spielkarte = Spielkarte(
+        id = spielId,
+        name = name,
+        zeilen = zeilen,
+        spalten = spalten,
+        startZeile = startZeile,
+        startSpalte = startSpalte,
+        gelaendefelder = gelaendefelder,
+    )
+}
+
+/**
+ * Karte einer konkreten Partie. Ihre Geländedaten werden nach Spielbeginn nicht mehr verändert;
+ * alle laufenden Änderungen liegen in [belegung].
+ *
+ * Format 1 wird nur angenommen, damit bestehende serialisierte Spielstände eingelesen und danach
+ * mit [aufAktuellesFormat] normalisiert werden können. Neue Karten werden immer als Format 2
+ * geschrieben.
  */
 @Serializable
 data class Spielkarte(
@@ -19,77 +70,56 @@ data class Spielkarte(
     val spalten: Int,
     val startZeile: Int = 0,
     val startSpalte: Int = 0,
-    val landfelder: List<Landfeld> = emptyList(),
-    val spezialfelder: List<Spezialfeld> = emptyList(),
+    @SerialName("landfelder")
+    val gelaendefelder: List<GelaendeFeld> = emptyList(),
+    val belegung: KartenBelegung = KartenBelegung(),
 ) {
     init {
-        require(formatVersion == AKTUELLE_KARTEN_FORMAT_VERSION) {
-            "Nicht unterstützte Kartenformatversion: $formatVersion."
-        }
-        require(id.isNotBlank()) { "Karten-ID darf nicht leer sein." }
-        require(name.isNotBlank()) { "Kartenname darf nicht leer sein." }
-        require(zeilen > 0) { "Die Karte muss mindestens eine Zeile enthalten." }
-        require(spalten > 0) { "Die Karte muss mindestens eine Spalte enthalten." }
-        require(startZeile.toLong() + zeilen <= Int.MAX_VALUE.toLong() + 1L) {
-            "Der Kartenbereich überschreitet den ganzzahligen Koordinatenraum."
-        }
-        require(startSpalte.toLong() + spalten <= Int.MAX_VALUE.toLong() + 1L) {
-            "Der Kartenbereich überschreitet den ganzzahligen Koordinatenraum."
-        }
-
-        val landPositionsListe = landfelder.map(Landfeld::position)
-        val landPositionen = landPositionsListe.toSet()
-        require(landPositionsListe.size == landPositionen.size) {
-            "Jedes Dreieck darf höchstens ein Landfeld tragen."
-        }
-        landPositionsListe.forEach(::pruefePosition)
-
-        val spezialIds = spezialfelder.map(Spezialfeld::id)
-        require(spezialIds.size == spezialIds.toSet().size) {
-            "Spezialfeld-IDs müssen innerhalb einer Karte eindeutig sein."
-        }
-        val belegteSpezialPositionen = mutableSetOf<KartenDreieck>()
-        spezialfelder.forEach { spezialfeld ->
-            require(spezialfeld.positionen.size == 6) {
-                "Spezialfeld ${spezialfeld.name} muss aus genau sechs Dreiecken bestehen."
-            }
-            require(spezialfeld.positionen.size == spezialfeld.positionen.toSet().size) {
-                "Spezialfeld ${spezialfeld.name} enthält ein Dreieck mehrfach."
-            }
-            spezialfeld.positionen.forEach { position ->
-                pruefePosition(position)
-                require(position in landPositionen) {
-                    "Spezialfelder dürfen nur auf Land liegen: $position."
-                }
-                require(belegteSpezialPositionen.add(position)) {
-                    "Spezialfelder dürfen sich nicht überlagern: $position."
-                }
-            }
-        }
+        pruefeKartenGrundlage(
+            formatVersion = formatVersion,
+            id = id,
+            name = name,
+            zeilen = zeilen,
+            spalten = spalten,
+            startZeile = startZeile,
+            startSpalte = startSpalte,
+            gelaendefelder = gelaendefelder,
+        )
+        belegung.pruefeFuer(this)
     }
 
-    val landNachPosition: Map<KartenDreieck, GelaendeTyp>
-        get() = landfelder.associate { feld -> feld.position to feld.gelaende }
-
+    /** Übergangsname für bestehenden Darstellungscode. */
+    val landfelder: List<GelaendeFeld> get() = gelaendefelder
+    val landNachPosition: Map<KartenFeld, GelaendeTyp>
+        get() = gelaendefelder.associate { feld -> feld.position to feld.gelaende }
     val endeZeileExklusiv: Long get() = startZeile.toLong() + zeilen
     val endeSpalteExklusiv: Long get() = startSpalte.toLong() + spalten
 
-    private fun pruefePosition(position: KartenDreieck) {
-        require(
-            position.zeile.toLong() in startZeile.toLong() until endeZeileExklusiv &&
-                position.spalte.toLong() in startSpalte.toLong() until endeSpalteExklusiv,
-        ) {
-            "Dreieck liegt außerhalb der Karte: $position."
-        }
+    fun alsVorlage(vorlagenId: String = id): KartenVorlage = KartenVorlage(
+        id = vorlagenId,
+        name = name,
+        zeilen = zeilen,
+        spalten = spalten,
+        startZeile = startZeile,
+        startSpalte = startSpalte,
+        gelaendefelder = gelaendefelder,
+    )
+
+    fun aufAktuellesFormat(): Spielkarte = if (formatVersion == AKTUELLE_KARTEN_FORMAT_VERSION) {
+        this
+    } else {
+        copy(formatVersion = AKTUELLE_KARTEN_FORMAT_VERSION)
     }
 }
 
 @Serializable
-data class KartenDreieck(
+data class KartenFeld(
     val zeile: Int,
     val spalte: Int,
     val haelfte: DreieckHaelfte,
 )
+
+typealias KartenDreieck = KartenFeld
 
 @Serializable
 enum class DreieckHaelfte {
@@ -98,10 +128,12 @@ enum class DreieckHaelfte {
 }
 
 @Serializable
-data class Landfeld(
-    val position: KartenDreieck,
+data class GelaendeFeld(
+    val position: KartenFeld,
     val gelaende: GelaendeTyp,
 )
+
+typealias Landfeld = GelaendeFeld
 
 @Serializable
 enum class GelaendeTyp {
@@ -112,22 +144,42 @@ enum class GelaendeTyp {
     SUMPF,
 }
 
-@Serializable
-data class Spezialfeld(
-    val id: String,
-    val name: String,
-    val typ: SpezialfeldTyp,
-    val positionen: List<KartenDreieck>,
+private fun pruefeKartenGrundlage(
+    formatVersion: Int,
+    id: String,
+    name: String,
+    zeilen: Int,
+    spalten: Int,
+    startZeile: Int,
+    startSpalte: Int,
+    gelaendefelder: List<GelaendeFeld>,
 ) {
-    init {
-        require(id.isNotBlank()) { "Spezialfeld-ID darf nicht leer sein." }
-        require(name.isNotBlank()) { "Spezialfeldname darf nicht leer sein." }
+    require(formatVersion in 1..AKTUELLE_KARTEN_FORMAT_VERSION) {
+        "Nicht unterstützte Kartenformatversion: $formatVersion."
     }
-}
+    require(id.isNotBlank()) { "Karten-ID darf nicht leer sein." }
+    require(name.isNotBlank()) { "Kartenname darf nicht leer sein." }
+    require(zeilen > 0) { "Die Karte muss mindestens eine Zeile enthalten." }
+    require(spalten > 0) { "Die Karte muss mindestens eine Spalte enthalten." }
+    val endeZeile = startZeile.toLong() + zeilen
+    val endeSpalte = startSpalte.toLong() + spalten
+    require(endeZeile <= Int.MAX_VALUE.toLong() + 1L) {
+        "Der Kartenbereich überschreitet den ganzzahligen Koordinatenraum."
+    }
+    require(endeSpalte <= Int.MAX_VALUE.toLong() + 1L) {
+        "Der Kartenbereich überschreitet den ganzzahligen Koordinatenraum."
+    }
 
-@Serializable
-enum class SpezialfeldTyp {
-    HEXAGON,
-    STADT,
-    HAFEN,
+    val positionen = gelaendefelder.map(GelaendeFeld::position)
+    require(positionen.size == positionen.toSet().size) {
+        "Jedes Dreieck darf höchstens ein Geländefeld tragen."
+    }
+    positionen.forEach { position ->
+        require(
+            position.zeile.toLong() in startZeile.toLong() until endeZeile &&
+                position.spalte.toLong() in startSpalte.toLong() until endeSpalte,
+        ) {
+            "Dreieck liegt außerhalb der Karte: $position."
+        }
+    }
 }
