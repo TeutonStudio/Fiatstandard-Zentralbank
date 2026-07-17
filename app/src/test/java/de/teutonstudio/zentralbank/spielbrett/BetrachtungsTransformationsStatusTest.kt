@@ -47,6 +47,22 @@ class BetrachtungsTransformationsStatusTest {
     }
 
     @Test
+    fun `Bildschirmgeste verschiebt den Kamerafokus in der Ebene`() {
+        val status = BetrachtungsTransformationsStatus()
+
+        status.verschiebeDurchBildschirmgeste(
+            deltaX = 20f,
+            deltaY = 10f,
+            welteinheitenProPixel = 0.1f,
+        )
+
+        assertEquals(-2f, status.fokusX, 0.0001f)
+        assertEquals(-1f, status.fokusZ, 0.0001f)
+        assertEquals(0f, status.azimutGrad, 0.0001f)
+        assertEquals(38f, status.neigungGrad, 0.0001f)
+    }
+
+    @Test
     fun `Status kann gesetzt und auf Startwert zurueckgesetzt werden`() {
         val start = BetrachtungsTransformation(
             zoom = 1.5f,
@@ -74,4 +90,3 @@ class BetrachtungsTransformationsStatusTest {
         }
     }
 }
-

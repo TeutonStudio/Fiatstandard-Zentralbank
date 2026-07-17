@@ -74,6 +74,7 @@ fun KartenEditorDialog(
     var entwurf by remember(ausgangskarte) { mutableStateOf(ausgangskarte) }
     var name by remember(ausgangskarte) { mutableStateOf(ausgangskarte.name) }
     var werkzeug by remember { mutableStateOf(KartenWerkzeug.EBENE) }
+    var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
     var wirdGespeichert by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -107,6 +108,8 @@ fun KartenEditorDialog(
                             },
                             werkzeug = werkzeug,
                             beiWerkzeug = { werkzeug = it },
+                            kameraModus = kameraModus,
+                            beiKameraModus = { kameraModus = it },
                         )
                     }
                     val editor: @Composable (Modifier) -> Unit = { modifier ->
@@ -114,6 +117,7 @@ fun KartenEditorDialog(
                             Spielbrett3D(
                                 modell = entwurf.zu3DModell(zeigeBearbeitungsRaster = true),
                                 modifier = Modifier.fillMaxSize(),
+                                kameraInteraktionsModus = kameraModus,
                                 onDreieckBeruehrt = { treffer ->
                                     val bearbeitet = entwurf.wendeWerkzeugAn(
                                         treffer = treffer,
@@ -128,7 +132,12 @@ fun KartenEditorDialog(
                                 },
                             )
                             Text(
-                                text = "Tippen: bearbeiten · Ziehen: drehen · Zwei Finger: verschieben/zoomen",
+                                text = when (kameraModus) {
+                                    KameraInteraktionsModus.DREHEN ->
+                                        "Tippen: bearbeiten · Ziehen: drehen · Zwei Finger: verschieben/zoomen"
+                                    KameraInteraktionsModus.VERSCHIEBEN ->
+                                        "Tippen: bearbeiten · Ziehen: Fokus verschieben · Pinch: zoomen"
+                                },
                                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                                 style = MaterialTheme.typography.labelSmall,
                             )
@@ -198,6 +207,8 @@ private fun KartenWerkzeugleiste(
     beiAusdehnung: (Int, Int) -> Unit,
     werkzeug: KartenWerkzeug,
     beiWerkzeug: (KartenWerkzeug) -> Unit,
+    kameraModus: KameraInteraktionsModus,
+    beiKameraModus: (KameraInteraktionsModus) -> Unit,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -243,6 +254,22 @@ private fun KartenWerkzeugleiste(
                 "Spalten ${karte.startSpalte} bis ${karte.endeSpalteExklusiv - 1}",
             style = MaterialTheme.typography.bodySmall,
         )
+        Text("Kamera", style = MaterialTheme.typography.titleSmall)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            FilterChip(
+                selected = kameraModus == KameraInteraktionsModus.DREHEN,
+                onClick = { beiKameraModus(KameraInteraktionsModus.DREHEN) },
+                label = { Text("Drehen") },
+            )
+            FilterChip(
+                selected = kameraModus == KameraInteraktionsModus.VERSCHIEBEN,
+                onClick = { beiKameraModus(KameraInteraktionsModus.VERSCHIEBEN) },
+                label = { Text("Verschieben") },
+            )
+        }
         Text("Gelände", style = MaterialTheme.typography.titleSmall)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),

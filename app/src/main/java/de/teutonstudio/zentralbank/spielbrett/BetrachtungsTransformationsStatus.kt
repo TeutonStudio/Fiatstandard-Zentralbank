@@ -123,6 +123,25 @@ class BetrachtungsTransformationsStatus(
         fokusZ += -rechts * sinAzimut - vorwaerts * cosAzimut
     }
 
+    /**
+     * Verschiebt den Fokus entsprechend einer Ziehbewegung auf dem Bildschirm. Dadurch verwenden
+     * Ein- und Zwei-Finger-Verschiebung exakt dieselbe Abbildung in die Kartenebene.
+     */
+    fun verschiebeDurchBildschirmgeste(
+        deltaX: Float,
+        deltaY: Float,
+        welteinheitenProPixel: Float,
+    ) {
+        require(
+            deltaX.isFinite() && deltaY.isFinite() &&
+                welteinheitenProPixel.isFinite() && welteinheitenProPixel > 0f,
+        ) { "Bildschirmverschiebung und Maßstab müssen endlich und der Maßstab positiv sein." }
+        verschiebeInEbene(
+            rechts = -deltaX * welteinheitenProPixel,
+            vorwaerts = deltaY * welteinheitenProPixel,
+        )
+    }
+
     /** Setzt den Orbit-Fokus in Weltkoordinaten auf der XZ-Brett-Ebene. */
     fun setzeFokus(x: Float, z: Float) {
         require(x.isFinite() && z.isFinite()) { "Der Kamera-Fokus muss endlich sein." }
@@ -184,4 +203,3 @@ private fun BetrachtungsTransformation.normalisiert() = copy(
 )
 
 private fun normalisiereGrad(winkel: Float): Float = ((winkel % 360f) + 360f) % 360f
-

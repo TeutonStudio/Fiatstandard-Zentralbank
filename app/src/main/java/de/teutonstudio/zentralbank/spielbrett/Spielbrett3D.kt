@@ -65,6 +65,8 @@ private val GrundFarbeDunkel = WasserRasterDunkel
  *
  * [betrachtungsStatus] enthaelt dieselbe Transformation, die auch die Gesten veraendern. Dadurch
  * kann die Ansicht von aussen beobachtet, ueber Schaltflaechen gesteuert oder gespeichert werden.
+ * [kameraInteraktionsModus] schaltet die Ein-Finger-Geste zwischen Orbit-Drehung und einer
+ * Verschiebung des Kamerafokus parallel zur Kartenebene um.
  *
  * Beispiel:
  * ```kotlin
@@ -89,6 +91,7 @@ fun Spielbrett3D(
     modifier: Modifier = Modifier,
     betrachtungsStatus: BetrachtungsTransformationsStatus =
         rememberBetrachtungsTransformationsStatus(),
+    kameraInteraktionsModus: KameraInteraktionsModus = KameraInteraktionsModus.DREHEN,
     onDreieckBeruehrt: ((DreieckTreffer) -> Unit)? = null,
 ) {
     if (LocalInspectionMode.current) {
@@ -118,8 +121,13 @@ fun Spielbrett3D(
     val cameraNode = rememberCameraNode(engine)
     var ansichtsGroesse by remember { mutableStateOf(IntSize.Zero) }
     val aktuellerBeruehrungsEmpfaenger = rememberUpdatedState(onDreieckBeruehrt)
-    val betrachtungsGesten = remember(betrachtungsStatus, cameraNode, geometrie) {
-        BetrachtungsGesten(betrachtungsStatus) { x, y ->
+    val betrachtungsGesten = remember(
+        betrachtungsStatus,
+        kameraInteraktionsModus,
+        cameraNode,
+        geometrie,
+    ) {
+        BetrachtungsGesten(betrachtungsStatus, kameraInteraktionsModus) { x, y ->
             val strahl = cameraNode.view?.screenToRay(x, y) ?: return@BetrachtungsGesten
             if (abs(strahl.direction.y) < 0.0001f) return@BetrachtungsGesten
             val faktor = -strahl.origin.y / strahl.direction.y
@@ -271,6 +279,7 @@ fun Spielbrett3D(
 
 private class BetrachtungsGesten(
     private val status: BetrachtungsTransformationsStatus,
+    private val einFingerModus: KameraInteraktionsModus,
     private val beiTippen: (x: Float, y: Float) -> Unit,
 ) {
     private var letzteZeigerAnzahl = 0
@@ -311,26 +320,42 @@ private class BetrachtungsGesten(
                     val deltaY = schwerpunktY - letzterSchwerpunktY
 
                     if (zeigerAnzahl == 1) {
-                        status.dreheUmFokus(
-                            azimutDeltaGrad = -deltaX * 0.3f,
-                            neigungsDeltaGrad = -deltaY * 0.24f,
-                        )
+                        when (einFingerModus) {
+                            KameraInteraktionsModus.DREHEN -> status.dreheUmFokus(
+                                azimutDeltaGrad = -deltaX * 0.3f,
+                                neigungsDeltaGrad = -deltaY * 0.24f,
+                            )
+                            KameraInteraktionsModus.VERSCHIEBEN -> {
+                                val welteinheitenProPixel = berechneWelteinheitenProPixel(
+                                    ansichtsGroesse = ansichtsGroesse,
+                                    szenengroesse = szenengroesse,
+                                    zoom = status.zoom,
+                                )
+                                if (welteinheitenProPixel != null) {
+                                    status.verschiebeDurchBildschirmgeste(
+                                        deltaX = deltaX,
+                                        deltaY = deltaY,
+                                        welteinheitenProPixel = welteinheitenProPixel,
+                                    )
+                                }
+                            }
+                        }
                     } else if (zeigerAnzahl >= 2) {
                         val spannweite = ereignis.spannweite()
                         if (letzteSpannweite > 0f && spannweite > 0f) {
                             status.zoome(spannweite / letzteSpannweite)
                         }
 
-                        val kurzeAnsichtsseite = min(
-                            ansichtsGroesse.width,
-                            ansichtsGroesse.height,
+                        val welteinheitenProPixel = berechneWelteinheitenProPixel(
+                            ansichtsGroesse = ansichtsGroesse,
+                            szenengroesse = szenengroesse,
+                            zoom = status.zoom,
                         )
-                        if (kurzeAnsichtsseite > 0) {
-                            val welteinheitenProPixel =
-                                szenengroesse / kurzeAnsichtsseite / status.zoom
-                            status.verschiebeInEbene(
-                                rechts = -deltaX * welteinheitenProPixel,
-                                vorwaerts = deltaY * welteinheitenProPixel,
+                        if (welteinheitenProPixel != null) {
+                            status.verschiebeDurchBildschirmgeste(
+                                deltaX = deltaX,
+                                deltaY = deltaY,
+                                welteinheitenProPixel = welteinheitenProPixel,
                             )
                         }
                         letzteSpannweite = spannweite
@@ -369,6 +394,16 @@ private class BetrachtungsGesten(
         letzteZeigerAnzahl = 0
         letzteSpannweite = 0f
     }
+}
+
+private fun berechneWelteinheitenProPixel(
+    ansichtsGroesse: IntSize,
+    szenengroesse: Float,
+    zoom: Float,
+): Float? {
+    val kurzeAnsichtsseite = min(ansichtsGroesse.width, ansichtsGroesse.height)
+    return kurzeAnsichtsseite.takeIf { it > 0 }
+        ?.let { seite -> szenengroesse / seite / zoom }
 }
 
 private fun MotionEvent.schwerpunktX(): Float =
