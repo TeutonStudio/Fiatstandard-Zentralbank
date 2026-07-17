@@ -4,6 +4,7 @@ import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
@@ -17,6 +18,12 @@ class SpielstandZuordnungTest {
         id = 42,
         startzustand = SpielZustand(
             spieler = listOf(Spieler(id = anna, name = "Anna")),
+            karte = Spielkarte(
+                id = "spiel-42",
+                name = "Insel 42",
+                zeilen = 6,
+                spalten = 7,
+            ),
         ),
         ereignisse = listOf(
             SpielEreignis.RohstoffEinnahme(
@@ -32,6 +39,7 @@ class SpielstandZuordnungTest {
         val geladen = spiel.zuEntitaet().zuGespeichertemSpiel()
 
         assertEquals(spiel, geladen)
+        assertEquals("spiel-42", geladen.startzustand.karte?.id)
         assertEquals(3, geladen.aktuellerZustand().spieler.single().rohstoffe[Rohstoff.LEHM])
     }
 

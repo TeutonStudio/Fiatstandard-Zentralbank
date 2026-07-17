@@ -74,6 +74,7 @@ fun Spiel.zuSpielZustand(): SpielZustand {
     val spielerNamen = spielerIds.keys.map { it.name }.toSet()
 
     return SpielZustand(
+        karte = karte,
         spieler = spielerListe.map { spieler ->
             FachSpieler(
                 id = spielerIds.getValue(spieler),

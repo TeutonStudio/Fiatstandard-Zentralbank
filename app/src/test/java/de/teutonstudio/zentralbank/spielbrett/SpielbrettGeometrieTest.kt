@@ -34,8 +34,8 @@ class SpielbrettGeometrieTest {
     }
 
     @Test
-    fun `Auflagenradius ergibt eine Dreieckshoehe von eins`() {
-        assertEquals(AUFLAGEN_HOEHE, AUFLAGEN_RADIUS * 1.5f, 0.0001f)
+    fun `Auflagenradius deckt das ganze Grunddreieck ab`() {
+        assertEquals(GRUNDDREIECK_HOEHE, AUFLAGEN_RADIUS * 1.5f, 0.0001f)
     }
 
     @Test
@@ -53,6 +53,51 @@ class SpielbrettGeometrieTest {
         )
 
         assertEquals(listOf(gold, wasser), modell.auflagen.map(DreieckAuflage::typ))
+    }
+
+    @Test
+    fun `Land und Spezialauflage duerfen dasselbe Dreieck belegen`() {
+        val position = DreieckPosition(0, 0, DreieckAusrichtung.OBEN)
+
+        val modell = Spielbrett3DModell(
+            zeilen = 1,
+            spalten = 1,
+            auflagen = listOf(
+                DreieckAuflage(position, DreieckTyp("Land", Color.Green)),
+                DreieckAuflage(
+                    position,
+                    DreieckTyp("Spezial", Color.Magenta),
+                    AuflagenEbene.SPEZIAL,
+                ),
+            ),
+        )
+
+        assertEquals(2, modell.auflagen.size)
+    }
+
+    @Test
+    fun `Treffer findet Dreieck und naechste Ecke`() {
+        val geometrie = berechneSpielbrettGeometrie(3, 3)
+        val dreieck = geometrie.dreiecke.first()
+
+        val treffer = geometrie.treffer(dreieck.mittelpunkt)
+
+        assertEquals(dreieck.position, treffer?.position)
+        assertTrue(treffer?.naechsteEcke in 0..2)
+    }
+
+    @Test
+    fun `innerer Eckpunkt bildet ein Hexagon aus sechs Dreiecken`() {
+        val geometrie = berechneSpielbrettGeometrie(4, 4)
+        val innererTreffer = geometrie.dreiecke.asSequence()
+            .flatMap { dreieck ->
+                dreieck.ecken.indices.asSequence().map { ecke ->
+                    DreieckTreffer(dreieck.position, ecke)
+                }
+            }
+            .first { treffer -> geometrie.hexagonUm(treffer).size == 6 }
+
+        assertEquals(6, geometrie.hexagonUm(innererTreffer).distinct().size)
     }
 
     @Test

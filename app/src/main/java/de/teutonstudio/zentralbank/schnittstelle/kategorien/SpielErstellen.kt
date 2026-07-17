@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.tooling.preview.Preview
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
@@ -23,6 +24,7 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereBauteile
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereLeitzinsatzZiele
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereWarenkorb
+import java.util.UUID
 
 @Composable
 fun SpielErstellen(
@@ -30,6 +32,7 @@ fun SpielErstellen(
     erstelleSpiel: (daten: Spiel, nachErstellen: () -> Unit) -> Unit,
     nachAbschluß: () -> Unit,
     seite: MutableIntState = remember { mutableIntStateOf(1) },
+    vorbelegteKarte: Spielkarte? = null,
 ) {
     val spieler = remember { mutableStateMapOf(
         "Spieler 1" to 100.toZahlungsmittel(),
@@ -37,6 +40,7 @@ fun SpielErstellen(
         "Spieler 3" to 100.toZahlungsmittel(),
     ) }
     val spielerGültig = remember { mutableStateOf(true) }
+    val ausgewaehlteKarte = remember { mutableStateOf(vorbelegteKarte) }
     val warenkorb = remember { mutableStateMapOf<Rohstoffe, Int>() }
     val zentralbankZiele = remember { mutableListOf(15f,2f,.5f,2f) }
     val bauteileProSpieler = remember {
@@ -45,11 +49,15 @@ fun SpielErstellen(
         }
     }
     val spielerNamen = spieler.keys.toList()
-    val abschlussSeite = 4 + spielerNamen.size
+    val abschlussSeite = 5 + spielerNamen.size
     Titel(
         beiZurück = { seite.intValue -= 1 },
         beiWeiter = if (seite.intValue < abschlussSeite) {
-            { if (spielerGültig.value) seite.intValue += 1 }
+            {
+                val darfWeiter = spielerGültig.value &&
+                    (seite.intValue != 4 || ausgewaehlteKarte.value != null)
+                if (darfWeiter) seite.intValue += 1
+            }
         } else {
             null
         },
@@ -60,8 +68,14 @@ fun SpielErstellen(
             1 -> { definiereSpieler(spielerGültig,spieler) }
             2 -> { definiereWarenkorb(warenkorb) }
             3 -> { definiereLeitzinsatzZiele(zentralbankZiele) }
-            in 4 until abschlussSeite -> {
-                val idx = seite.intValue - 4
+            4 -> {
+                KartenAuswahl(
+                    ausgewaehlteKarte = ausgewaehlteKarte.value,
+                    beiAuswahl = { karte -> ausgewaehlteKarte.value = karte },
+                )
+            }
+            in 5 until abschlussSeite -> {
+                val idx = seite.intValue - 5
                 val fürWenn = "für ${spielerNamen[idx]}"
 
                 definiereBauteile(fürWenn, bauteileProSpieler[idx])
@@ -71,18 +85,24 @@ fun SpielErstellen(
                     val bauteile = bauteileProSpieler[idx].toMutableMap()
                     Spieler(name, bauteile) to (spieler[name] ?: Zahlungsmittel())
                 }.toMap()
-                val daten = Spiel(
-                    zentralbankZiele[0],
-                    ausgabe,
-                    warenkorb.toMap(),
-                    zentralbankZiele[1],
-                    zentralbankZiele[2],
-                    zentralbankZiele[3]
-                )
-                LaunchedEffect(Unit) {
-                    erstelleSpiel(daten, nachAbschluß)
+                val karte = ausgewaehlteKarte.value
+                if (karte == null) {
+                    Text("Bitte zuerst eine Spielkarte auswählen.")
+                } else {
+                    val daten = Spiel(
+                        leitzinssatz = zentralbankZiele[0],
+                        spieler = ausgabe,
+                        warenkorb = warenkorb.toMap(),
+                        inflationsziel = zentralbankZiele[1],
+                        normaleAbweichung = zentralbankZiele[2],
+                        starkeAbweichung = zentralbankZiele[3],
+                        karte = karte.copy(id = "spiel-${UUID.randomUUID()}"),
+                    )
+                    LaunchedEffect(Unit) {
+                        erstelleSpiel(daten, nachAbschluß)
+                    }
+                    Text("Spiel wird erstellt …")
                 }
-                Text("Spiel wird erstellt …")
             }
         }
     }

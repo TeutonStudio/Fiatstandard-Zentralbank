@@ -15,6 +15,7 @@ data class Spielbrett3DModell(
     val zeilen: Int,
     val spalten: Int,
     val auflagen: List<DreieckAuflage> = emptyList(),
+    val zeigeBearbeitungsRaster: Boolean = false,
 ) {
     init {
         require(zeilen > 0) { "zeilen muss groesser als 0 sein." }
@@ -30,12 +31,12 @@ data class Spielbrett3DModell(
         }
 
         val doppeltBelegteFelder = auflagen
-            .groupingBy(DreieckAuflage::position)
+            .groupingBy { auflage -> auflage.position to auflage.ebene }
             .eachCount()
             .filterValues { anzahl -> anzahl > 1 }
             .keys
         require(doppeltBelegteFelder.isEmpty()) {
-            "Pro Grunddreieck ist hoechstens eine Auflage erlaubt: $doppeltBelegteFelder"
+            "Pro Grunddreieck und Ebene ist höchstens eine Auflage erlaubt: $doppeltBelegteFelder"
         }
     }
 }
@@ -82,5 +83,15 @@ data class DreieckTyp(
 data class DreieckAuflage(
     val position: DreieckPosition,
     val typ: DreieckTyp,
+    val ebene: AuflagenEbene = AuflagenEbene.LAND,
 )
 
+enum class AuflagenEbene {
+    LAND,
+    SPEZIAL,
+}
+
+data class DreieckTreffer(
+    val position: DreieckPosition,
+    val naechsteEcke: Int,
+)

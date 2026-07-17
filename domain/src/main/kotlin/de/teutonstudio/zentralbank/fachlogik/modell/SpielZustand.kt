@@ -69,6 +69,7 @@ data class Anleihe(
 @Serializable
 data class SpielZustand(
     val spieler: List<Spieler>,
+    val karte: Spielkarte? = null,
     val bankkonto: Geld = Geld.NULL,
     val bankAnleihen: List<AnleiheId> = emptyList(),
     val warenkorb: Map<Rohstoff, Int> = emptyMap(),

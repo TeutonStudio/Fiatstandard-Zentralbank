@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,7 @@ fun Spielmenü(
     beiAuslandSaldo: () -> Unit,
     beiHandel: () -> Unit,
     beiAnleihe: () -> Unit,
+    beiKarte: () -> Unit,
     beiNaechstemZugabschnitt: () -> Unit,
     spiel: Spiel,
     aktiverSpielerName: String?,
@@ -55,6 +57,7 @@ fun Spielmenü(
                 zugText = zugText,
                 modifier = modifier(null),
                 beiKlick = beiNaechstemZugabschnitt,
+                beiKarte = beiKarte,
             )
         } }
     }
@@ -67,6 +70,7 @@ private fun ZugStatusKarte(
     zugText: String,
     modifier: Modifier,
     beiKlick: () -> Unit,
+    beiKarte: () -> Unit,
 ) {
     val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
     val aktiverIndex = spiel.spielerListe.indexOfFirst { spieler ->
@@ -127,6 +131,12 @@ private fun ZugStatusKarte(
                     }
                 }
             }
+            OutlinedButton(
+                onClick = beiKarte,
+                modifier = Modifier.padding(top = 6.dp),
+            ) {
+                Text("Spielkarte öffnen")
+            }
         }
     }
 }
@@ -137,6 +147,6 @@ private fun ZugStatusKarte(
 @Composable
 private fun SpielmenüPreview() {
     Column() {
-        Spielmenü({},{},{},{},{},{},{}, TestSpiel, TestSpiel.spielerListe.first().name)
+        Spielmenü({},{},{},{},{},{},{},{}, TestSpiel, TestSpiel.spielerListe.first().name)
     }
 }

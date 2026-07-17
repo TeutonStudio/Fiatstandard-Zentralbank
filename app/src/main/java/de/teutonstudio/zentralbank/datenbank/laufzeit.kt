@@ -1,6 +1,7 @@
 package de.teutonstudio.zentralbank.datenbank
 
 import java.util.EnumMap
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import kotlin.collections.associateWith
 import kotlin.collections.count
 import kotlin.collections.forEach
@@ -263,6 +264,7 @@ open class Spiel(
     private val inflationsziel: Triple<Float,Float,Float>, // Zielwert, ein schritt, zwei schritte
     private val handel: Handelsregister, // Handelsdaten während des Spiels
     private val konflikt: Kriegsregister,
+    val karte: Spielkarte? = null,
 ) {
     private var aktiverSpielerName: String? = spieler.firstOrNull()?.name
 
@@ -278,12 +280,13 @@ open class Spiel(
         inflationsziel: Float,
         normaleAbweichung: Float,
         starkeAbweichung: Float,
+        karte: Spielkarte? = null,
     ): this(
         mutableListOf(Runde(0,leitzinssatz)),
         spieler.keys.toList(), warenkorb, (inflationsziel to normaleAbweichung to starkeAbweichung).toTriple(),
         Handelsregister(spieler.map { (spieler,guthaben) ->
             Anleihenhandel(spieler, Geschäftsbank,Anleihe(spieler, Zahlungsmittel(),-guthaben,1),Zahlungsmittel())
-        }.toSet()), Kriegsregister()
+        }.toSet()), Kriegsregister(), karte,
     )
 
 /*    constructor(daten:SpielDaten): this(

@@ -392,6 +392,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             abgebildeterSpielZustand
         } else {
             abgebildeterSpielZustand.copy(
+                karte = bisherigerSpielZustand.karte,
                 rundenzähler = bisherigerSpielZustand.rundenzähler,
                 aktiverSpieler = bisherigerSpielZustand.aktiverSpieler,
                 zugStatus = bisherigerSpielZustand.zugStatus,
@@ -556,7 +557,10 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 "Spielstand $id besitzt keine Legacy-Daten für die noch nicht migrierte Oberfläche.",
             )
         setzeAktuellesSpiel(
-            spiel = legacyDaten.zuLegacySpiel(spielDaten),
+            spiel = legacyDaten.zuLegacySpiel(
+                daten = spielDaten,
+                karte = gespeichertesSpiel.startzustand.karte,
+            ),
             daten = spielDaten to legacyDaten,
             gespeichertesSpiel = gespeichertesSpiel,
         )

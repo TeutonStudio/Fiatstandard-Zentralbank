@@ -3,10 +3,11 @@ package de.teutonstudio.zentralbank.spielbrett
 import kotlin.math.sqrt
 
 internal const val GRUNDDREIECK_HOEHE = 2f
-internal const val AUFLAGEN_HOEHE = 1f
+internal const val AUFLAGEN_HOEHE = 0.32f
+internal const val SPEZIAL_AUFLAGEN_HOEHE = 0.14f
 
 // Bei einem gleichseitigen Dreieck gilt h = 3r/2 fuer den Umkreisradius r.
-internal const val AUFLAGEN_RADIUS = AUFLAGEN_HOEHE * 2f / 3f
+internal const val AUFLAGEN_RADIUS = GRUNDDREIECK_HOEHE * 2f / 3f
 
 internal data class BrettPunkt(
     val x: Float,
@@ -32,7 +33,46 @@ internal data class SpielbrettGeometrie(
 
     fun dreieck(position: DreieckPosition): GrundDreieck =
         requireNotNull(nachPosition[position]) { "Unbekannte Dreieckposition: $position" }
+
+    fun treffer(punkt: BrettPunkt): DreieckTreffer? {
+        val dreieck = dreiecke.firstOrNull { kandidat -> kandidat.enthaelt(punkt) } ?: return null
+        val naechsteEcke = dreieck.ecken.indices.minBy { index ->
+            val ecke = dreieck.ecken[index]
+            val deltaX = ecke.x - punkt.x
+            val deltaZ = ecke.z - punkt.z
+            deltaX * deltaX + deltaZ * deltaZ
+        }
+        return DreieckTreffer(dreieck.position, naechsteEcke)
+    }
+
+    fun hexagonUm(treffer: DreieckTreffer): List<DreieckPosition> {
+        val mittelpunkt = dreieck(treffer.position).ecken[treffer.naechsteEcke]
+        return dreiecke
+            .filter { kandidat -> kandidat.ecken.any { ecke -> ecke.fastGleich(mittelpunkt) } }
+            .map(GrundDreieck::position)
+            .sortedWith(
+                compareBy<DreieckPosition>(DreieckPosition::zeile)
+                    .thenBy(DreieckPosition::spalte)
+                    .thenBy { position -> position.ausrichtung.ordinal },
+            )
+    }
 }
+
+private fun GrundDreieck.enthaelt(punkt: BrettPunkt): Boolean {
+    fun vorzeichen(a: BrettPunkt, b: BrettPunkt, c: BrettPunkt): Float =
+        (a.x - c.x) * (b.z - c.z) - (b.x - c.x) * (a.z - c.z)
+
+    val d1 = vorzeichen(punkt, ecken[0], ecken[1])
+    val d2 = vorzeichen(punkt, ecken[1], ecken[2])
+    val d3 = vorzeichen(punkt, ecken[2], ecken[0])
+    val hatNegativ = d1 < -0.0001f || d2 < -0.0001f || d3 < -0.0001f
+    val hatPositiv = d1 > 0.0001f || d2 > 0.0001f || d3 > 0.0001f
+    return !(hatNegativ && hatPositiv)
+}
+
+private fun BrettPunkt.fastGleich(anderer: BrettPunkt): Boolean =
+    kotlin.math.abs(x - anderer.x) < 0.0001f &&
+        kotlin.math.abs(z - anderer.z) < 0.0001f
 
 internal fun berechneSpielbrettGeometrie(
     zeilen: Int,
@@ -98,4 +138,3 @@ internal fun berechneSpielbrettGeometrie(
         tiefe = maxZ - minZ,
     )
 }
-

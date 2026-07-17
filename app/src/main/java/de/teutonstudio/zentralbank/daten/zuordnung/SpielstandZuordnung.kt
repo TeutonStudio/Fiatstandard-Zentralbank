@@ -33,6 +33,7 @@ import de.teutonstudio.zentralbank.datenbank.fromString
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -68,7 +69,10 @@ fun SpielstandEntitaet.zuGespeichertemSpiel(): GespeichertesSpiel {
     )
 }
 
-fun List<SpeicherDaten>.zuLegacySpiel(daten: SpielDaten): Spiel {
+fun List<SpeicherDaten>.zuLegacySpiel(
+    daten: SpielDaten,
+    karte: Spielkarte? = null,
+): Spiel {
     val runden = filterIsInstance<RundeDaten>()
         .sortedBy { it.index }
         .map { Runde(it.index, it.leitzinssatz) }
@@ -238,6 +242,7 @@ fun List<SpeicherDaten>.zuLegacySpiel(daten: SpielDaten): Spiel {
         inflationsziel = Triple(daten.inflationsziel, daten.nAbweichung, daten.sAbweichung),
         handel = Handelsregister(handelsEinträge),
         konflikt = Kriegsregister(vertragsEinträge),
+        karte = karte,
     )
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,6 +33,8 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielLaden
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
+import de.teutonstudio.zentralbank.spielbrett.Spielbrett3D
+import de.teutonstudio.zentralbank.spielbrett.zu3DModell
 
 private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
 
@@ -59,6 +62,7 @@ sealed class Screen(val route: String) {
     object NewGame: Screen(route = "new_game")
     object LoadGame: Screen(route = "load_game")
     object Game: Screen(route = "game")
+    object GameMap: Screen(route = "game_map")
     object PlayerSaldo: Screen(route = "player_saldo")
     object DebtSaldo: Screen(route = "debt_saldo")
     object MarketSaldo: Screen(route = "market_saldo")
@@ -124,6 +128,7 @@ fun Navigation(viewModel: GameViewModel) {
                     { navController.navigate(route = Screen.ForeignSaldo.route) },
                     { navController.navigate(route = Screen.NewTrade.route) },
                     { navController.navigate(route = Screen.NewCredit.route) },
+                    { navController.navigate(route = Screen.GameMap.route) },
                     viewModel::naechsterZugabschnitt,
                     spiel = spiel,
                     aktiverSpielerName = spielZustand?.zugStatus?.spieler?.wert,
@@ -138,6 +143,22 @@ fun Navigation(viewModel: GameViewModel) {
                         ),
                         onClose = viewModel::naechsterZugabschnitt,
                     )
+                }
+            }
+        }
+
+        composable(route = Screen.GameMap.route) {
+            MitAktuellemSpiel(viewModel, navController) {
+                val karte = viewModel.spielZustand.collectAsState().value?.karte
+                Titel(beiZurück = { navController.popBackStack() }) {
+                    if (karte == null) {
+                        Text("Dieser ältere Spielstand enthält noch keine Spielkarte.")
+                    } else {
+                        Spielbrett3D(
+                            modell = karte.zu3DModell(),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }

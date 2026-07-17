@@ -21,6 +21,18 @@ class SpielZustandSerialisierungTest {
                     bauteile = mapOf(BauteilTyp.EISENBAHNLINIE to 1),
                 ),
             ),
+            karte = Spielkarte(
+                id = "spiel-anna",
+                name = "Annas Insel",
+                zeilen = 4,
+                spalten = 5,
+                landfelder = listOf(
+                    Landfeld(
+                        KartenDreieck(1, 2, DreieckHaelfte.OBEN),
+                        GelaendeTyp.WALD,
+                    ),
+                ),
+            ),
             bankkonto = Geld.mark(100),
             bankAnleihen = emptyList(),
             warenkorb = mapOf(Rohstoff.HOLZ to 3),
