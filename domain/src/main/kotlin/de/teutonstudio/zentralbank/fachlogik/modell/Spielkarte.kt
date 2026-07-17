@@ -3,11 +3,12 @@ package de.teutonstudio.zentralbank.fachlogik.modell
 import kotlinx.serialization.Serializable
 
 const val AKTUELLE_KARTEN_FORMAT_VERSION = 1
-const val MAXIMALE_KARTEN_AUSDEHNUNG = 64
 
 /**
  * Dünn besetztes Kartenmodell: Wasser ist die unendliche Grundebene und wird nicht gespeichert.
  * Nur Dreiecke mit einer Landauflage sowie mehrteilige Spezialfelder belegen Speicherplatz.
+ * [startZeile]/[startSpalte] und die Ausdehnung beschreiben lediglich den aktuell im Editor
+ * sichtbaren Bereich. Dieser kann ohne fachliche Obergrenze in jede Richtung erweitert werden.
  */
 @Serializable
 data class Spielkarte(
@@ -16,6 +17,8 @@ data class Spielkarte(
     val name: String,
     val zeilen: Int,
     val spalten: Int,
+    val startZeile: Int = 0,
+    val startSpalte: Int = 0,
     val landfelder: List<Landfeld> = emptyList(),
     val spezialfelder: List<Spezialfeld> = emptyList(),
 ) {
@@ -25,11 +28,13 @@ data class Spielkarte(
         }
         require(id.isNotBlank()) { "Karten-ID darf nicht leer sein." }
         require(name.isNotBlank()) { "Kartenname darf nicht leer sein." }
-        require(zeilen in 1..MAXIMALE_KARTEN_AUSDEHNUNG) {
-            "Zeilen müssen zwischen 1 und $MAXIMALE_KARTEN_AUSDEHNUNG liegen."
+        require(zeilen > 0) { "Die Karte muss mindestens eine Zeile enthalten." }
+        require(spalten > 0) { "Die Karte muss mindestens eine Spalte enthalten." }
+        require(startZeile.toLong() + zeilen <= Int.MAX_VALUE.toLong() + 1L) {
+            "Der Kartenbereich überschreitet den ganzzahligen Koordinatenraum."
         }
-        require(spalten in 1..MAXIMALE_KARTEN_AUSDEHNUNG) {
-            "Spalten müssen zwischen 1 und $MAXIMALE_KARTEN_AUSDEHNUNG liegen."
+        require(startSpalte.toLong() + spalten <= Int.MAX_VALUE.toLong() + 1L) {
+            "Der Kartenbereich überschreitet den ganzzahligen Koordinatenraum."
         }
 
         val landPositionsListe = landfelder.map(Landfeld::position)
@@ -66,8 +71,14 @@ data class Spielkarte(
     val landNachPosition: Map<KartenDreieck, GelaendeTyp>
         get() = landfelder.associate { feld -> feld.position to feld.gelaende }
 
+    val endeZeileExklusiv: Long get() = startZeile.toLong() + zeilen
+    val endeSpalteExklusiv: Long get() = startSpalte.toLong() + spalten
+
     private fun pruefePosition(position: KartenDreieck) {
-        require(position.zeile in 0 until zeilen && position.spalte in 0 until spalten) {
+        require(
+            position.zeile.toLong() in startZeile.toLong() until endeZeileExklusiv &&
+                position.spalte.toLong() in startSpalte.toLong() until endeSpalteExklusiv,
+        ) {
             "Dreieck liegt außerhalb der Karte: $position."
         }
     }
@@ -78,12 +89,7 @@ data class KartenDreieck(
     val zeile: Int,
     val spalte: Int,
     val haelfte: DreieckHaelfte,
-) {
-    init {
-        require(zeile >= 0) { "Dreieckzeile darf nicht negativ sein." }
-        require(spalte >= 0) { "Dreieckspalte darf nicht negativ sein." }
-    }
-}
+)
 
 @Serializable
 enum class DreieckHaelfte {

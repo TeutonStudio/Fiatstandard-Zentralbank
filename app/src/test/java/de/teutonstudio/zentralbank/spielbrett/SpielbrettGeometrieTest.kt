@@ -101,6 +101,25 @@ class SpielbrettGeometrieTest {
     }
 
     @Test
+    fun `Geometrie behaelt negative Kartenkoordinaten bei`() {
+        val geometrie = berechneSpielbrettGeometrie(
+            zeilen = 3,
+            spalten = 4,
+            startZeile = -8,
+            startSpalte = -12,
+        )
+
+        assertTrue(
+            DreieckPosition(-8, -12, DreieckAusrichtung.UNTEN) in
+                geometrie.dreiecke.map(GrundDreieck::position),
+        )
+        assertTrue(
+            DreieckPosition(-6, -9, DreieckAusrichtung.OBEN) in
+                geometrie.dreiecke.map(GrundDreieck::position),
+        )
+    }
+
+    @Test
     fun `Positionen ausserhalb des Bretts werden abgelehnt`() {
         val fehler = assertThrows(IllegalArgumentException::class.java) {
             Spielbrett3DModell(

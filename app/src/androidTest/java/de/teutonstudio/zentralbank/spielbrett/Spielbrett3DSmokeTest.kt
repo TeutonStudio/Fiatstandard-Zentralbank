@@ -19,9 +19,11 @@ class Spielbrett3DSmokeTest {
             name = "3D-Test",
             zeilen = 3,
             spalten = 3,
+            startZeile = -2,
+            startSpalte = -2,
             landfelder = listOf(
                 Landfeld(
-                    KartenDreieck(1, 1, DreieckHaelfte.OBEN),
+                    KartenDreieck(-1, -1, DreieckHaelfte.OBEN),
                     GelaendeTyp.WALD,
                 ),
             ),

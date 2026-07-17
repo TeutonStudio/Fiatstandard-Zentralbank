@@ -39,12 +39,43 @@ class SpielkarteTest {
         val karte = Spielkarte(
             id = "wasser",
             name = "Offenes Meer",
-            zeilen = 64,
-            spalten = 64,
+            zeilen = 100_000,
+            spalten = 250_000,
+            startZeile = -50_000,
+            startSpalte = -125_000,
         )
 
         assertEquals(0, karte.landfelder.size)
         assertEquals(0, karte.spezialfelder.size)
+    }
+
+    @Test
+    fun karteUnterstuetztNegativeKoordinatenOhneFesteAusdehnungsgrenze() {
+        val position = KartenDreieck(-7_500, -12_000, DreieckHaelfte.OBEN)
+
+        val karte = Spielkarte(
+            id = "unbegrenzt",
+            name = "Unbegrenzte Karte",
+            zeilen = 20_000,
+            spalten = 30_000,
+            startZeile = -10_000,
+            startSpalte = -15_000,
+            landfelder = listOf(Landfeld(position, GelaendeTyp.GEBIRGE)),
+        )
+
+        assertEquals(GelaendeTyp.GEBIRGE, karte.landNachPosition[position])
+        assertEquals(10_000L, karte.endeZeileExklusiv)
+        assertEquals(15_000L, karte.endeSpalteExklusiv)
+    }
+
+    @Test
+    fun bestehendeKarteOhneUrsprungBeginntWeiterhinBeiNull() {
+        val geladen = Json.decodeFromString<Spielkarte>(
+            """{"id":"alt","name":"Alte Karte","zeilen":3,"spalten":4}""",
+        )
+
+        assertEquals(0, geladen.startZeile)
+        assertEquals(0, geladen.startSpalte)
     }
 
     @Test

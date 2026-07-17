@@ -77,19 +77,23 @@ private fun BrettPunkt.fastGleich(anderer: BrettPunkt): Boolean =
 internal fun berechneSpielbrettGeometrie(
     zeilen: Int,
     spalten: Int,
+    startZeile: Int = 0,
+    startSpalte: Int = 0,
 ): SpielbrettGeometrie {
     require(zeilen > 0)
     require(spalten > 0)
 
     val seitenlaenge = 2f * GRUNDDREIECK_HOEHE / sqrt(3f)
     val roheDreiecke = buildList {
-        repeat(zeilen) { zeile ->
-            val zOben = zeile * GRUNDDREIECK_HOEHE
+        repeat(zeilen) { lokalerZeilenIndex ->
+            val zeile = startZeile + lokalerZeilenIndex
+            val zOben = lokalerZeilenIndex * GRUNDDREIECK_HOEHE
             val zUnten = zOben + GRUNDDREIECK_HOEHE
-            val zeilenVersatz = zeile * seitenlaenge / 2f
+            val zeilenVersatz = lokalerZeilenIndex * seitenlaenge / 2f
 
-            repeat(spalten) { spalte ->
-                val xLinks = zeilenVersatz + spalte * seitenlaenge
+            repeat(spalten) { lokalerSpaltenIndex ->
+                val spalte = startSpalte + lokalerSpaltenIndex
+                val xLinks = zeilenVersatz + lokalerSpaltenIndex * seitenlaenge
                 val a = BrettPunkt(xLinks, zOben)
                 val b = BrettPunkt(xLinks + seitenlaenge, zOben)
                 val c = BrettPunkt(xLinks + seitenlaenge / 2f, zUnten)

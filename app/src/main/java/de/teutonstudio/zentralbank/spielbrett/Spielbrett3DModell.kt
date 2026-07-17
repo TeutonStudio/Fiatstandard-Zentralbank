@@ -6,26 +6,37 @@ import androidx.compose.ui.graphics.Color
 /**
  * Vollstaendige Beschreibung eines dreieckig tesselierten Spielbretts.
  *
- * Eine Spalte bezeichnet eine aus zwei Dreiecken bestehende Raute. Das Brett enthaelt daher
- * [zeilen] * [spalten] * 2 Grunddreiecke. [auflagen] bestimmt, auf welchen Grunddreiecken ein
- * farbiges, dreiseitiges Prisma dargestellt wird.
+ * Eine Spalte bezeichnet eine aus zwei Dreiecken bestehende Raute. Das sichtbare Raster enthaelt
+ * daher [zeilen] * [spalten] * 2 Grunddreiecke und kann dank [startZeile]/[startSpalte] auch
+ * negative Kartenkoordinaten darstellen. [auflagen] bestimmt, auf welchen Grunddreiecken ein
+ * farbiges, dreiseitiges Prisma dargestellt wird; Wasser setzt sich ausserhalb des Rasters fort.
  */
 @Immutable
 data class Spielbrett3DModell(
     val zeilen: Int,
     val spalten: Int,
+    val startZeile: Int = 0,
+    val startSpalte: Int = 0,
     val auflagen: List<DreieckAuflage> = emptyList(),
     val zeigeBearbeitungsRaster: Boolean = false,
 ) {
     init {
         require(zeilen > 0) { "zeilen muss groesser als 0 sein." }
         require(spalten > 0) { "spalten muss groesser als 0 sein." }
+        val endeZeileExklusiv = startZeile.toLong() + zeilen
+        val endeSpalteExklusiv = startSpalte.toLong() + spalten
+        require(endeZeileExklusiv <= Int.MAX_VALUE.toLong() + 1L) {
+            "Der Zeilenbereich überschreitet den Koordinatenraum."
+        }
+        require(endeSpalteExklusiv <= Int.MAX_VALUE.toLong() + 1L) {
+            "Der Spaltenbereich überschreitet den Koordinatenraum."
+        }
 
         auflagen.forEach { auflage ->
-            require(auflage.position.zeile < zeilen) {
+            require(auflage.position.zeile.toLong() in startZeile.toLong() until endeZeileExklusiv) {
                 "Auflage in Zeile ${auflage.position.zeile} liegt ausserhalb des Bretts."
             }
-            require(auflage.position.spalte < spalten) {
+            require(auflage.position.spalte.toLong() in startSpalte.toLong() until endeSpalteExklusiv) {
                 "Auflage in Spalte ${auflage.position.spalte} liegt ausserhalb des Bretts."
             }
         }
@@ -47,12 +58,7 @@ data class DreieckPosition(
     val zeile: Int,
     val spalte: Int,
     val ausrichtung: DreieckAusrichtung,
-) {
-    init {
-        require(zeile >= 0) { "zeile darf nicht negativ sein." }
-        require(spalte >= 0) { "spalte darf nicht negativ sein." }
-    }
-}
+)
 
 /** Ausrichtung in der Draufsicht entlang der vertikalen Brettachse. */
 enum class DreieckAusrichtung {

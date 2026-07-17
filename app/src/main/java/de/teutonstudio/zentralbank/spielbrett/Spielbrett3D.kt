@@ -43,7 +43,7 @@ import kotlin.math.sin
 
 private const val BRETT_DICKE = 0.12f
 private const val OBERFLAECHEN_ABSTAND = 0.004f
-private const val WASSER_AUSDEHNUNGSFAKTOR = 8f
+private const val WASSER_MINDEST_SICHTWEITE = 10_000f
 private const val BRETT_RAND = 0.35f
 private const val KAMERA_FOKUS_HOEHE = AUFLAGEN_HOEHE * 0.2f
 
@@ -100,8 +100,18 @@ fun Spielbrett3D(
         return
     }
 
-    val geometrie = remember(modell.zeilen, modell.spalten) {
-        berechneSpielbrettGeometrie(modell.zeilen, modell.spalten)
+    val geometrie = remember(
+        modell.zeilen,
+        modell.spalten,
+        modell.startZeile,
+        modell.startSpalte,
+    ) {
+        berechneSpielbrettGeometrie(
+            zeilen = modell.zeilen,
+            spalten = modell.spalten,
+            startZeile = modell.startZeile,
+            startSpalte = modell.startSpalte,
+        )
     }
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
@@ -149,7 +159,7 @@ fun Spielbrett3D(
     }
 
     val szenengroesse = max(geometrie.breite, geometrie.tiefe)
-    val wasserAusdehnung = max(szenengroesse * WASSER_AUSDEHNUNGSFAKTOR, 32f)
+    val wasserAusdehnung = max(szenengroesse * 64f, WASSER_MINDEST_SICHTWEITE)
     val kameraAbstand = szenengroesse * 1.15f + AUFLAGEN_HOEHE * 2f
     val transformation = betrachtungsStatus.transformation
     val kameraDistanz = kameraAbstand / transformation.zoom
@@ -178,7 +188,7 @@ fun Spielbrett3D(
             .onSizeChanged { groesse -> ansichtsGroesse = groesse }
             .semantics {
                 contentDescription =
-                    "3D-Spielbrett mit ${modell.zeilen * modell.spalten * 2} " +
+                    "3D-Spielbrett mit ${modell.zeilen.toLong() * modell.spalten * 2L} " +
                         "Dreiecken und ${modell.auflagen.size} Auflagen"
             },
         engine = engine,
@@ -202,7 +212,11 @@ fun Spielbrett3D(
                 z = wasserAusdehnung,
             ),
             materialInstance = wasserMaterial,
-            position = Position(y = -BRETT_DICKE / 2f),
+            position = Position(
+                x = transformation.fokusX,
+                y = -BRETT_DICKE / 2f,
+                z = transformation.fokusZ,
+            ),
         )
 
         if (modell.zeigeBearbeitungsRaster) {
@@ -391,8 +405,18 @@ private fun SpielbrettVorschau(
     transformation: BetrachtungsTransformation,
     modifier: Modifier = Modifier,
 ) {
-    val geometrie = remember(modell.zeilen, modell.spalten) {
-        berechneSpielbrettGeometrie(modell.zeilen, modell.spalten)
+    val geometrie = remember(
+        modell.zeilen,
+        modell.spalten,
+        modell.startZeile,
+        modell.startSpalte,
+    ) {
+        berechneSpielbrettGeometrie(
+            zeilen = modell.zeilen,
+            spalten = modell.spalten,
+            startZeile = modell.startZeile,
+            startSpalte = modell.startSpalte,
+        )
     }
 
     Canvas(

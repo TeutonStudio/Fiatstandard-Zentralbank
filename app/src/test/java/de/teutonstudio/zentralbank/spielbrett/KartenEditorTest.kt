@@ -71,6 +71,22 @@ class KartenEditorTest {
         assertTrue(verkleinert.spezialfelder.isEmpty())
     }
 
+    @Test
+    fun `Bearbeitungsbereich waechst ohne Limit in alle vier Richtungen`() {
+        val karte = leereKarte()
+            .erweitert(KartenRichtung.NORDEN, 80)
+            .erweitert(KartenRichtung.SUEDEN, 90)
+            .erweitert(KartenRichtung.WESTEN, 100)
+            .erweitert(KartenRichtung.OSTEN, 110)
+
+        assertEquals(-80, karte.startZeile)
+        assertEquals(-100, karte.startSpalte)
+        assertEquals(174, karte.zeilen)
+        assertEquals(214, karte.spalten)
+        assertEquals(94L, karte.endeZeileExklusiv)
+        assertEquals(114L, karte.endeSpalteExklusiv)
+    }
+
     private fun leereKarte() = Spielkarte(
         id = "testkarte",
         name = "Testkarte",
@@ -79,7 +95,12 @@ class KartenEditorTest {
     )
 
     private fun innererTreffer(karte: Spielkarte): DreieckTreffer {
-        val geometrie = berechneSpielbrettGeometrie(karte.zeilen, karte.spalten)
+        val geometrie = berechneSpielbrettGeometrie(
+            zeilen = karte.zeilen,
+            spalten = karte.spalten,
+            startZeile = karte.startZeile,
+            startSpalte = karte.startSpalte,
+        )
         return geometrie.dreiecke.asSequence()
             .flatMap { dreieck ->
                 dreieck.ecken.indices.asSequence().map { ecke ->

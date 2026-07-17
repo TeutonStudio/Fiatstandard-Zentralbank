@@ -45,6 +45,8 @@ fun Spielkarte.zu3DModell(
 ): Spielbrett3DModell = Spielbrett3DModell(
     zeilen = zeilen,
     spalten = spalten,
+    startZeile = startZeile,
+    startSpalte = startSpalte,
     zeigeBearbeitungsRaster = zeigeBearbeitungsRaster,
     auflagen = buildList {
         landfelder.forEach { landfeld ->

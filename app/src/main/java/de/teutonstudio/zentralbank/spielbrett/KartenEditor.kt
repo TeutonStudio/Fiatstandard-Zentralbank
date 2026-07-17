@@ -38,7 +38,6 @@ import de.teutonstudio.zentralbank.daten.karten.KartenAblage
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenDreieck
 import de.teutonstudio.zentralbank.fachlogik.modell.Landfeld
-import de.teutonstudio.zentralbank.fachlogik.modell.MAXIMALE_KARTEN_AUSDEHNUNG
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
@@ -56,6 +55,13 @@ internal enum class KartenWerkzeug(val beschriftung: String) {
     STADT("Spezial: Stadt"),
     HAFEN("Spezial: Hafen"),
     SPEZIAL_ENTFERNEN("Spezial entfernen"),
+}
+
+internal enum class KartenRichtung(val beschriftung: String) {
+    NORDEN("Norden +1"),
+    SUEDEN("Süden +1"),
+    WESTEN("Westen +1"),
+    OSTEN("Osten +1"),
 }
 
 @Composable
@@ -93,6 +99,9 @@ fun KartenEditorDialog(
                             name = name,
                             beiName = { name = it },
                             karte = entwurf,
+                            beiErweitern = { richtung ->
+                                entwurf = entwurf.erweitert(richtung)
+                            },
                             beiAusdehnung = { zeilen, spalten ->
                                 entwurf = entwurf.mitAusdehnung(zeilen, spalten)
                             },
@@ -185,6 +194,7 @@ private fun KartenWerkzeugleiste(
     name: String,
     beiName: (String) -> Unit,
     karte: Spielkarte,
+    beiErweitern: (KartenRichtung) -> Unit,
     beiAusdehnung: (Int, Int) -> Unit,
     werkzeug: KartenWerkzeug,
     beiWerkzeug: (KartenWerkzeug) -> Unit,
@@ -217,6 +227,22 @@ private fun KartenWerkzeugleiste(
                 modifier = Modifier.weight(1f),
             )
         }
+        Text("Bearbeitungsbereich dynamisch erweitern", style = MaterialTheme.typography.titleSmall)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            KartenRichtung.entries.forEach { richtung ->
+                OutlinedButton(onClick = { beiErweitern(richtung) }) {
+                    Text(richtung.beschriftung)
+                }
+            }
+        }
+        Text(
+            "Zeilen ${karte.startZeile} bis ${karte.endeZeileExklusiv - 1} · " +
+                "Spalten ${karte.startSpalte} bis ${karte.endeSpalteExklusiv - 1}",
+            style = MaterialTheme.typography.bodySmall,
+        )
         Text("Gelände", style = MaterialTheme.typography.titleSmall)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -253,22 +279,25 @@ private fun AusdehnungsFeld(
         value = wert.toString(),
         onValueChange = { eingabe ->
             eingabe.toIntOrNull()
-                ?.takeIf { it in 1..MAXIMALE_KARTEN_AUSDEHNUNG }
+                ?.takeIf { it > 0 }
                 ?.let(beiWert)
         },
         modifier = modifier,
         label = { Text(bezeichnung) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        supportingText = { Text("1–$MAXIMALE_KARTEN_AUSDEHNUNG") },
+        supportingText = { Text("Mindestens 1 · kein festes Maximum") },
     )
 }
 
 internal fun Spielkarte.mitAusdehnung(neueZeilen: Int, neueSpalten: Int): Spielkarte {
-    require(neueZeilen in 1..MAXIMALE_KARTEN_AUSDEHNUNG)
-    require(neueSpalten in 1..MAXIMALE_KARTEN_AUSDEHNUNG)
+    require(neueZeilen > 0)
+    require(neueSpalten > 0)
+    val neueEndZeile = startZeile.toLong() + neueZeilen
+    val neueEndSpalte = startSpalte.toLong() + neueSpalten
     val land = landfelder.filter { feld ->
-        feld.position.zeile < neueZeilen && feld.position.spalte < neueSpalten
+        feld.position.zeile.toLong() in startZeile.toLong() until neueEndZeile &&
+            feld.position.spalte.toLong() in startSpalte.toLong() until neueEndSpalte
     }
     val landPositionen = land.mapTo(mutableSetOf(), Landfeld::position)
     return copy(
@@ -278,6 +307,37 @@ internal fun Spielkarte.mitAusdehnung(neueZeilen: Int, neueSpalten: Int): Spielk
         spezialfelder = spezialfelder.filter { feld ->
             feld.positionen.all { position -> position in landPositionen }
         },
+    )
+}
+
+internal fun Spielkarte.erweitert(
+    richtung: KartenRichtung,
+    anzahl: Int = 1,
+): Spielkarte {
+    require(anzahl > 0) { "Es muss um mindestens eine Reihe erweitert werden." }
+    val neueZeilen = when (richtung) {
+        KartenRichtung.NORDEN, KartenRichtung.SUEDEN -> Math.addExact(zeilen, anzahl)
+        KartenRichtung.WESTEN, KartenRichtung.OSTEN -> zeilen
+    }
+    val neueSpalten = when (richtung) {
+        KartenRichtung.WESTEN, KartenRichtung.OSTEN -> Math.addExact(spalten, anzahl)
+        KartenRichtung.NORDEN, KartenRichtung.SUEDEN -> spalten
+    }
+    val neueStartZeile = if (richtung == KartenRichtung.NORDEN) {
+        Math.subtractExact(startZeile, anzahl)
+    } else {
+        startZeile
+    }
+    val neueStartSpalte = if (richtung == KartenRichtung.WESTEN) {
+        Math.subtractExact(startSpalte, anzahl)
+    } else {
+        startSpalte
+    }
+    return copy(
+        zeilen = neueZeilen,
+        spalten = neueSpalten,
+        startZeile = neueStartZeile,
+        startSpalte = neueStartSpalte,
     )
 }
 
@@ -303,7 +363,12 @@ internal fun Spielkarte.wendeWerkzeugAn(
     }
 
     val spezialTyp = werkzeug.spezialOderNull() ?: return this
-    val positionen = berechneSpielbrettGeometrie(zeilen, spalten)
+    val positionen = berechneSpielbrettGeometrie(
+        zeilen = zeilen,
+        spalten = spalten,
+        startZeile = startZeile,
+        startSpalte = startSpalte,
+    )
         .kartenHexagonUm(treffer)
     if (positionen.size != 6) return this
 
