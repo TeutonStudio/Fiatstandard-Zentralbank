@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Database
+import de.teutonstudio.zentralbank.daten.raumdatenbank.ZentralbankMigrationen
+import de.teutonstudio.zentralbank.daten.raumdatenbank.entitaet.SpielstandEntitaet
+import de.teutonstudio.zentralbank.daten.raumdatenbank.zugriff.SpielstandDao
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -20,8 +23,9 @@ import kotlinx.coroutines.flow.flowOn
         HandelsDaten::class,
         AnleiheDaten::class,
         VertragsDaten::class,
+        SpielstandEntitaet::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tradeDao(): TradeDao
     abstract fun creditDao(): CreditDao
     abstract fun contractDao(): ContractDao
+    abstract fun spielstandDao(): SpielstandDao
 
     companion object {
         @Volatile
@@ -45,7 +50,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "zentralbankspeicher"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .addMigrations(ZentralbankMigrationen.VON_1_NACH_2)
                     .build()
             }
             emit(INSTANCE!!)
