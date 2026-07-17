@@ -102,7 +102,7 @@ fun Navigation(viewModel: GameViewModel) {
                 SpielErstellen(
                     Screen.StartScreen.navigiere(navController),
                     viewModel::erstelleSpiel,
-                    Screen.Game.navigiere(navController)
+                    Screen.GameMap.navigiere(navController),
                 )
             }
 

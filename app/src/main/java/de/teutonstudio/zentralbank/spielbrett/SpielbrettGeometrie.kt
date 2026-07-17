@@ -1,7 +1,11 @@
 package de.teutonstudio.zentralbank.spielbrett
 
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.felder
+import kotlin.math.floor
 import kotlin.math.sqrt
 
 internal const val GRUNDDREIECK_HOEHE = 2f
@@ -10,6 +14,7 @@ internal const val SPEZIAL_AUFLAGEN_HOEHE = 0.14f
 
 // Bei einem gleichseitigen Dreieck gilt h = 3r/2 fuer den Umkreisradius r.
 internal const val AUFLAGEN_RADIUS = GRUNDDREIECK_HOEHE * 2f / 3f
+private val GRUNDDREIECK_SEITENLAENGE = 2f * GRUNDDREIECK_HOEHE / sqrt(3f)
 
 internal data class BrettPunkt(
     val x: Float,
@@ -30,6 +35,7 @@ internal data class SpielbrettGeometrie(
     val dreiecke: List<GrundDreieck>,
     val breite: Float,
     val tiefe: Float,
+    val ursprung: BrettPunkt = BrettPunkt(0f, 0f),
 ) {
     private val nachPosition = dreiecke.associateBy(GrundDreieck::position)
 
@@ -38,18 +44,42 @@ internal data class SpielbrettGeometrie(
 
     fun treffer(punkt: BrettPunkt): DreieckTreffer? {
         val dreieck = dreiecke.firstOrNull { kandidat -> kandidat.enthaelt(punkt) } ?: return null
-        val naechsteEcke = dreieck.ecken.indices.minBy { index ->
-            val ecke = dreieck.ecken[index]
+        return dreieck.treffer(punkt)
+    }
+
+    fun unbegrenzterTreffer(punkt: BrettPunkt): DreieckTreffer? {
+        val absolutesX = punkt.x + ursprung.x
+        val absolutesZ = punkt.z + ursprung.z
+        val ungefaehreZeile = floor(absolutesZ / GRUNDDREIECK_HOEHE).toInt()
+        val ungefaehreSpalte = floor(
+            (absolutesX - ungefaehreZeile * GRUNDDREIECK_SEITENLAENGE / 2f) /
+                GRUNDDREIECK_SEITENLAENGE,
+        ).toInt()
+        val kandidaten = buildList {
+            for (zeile in (ungefaehreZeile - 1)..(ungefaehreZeile + 1)) {
+                for (spalte in (ungefaehreSpalte - 1)..(ungefaehreSpalte + 1)) {
+                    DreieckAusrichtung.entries.forEach { ausrichtung ->
+                        add(grundDreieck(DreieckPosition(zeile, spalte, ausrichtung), ursprung))
+                    }
+                }
+            }
+        }
+        return kandidaten.firstOrNull { it.enthaelt(punkt) }?.treffer(punkt)
+    }
+
+    private fun GrundDreieck.treffer(punkt: BrettPunkt): DreieckTreffer {
+        val naechsteEcke = ecken.indices.minBy { index ->
+            val ecke = ecken[index]
             val deltaX = ecke.x - punkt.x
             val deltaZ = ecke.z - punkt.z
             deltaX * deltaX + deltaZ * deltaZ
         }
-        val naechsteKante = dreieck.ecken.indices.minBy { index ->
-            val a = dreieck.ecken[index]
-            val b = dreieck.ecken[(index + 1) % dreieck.ecken.size]
+        val naechsteKante = ecken.indices.minBy { index ->
+            val a = ecken[index]
+            val b = ecken[(index + 1) % ecken.size]
             quadratischerAbstandZuStrecke(punkt, a, b)
         }
-        val ecke = dreieck.ecken[naechsteEcke]
+        val ecke = ecken[naechsteEcke]
         val eckenAbstand = sqrt(
             (ecke.x - punkt.x) * (ecke.x - punkt.x) +
                 (ecke.z - punkt.z) * (ecke.z - punkt.z),
@@ -57,12 +87,12 @@ internal data class SpielbrettGeometrie(
         val kantenAbstand = sqrt(
             quadratischerAbstandZuStrecke(
                 punkt,
-                dreieck.ecken[naechsteKante],
-                dreieck.ecken[(naechsteKante + 1) % dreieck.ecken.size],
+                ecken[naechsteKante],
+                ecken[(naechsteKante + 1) % ecken.size],
             ),
         )
         return DreieckTreffer(
-            position = dreieck.position,
+            position = position,
             naechsteEcke = naechsteEcke,
             naechsteKante = naechsteKante,
             abstandZurNaechstenEcke = eckenAbstand,
@@ -83,12 +113,10 @@ internal data class SpielbrettGeometrie(
     }
 
     fun punkt(ecke: KartenEcke): BrettPunkt? {
-        dreiecke.forEach { dreieck ->
-            val fachEcken = dreieck.position.zuKartenFeld().ecken()
-            val index = fachEcken.indexOf(ecke)
-            if (index >= 0) return dreieck.ecken[index]
-        }
-        return null
+        return BrettPunkt(
+            x = ecke.x * GRUNDDREIECK_SEITENLAENGE / 2f - ursprung.x,
+            z = ecke.y * GRUNDDREIECK_HOEHE / 2f - ursprung.z,
+        )
     }
 }
 
@@ -130,71 +158,68 @@ private fun BrettPunkt.fastGleich(anderer: BrettPunkt): Boolean =
     kotlin.math.abs(x - anderer.x) < 0.0001f &&
         kotlin.math.abs(z - anderer.z) < 0.0001f
 
-internal fun berechneSpielbrettGeometrie(
-    zeilen: Int,
-    spalten: Int,
-    startZeile: Int = 0,
-    startSpalte: Int = 0,
+internal fun berechneSpielbrettGeometrie(hexagon: KartenHexagon): SpielbrettGeometrie {
+    val ursprung = BrettPunkt(
+        x = hexagon.zentrum.x * GRUNDDREIECK_SEITENLAENGE / 2f,
+        z = hexagon.zentrum.y * GRUNDDREIECK_HOEHE / 2f,
+    )
+    return geometrieAusPositionen(
+        positionen = hexagon.felder().map(KartenFeld::zu3DPosition),
+        ursprung = ursprung,
+    )
+}
+
+internal fun SpielbrettGeometrie.rasterAusschnittUm(
+    mitte: DreieckPosition,
+    radius: Int = 12,
 ): SpielbrettGeometrie {
-    require(zeilen > 0)
-    require(spalten > 0)
-
-    val seitenlaenge = 2f * GRUNDDREIECK_HOEHE / sqrt(3f)
-    val roheDreiecke = buildList {
-        repeat(zeilen) { lokalerZeilenIndex ->
-            val zeile = startZeile + lokalerZeilenIndex
-            val zOben = lokalerZeilenIndex * GRUNDDREIECK_HOEHE
-            val zUnten = zOben + GRUNDDREIECK_HOEHE
-            val zeilenVersatz = lokalerZeilenIndex * seitenlaenge / 2f
-
-            repeat(spalten) { lokalerSpaltenIndex ->
-                val spalte = startSpalte + lokalerSpaltenIndex
-                val xLinks = zeilenVersatz + lokalerSpaltenIndex * seitenlaenge
-                val a = BrettPunkt(xLinks, zOben)
-                val b = BrettPunkt(xLinks + seitenlaenge, zOben)
-                val c = BrettPunkt(xLinks + seitenlaenge / 2f, zUnten)
-                val d = BrettPunkt(xLinks + seitenlaenge * 1.5f, zUnten)
-
-                add(
-                    GrundDreieck(
-                        position = DreieckPosition(
-                            zeile = zeile,
-                            spalte = spalte,
-                            ausrichtung = DreieckAusrichtung.UNTEN,
-                        ),
-                        ecken = listOf(a, b, c),
-                    ),
-                )
-                add(
-                    GrundDreieck(
-                        position = DreieckPosition(
-                            zeile = zeile,
-                            spalte = spalte,
-                            ausrichtung = DreieckAusrichtung.OBEN,
-                        ),
-                        ecken = listOf(b, d, c),
-                    ),
-                )
+    require(radius > 0)
+    val positionen = buildList {
+        for (zeile in (mitte.zeile - radius)..(mitte.zeile + radius)) {
+            for (spalte in (mitte.spalte - radius)..(mitte.spalte + radius)) {
+                DreieckAusrichtung.entries.forEach { ausrichtung ->
+                    add(DreieckPosition(zeile, spalte, ausrichtung))
+                }
             }
         }
     }
+    return geometrieAusPositionen(positionen, ursprung)
+}
 
-    val minX = roheDreiecke.minOf { dreieck -> dreieck.ecken.minOf(BrettPunkt::x) }
-    val maxX = roheDreiecke.maxOf { dreieck -> dreieck.ecken.maxOf(BrettPunkt::x) }
-    val minZ = roheDreiecke.minOf { dreieck -> dreieck.ecken.minOf(BrettPunkt::z) }
-    val maxZ = roheDreiecke.maxOf { dreieck -> dreieck.ecken.maxOf(BrettPunkt::z) }
-    val mitteX = (minX + maxX) / 2f
-    val mitteZ = (minZ + maxZ) / 2f
-
+private fun geometrieAusPositionen(
+    positionen: List<DreieckPosition>,
+    ursprung: BrettPunkt,
+): SpielbrettGeometrie {
+    val dreiecke = positionen.map { grundDreieck(it, ursprung) }
+    val minX = dreiecke.minOf { it.ecken.minOf(BrettPunkt::x) }
+    val maxX = dreiecke.maxOf { it.ecken.maxOf(BrettPunkt::x) }
+    val minZ = dreiecke.minOf { it.ecken.minOf(BrettPunkt::z) }
+    val maxZ = dreiecke.maxOf { it.ecken.maxOf(BrettPunkt::z) }
     return SpielbrettGeometrie(
-        dreiecke = roheDreiecke.map { dreieck ->
-            dreieck.copy(
-                ecken = dreieck.ecken.map { punkt ->
-                    BrettPunkt(x = punkt.x - mitteX, z = punkt.z - mitteZ)
-                },
-            )
-        },
+        dreiecke = dreiecke,
         breite = maxX - minX,
         tiefe = maxZ - minZ,
+        ursprung = ursprung,
+    )
+}
+
+private fun grundDreieck(
+    position: DreieckPosition,
+    ursprung: BrettPunkt,
+): GrundDreieck {
+    val zOben = position.zeile * GRUNDDREIECK_HOEHE - ursprung.z
+    val zUnten = zOben + GRUNDDREIECK_HOEHE
+    val xLinks = position.zeile * GRUNDDREIECK_SEITENLAENGE / 2f +
+        position.spalte * GRUNDDREIECK_SEITENLAENGE - ursprung.x
+    val a = BrettPunkt(xLinks, zOben)
+    val b = BrettPunkt(xLinks + GRUNDDREIECK_SEITENLAENGE, zOben)
+    val c = BrettPunkt(xLinks + GRUNDDREIECK_SEITENLAENGE / 2f, zUnten)
+    val d = BrettPunkt(xLinks + GRUNDDREIECK_SEITENLAENGE * 1.5f, zUnten)
+    return GrundDreieck(
+        position = position,
+        ecken = when (position.ausrichtung) {
+            DreieckAusrichtung.UNTEN -> listOf(a, b, c)
+            DreieckAusrichtung.OBEN -> listOf(b, d, c)
+        },
     )
 }

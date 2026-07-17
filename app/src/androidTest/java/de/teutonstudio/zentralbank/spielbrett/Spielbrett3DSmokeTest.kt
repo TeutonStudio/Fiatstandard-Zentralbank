@@ -8,6 +8,7 @@ import de.teutonstudio.zentralbank.MainActivity
 import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenDreieck
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.Landfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import org.junit.Assert.assertFalse
@@ -16,14 +17,11 @@ import org.junit.Test
 
 class Spielbrett3DSmokeTest {
     @Test
-    fun sceneViewStelltWasserRasterUndLandAuflageDar() {
+    fun sceneViewStelltUnbegrenztesRasterUndLandAuflageDar() {
         val karte = Spielkarte(
             id = "3d-test",
             name = "3D-Test",
-            zeilen = 3,
-            spalten = 3,
-            startZeile = -2,
-            startSpalte = -2,
+            hexagon = KartenHexagon(radius = 3),
             gelaendefelder = listOf(
                 Landfeld(
                     KartenDreieck(-1, -1, DreieckHaelfte.OBEN),

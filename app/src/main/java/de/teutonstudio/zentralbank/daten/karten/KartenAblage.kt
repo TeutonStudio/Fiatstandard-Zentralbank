@@ -5,6 +5,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.AKTUELLE_KARTEN_FORMAT_VERSI
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.rechteckAlsHexagon
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -98,21 +99,24 @@ class KartenAblage(context: Context) {
         val objekt = json.parseToJsonElement(this).jsonObject
         val version = objekt["formatVersion"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1
         return when (version) {
-            1 -> {
-                val alt = json.decodeFromString<AlteKartenVorlageV1>(this)
+            1, 2 -> {
+                val alt = json.decodeFromString<AlteKartenVorlage>(this)
                 KartenEintrag(
                     vorlage = KartenVorlage(
                         id = alt.id,
                         name = alt.name,
-                        zeilen = alt.zeilen,
-                        spalten = alt.spalten,
-                        startZeile = alt.startZeile,
-                        startSpalte = alt.startSpalte,
+                        hexagon = rechteckAlsHexagon(
+                            startZeile = alt.startZeile,
+                            startSpalte = alt.startSpalte,
+                            zeilen = alt.zeilen,
+                            spalten = alt.spalten,
+                        ),
                         gelaendefelder = alt.landfelder,
                     ),
                     quelle = quelle,
                     migrationsHinweise = listOf(
-                        "Kartenformat 1 wurde als Geländevorlage in Format 2 eingelesen.",
+                        "Kartenformat $version wurde verlustfrei in ein radiusbasiertes " +
+                            "Hexagon des Formats 3 eingelesen.",
                     ) + alt.spezialfelder.map { spezialfeld ->
                         "${spezialfeld.name} (${spezialfeld.typ}) wurde nicht als Spielbelegung " +
                             "übernommen; bitte im Spielmodus regelkonform platzieren."
@@ -135,7 +139,7 @@ class KartenAblage(context: Context) {
 }
 
 @Serializable
-private data class AlteKartenVorlageV1(
+private data class AlteKartenVorlage(
     val id: String,
     val name: String,
     val zeilen: Int,

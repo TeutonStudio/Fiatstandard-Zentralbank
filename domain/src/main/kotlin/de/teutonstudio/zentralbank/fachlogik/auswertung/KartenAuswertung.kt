@@ -35,7 +35,9 @@ object KartenAuswertung {
             karte.belegung.kantenNachPosition[kante]
                 ?.takeIf { it.zustand == BauwerkZustand.INTAKT }
                 ?.let { schiene ->
-                    staerken[schiene.besitzer] = maxOf(staerken[schiene.besitzer] ?: 0, 1)
+                    verbundeneSpieler(karte, schiene.position).forEach { spieler ->
+                        staerken[spieler] = maxOf(staerken[spieler] ?: 0, 1)
+                    }
                 }
         }
         feld.ecken().forEach { ecke ->
@@ -96,28 +98,77 @@ object KartenAuswertung {
     fun mitHauptbahnhofVerbundeneSchienen(
         karte: Spielkarte,
         spieler: SpielerId,
-    ): Set<KartenKante> {
-        val startEcken = karte.belegung.ecken
+    ): Set<KartenKante> = karte.belegung.kanten
+        .asSequence()
+        .filter { it.zustand == BauwerkZustand.INTAKT }
+        .filter { spieler in verbundeneSpieler(karte, it.position) }
+        .mapTo(mutableSetOf(), KantenBelegung::position)
+
+    /**
+     * Spieler, deren intakter Hauptbahnhof über die zusammenhängende Handelslinie erreichbar ist.
+     * Die Linie bleibt fachlich neutral; diese Menge beschreibt Nutzung und aktuelle Gewalt.
+     */
+    fun verbundeneSpieler(
+        karte: Spielkarte,
+        kante: KartenKante,
+    ): Set<SpielerId> {
+        val komponente = schienenKomponente(karte, kante)
+        if (komponente.isEmpty()) return emptySet()
+        val ecken = komponente.flatMapTo(mutableSetOf()) { listOf(it.anfang, it.ende) }
+        return karte.belegung.ecken
+            .asSequence()
             .filter {
                 it.typ == EckGebaeudeTyp.HAUPTBAHNHOF &&
-                    it.besitzer == spieler &&
-                    it.zustand == BauwerkZustand.INTAKT
+                    it.zustand == BauwerkZustand.INTAKT &&
+                    it.position in ecken
             }
-            .mapTo(mutableSetOf()) { it.position }
-        if (startEcken.isEmpty()) return emptySet()
+            .mapNotNullTo(mutableSetOf()) { it.besitzer }
+    }
 
-        val schienen = karte.belegung.kanten.filter {
-            it.besitzer == spieler && it.zustand == BauwerkZustand.INTAKT
+    /** Nur eine ausschließlich mit einem Spieler verbundene Linie steht unter dessen Gewalt. */
+    fun gewalthaber(
+        karte: Spielkarte,
+        kante: KartenKante,
+    ): SpielerId? = verbundeneSpieler(karte, kante).singleOrNull()
+
+    /** Bestimmt die Gewalt auch für eine zerstörte Linie anhand ihres Netzes im intakten Zustand. */
+    fun gewalthaberBeiIntakterLinie(
+        karte: Spielkarte,
+        kante: KartenKante,
+    ): SpielerId? {
+        val eintrag = karte.belegung.kantenNachPosition[kante] ?: return null
+        val pruefKarte = if (eintrag.zustand == BauwerkZustand.INTAKT) {
+            karte
+        } else {
+            karte.copy(
+                belegung = karte.belegung.copy(
+                    kanten = karte.belegung.kanten.map {
+                        if (it.position == kante) it.copy(zustand = BauwerkZustand.INTAKT) else it
+                    },
+                ),
+            )
         }
+        return gewalthaber(pruefKarte, kante)
+    }
+
+    private fun schienenKomponente(
+        karte: Spielkarte,
+        start: KartenKante,
+    ): Set<KartenKante> {
+        val schienen = karte.belegung.kanten.filter { it.zustand == BauwerkZustand.INTAKT }
+        if (schienen.none { it.position == start }) return emptySet()
         val anEcke = buildMap<KartenEcke, MutableList<KantenBelegung>> {
             schienen.forEach { schiene ->
                 getOrPut(schiene.position.anfang) { mutableListOf() }.add(schiene)
                 getOrPut(schiene.position.ende) { mutableListOf() }.add(schiene)
             }
         }
-        val besuchteEcken = startEcken.toMutableSet()
-        val verbundeneSchienen = mutableSetOf<KartenKante>()
-        val offen = ArrayDeque<KartenEcke>().apply { addAll(startEcken) }
+        val besuchteEcken = mutableSetOf(start.anfang, start.ende)
+        val verbundeneSchienen = mutableSetOf(start)
+        val offen = ArrayDeque<KartenEcke>().apply {
+            add(start.anfang)
+            add(start.ende)
+        }
         while (offen.isNotEmpty()) {
             val ecke = offen.removeFirst()
             anEcke[ecke].orEmpty().forEach { schiene ->

@@ -4,8 +4,18 @@ import de.teutonstudio.zentralbank.daten.zuordnung.zuGeld
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
+import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
+import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -39,5 +49,43 @@ class DomainMappingTest {
             state.warenkorb.keys,
         )
         assertTrue(state.spieler.all { BauteilTyp.EISENBAHNLINIE in it.bauteile.keys })
+    }
+
+    @Test
+    fun neuesKartenspielBeginntBeiErstemSpielerOhneHauptbahnhofInRundeNull() {
+        val anna = Spieler("Anna", emptyMap())
+        val bert = Spieler("Bert", emptyMap())
+        val annaId = SpielerId("Anna")
+        val karte = Spielkarte(
+            id = "runde-null",
+            name = "Runde Null",
+            hexagon = KartenHexagon(radius = 6),
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(
+                        KartenFeld(0, 0, DreieckHaelfte.UNTEN).ecken().first(),
+                        EckGebaeudeTyp.HAUPTBAHNHOF,
+                        annaId,
+                    ),
+                ),
+            ),
+        )
+        val spiel = Spiel(
+            leitzinssatz = 0f,
+            spieler = linkedMapOf(
+                anna to Zahlungsmittel(),
+                bert to Zahlungsmittel(),
+            ),
+            warenkorb = emptyMap(),
+            inflationsziel = 2f,
+            normaleAbweichung = 0.5f,
+            starkeAbweichung = 2f,
+            karte = karte,
+        )
+
+        val zustand = spiel.zuSpielZustand()
+
+        assertEquals(Spielabschnitt.RUNDE_NULL, zustand.spielabschnitt)
+        assertEquals(SpielerId("Bert"), zustand.aktiverSpieler)
     }
 }

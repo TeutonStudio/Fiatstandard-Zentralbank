@@ -3,46 +3,31 @@ package de.teutonstudio.zentralbank.spielbrett
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
+import de.teutonstudio.zentralbank.fachlogik.modell.enthaelt
 
 /**
  * Vollstaendige Beschreibung eines dreieckig tesselierten Spielbretts.
  *
- * Eine Spalte bezeichnet eine aus zwei Dreiecken bestehende Raute. Das sichtbare Raster enthaelt
- * daher [zeilen] * [spalten] * 2 Grunddreiecke und kann dank [startZeile]/[startSpalte] auch
- * negative Kartenkoordinaten darstellen. [auflagen] bestimmt, auf welchen Grunddreiecken ein
- * farbiges, dreiseitiges Prisma dargestellt wird; Wasser setzt sich ausserhalb des Rasters fort.
+ * [hexagon] beschreibt die gespeicherte Kartenform mit genau 6 * radius² Dreiecken. Der Baumodus
+ * kann darüber ein unbegrenzt nachgeführtes Bearbeitungsraster anzeigen, ohne Wasser zu rendern.
  */
 @Immutable
 data class Spielbrett3DModell(
-    val zeilen: Int,
-    val spalten: Int,
-    val startZeile: Int = 0,
-    val startSpalte: Int = 0,
+    val hexagon: KartenHexagon,
     val auflagen: List<DreieckAuflage> = emptyList(),
     val eckObjekte: List<EckObjektAuflage> = emptyList(),
     val kantenObjekte: List<KantenObjektAuflage> = emptyList(),
     val feldObjekte: List<FeldObjektAuflage> = emptyList(),
     val zeigeBearbeitungsRaster: Boolean = false,
+    val zeigeWasserFlaeche: Boolean = true,
+    val unbegrenztesBearbeitungsRaster: Boolean = false,
 ) {
     init {
-        require(zeilen > 0) { "zeilen muss groesser als 0 sein." }
-        require(spalten > 0) { "spalten muss groesser als 0 sein." }
-        val endeZeileExklusiv = startZeile.toLong() + zeilen
-        val endeSpalteExklusiv = startSpalte.toLong() + spalten
-        require(endeZeileExklusiv <= Int.MAX_VALUE.toLong() + 1L) {
-            "Der Zeilenbereich überschreitet den Koordinatenraum."
-        }
-        require(endeSpalteExklusiv <= Int.MAX_VALUE.toLong() + 1L) {
-            "Der Spaltenbereich überschreitet den Koordinatenraum."
-        }
-
         auflagen.forEach { auflage ->
-            require(auflage.position.zeile.toLong() in startZeile.toLong() until endeZeileExklusiv) {
-                "Auflage in Zeile ${auflage.position.zeile} liegt ausserhalb des Bretts."
-            }
-            require(auflage.position.spalte.toLong() in startSpalte.toLong() until endeSpalteExklusiv) {
-                "Auflage in Spalte ${auflage.position.spalte} liegt ausserhalb des Bretts."
+            require(hexagon.enthaelt(auflage.position.zuKartenFeld())) {
+                "Auflage ${auflage.position} liegt außerhalb des Kartenhexagons."
             }
         }
 

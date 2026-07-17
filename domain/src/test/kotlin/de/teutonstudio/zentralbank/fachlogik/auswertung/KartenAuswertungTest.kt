@@ -10,7 +10,10 @@ import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
@@ -19,11 +22,13 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KartenAuswertungTest {
     private val anna = SpielerId("anna")
+    private val bert = SpielerId("bert")
     private val feld = KartenFeld(2, 2, DreieckHaelfte.UNTEN)
     private val kante = feld.kanten().first()
     private val land = angrenzendeFelder(kante).map { GelaendeFeld(it, GelaendeTyp.EBENE) }
@@ -32,9 +37,9 @@ class KartenAuswertungTest {
     fun besteAnschlussartBestimmtErtrag() {
         val karte = karte(
             ecken = listOf(
-                EckBelegung(feld.ecken().first(), EckGebaeudeTyp.GROSSBAHNHOF, anna),
+                EckBelegung(feld.ecken().last(), EckGebaeudeTyp.GROSSBAHNHOF, anna),
             ),
-            kanten = listOf(KantenBelegung(kante, anna)),
+            kanten = listOf(KantenBelegung(kante)),
         )
 
         assertEquals(mapOf(anna to 3), KartenAuswertung.ertrag(karte, feld))
@@ -55,11 +60,50 @@ class KartenAuswertungTest {
         val ohne = karte(anlage = FeldAnlage.Geschaeftsbank)
         val mit = karte(
             anlage = FeldAnlage.Geschaeftsbank,
-            kanten = listOf(KantenBelegung(kante, anna)),
+            kanten = listOf(KantenBelegung(kante)),
         )
 
         assertFalse(KartenAuswertung.kontrolliertGeschaeftsbank(ohne, feld, anna))
         assertTrue(KartenAuswertung.kontrolliertGeschaeftsbank(mit, feld, anna))
+    }
+
+    @Test
+    fun handelslinieHatNurBeiGenauEinemVerbundenenSpielerEinenGewalthaber() {
+        val ecken = listOf(
+            KartenEcke(6, 4),
+            KartenEcke(8, 4),
+            KartenEcke(10, 4),
+            KartenEcke(12, 4),
+        )
+        val linien = ecken.zipWithNext(KartenKante::zwischen)
+        val netz = Spielkarte(
+            id = "gemeinsames-netz",
+            name = "Gemeinsames Netz",
+            hexagon = KartenHexagon(radius = 8),
+            gelaendefelder = linien
+                .flatMap(::angrenzendeFelder)
+                .distinct()
+                .map { GelaendeFeld(it, GelaendeTyp.EBENE) },
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(ecken.first(), EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                    EckBelegung(ecken.last(), EckGebaeudeTyp.HAUPTBAHNHOF, bert),
+                ),
+                kanten = linien.map(::KantenBelegung),
+            ),
+        )
+
+        linien.forEach { linie ->
+            assertEquals(setOf(anna, bert), KartenAuswertung.verbundeneSpieler(netz, linie))
+            assertNull(KartenAuswertung.gewalthaber(netz, linie))
+        }
+
+        val nurAnna = netz.copy(
+            belegung = netz.belegung.copy(ecken = netz.belegung.ecken.take(1)),
+        )
+        linien.forEach { linie ->
+            assertEquals(anna, KartenAuswertung.gewalthaber(nurAnna, linie))
+        }
     }
 
     private fun karte(
@@ -69,11 +113,16 @@ class KartenAuswertungTest {
     ) = Spielkarte(
         id = "auswertung",
         name = "Auswertung",
-        zeilen = 6,
-        spalten = 6,
+        hexagon = KartenHexagon(radius = 8),
         gelaendefelder = land,
         belegung = KartenBelegung(
-            ecken = ecken,
+            ecken = if (kanten.isEmpty()) ecken else {
+                ecken + EckBelegung(
+                    kante.anfang,
+                    EckGebaeudeTyp.HAUPTBAHNHOF,
+                    anna,
+                )
+            },
             kanten = kanten,
             felder = listOf(FeldBelegung(feld, anlage)),
         ),

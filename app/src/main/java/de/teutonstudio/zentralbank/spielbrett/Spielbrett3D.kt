@@ -34,6 +34,7 @@ import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.utils.screenToRay
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -50,8 +51,8 @@ private const val KAMERA_FOKUS_HOEHE = AUFLAGEN_HOEHE * 0.2f
 private const val OBJEKT_BASIS_HOEHE = AUFLAGEN_HOEHE + 0.03f
 
 private val WasserFarbe = Color(0xFF1565A8)
-private val WasserRasterHell = Color(0xFF1976B9)
-private val WasserRasterDunkel = Color(0xFF0F5A99)
+private val WasserRasterHell = Color(0x1A90A4AE)
+private val WasserRasterDunkel = Color(0x0D90A4AE)
 private val VorschauFarbe = Color(0xFF0B3D66)
 private val BrettSeitenFarbe = WasserFarbe
 private val GrundFarbeHell = WasserRasterHell
@@ -74,8 +75,7 @@ private val GrundFarbeDunkel = WasserRasterDunkel
  * ```kotlin
  * Spielbrett3D(
  *     modell = Spielbrett3DModell(
- *         zeilen = 3,
- *         spalten = 4,
+ *         hexagon = KartenHexagon(radius = 3),
  *         auflagen = listOf(
  *             DreieckAuflage(
  *                 DreieckPosition(0, 1, DreieckAusrichtung.UNTEN),
@@ -105,18 +105,19 @@ fun Spielbrett3D(
         return
     }
 
-    val geometrie = remember(
-        modell.zeilen,
-        modell.spalten,
-        modell.startZeile,
-        modell.startSpalte,
-    ) {
-        berechneSpielbrettGeometrie(
-            zeilen = modell.zeilen,
-            spalten = modell.spalten,
-            startZeile = modell.startZeile,
-            startSpalte = modell.startSpalte,
-        )
+    val geometrie = remember(modell.hexagon) {
+        berechneSpielbrettGeometrie(modell.hexagon)
+    }
+    val transformation = betrachtungsStatus.transformation
+    val rasterMitte = if (modell.unbegrenztesBearbeitungsRaster) {
+        geometrie.unbegrenzterTreffer(
+            BrettPunkt(transformation.fokusX, transformation.fokusZ),
+        )?.position
+    } else {
+        null
+    }
+    val rasterGeometrie = remember(geometrie, rasterMitte) {
+        rasterMitte?.let { geometrie.rasterAusschnittUm(it) } ?: geometrie
     }
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
@@ -128,6 +129,7 @@ fun Spielbrett3D(
         kameraInteraktionsModus,
         cameraNode,
         geometrie,
+        modell.unbegrenztesBearbeitungsRaster,
     ) {
         BetrachtungsGesten(betrachtungsStatus, kameraInteraktionsModus) { x, y ->
             val strahl = cameraNode.view?.screenToRay(x, y) ?: return@BetrachtungsGesten
@@ -138,11 +140,17 @@ fun Spielbrett3D(
                 x = strahl.origin.x + strahl.direction.x * faktor,
                 z = strahl.origin.z + strahl.direction.z * faktor,
             )
-            geometrie.treffer(punkt)?.let { treffer ->
-                aktuellerBeruehrungsEmpfaenger.value?.invoke(treffer)
+            val treffer = if (modell.unbegrenztesBearbeitungsRaster) {
+                geometrie.unbegrenzterTreffer(punkt)
+            } else {
+                geometrie.treffer(punkt)
+            }
+            treffer?.let {
+                aktuellerBeruehrungsEmpfaenger.value?.invoke(it)
             }
         }
     }
+    val aktuelleGesten = rememberUpdatedState(betrachtungsGesten)
 
     val wasserMaterial = remember(materialLoader) {
         materialLoader.createColorInstance(
@@ -182,10 +190,12 @@ fun Spielbrett3D(
         }
     }
 
-    val szenengroesse = max(geometrie.breite, geometrie.tiefe)
+    val szenengroesse = max(
+        max(geometrie.breite, geometrie.tiefe),
+        if (modell.unbegrenztesBearbeitungsRaster) 24f else 0f,
+    )
     val wasserAusdehnung = max(szenengroesse * 64f, WASSER_MINDEST_SICHTWEITE)
     val kameraAbstand = szenengroesse * 1.15f + AUFLAGEN_HOEHE * 2f
-    val transformation = betrachtungsStatus.transformation
     val kameraDistanz = kameraAbstand / transformation.zoom
     val azimut = Math.toRadians(transformation.azimutGrad.toDouble())
     val neigung = Math.toRadians(transformation.neigungGrad.toDouble())
@@ -212,7 +222,7 @@ fun Spielbrett3D(
             .onSizeChanged { groesse -> ansichtsGroesse = groesse }
             .semantics {
                 contentDescription =
-                    "3D-Spielbrett mit ${modell.zeilen.toLong() * modell.spalten * 2L} " +
+                    "Hexagonales 3D-Spielbrett mit ${modell.hexagon.anzahlFelder} " +
                         "Dreiecken und ${modell.auflagen.size} Auflagen"
             },
         engine = engine,
@@ -221,7 +231,7 @@ fun Spielbrett3D(
         cameraManipulator = null,
         onGestureListener = null,
         onTouchEvent = { ereignis, _ ->
-            betrachtungsGesten.verarbeite(
+            aktuelleGesten.value.verarbeite(
                 ereignis = ereignis,
                 ansichtsGroesse = ansichtsGroesse,
                 szenengroesse = szenengroesse,
@@ -229,22 +239,24 @@ fun Spielbrett3D(
         },
         autoCenterContent = false,
     ) {
-        CubeNode(
-            size = Size(
-                x = wasserAusdehnung,
-                y = BRETT_DICKE,
-                z = wasserAusdehnung,
-            ),
-            materialInstance = wasserMaterial,
-            position = Position(
-                x = transformation.fokusX,
-                y = -BRETT_DICKE / 2f,
-                z = transformation.fokusZ,
-            ),
-        )
+        if (modell.zeigeWasserFlaeche) {
+            CubeNode(
+                size = Size(
+                    x = wasserAusdehnung,
+                    y = BRETT_DICKE,
+                    z = wasserAusdehnung,
+                ),
+                materialInstance = wasserMaterial,
+                position = Position(
+                    x = transformation.fokusX,
+                    y = -BRETT_DICKE / 2f,
+                    z = transformation.fokusZ,
+                ),
+            )
+        }
 
         if (modell.zeigeBearbeitungsRaster) {
-            geometrie.dreiecke.forEachIndexed { index, dreieck ->
+            rasterGeometrie.dreiecke.forEachIndexed { index, dreieck ->
                 key(dreieck.position) {
                     ShapeNode(
                         polygonPath = dreieck.ecken.map { punkt ->
@@ -549,18 +561,19 @@ private fun SpielbrettVorschau(
     transformation: BetrachtungsTransformation,
     modifier: Modifier = Modifier,
 ) {
-    val geometrie = remember(
-        modell.zeilen,
-        modell.spalten,
-        modell.startZeile,
-        modell.startSpalte,
-    ) {
-        berechneSpielbrettGeometrie(
-            zeilen = modell.zeilen,
-            spalten = modell.spalten,
-            startZeile = modell.startZeile,
-            startSpalte = modell.startSpalte,
-        )
+    val geometrie = remember(modell.hexagon) {
+        berechneSpielbrettGeometrie(modell.hexagon)
+    }
+    val rasterMitte = geometrie.unbegrenzterTreffer(
+        BrettPunkt(transformation.fokusX, transformation.fokusZ),
+    )?.position
+    val rasterGeometrie = remember(geometrie, rasterMitte) {
+        rasterMitte?.let { geometrie.rasterAusschnittUm(it) } ?: geometrie
+    }
+    val rahmenGeometrie = if (modell.unbegrenztesBearbeitungsRaster) {
+        rasterGeometrie
+    } else {
+        geometrie
     }
 
     Canvas(
@@ -597,8 +610,8 @@ private fun SpielbrettVorschau(
             )
         }
 
-        val halbeBrettBreite = (geometrie.breite + BRETT_RAND * 2f) / 2f
-        val halbeBrettTiefe = (geometrie.tiefe + BRETT_RAND * 2f) / 2f
+        val halbeBrettBreite = (rahmenGeometrie.breite + BRETT_RAND * 2f) / 2f
+        val halbeBrettTiefe = (rahmenGeometrie.tiefe + BRETT_RAND * 2f) / 2f
         val maximaleHoehe = when {
             modell.eckObjekte.isNotEmpty() -> OBJEKT_BASIS_HOEHE + 0.92f
             modell.auflagen.any { it.ebene == AuflagenEbene.SPEZIAL } ->
@@ -653,54 +666,58 @@ private fun SpielbrettVorschau(
         val untereBrettEcken = obereBrettEcken.map { punkt ->
             punkt.copy(y = -BRETT_DICKE)
         }
-        drawPath(pfad(untereBrettEcken), BrettSeitenFarbe.abgedunkelt(0.45f))
-        obereBrettEcken.indices
-            .map { index ->
-                val naechsterIndex = (index + 1) % obereBrettEcken.size
-                val seite = listOf(
-                    untereBrettEcken[index],
-                    untereBrettEcken[naechsterIndex],
-                    obereBrettEcken[naechsterIndex],
-                    obereBrettEcken[index],
-                )
-                seite to seite.map { unskalierteProjektion(it).tiefe }.average()
-            }
-            .sortedBy { (_, tiefe) -> tiefe }
-            .forEachIndexed { index, (seite, _) ->
-                drawPath(
-                    path = pfad(seite),
-                    color = BrettSeitenFarbe.abgedunkelt(0.58f + index * 0.07f),
-                )
-            }
-        drawPath(pfad(obereBrettEcken), BrettSeitenFarbe)
+        if (modell.zeigeWasserFlaeche) {
+            drawPath(pfad(untereBrettEcken), BrettSeitenFarbe.abgedunkelt(0.45f))
+            obereBrettEcken.indices
+                .map { index ->
+                    val naechsterIndex = (index + 1) % obereBrettEcken.size
+                    val seite = listOf(
+                        untereBrettEcken[index],
+                        untereBrettEcken[naechsterIndex],
+                        obereBrettEcken[naechsterIndex],
+                        obereBrettEcken[index],
+                    )
+                    seite to seite.map { unskalierteProjektion(it).tiefe }.average()
+                }
+                .sortedBy { (_, tiefe) -> tiefe }
+                .forEachIndexed { index, (seite, _) ->
+                    drawPath(
+                        path = pfad(seite),
+                        color = BrettSeitenFarbe.abgedunkelt(0.58f + index * 0.07f),
+                    )
+                }
+            drawPath(pfad(obereBrettEcken), BrettSeitenFarbe)
+        }
 
-        geometrie.dreiecke
-            .withIndex()
-            .sortedBy { (_, dreieck) ->
-                unskalierteProjektion(
-                    VorschauWeltPunkt(
-                        x = dreieck.mittelpunkt.x,
-                        y = OBERFLAECHEN_ABSTAND,
-                        z = dreieck.mittelpunkt.z,
-                    ),
-                ).tiefe
-            }
-            .forEach { (index, dreieck) ->
-                val dreieckPfad = pfad(
-                    dreieck.ecken.map { punkt ->
-                        VorschauWeltPunkt(punkt.x, OBERFLAECHEN_ABSTAND, punkt.z)
-                    },
-                )
-                drawPath(
-                    path = dreieckPfad,
-                    color = if (index % 2 == 0) GrundFarbeHell else GrundFarbeDunkel,
-                )
-                drawPath(
-                    path = dreieckPfad,
-                    color = Color(0xFFB0BEC5).copy(alpha = 0.48f),
-                    style = Stroke(width = 1.dp.toPx()),
-                )
-            }
+        if (modell.zeigeBearbeitungsRaster) {
+            rasterGeometrie.dreiecke
+                .withIndex()
+                .sortedBy { (_, dreieck) ->
+                    unskalierteProjektion(
+                        VorschauWeltPunkt(
+                            x = dreieck.mittelpunkt.x,
+                            y = OBERFLAECHEN_ABSTAND,
+                            z = dreieck.mittelpunkt.z,
+                        ),
+                    ).tiefe
+                }
+                .forEach { (index, dreieck) ->
+                    val dreieckPfad = pfad(
+                        dreieck.ecken.map { punkt ->
+                            VorschauWeltPunkt(punkt.x, OBERFLAECHEN_ABSTAND, punkt.z)
+                        },
+                    )
+                    drawPath(
+                        path = dreieckPfad,
+                        color = if (index % 2 == 0) GrundFarbeHell else GrundFarbeDunkel,
+                    )
+                    drawPath(
+                        path = dreieckPfad,
+                        color = Color(0xFFB0BEC5).copy(alpha = 0.48f),
+                        style = Stroke(width = 1.dp.toPx()),
+                    )
+                }
+        }
 
         modell.auflagen
             .sortedBy { auflage ->
@@ -826,8 +843,7 @@ private fun Spielbrett3DPreview() {
     )
     Spielbrett3D(
         modell = Spielbrett3DModell(
-            zeilen = 3,
-            spalten = 4,
+            hexagon = KartenHexagon(radius = 6),
             auflagen = listOf(
                 DreieckAuflage(
                     position = DreieckPosition(0, 0, DreieckAusrichtung.UNTEN),

@@ -54,7 +54,7 @@ private enum class SpielKartenWerkzeug(
     ECKE_ZERSTOEREN("Zerstören", KartenZielModus.ECKE),
     ECKE_REPARIEREN("Reparieren", KartenZielModus.ECKE),
     ECKE_ENTFERNEN("Entfernen", KartenZielModus.ECKE),
-    SCHIENE("Schiene", KartenZielModus.KANTE),
+    SCHIENE("Handelslinie", KartenZielModus.KANTE),
     KANTE_ZERSTOEREN("Zerstören", KartenZielModus.KANTE),
     KANTE_REPARIEREN("Reparieren", KartenZielModus.KANTE),
     KANTE_ENTFERNEN("Entfernen", KartenZielModus.KANTE),

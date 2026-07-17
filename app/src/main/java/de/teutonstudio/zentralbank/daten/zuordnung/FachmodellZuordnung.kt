@@ -74,14 +74,21 @@ fun Spiel.zuSpielZustand(): SpielZustand {
         .groupBy { it.aktuellerBesitzer.name }
         .mapValues { (_, werte) -> werte.mapNotNull { anleiheIds[it] } }
     val spielerNamen = spielerIds.keys.map { it.name }.toSet()
+    val spielerOhneHauptbahnhof = spielerIds.values.filterTo(linkedSetOf()) { spielerId ->
+        karte?.belegung?.ecken.orEmpty().none { belegung ->
+            belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF && belegung.besitzer == spielerId
+        }
+    }
+    val istRundeNull = karte != null && aktuelleRunde <= 1 && spielerOhneHauptbahnhof.isNotEmpty()
+    val aktiverFachSpieler = if (istRundeNull) {
+        spielerIds.values.firstOrNull { it in spielerOhneHauptbahnhof }
+    } else {
+        spielerListe.firstOrNull()?.let { spielerIds.getValue(it) }
+    }
 
     return SpielZustand(
         karte = karte,
-        spielabschnitt = if (
-            karte != null &&
-            aktuelleRunde <= 1 &&
-            karte.belegung.ecken.none { it.typ == EckGebaeudeTyp.HAUPTBAHNHOF }
-        ) {
+        spielabschnitt = if (istRundeNull) {
             Spielabschnitt.RUNDE_NULL
         } else {
             Spielabschnitt.REGULAER
@@ -124,6 +131,6 @@ fun Spiel.zuSpielZustand(): SpielZustand {
             .mapValues { (_, preis) -> preis.zuGeld() },
         leitzins = aktuellerLeitzinssatz.zuBasispunkte(),
         rundenzähler = (aktuelleRunde - 1).coerceAtLeast(0),
-        aktiverSpieler = spielerListe.firstOrNull()?.let { spielerIds.getValue(it) },
+        aktiverSpieler = aktiverFachSpieler,
     )
 }

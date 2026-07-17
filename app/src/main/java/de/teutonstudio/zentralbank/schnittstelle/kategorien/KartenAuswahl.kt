@@ -86,8 +86,6 @@ fun KartenAuswahl(
                         vorlage = KartenVorlage(
                             id = "neuer-entwurf",
                             name = "Neue Karte",
-                            zeilen = 8,
-                            spalten = 8,
                         ),
                         quelle = KartenQuelle.EIGENE_KARTE,
                     )
@@ -192,7 +190,8 @@ private fun KartenListe(
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Text(
-                        "${eintrag.vorlage.zeilen} × ${eintrag.vorlage.spalten} Rauten · " +
+                        "Hexagonradius ${eintrag.vorlage.hexagon.radius} · " +
+                            "${eintrag.vorlage.hexagon.anzahlFelder} Dreiecke · " +
                             "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke",
                         style = MaterialTheme.typography.bodySmall,
                     )

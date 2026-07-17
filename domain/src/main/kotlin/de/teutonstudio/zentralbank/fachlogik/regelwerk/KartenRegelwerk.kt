@@ -155,17 +155,23 @@ internal object KartenRegelwerk {
         }
         val nachbarn = angrenzendeFelder(ereignis.kante)
         require(nachbarn.size == 2 && nachbarn.all { it in karte.landNachPosition }) {
-            "Eine Schiene ist nur zwischen zwei Geländefeldern erlaubt."
+            "Eine Handelslinie ist nur zwischen zwei Geländefeldern erlaubt."
         }
-        val nachKosten = bucheBauteil(zustand, ereignis.spieler, BauteilTyp.EISENBAHNLINIE, 1)
+        val probeKarte = karte.copy(
+            belegung = karte.belegung.copy(
+                kanten = karte.belegung.kanten + KantenBelegung(ereignis.kante),
+            ),
+        )
+        require(ereignis.spieler in KartenAuswertung.verbundeneSpieler(probeKarte, ereignis.kante)) {
+            "Eine Handelslinie muss mit dem eigenen Hauptbahnhof oder Liniennetz verbunden sein."
+        }
+        val nachKosten = bucheKosten(zustand, ereignis.spieler, BauteilTyp.EISENBAHNLINIE)
         val aktuelleKarte = requireNotNull(nachKosten.karte)
         return nachKosten.copy(
             karte = aktuelleKarte.copy(
                 belegung = aktuelleKarte.belegung.copy(
-                    kanten = (aktuelleKarte.belegung.kanten + KantenBelegung(
-                        position = ereignis.kante,
-                        besitzer = ereignis.spieler,
-                    )).kantenSortiert(),
+                    kanten = (aktuelleKarte.belegung.kanten +
+                        KantenBelegung(position = ereignis.kante)).kantenSortiert(),
                 ),
             ),
         )
@@ -229,24 +235,20 @@ internal object KartenRegelwerk {
                             it.hafenA == ort.position || it.hafenB == ort.position
                         },
                     )
-                }.entferneUnverbundeneSchienen(bisher.besitzer)
+                }.entferneUnverbundeneSchienen()
             }
             is KartenOrt.Kante -> {
                 val bisher = karte.belegung.kantenNachPosition[ort.position]
                     ?: error("Die gewählte Kante ist nicht belegt.")
-                pruefeEntfernung(ereignis.spieler, bisher.besitzer, ereignis.grund)
-                val nachBestand = if (bisher.zustand == BauwerkZustand.ZERSTOERT) {
-                    zustand
-                } else {
-                    bucheBauteil(
-                        zustand,
-                        bisher.besitzer,
-                        BauteilTyp.EISENBAHNLINIE,
-                        -1,
-                        kostenBuchen = false,
-                    )
+                if (ereignis.grund == KartenAenderungsGrund.SPIELERAKTION) {
+                    require(
+                        KartenAuswertung.gewalthaberBeiIntakterLinie(karte, ort.position) ==
+                            ereignis.spieler,
+                    ) {
+                        "Nur der alleinige Gewalthaber darf diese Handelslinie abbauen."
+                    }
                 }
-                nachBestand.mitBelegung { belegung ->
+                zustand.mitBelegung { belegung ->
                     belegung.copy(kanten = belegung.kanten.filterNot { it.position == ort.position })
                 }
             }
@@ -324,7 +326,7 @@ internal object KartenRegelwerk {
                     )
                 }
                 if (ereignis.zustand == BauwerkZustand.ZERSTOERT) {
-                    danach.entferneUnverbundeneSchienen(bisher.besitzer)
+                    danach.entferneUnverbundeneSchienen()
                 } else {
                     danach
                 }
@@ -332,9 +334,16 @@ internal object KartenRegelwerk {
             is KartenOrt.Kante -> zustand.mitBelegung { belegung ->
                 val bisher = belegung.kantenNachPosition[ort.position]
                     ?: error("Die gewählte Kante ist nicht belegt.")
-                pruefeZustandsAenderung(zustand, ereignis.spieler, bisher.besitzer, ereignis.grund)
+                if (ereignis.grund == KartenAenderungsGrund.SPIELERAKTION) {
+                    require(
+                        KartenAuswertung.gewalthaberBeiIntakterLinie(
+                            requireNotNull(zustand.karte),
+                            ort.position,
+                        ) == ereignis.spieler,
+                    ) { "Nur der alleinige Gewalthaber darf diese Handelslinie verändern." }
+                }
                 require(ereignis.zustand != BauwerkZustand.BELAGERT) {
-                    "Eine Schiene kann nicht belagert sein."
+                    "Eine Handelslinie kann nicht belagert sein."
                 }
                 belegung.copy(
                     kanten = belegung.kanten.map { eintrag ->
@@ -342,12 +351,7 @@ internal object KartenRegelwerk {
                         else eintrag
                     },
                 )
-            }.passeBestandAnZustand(
-                besitzer = zustand.karte?.belegung?.kantenNachPosition?.get(ort.position)?.besitzer,
-                bauteil = BauteilTyp.EISENBAHNLINIE,
-                vorher = zustand.karte?.belegung?.kantenNachPosition?.get(ort.position)?.zustand,
-                nachher = ereignis.zustand,
-            )
+            }
         }
     }
 
@@ -502,6 +506,16 @@ internal object KartenRegelwerk {
         }
     }
 
+    private fun bucheKosten(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+        bauteil: BauteilTyp,
+    ): SpielZustand = if (bauteil.kosten.isEmpty()) {
+        zustand
+    } else {
+        RohstoffRegelwerk.rohstoffeBuchen(zustand, spieler, bauteil.kosten, -1)
+    }
+
     private fun SpielZustand.passeBestandAnZustand(
         besitzer: SpielerId?,
         bauteil: BauteilTyp?,
@@ -521,30 +535,15 @@ internal object KartenRegelwerk {
         }
     }
 
-    private fun SpielZustand.entferneUnverbundeneSchienen(
-        spieler: SpielerId?,
-    ): SpielZustand {
-        if (spieler == null) return this
+    private fun SpielZustand.entferneUnverbundeneSchienen(): SpielZustand {
         val karte = karte ?: return this
-        val verbunden = KartenAuswertung.mitHauptbahnhofVerbundeneSchienen(karte, spieler)
         val zuEntfernen = karte.belegung.kanten.filter {
-            it.besitzer == spieler && it.position !in verbunden
+            it.zustand == BauwerkZustand.INTAKT &&
+                KartenAuswertung.verbundeneSpieler(karte, it.position).isEmpty()
         }
         if (zuEntfernen.isEmpty()) return this
-        val zuBuchen = zuEntfernen.count { it.zustand != BauwerkZustand.ZERSTOERT }
-        val nachBestand = if (zuBuchen > 0) {
-            bucheBauteil(
-                this,
-                spieler,
-                BauteilTyp.EISENBAHNLINIE,
-                -zuBuchen,
-                kostenBuchen = false,
-            )
-        } else {
-            this
-        }
         val positionen = zuEntfernen.mapTo(mutableSetOf()) { it.position }
-        return nachBestand.mitBelegung { belegung ->
+        return mitBelegung { belegung ->
             belegung.copy(kanten = belegung.kanten.filterNot { it.position in positionen })
         }
     }

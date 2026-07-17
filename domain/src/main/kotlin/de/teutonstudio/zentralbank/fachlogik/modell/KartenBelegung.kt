@@ -80,11 +80,12 @@ data class EckBelegung(
 @Serializable
 data class KantenBelegung(
     val position: KartenKante,
-    val besitzer: SpielerId,
     val zustand: BauwerkZustand = BauwerkZustand.INTAKT,
 ) {
     init {
-        require(zustand != BauwerkZustand.BELAGERT) { "Eine Schiene kann nicht belagert sein." }
+        require(zustand != BauwerkZustand.BELAGERT) {
+            "Eine Handelslinie kann nicht belagert sein."
+        }
     }
 }
 
@@ -184,6 +185,15 @@ data class KartenBelegung(
         require(kriegseinheiten.size == kriegseinheiten.map(KriegsEinheitBelegung::id).toSet().size) {
             "Kriegseinheiten-IDs müssen eindeutig sein."
         }
+        val hauptbahnhoefeNachSpieler = ecken
+            .asSequence()
+            .filter { belegung -> belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF }
+            .mapNotNull(EckBelegung::besitzer)
+            .groupingBy { spieler -> spieler }
+            .eachCount()
+        require(hauptbahnhoefeNachSpieler.values.none { anzahl -> anzahl > 1 }) {
+            "Jeder Spieler darf höchstens einen Hauptbahnhof besitzen."
+        }
 
         seewege.forEach { seeweg ->
             val hafenA = eckenNachPosition[seeweg.hafenA]
@@ -244,7 +254,8 @@ data class KartenBelegung(
             }
             val nachbarn = angrenzendeFelder(belegung.position)
             require(nachbarn.size == 2 && nachbarn.all { it in karte.landNachPosition }) {
-                "Eine Schiene darf nur zwischen zwei Geländefeldern liegen: ${belegung.position}."
+                "Eine Handelslinie darf nur zwischen zwei Geländefeldern liegen: " +
+                    "${belegung.position}."
             }
         }
     }

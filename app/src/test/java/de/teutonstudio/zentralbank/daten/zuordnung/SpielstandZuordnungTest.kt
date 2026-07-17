@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.daten.zuordnung
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
@@ -21,8 +22,7 @@ class SpielstandZuordnungTest {
             karte = Spielkarte(
                 id = "spiel-42",
                 name = "Insel 42",
-                zeilen = 6,
-                spalten = 7,
+                hexagon = KartenHexagon(radius = 7),
             ),
         ),
         ereignisse = listOf(

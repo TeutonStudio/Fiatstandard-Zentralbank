@@ -50,8 +50,6 @@ class SpielErstellenTest {
                 vorbelegteKarte = KartenVorlage(
                     id = "test-vorlage",
                     name = "Testkarte",
-                    zeilen = 2,
-                    spalten = 2,
                 ),
             )
         }

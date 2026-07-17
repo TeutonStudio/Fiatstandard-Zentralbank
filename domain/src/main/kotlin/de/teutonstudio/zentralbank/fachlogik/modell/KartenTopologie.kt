@@ -29,12 +29,74 @@ fun KartenFeld.kanten(): List<KartenKante> {
 }
 
 fun Spielkarte.enthaeltFeld(position: KartenFeld): Boolean =
-    position.zeile.toLong() in startZeile.toLong() until endeZeileExklusiv &&
-        position.spalte.toLong() in startSpalte.toLong() until endeSpalteExklusiv
+    hexagon.enthaelt(position)
 
 fun KartenVorlage.enthaeltFeld(position: KartenFeld): Boolean =
-    position.zeile.toLong() in startZeile.toLong() until endeZeileExklusiv &&
-        position.spalte.toLong() in startSpalte.toLong() until endeSpalteExklusiv
+    hexagon.enthaelt(position)
+
+fun KartenHexagon.enthaelt(position: KartenFeld): Boolean =
+    benoetigterRadius(position) <= radius
+
+fun KartenHexagon.benoetigterRadius(position: KartenFeld): Int {
+    val (x, y) = position.skalierterMittelpunkt()
+    val relativX = x - 3L * zentrum.x
+    val relativY = y - 3L * zentrum.y
+    return maxOf(
+        Math.floorDiv(kotlin.math.abs(relativY), 6L) + 1L,
+        Math.floorDiv(kotlin.math.abs(2L * relativX + relativY), 12L) + 1L,
+        Math.floorDiv(kotlin.math.abs(2L * relativX - relativY), 12L) + 1L,
+    ).also { radius ->
+        require(radius <= Int.MAX_VALUE) { "Das Dreieck liegt außerhalb des Radius-Zahlenraums." }
+    }.toInt()
+}
+
+/** Liefert die genau 6 * radius² Dreiecksfelder des Hexagons in stabiler Reihenfolge. */
+fun KartenHexagon.felder(): List<KartenFeld> {
+    val mittelZeile = Math.floorDiv(zentrum.y, 2)
+    val ungefaehreMittelSpalte = Math.floorDiv(zentrum.x - mittelZeile, 2)
+    val zeilen = (mittelZeile - radius)..(mittelZeile + radius)
+    val spalten = (ungefaehreMittelSpalte - radius * 2)..
+        (ungefaehreMittelSpalte + radius * 2)
+    return buildList {
+        zeilen.forEach { zeile ->
+            spalten.forEach { spalte ->
+                DreieckHaelfte.entries.forEach { haelfte ->
+                    val feld = KartenFeld(zeile, spalte, haelfte)
+                    if (enthaelt(feld)) add(feld)
+                }
+            }
+        }
+    }.sortedMitKartenPosition().also { felder ->
+        check(felder.size.toLong() == anzahlFelder) {
+            "Hexagonradius $radius ergab ${felder.size} statt $anzahlFelder Dreiecke."
+        }
+    }
+}
+
+/** Umschließt einen alten rechteckigen Rasterausschnitt verlustfrei mit einem Hexagon. */
+fun rechteckAlsHexagon(
+    startZeile: Int,
+    startSpalte: Int,
+    zeilen: Int,
+    spalten: Int,
+): KartenHexagon {
+    require(zeilen > 0 && spalten > 0) { "Der alte Kartenausschnitt muss positiv sein." }
+    val endZeile = Math.addExact(startZeile, zeilen - 1)
+    val endSpalte = Math.addExact(startSpalte, spalten - 1)
+    val mittelZeile = startZeile + (zeilen - 1) / 2
+    val mittelSpalte = startSpalte + (spalten - 1) / 2
+    val zentrum = KartenFeld(mittelZeile, mittelSpalte, DreieckHaelfte.UNTEN).ecken().first()
+    val eckFelder = buildList {
+        listOf(startZeile, endZeile).forEach { zeile ->
+            listOf(startSpalte, endSpalte).forEach { spalte ->
+                DreieckHaelfte.entries.forEach { haelfte ->
+                    add(KartenFeld(zeile, spalte, haelfte))
+                }
+            }
+        }
+    }
+    return KartenHexagon(zentrum).mitMindestradiusFuer(eckFelder)
+}
 
 /** Liefert die geometrisch möglichen Nachbarfelder; Positionen außerhalb sind Wasser. */
 fun angrenzendeFelder(ecke: KartenEcke): List<KartenFeld> {
@@ -98,3 +160,8 @@ private fun List<KartenFeld>.sortedMitKartenPosition(): List<KartenFeld> =
             .thenBy(KartenFeld::spalte)
             .thenBy { feld -> feld.haelfte.ordinal },
     )
+
+private fun KartenFeld.skalierterMittelpunkt(): Pair<Long, Long> = when (haelfte) {
+    DreieckHaelfte.UNTEN -> 3L * zeile + 6L * spalte + 3L to 6L * zeile + 2L
+    DreieckHaelfte.OBEN -> 3L * zeile + 6L * spalte + 6L to 6L * zeile + 4L
+}

@@ -65,11 +65,10 @@ fun Spielkarte.zu3DModell(
         ?: NeutralFarbe
 
     return Spielbrett3DModell(
-        zeilen = zeilen,
-        spalten = spalten,
-        startZeile = startZeile,
-        startSpalte = startSpalte,
+        hexagon = hexagon,
         zeigeBearbeitungsRaster = zeigeBearbeitungsRaster,
+        zeigeWasserFlaeche = !zeigeBearbeitungsRaster,
+        unbegrenztesBearbeitungsRaster = zeigeBearbeitungsRaster,
         auflagen = gelaendefelder.map { landfeld ->
             DreieckAuflage(
                 position = landfeld.position.zu3DPosition(),
@@ -106,13 +105,14 @@ fun Spielkarte.zu3DModell(
         }.let(::listOfNotNull),
         kantenObjekte = belegung.kanten.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
+            val gewalthaber = KartenAuswertung.gewalthaber(this, eintrag.position)
             KantenObjektAuflage(
                 position = eintrag.position,
                 typ = SpielObjektTyp(
-                    name = "Schiene",
+                    name = "Handelslinie",
                     farbe = if (zustand == ObjektDarstellungsZustand.ZERSTOERT) {
                         ZerstoertFarbe
-                    } else spielerFarbe(eintrag.besitzer),
+                    } else spielerFarbe(gewalthaber),
                     form = SpielObjektForm.SCHIENE,
                     zustand = zustand,
                 ),

@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.fachlogik.regelwerk
 import de.teutonstudio.zentralbank.fachlogik.ablauf.SpielAblauf
 import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
+import de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
@@ -15,6 +16,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
@@ -32,6 +34,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.benachbarteEcken
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -125,8 +128,7 @@ class KartenRegelwerkTest {
             karte = Spielkarte(
                 id = "kueste",
                 name = "Küste",
-                zeilen = 6,
-                spalten = 6,
+                hexagon = KartenHexagon(radius = 12),
                 gelaendefelder = listOf(GelaendeFeld(feld, GelaendeTyp.EBENE)),
             ),
         )
@@ -141,6 +143,65 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun gebauteHandelslinieBleibtBesitzerlosAberUnterAnnasGewalt() {
+        val start = zustand()
+        val karte = requireNotNull(start.karte)
+        val kante = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten().first()
+        val mitHauptbahnhof = start.copy(
+            karte = karte.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(kante.anfang, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                    ),
+                ),
+            ),
+        )
+
+        val danach = SpielRegelwerk.wendeAn(
+            mitHauptbahnhof,
+            SpielEreignis.SchieneGebaut(anna, kante),
+        ).getOrThrow()
+
+        assertEquals(anna, KartenAuswertung.gewalthaber(requireNotNull(danach.karte), kante))
+        assertNull(danach.spieler.first { it.id == anna }.bauteile[BauteilTyp.EISENBAHNLINIE])
+        assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.HOLZ])
+        assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.STAHL])
+    }
+
+    @Test
+    fun gemeinsamVerbundenesHandelsnetzDarfKeinerDerSpielerAbbauen() {
+        val start = zustand()
+        val karte = requireNotNull(start.karte)
+        val ecken = listOf(
+            de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke(6, 4),
+            de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke(8, 4),
+            de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke(10, 4),
+            de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke(12, 4),
+        )
+        val linien = ecken.zipWithNext(KartenKante::zwischen)
+        val gemeinsam = start.copy(
+            karte = karte.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(ecken.first(), EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                        EckBelegung(ecken.last(), EckGebaeudeTyp.HAUPTBAHNHOF, bert),
+                    ),
+                    kanten = linien.map(::KantenBelegung),
+                ),
+            ),
+        )
+
+        val abbauen = SpielEreignis.KartenBelegungEntfernt(
+            spieler = anna,
+            ort = KartenOrt.Kante(linien.first()),
+        )
+        val ergebnis = SpielRegelwerk.wendeAn(gemeinsam, abbauen)
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("Gewalthaber"))
+    }
+
+    @Test
     fun hafenBrauchtZweiWasserUndZweiGelaendefelder() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val kuestenLand = angrenzendeFelder(ecke).take(2).map { feld ->
@@ -150,8 +211,7 @@ class KartenRegelwerkTest {
             karte = Spielkarte(
                 id = "kueste",
                 name = "Küste",
-                zeilen = 6,
-                spalten = 6,
+                hexagon = KartenHexagon(radius = 12),
                 gelaendefelder = kuestenLand,
             ),
         )
@@ -278,7 +338,6 @@ class KartenRegelwerkTest {
                     spieler.copy(
                         bauteile = mapOf(
                             BauteilTyp.BAHNHOF to 1,
-                            BauteilTyp.EISENBAHNLINIE to 2,
                         ),
                     )
                 } else spieler
@@ -290,8 +349,8 @@ class KartenRegelwerkTest {
                         EckBelegung(bahnhof, EckGebaeudeTyp.BAHNHOF, anna),
                     ),
                     kanten = listOf(
-                        KantenBelegung(verbundeneSchiene, anna),
-                        KantenBelegung(unverbundeneSchiene, anna),
+                        KantenBelegung(verbundeneSchiene),
+                        KantenBelegung(unverbundeneSchiene),
                     ),
                 ),
             ),
@@ -308,7 +367,7 @@ class KartenRegelwerkTest {
         ).getOrThrow()
 
         assertEquals(listOf(verbundeneSchiene), danach.karte?.belegung?.kanten?.map { it.position })
-        assertEquals(1, danach.spieler.first { it.id == anna }.bauteile[BauteilTyp.EISENBAHNLINIE])
+        assertEquals(null, danach.spieler.first { it.id == anna }.bauteile[BauteilTyp.EISENBAHNLINIE])
         assertEquals(
             BauwerkZustand.ZERSTOERT,
             danach.karte?.belegung?.eckenNachPosition?.get(bahnhof)?.zustand,
@@ -364,8 +423,7 @@ class KartenRegelwerkTest {
             karte = Spielkarte(
                 id = "test",
                 name = "Testkarte",
-                zeilen = 6,
-                spalten = 6,
+                hexagon = KartenHexagon(radius = 12),
                 gelaendefelder = land,
             ),
             spielabschnitt = if (rundeNull) Spielabschnitt.RUNDE_NULL else Spielabschnitt.REGULAER,

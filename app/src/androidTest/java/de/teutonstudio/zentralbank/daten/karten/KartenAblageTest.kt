@@ -26,8 +26,6 @@ class KartenAblageTest {
             KartenVorlage(
                 id = "instrumentierter-entwurf",
                 name = "Instrumentierte Karte",
-                zeilen = 3,
-                spalten = 4,
             ),
         )
         try {
@@ -38,6 +36,40 @@ class KartenAblageTest {
             assertEquals(gespeichert, neuGeladen.vorlage)
         } finally {
             File(kontext.filesDir, "karten/eigene/${gespeichert.id}.json").delete()
+        }
+    }
+
+    @Test
+    fun AlteEigeneRasterkarteWirdMitGeneriertemSerializerAlsHexagonGeladen() = runBlocking {
+        val kontext = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val verzeichnis = File(kontext.filesDir, "karten/eigene").apply { mkdirs() }
+        val alteKarte = File(verzeichnis, "legacy-serializer-test.json")
+        alteKarte.writeText(
+            """{
+                "formatVersion": 2,
+                "id": "eigene-legacy-serializer-test",
+                "name": "Alte Rasterkarte",
+                "zeilen": 2,
+                "spalten": 3,
+                "landfelder": [
+                    {
+                        "position": {"zeile": 1, "spalte": 2, "haelfte": "UNTEN"},
+                        "gelaende": "EBENE"
+                    }
+                ]
+            }""".trimIndent(),
+        )
+
+        try {
+            val geladen = KartenAblage(kontext).alleKartenLaden().single { eintrag ->
+                eintrag.vorlage.id == "eigene-legacy-serializer-test"
+            }
+
+            assertEquals(1, geladen.vorlage.gelaendefelder.size)
+            assertTrue(geladen.vorlage.hexagon.radius > 0)
+            assertTrue(geladen.migrationsHinweise.single().contains("Formats 3"))
+        } finally {
+            alteKarte.delete()
         }
     }
 }

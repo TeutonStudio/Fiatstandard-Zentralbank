@@ -20,8 +20,7 @@ class SpielkarteTest {
         val karte = Spielkarte(
             id = "inselreich",
             name = "Inselreich",
-            zeilen = 4,
-            spalten = 4,
+            hexagon = KartenHexagon(radius = 5),
             gelaendefelder = land,
             belegung = KartenBelegung(
                 ecken = listOf(
@@ -31,7 +30,7 @@ class SpielkarteTest {
                         besitzer = SpielerId("anna"),
                     ),
                 ),
-                kanten = listOf(KantenBelegung(kante, SpielerId("anna"))),
+                kanten = listOf(KantenBelegung(kante)),
                 felder = listOf(
                     FeldBelegung(feld, FeldAnlage.Abbaueinheit(Rohstoff.NAHRUNG)),
                 ),
@@ -48,8 +47,7 @@ class SpielkarteTest {
         val vorlage = KartenVorlage(
             id = "vorlage",
             name = "Vorlage",
-            zeilen = 2,
-            spalten = 2,
+            hexagon = KartenHexagon(radius = 2),
             gelaendefelder = listOf(
                 GelaendeFeld(KartenFeld(0, 0, DreieckHaelfte.OBEN), GelaendeTyp.WALD),
             ),
@@ -67,55 +65,42 @@ class SpielkarteTest {
         val karte = Spielkarte(
             id = "wasser",
             name = "Offenes Meer",
-            zeilen = 100_000,
-            spalten = 250_000,
-            startZeile = -50_000,
-            startSpalte = -125_000,
+            hexagon = KartenHexagon(radius = 100_000),
         )
 
         assertEquals(0, karte.gelaendefelder.size)
         assertEquals(KartenBelegung(), karte.belegung)
+        assertEquals(60_000_000_000L, karte.hexagon.anzahlFelder)
     }
 
     @Test
     fun karteUnterstuetztNegativeKoordinatenOhneFesteAusdehnungsgrenze() {
         val position = KartenFeld(-7_500, -12_000, DreieckHaelfte.OBEN)
+        val hexagon = KartenHexagon().mitMindestradiusFuer(listOf(position))
         val karte = Spielkarte(
             id = "unbegrenzt",
             name = "Unbegrenzte Karte",
-            zeilen = 20_000,
-            spalten = 30_000,
-            startZeile = -10_000,
-            startSpalte = -15_000,
+            hexagon = hexagon,
             gelaendefelder = listOf(GelaendeFeld(position, GelaendeTyp.GEBIRGE)),
         )
 
         assertEquals(GelaendeTyp.GEBIRGE, karte.landNachPosition[position])
-        assertEquals(10_000L, karte.endeZeileExklusiv)
-        assertEquals(15_000L, karte.endeSpalteExklusiv)
+        assertTrue(karte.enthaeltFeld(position))
+        assertTrue(hexagon.radius > 12_000)
     }
 
     @Test
-    fun formatEinsMitLandfeldernBleibtLadbarUndWirdNormalisiert() {
-        val geladen = json.decodeFromString<Spielkarte>(
-            """{
-                "formatVersion":1,
-                "id":"alt",
-                "name":"Alte Karte",
-                "zeilen":3,
-                "spalten":4,
-                "landfelder":[
-                    {"position":{"zeile":1,"spalte":1,"haelfte":"OBEN"},"gelaende":"WALD"}
-                ],
-                "spezialfelder":[{"id":"alt","name":"Stadt","typ":"STADT","positionen":[]}]
-            }""".trimIndent(),
+    fun radiusBestimmtEinHexagonAusSechsMalRadiusQuadratDreiecken() {
+        assertEquals(6, KartenHexagon(radius = 1).felder().size)
+        assertEquals(24, KartenHexagon(radius = 2).felder().size)
+        assertEquals(54, KartenHexagon(radius = 3).felder().size)
+
+        val kodiert = json.encodeToString(
+            KartenVorlage(id = "hex", name = "Hexagon", hexagon = KartenHexagon(radius = 3)),
         )
-
-        val aktuell = geladen.aufAktuellesFormat()
-
-        assertEquals(AKTUELLE_KARTEN_FORMAT_VERSION, aktuell.formatVersion)
-        assertEquals(1, aktuell.gelaendefelder.size)
-        assertTrue(aktuell.belegung.ecken.isEmpty())
+        assertTrue(kodiert.contains("\"hexagon\""))
+        assertTrue(!kodiert.contains("\"zeilen\""))
+        assertTrue(!kodiert.contains("\"spalten\""))
     }
 
     @Test
@@ -124,8 +109,7 @@ class SpielkarteTest {
             Spielkarte(
                 id = "ungueltig",
                 name = "Ungültig",
-                zeilen = 3,
-                spalten = 3,
+                hexagon = KartenHexagon(radius = 5),
                 belegung = KartenBelegung(
                     felder = listOf(
                         FeldBelegung(
@@ -145,13 +129,35 @@ class SpielkarteTest {
             Spielkarte(
                 id = "ungueltig",
                 name = "Ungültig",
-                zeilen = 3,
-                spalten = 3,
+                hexagon = KartenHexagon(radius = 5),
                 gelaendefelder = listOf(GelaendeFeld(feld, GelaendeTyp.EBENE)),
                 belegung = KartenBelegung(
-                    kanten = listOf(KantenBelegung(feld.kanten().first(), SpielerId("anna"))),
+                    kanten = listOf(KantenBelegung(feld.kanten().first())),
                 ),
             )
         }
+    }
+
+    @Test
+    fun spielerDarfAuchInGeladenemSpielNurEinenHauptbahnhofHaben() {
+        val anna = SpielerId("anna")
+        val erster = KartenFeld(0, 0, DreieckHaelfte.UNTEN).ecken().first()
+        val zweiter = KartenFeld(2, 2, DreieckHaelfte.OBEN).ecken().last()
+
+        val fehler = assertThrows(IllegalArgumentException::class.java) {
+            Spielkarte(
+                id = "doppelt",
+                name = "Doppelter Hauptbahnhof",
+                hexagon = KartenHexagon(radius = 8),
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(erster, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                        EckBelegung(zweiter, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                    ),
+                ),
+            )
+        }
+
+        assertTrue(fehler.message.orEmpty().contains("höchstens einen Hauptbahnhof"))
     }
 }

@@ -1,6 +1,10 @@
 package de.teutonstudio.zentralbank.spielbrett
 
 import androidx.compose.ui.graphics.Color
+import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import kotlin.math.abs
 import kotlin.math.sqrt
 import org.junit.Assert.assertEquals
@@ -11,8 +15,8 @@ import org.junit.Test
 
 class SpielbrettGeometrieTest {
     @Test
-    fun `jede Zelle erzeugt zwei Grunddreiecke`() {
-        val geometrie = berechneSpielbrettGeometrie(zeilen = 3, spalten = 4)
+    fun `Hexagonradius zwei erzeugt vierundzwanzig Grunddreiecke`() {
+        val geometrie = berechneSpielbrettGeometrie(KartenHexagon(radius = 2))
 
         assertEquals(24, geometrie.dreiecke.size)
         assertEquals(24, geometrie.dreiecke.map(GrundDreieck::position).distinct().size)
@@ -20,7 +24,7 @@ class SpielbrettGeometrieTest {
 
     @Test
     fun `Grunddreiecke sind gleichseitig und haben Hoehe zwei`() {
-        val dreieck = berechneSpielbrettGeometrie(1, 1).dreieck(
+        val dreieck = berechneSpielbrettGeometrie(KartenHexagon()).dreieck(
             DreieckPosition(0, 0, DreieckAusrichtung.UNTEN),
         )
         val kanten = listOf(
@@ -45,8 +49,7 @@ class SpielbrettGeometrieTest {
         val wasser = DreieckTyp("Wasser", Color.Blue)
 
         val modell = Spielbrett3DModell(
-            zeilen = 2,
-            spalten = 2,
+            hexagon = KartenHexagon(radius = 4),
             auflagen = listOf(
                 DreieckAuflage(DreieckPosition(0, 0, DreieckAusrichtung.OBEN), gold),
                 DreieckAuflage(DreieckPosition(1, 1, DreieckAusrichtung.UNTEN), wasser),
@@ -61,8 +64,7 @@ class SpielbrettGeometrieTest {
         val position = DreieckPosition(0, 0, DreieckAusrichtung.OBEN)
 
         val modell = Spielbrett3DModell(
-            zeilen = 1,
-            spalten = 1,
+            hexagon = KartenHexagon(radius = 2),
             auflagen = listOf(
                 DreieckAuflage(position, DreieckTyp("Land", Color.Green)),
                 DreieckAuflage(
@@ -78,7 +80,7 @@ class SpielbrettGeometrieTest {
 
     @Test
     fun `Treffer findet Dreieck und naechste Ecke`() {
-        val geometrie = berechneSpielbrettGeometrie(3, 3)
+        val geometrie = berechneSpielbrettGeometrie(KartenHexagon(radius = 3))
         val dreieck = geometrie.dreiecke.first()
 
         val treffer = geometrie.treffer(dreieck.mittelpunkt)
@@ -89,7 +91,7 @@ class SpielbrettGeometrieTest {
 
     @Test
     fun `Eck- und Kantenwerkzeuge verlangen einen Treffer nahe am Ziel`() {
-        val geometrie = berechneSpielbrettGeometrie(3, 3)
+        val geometrie = berechneSpielbrettGeometrie(KartenHexagon(radius = 3))
         val dreieck = geometrie.dreiecke.first()
         val mittenTreffer = requireNotNull(geometrie.treffer(dreieck.mittelpunkt))
         val kantenMitte = BrettPunkt(
@@ -107,7 +109,7 @@ class SpielbrettGeometrieTest {
 
     @Test
     fun `innerer Eckpunkt bildet ein Hexagon aus sechs Dreiecken`() {
-        val geometrie = berechneSpielbrettGeometrie(4, 4)
+        val geometrie = berechneSpielbrettGeometrie(KartenHexagon(radius = 4))
         val innererTreffer = geometrie.dreiecke.asSequence()
             .flatMap { dreieck ->
                 dreieck.ecken.indices.asSequence().map { ecke ->
@@ -122,14 +124,14 @@ class SpielbrettGeometrieTest {
     @Test
     fun `Geometrie behaelt negative Kartenkoordinaten bei`() {
         val geometrie = berechneSpielbrettGeometrie(
-            zeilen = 3,
-            spalten = 4,
-            startZeile = -8,
-            startSpalte = -12,
+            KartenHexagon(
+                zentrum = KartenFeld(-7, -10, DreieckHaelfte.UNTEN).ecken().first(),
+                radius = 4,
+            ),
         )
 
         assertTrue(
-            DreieckPosition(-8, -12, DreieckAusrichtung.UNTEN) in
+            DreieckPosition(-7, -10, DreieckAusrichtung.UNTEN) in
                 geometrie.dreiecke.map(GrundDreieck::position),
         )
         assertTrue(
@@ -142,18 +144,17 @@ class SpielbrettGeometrieTest {
     fun `Positionen ausserhalb des Bretts werden abgelehnt`() {
         val fehler = assertThrows(IllegalArgumentException::class.java) {
             Spielbrett3DModell(
-                zeilen = 1,
-                spalten = 1,
+                hexagon = KartenHexagon(),
                 auflagen = listOf(
                     DreieckAuflage(
-                        DreieckPosition(1, 0, DreieckAusrichtung.OBEN),
+                        DreieckPosition(10, 10, DreieckAusrichtung.OBEN),
                         DreieckTyp("Ungueltig", Color.Red),
                     ),
                 ),
             )
         }
 
-        assertTrue(fehler.message.orEmpty().contains("ausserhalb"))
+        assertTrue(fehler.message.orEmpty().contains("außerhalb"))
     }
 
     private fun abstand(a: BrettPunkt, b: BrettPunkt): Float =

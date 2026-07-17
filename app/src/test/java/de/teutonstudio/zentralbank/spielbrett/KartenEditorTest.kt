@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.spielbrett
 
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,37 +37,28 @@ class KartenEditorTest {
     }
 
     @Test
-    fun verkleinernMeldetUndEntferntFelderAusserhalb() {
-        val karte = leereKarte()
-            .wendeWerkzeugAn(
-                DreieckTreffer(DreieckPosition(3, 3, DreieckAusrichtung.OBEN), 0),
-                KartenWerkzeug.EBENE,
-            )
+    fun weitEntferntesGelaendeVergroessertDenHexagonradiusAutomatisch() {
+        val weitWeg = DreieckTreffer(DreieckPosition(30, -40, DreieckAusrichtung.OBEN), 0)
 
-        assertEquals(1, karte.anzahlEntfallenderFelder(2, 2))
-        assertTrue(karte.mitAusdehnung(2, 2).gelaendefelder.isEmpty())
+        val karte = leereKarte().wendeWerkzeugAn(weitWeg, KartenWerkzeug.EBENE)
+
+        assertTrue(karte.hexagon.radius > 30)
+        assertTrue(karte.enthaeltFeld(weitWeg.position.zuKartenFeld()))
     }
 
     @Test
-    fun bearbeitungsbereichWaechstOhneLimitInAlleVierRichtungen() {
-        val karte = leereKarte()
-            .erweitert(KartenRichtung.NORDEN, 80)
-            .erweitert(KartenRichtung.SUEDEN, 90)
-            .erweitert(KartenRichtung.WESTEN, 100)
-            .erweitert(KartenRichtung.OSTEN, 110)
+    fun entfernenDesAeusserstenFeldesVerkleinertDenGespeichertenRadius() {
+        val weitWeg = DreieckTreffer(DreieckPosition(-25, 35, DreieckAusrichtung.UNTEN), 0)
+        val gross = leereKarte().wendeWerkzeugAn(weitWeg, KartenWerkzeug.WALD)
 
-        assertEquals(-80, karte.startZeile)
-        assertEquals(-100, karte.startSpalte)
-        assertEquals(174, karte.zeilen)
-        assertEquals(214, karte.spalten)
-        assertEquals(94L, karte.endeZeileExklusiv)
-        assertEquals(114L, karte.endeSpalteExklusiv)
+        val wiederLeer = gross.wendeWerkzeugAn(weitWeg, KartenWerkzeug.WASSER)
+
+        assertTrue(gross.hexagon.radius > 1)
+        assertEquals(1, wiederLeer.hexagon.radius)
     }
 
     private fun leereKarte() = KartenVorlage(
         id = "testkarte",
         name = "Testkarte",
-        zeilen = 4,
-        spalten = 4,
     )
 }

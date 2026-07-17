@@ -24,8 +24,7 @@ class SpielZustandSerialisierungTest {
             karte = Spielkarte(
                 id = "spiel-anna",
                 name = "Annas Insel",
-                zeilen = 4,
-                spalten = 5,
+                hexagon = KartenHexagon(radius = 6),
                 gelaendefelder = listOf(
                     Landfeld(
                         KartenDreieck(1, 2, DreieckHaelfte.OBEN),
