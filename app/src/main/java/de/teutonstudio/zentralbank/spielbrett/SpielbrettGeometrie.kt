@@ -14,7 +14,7 @@ internal const val SPEZIAL_AUFLAGEN_HOEHE = 0.14f
 
 // Bei einem gleichseitigen Dreieck gilt h = 3r/2 fuer den Umkreisradius r.
 internal const val AUFLAGEN_RADIUS = GRUNDDREIECK_HOEHE * 2f / 3f
-private val GRUNDDREIECK_SEITENLAENGE = 2f * GRUNDDREIECK_HOEHE / sqrt(3f)
+internal val GRUNDDREIECK_SEITENLAENGE = 2f * GRUNDDREIECK_HOEHE / sqrt(3f)
 
 internal data class BrettPunkt(
     val x: Float,
@@ -203,7 +203,7 @@ private fun geometrieAusPositionen(
     )
 }
 
-private fun grundDreieck(
+internal fun grundDreieck(
     position: DreieckPosition,
     ursprung: BrettPunkt,
 ): GrundDreieck {

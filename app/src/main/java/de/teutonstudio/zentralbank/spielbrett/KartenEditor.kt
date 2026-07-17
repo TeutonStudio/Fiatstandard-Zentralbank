@@ -67,9 +67,9 @@ fun KartenEditorDialog(
     val entwurf = verlauf[verlaufIndex]
     var name by remember(ausgangsvorlage) { mutableStateOf(ausgangsvorlage.name) }
     var werkzeug by remember { mutableStateOf(KartenWerkzeug.EBENE) }
-    var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
     var wirdGespeichert by remember { mutableStateOf(false) }
+    val draufsichtStatus = rememberKartenDraufsichtStatus()
     val scope = rememberCoroutineScope()
 
     fun uebernehme(neu: KartenVorlage) {
@@ -96,7 +96,7 @@ fun KartenEditorDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("3D-Spielkarte", style = MaterialTheme.typography.headlineSmall)
+                    Text("Spielkarte – Draufsicht", style = MaterialTheme.typography.headlineSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         FilterChip(selected = true, onClick = {}, label = { Text("Bauen") })
                         FilterChip(
@@ -108,8 +108,7 @@ fun KartenEditorDialog(
                     }
                 }
                 Text(
-                    "Das Dreiecksraster ist unbegrenzt. Sichtbar sind nur Raster und Gelände; " +
-                        "Wasser bleibt transparent.",
+                    "Das Dreiecksraster ist unbegrenzt. Nicht belegte Dreiecke stellen Wasser dar.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 BoxWithConstraints(modifier = Modifier.weight(1f)) {
@@ -122,8 +121,7 @@ fun KartenEditorDialog(
                             karte = entwurf,
                             werkzeug = werkzeug,
                             beiWerkzeug = { werkzeug = it },
-                            kameraModus = kameraModus,
-                            beiKameraModus = { kameraModus = it },
+                            beiAnsichtZuruecksetzen = draufsichtStatus::zuruecksetzen,
                             kannRueckgaengig = verlaufIndex > 0,
                             kannWiederholen = verlaufIndex < verlauf.lastIndex,
                             beiRueckgaengig = { if (verlaufIndex > 0) verlaufIndex-- },
@@ -132,22 +130,18 @@ fun KartenEditorDialog(
                     }
                     val editor: @Composable (Modifier) -> Unit = { modifier ->
                         Box(modifier = modifier) {
-                            Spielbrett3D(
-                                modell = entwurf.zu3DModell(zeigeBearbeitungsRaster = true),
+                            KartenEditorDraufsicht(
+                                karte = entwurf,
+                                status = draufsichtStatus,
                                 modifier = Modifier.fillMaxSize(),
-                                kameraInteraktionsModus = kameraModus,
                                 onDreieckBeruehrt = { treffer ->
                                     fehlermeldung = null
                                     uebernehme(entwurf.wendeWerkzeugAn(treffer, werkzeug))
                                 },
                             )
                             Text(
-                                text = when (kameraModus) {
-                                    KameraInteraktionsModus.DREHEN ->
-                                        "Tippen: Gelände bearbeiten · Ziehen: drehen · Zwei Finger: verschieben/zoomen"
-                                    KameraInteraktionsModus.VERSCHIEBEN ->
-                                        "Tippen: Gelände bearbeiten · Ziehen: Fokus verschieben · Pinch: zoomen"
-                                },
+                                text =
+                                    "Tippen: Gelände bearbeiten · Ziehen: verschieben · Pinch: zoomen",
                                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                                 style = MaterialTheme.typography.labelSmall,
                             )
@@ -218,8 +212,7 @@ private fun KartenWerkzeugleiste(
     karte: KartenVorlage,
     werkzeug: KartenWerkzeug,
     beiWerkzeug: (KartenWerkzeug) -> Unit,
-    kameraModus: KameraInteraktionsModus,
-    beiKameraModus: (KameraInteraktionsModus) -> Unit,
+    beiAnsichtZuruecksetzen: () -> Unit,
     kannRueckgaengig: Boolean,
     kannWiederholen: Boolean,
     beiRueckgaengig: () -> Unit,
@@ -249,21 +242,9 @@ private fun KartenWerkzeugleiste(
                 "${karte.hexagon.anzahlFelder} Dreiecke",
             style = MaterialTheme.typography.bodySmall,
         )
-        Text("Kamera", style = MaterialTheme.typography.titleSmall)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            FilterChip(
-                selected = kameraModus == KameraInteraktionsModus.DREHEN,
-                onClick = { beiKameraModus(KameraInteraktionsModus.DREHEN) },
-                label = { Text("Drehen") },
-            )
-            FilterChip(
-                selected = kameraModus == KameraInteraktionsModus.VERSCHIEBEN,
-                onClick = { beiKameraModus(KameraInteraktionsModus.VERSCHIEBEN) },
-                label = { Text("Verschieben") },
-            )
+        Text("Ansicht", style = MaterialTheme.typography.titleSmall)
+        OutlinedButton(onClick = beiAnsichtZuruecksetzen) {
+            Text("Zentrieren")
         }
         Text("Gelände", style = MaterialTheme.typography.titleSmall)
         FlowRow(
