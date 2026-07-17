@@ -33,10 +33,12 @@ import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.TextCard
 
+internal const val MAXIMALE_SPIELER_ANZAHL = 7
+
 
 @Composable
 fun SpielerAnzahlAuswahl(
-    maxAnzahl: Int = 7,
+    maxAnzahl: Int = MAXIMALE_SPIELER_ANZAHL,
     anzahl: MutableIntState = remember { mutableIntStateOf(maxAnzahl) },
 ) {
     Row(modifier = ModiPad5.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
@@ -71,7 +73,7 @@ fun definiereSpieler(
     gültig: MutableState<Boolean>,
     spieler: MutableMap<String, Zahlungsmittel>,
 ) {
-    val maxSpieler = 7
+    val maxSpieler = MAXIMALE_SPIELER_ANZAHL
     val spielerAnzahl = remember { mutableIntStateOf(spieler.size) }
     val spielerWerte = remember { List(maxSpieler) {
         val liste = spieler.toList()

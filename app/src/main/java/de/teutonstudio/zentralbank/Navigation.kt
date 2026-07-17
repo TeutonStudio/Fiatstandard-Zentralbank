@@ -98,7 +98,7 @@ fun Navigation(viewModel: GameViewModel) {
             composable(route = Screen.NewGame.route) {
                 SpielErstellen(
                     Screen.StartScreen.navigiere(navController),
-                    viewModel.erstelleSpiel,
+                    viewModel::erstelleSpiel,
                     Screen.Game.navigiere(navController)
                 )
             }

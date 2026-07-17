@@ -479,18 +479,28 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    val erstelleSpiel = { spiel: Spiel -> erstelleSpiel(spiel) }
-    private fun erstelleSpiel(spiel: Spiel) {
+    fun erstelleSpiel(spiel: Spiel, nachErstellen: () -> Unit) {
         viewModelScope.launch {
-            val daten = spiel.zuSpeicherDaten()
-            datenbankBereit.await()
-            val gameID = withContext(Dispatchers.IO) { legacySpeicher.insertSpielSatz(daten) }
-            if (gameID != (-1).toLong()) {
+            try {
+                val daten = spiel.zuSpeicherDaten()
+                datenbankBereit.await()
+                val gameID = withContext(Dispatchers.IO) {
+                    legacySpeicher.insertSpielSatz(daten)
+                }
+                if (gameID == (-1).toLong()) {
+                    _spielFehler.emit("Spielstand konnte nicht angelegt werden.")
+                    return@launch
+                }
+
                 val gespeicherteDaten = daten.first.copy(spielID = gameID) to daten.second
                 setzeAktuellesSpiel(spiel, gespeicherteDaten)
                 speichereAktuellenFachSpielstand()
-            } else {
-                _spielFehler.tryEmit("Spielstand konnte nicht angelegt werden.")
+                nachErstellen()
+            } catch (throwable: Throwable) {
+                _spielFehler.emit(
+                    throwable.message?.let { "Spielstand konnte nicht angelegt werden: $it" }
+                        ?: "Spielstand konnte nicht angelegt werden.",
+                )
             }
         }
     }
