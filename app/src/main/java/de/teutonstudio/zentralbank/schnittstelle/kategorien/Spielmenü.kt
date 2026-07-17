@@ -42,6 +42,7 @@ fun Spielmenü(
     spiel: Spiel,
     aktiverSpielerName: String?,
     zugText: String = "Kein Zug aktiv",
+    zugZeitText: String? = null,
 ) {
     Titel(anleitung = remember { mutableStateOf(true) }) {
         GridByOrientation() { idx: Int, modifier -> when(idx) {
@@ -55,6 +56,7 @@ fun Spielmenü(
                 spiel = spiel,
                 aktiverSpielerName = aktiverSpielerName,
                 zugText = zugText,
+                zugZeitText = zugZeitText,
                 modifier = modifier(null),
                 beiKlick = beiNaechstemZugabschnitt,
                 beiKarte = beiKarte,
@@ -68,6 +70,7 @@ private fun ZugStatusKarte(
     spiel: Spiel,
     aktiverSpielerName: String?,
     zugText: String,
+    zugZeitText: String?,
     modifier: Modifier,
     beiKlick: () -> Unit,
     beiKarte: () -> Unit,
@@ -96,6 +99,13 @@ private fun ZugStatusKarte(
                 fontSize = 22.sp,
                 textAlign = TextAlign.Center,
             )
+            zugZeitText?.let { zeit ->
+                Text(
+                    text = "Spieltag $zeit Uhr",
+                    modifier = Modifier.padding(top = 3.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
             if (spiel.spielerListe.isNotEmpty()) {
                 Text(
                     text = "$verbleibendeZuege Züge bis zu den neu berechneten Marktpreisen",

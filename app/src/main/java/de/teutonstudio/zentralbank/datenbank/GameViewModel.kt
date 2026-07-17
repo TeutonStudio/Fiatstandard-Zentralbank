@@ -63,12 +63,14 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private val _spielstaende = MutableStateFlow<List<SpielstandUebersicht>>(emptyList())
     private val _spielZustand = MutableStateFlow<SpielZustand?>(null)
     private val _spielUebersicht = MutableStateFlow<SpielUebersichtZustand?>(null)
+    private val _rundenwechselAnzeige = MutableStateFlow<SpielZustand?>(null)
     private val _spielFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private var spielAblauf: SpielAblauf? = null
 
     val spielstaende: StateFlow<List<SpielstandUebersicht>> = _spielstaende.asStateFlow()
     val spielZustand: StateFlow<SpielZustand?> = _spielZustand.asStateFlow()
     val spielUebersicht: StateFlow<SpielUebersichtZustand?> = _spielUebersicht.asStateFlow()
+    val rundenwechselAnzeige: StateFlow<SpielZustand?> = _rundenwechselAnzeige.asStateFlow()
     val spielFehler: SharedFlow<String> = _spielFehler.asSharedFlow()
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
@@ -87,6 +89,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             SpielAblauf(gespeichert.startzustand, gespeichert.ereignisse)
         } ?: SpielAblauf(spiel.zuSpielZustand())
         spielAblauf = ablauf
+        _rundenwechselAnzeige.value = null
         aktualisiereSpielZustand(ablauf.zustand)
     }
 
@@ -196,19 +199,21 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     private fun uebernehmeEreignisErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
         if (nachher.rundenzähler > vorher.rundenzähler) {
-            beginneNaechsteRunde(nachher)
+            beginneNaechsteRunde(nachher)?.let { neuerRundenzustand ->
+                _rundenwechselAnzeige.value = neuerRundenzustand
+            }
         } else {
             aktualisiereSpielZustand(nachher)
         }
         speichereAktuellenFachSpielstand()
     }
 
-    private fun beginneNaechsteRunde(nachZugende: SpielZustand) {
+    private fun beginneNaechsteRunde(nachZugende: SpielZustand): SpielZustand? {
         try {
             aktuellesSpiel.beginneNaechsteRunde()
         } catch (throwable: Throwable) {
             _spielFehler.tryEmit(throwable.message ?: "Neue Runde konnte nicht begonnen werden.")
-            return
+            return null
         }
 
         val spielDaten = aktuelleDaten.first
@@ -229,7 +234,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         spielAblauf = SpielAblauf(synchronisiert)
         aktualisiereSpielZustand(synchronisiert)
 
-        if (spielDaten.spielID == (-1).toLong()) return
+        if (spielDaten.spielID == (-1).toLong()) return synchronisiert
 
         _spielDatenListe.update { spiele ->
             spiele + (spielDaten to neueDatenListe)
@@ -244,6 +249,11 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 )
             }
         }
+        return synchronisiert
+    }
+
+    fun rundenwechselAngezeigt() {
+        _rundenwechselAnzeige.value = null
     }
 
     fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {

@@ -110,6 +110,14 @@ fun KartenSpielBildschirm(
         }
         return
     }
+    val aktiverSpielerIndex = zustand.spieler.indexOfFirst { it.id == aktiverSpieler }
+        .coerceAtLeast(0)
+    val zeitfenster = spielzugZeitfenster(
+        spielerIndex = aktiverSpielerIndex,
+        spielerAnzahl = zustand.spieler.size.coerceAtLeast(1),
+    )
+    val himmel = HimmelsDarstellung.fuerSpielzug(zeitfenster)
+    val betrachtungsStatus = rememberBetrachtungsTransformationsStatus()
 
     val rundeNullRestbestand = if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
         zustand.rundeNullRestbestand?.get(aktiverSpieler)
@@ -199,10 +207,18 @@ fun KartenSpielBildschirm(
                             hervorhebung = ausgewaehltesZiel,
                         ),
                         modifier = Modifier.fillMaxSize(),
+                        betrachtungsStatus = betrachtungsStatus,
                         kameraInteraktionsModus = kameraModus,
+                        himmel = himmel,
                         onDreieckBeruehrt = { treffer ->
                             ausgewaehltesZiel = treffer.zuKartenOrt(werkzeug.ziel)
                         },
+                    )
+                    SpielbrettKompass(
+                        himmel = himmel,
+                        kameraAzimutGrad = betrachtungsStatus.azimutGrad,
+                        zeitfenster = zeitfenster,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                     )
                     Text(
                         "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +

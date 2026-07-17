@@ -54,6 +54,7 @@ class Karten3DZuordnungTest {
         )
         val nurAnna = grundkarte.zu3DModell(spielerReihenfolge = listOf(anna, bert))
         val annasFarbe = nurAnna.eckObjekte.single().typ.farbe
+        assertEquals(true, nurAnna.eckObjekte.single().typ.istVerwaltungsstandort)
 
         val neutraleFarbe = nurAnna.kantenObjekte
             .first { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }

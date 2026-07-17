@@ -17,6 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -28,14 +29,23 @@ import com.google.android.filament.MaterialInstance
 import io.github.sceneview.SceneScope
 import io.github.sceneview.SceneView
 import io.github.sceneview.geometries.Geometry
+import io.github.sceneview.material.setColor
+import io.github.sceneview.material.setMetallic
+import io.github.sceneview.material.setReflectance
+import io.github.sceneview.material.setRoughness
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Position2
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Size
+import io.github.sceneview.math.colorOf
 import io.github.sceneview.node.GeometryNode
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
+import io.github.sceneview.rememberEnvironment
+import io.github.sceneview.rememberEnvironmentLoader
+import io.github.sceneview.rememberFillLightNode
+import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.utils.screenToRay
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
@@ -45,6 +55,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 import kotlin.math.sin
 
 private const val BRETT_DICKE = 0.12f
@@ -55,9 +66,15 @@ private const val KAMERA_FOKUS_HOEHE = AUFLAGEN_HOEHE * 0.2f
 private const val OBJEKT_BASIS_HOEHE = AUFLAGEN_HOEHE + 0.03f
 
 private val WasserFarbe = Color(0xFF1565A8)
+private val NachtWasserFarbe = Color(0xFF061A31)
 private val WasserRasterHell = Color(0x1A90A4AE)
 private val WasserRasterDunkel = Color(0x0D90A4AE)
 private val VorschauFarbe = Color(0xFF0B3D66)
+private val TagesHimmelFarbe = Color(0xFF4A90D9)
+private val DaemmerungsHimmelFarbe = Color(0xFF5B446A)
+private val NachtHimmelFarbe = Color(0xFF020817)
+private val SonnenFarbe = Color(0xFFFFD27A)
+private val MondFarbe = Color(0xFFDCE8F6)
 private val BrettSeitenFarbe = WasserFarbe
 private val GrundFarbeHell = WasserRasterHell
 private val GrundFarbeDunkel = WasserRasterDunkel
@@ -99,6 +116,8 @@ fun Spielbrett3D(
     kameraInteraktionsModus: KameraInteraktionsModus = KameraInteraktionsModus.DREHEN,
     onDreieckBeruehrt: ((DreieckTreffer) -> Unit)? = null,
     statischeVorschau: Boolean = false,
+    himmel: HimmelsDarstellung = HimmelsDarstellung.fuerUhrzeit(12f),
+    eingabeAktiv: Boolean = true,
 ) {
     if (LocalInspectionMode.current || statischeVorschau) {
         SpielbrettVorschau(
@@ -125,7 +144,40 @@ fun Spielbrett3D(
     }
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
+    val environmentLoader = rememberEnvironmentLoader(engine)
+    val environment = rememberEnvironment(environmentLoader)
     val cameraNode = rememberCameraNode(engine)
+    val lichtVektor = himmel.lichtVektor()
+    val sonnenHoehenAnteil = (himmel.lichtHoeheGrad / 58f).coerceIn(0f, 1f)
+    val himmelsFarbe = himmel.himmelsFarbe()
+    val lichtFarbe = if (himmel.mondSichtbarkeit > himmel.sonnenSichtbarkeit) {
+        colorOf(Color(0xFF9CB9E8))
+    } else {
+        colorOf(lerp(Color(0xFFFFA45B), Color.White, sqrt(sonnenHoehenAnteil)))
+    }
+    val hauptlichtIntensitaet = if (himmel.mondSichtbarkeit > himmel.sonnenSichtbarkeit) {
+        350f + 650f * himmel.mondSichtbarkeit
+    } else {
+        1_500f + 11_500f * sonnenHoehenAnteil
+    }
+    val mainLightNode = rememberMainLightNode(engine) {
+        intensity = hauptlichtIntensitaet
+        lightDirection = Direction(-lichtVektor.x, -lichtVektor.y, -lichtVektor.z)
+        color = lichtFarbe
+        isShadowCaster = true
+    }
+    val fillLightNode = rememberFillLightNode(engine) {
+        intensity = if (himmel.nachtAnteil > 0f) {
+            120f + 180f * himmel.nachtAnteil
+        } else {
+            700f + 1_300f * sonnenHoehenAnteil
+        }
+        lightDirection = Direction(
+            lichtVektor.x * 0.6f,
+            -max(lichtVektor.y, 0.25f),
+            lichtVektor.z * 0.6f,
+        )
+    }
     var ansichtsGroesse by remember { mutableStateOf(IntSize.Zero) }
     val aktuellerBeruehrungsEmpfaenger = rememberUpdatedState(onDreieckBeruehrt)
     val betrachtungsGesten = remember(
@@ -163,6 +215,17 @@ fun Spielbrett3D(
             roughness = 0.28f,
         )
     }
+    val sternenMaterial = remember(materialLoader) {
+        materialLoader.createUnlitColorInstance(Color.White.copy(alpha = 0.001f)).apply {
+            setDoubleSided(true)
+        }
+    }
+    val sonnenMaterial = remember(materialLoader) {
+        materialLoader.createUnlitColorInstance(SonnenFarbe)
+    }
+    val mondMaterial = remember(materialLoader) {
+        materialLoader.createUnlitColorInstance(MondFarbe)
+    }
     val grundMaterialien = remember(materialLoader) {
         listOf(
             materialLoader.doppelseitigesMaterial(WasserRasterHell, rauheit = 0.32f),
@@ -196,11 +259,46 @@ fun Spielbrett3D(
             )
         }
     }
+    val verwaltungsKernMaterialien = remember(materialLoader, verwendeteObjektTypen) {
+        verwendeteObjektTypen
+            .filter(SpielObjektTyp::istVerwaltungsstandort)
+            .associateWith { typ -> materialLoader.createUnlitColorInstance(typ.farbe) }
+    }
+    val verwaltungsHaloMaterialien = remember(materialLoader, verwendeteObjektTypen) {
+        verwendeteObjektTypen
+            .filter(SpielObjektTyp::istVerwaltungsstandort)
+            .associateWith { typ ->
+                materialLoader.createUnlitColorInstance(typ.farbe.copy(alpha = 0.001f))
+            }
+    }
+
+    SideEffect {
+        environment.skybox?.setColor(colorOf(himmelsFarbe).toFloatArray())
+        environment.indirectLight?.intensity = if (himmel.nachtAnteil > 0f) {
+            500f + 700f * (1f - himmel.nachtAnteil)
+        } else {
+            3_000f + 7_000f * sonnenHoehenAnteil
+        }
+        wasserMaterial.setColor(lerp(WasserFarbe, NachtWasserFarbe, himmel.nachtAnteil))
+        wasserMaterial.setMetallic(0.08f + 0.52f * himmel.nachtAnteil)
+        wasserMaterial.setRoughness(0.28f - 0.15f * himmel.nachtAnteil)
+        wasserMaterial.setReflectance(0.45f + 0.4f * himmel.nachtAnteil)
+        sternenMaterial.setColor(Color.White.copy(alpha = 0.92f * himmel.sterneSichtbarkeit))
+        verwaltungsHaloMaterialien.forEach { (typ, material) ->
+            material.setColor(
+                typ.farbe.copy(alpha = 0.34f * himmel.nachtAnteil.coerceIn(0f, 1f)),
+            )
+        }
+    }
 
     val szenengroesse = max(
         max(geometrie.breite, geometrie.tiefe),
         if (modell.unbegrenztesBearbeitungsRaster) 24f else 0f,
     )
+    val himmelsRadius = max(szenengroesse * 3.2f, 32f)
+    val sternenMesh = remember(himmelsRadius) {
+        erstelleSternenhimmelMesh(himmelsRadius)
+    }
     val wasserAusdehnung = max(szenengroesse * 64f, WASSER_MINDEST_SICHTWEITE)
     val kameraAbstand = szenengroesse * 1.15f + AUFLAGEN_HOEHE * 2f
     val kameraDistanz = kameraAbstand / transformation.zoom
@@ -216,6 +314,11 @@ fun Spielbrett3D(
         x = fokusPosition.x + horizontalerAbstand * sin(azimut).toFloat(),
         y = fokusPosition.y + kameraDistanz * sin(neigung).toFloat(),
         z = fokusPosition.z + horizontalerAbstand * cos(azimut).toFloat(),
+    )
+    val himmelskoerperPosition = Position(
+        x = fokusPosition.x + lichtVektor.x * himmelsRadius * 0.88f,
+        y = fokusPosition.y + lichtVektor.y * himmelsRadius * 0.88f,
+        z = fokusPosition.z + lichtVektor.z * himmelsRadius * 0.88f,
     )
 
     SideEffect {
@@ -234,18 +337,50 @@ fun Spielbrett3D(
             },
         engine = engine,
         materialLoader = materialLoader,
+        environmentLoader = environmentLoader,
+        environment = environment,
+        mainLightNode = mainLightNode,
+        fillLightNode = fillLightNode,
         cameraNode = cameraNode,
         cameraManipulator = null,
         onGestureListener = null,
         onTouchEvent = { ereignis, _ ->
-            aktuelleGesten.value.verarbeite(
-                ereignis = ereignis,
-                ansichtsGroesse = ansichtsGroesse,
-                szenengroesse = szenengroesse,
-            )
+            if (eingabeAktiv) {
+                aktuelleGesten.value.verarbeite(
+                    ereignis = ereignis,
+                    ansichtsGroesse = ansichtsGroesse,
+                    szenengroesse = szenengroesse,
+                )
+            } else {
+                true
+            }
         },
         autoCenterContent = false,
     ) {
+        SternenhimmelNode(
+            meshDaten = sternenMesh,
+            materialInstance = sternenMaterial,
+            position = Position(x = fokusPosition.x, z = fokusPosition.z),
+        )
+        if (himmel.sonnenSichtbarkeit > 0.01f) {
+            SphereNode(
+                radius = himmelsRadius * 0.022f,
+                stacks = 10,
+                slices = 14,
+                materialInstance = sonnenMaterial,
+                position = himmelskoerperPosition,
+            )
+        }
+        if (himmel.mondSichtbarkeit > 0.01f) {
+            SphereNode(
+                radius = himmelsRadius * 0.018f,
+                stacks = 10,
+                slices = 14,
+                materialInstance = mondMaterial,
+                position = himmelskoerperPosition,
+            )
+        }
+
         if (modell.zeigeWasserFlaeche) {
             CubeNode(
                 size = Size(
@@ -365,21 +500,137 @@ fun Spielbrett3D(
             if (punkt != null) {
                 key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
                     val (radius, hoehe, seiten) = objekt.typ.eckAbmessungen()
+                    val leuchtet =
+                        objekt.typ.istVerwaltungsstandort && himmel.nachtAnteil > 0.04f
                     CylinderNode(
                         radius = radius,
                         height = hoehe,
                         sideCount = seiten,
-                        materialInstance = objektMaterialien.getValue(objekt.typ),
+                        materialInstance = if (leuchtet) {
+                            verwaltungsKernMaterialien.getValue(objekt.typ)
+                        } else {
+                            objektMaterialien.getValue(objekt.typ)
+                        },
                         position = Position(
                             x = punkt.x,
                             y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
                             z = punkt.z,
                         ),
                     )
+                    if (objekt.typ.istVerwaltungsstandort) {
+                        CylinderNode(
+                            radius = radius * 1.34f,
+                            height = hoehe * 1.08f,
+                            sideCount = 16,
+                            materialInstance = verwaltungsHaloMaterialien.getValue(objekt.typ),
+                            position = Position(
+                                x = punkt.x,
+                                y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
+                                z = punkt.z,
+                            ),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun HimmelsDarstellung.himmelsFarbe(): Color = if (nachtAnteil > 0f) {
+    lerp(DaemmerungsHimmelFarbe, NachtHimmelFarbe, nachtAnteil)
+} else {
+    val tagesHelligkeit = sqrt((lichtHoeheGrad / 22f).coerceIn(0f, 1f))
+    lerp(DaemmerungsHimmelFarbe, TagesHimmelFarbe, tagesHelligkeit)
+}
+
+private fun erstelleSternenhimmelMesh(radius: Float): GelaendeMeshDaten {
+    val ecken = mutableListOf<GelaendeMeshEcke>()
+    val indizes = mutableListOf<Int>()
+    repeat(72) { index ->
+        val azimutAnteil = ((index + 1) * 0.61803398875f) % 1f
+        val hoehenAnteil = ((index + 1) * 0.754877666f) % 1f
+        val azimut = 2.0 * Math.PI * azimutAnteil
+        val hoehe = Math.toRadians((12f + 68f * hoehenAnteil).toDouble())
+        val cosHoehe = cos(hoehe).toFloat()
+        val richtung = GelaendeMeshVektor(
+            x = sin(azimut).toFloat() * cosHoehe,
+            y = sin(hoehe).toFloat(),
+            z = -cos(azimut).toFloat() * cosHoehe,
+        )
+        val rechts = GelaendeMeshVektor(
+            x = cos(azimut).toFloat(),
+            y = 0f,
+            z = sin(azimut).toFloat(),
+        )
+        val oben = GelaendeMeshVektor(
+            x = -sin(azimut).toFloat() * sin(hoehe).toFloat(),
+            y = cosHoehe,
+            z = cos(azimut).toFloat() * sin(hoehe).toFloat(),
+        )
+        val mitte = richtung * radius
+        val groesse = radius * (0.0018f + 0.0016f * ((index * 37) % 11) / 10f)
+        val basis = ecken.size
+        val normale = richtung * -1f
+        listOf(
+            mitte - rechts * groesse - oben * groesse,
+            mitte + rechts * groesse - oben * groesse,
+            mitte + rechts * groesse + oben * groesse,
+            mitte - rechts * groesse + oben * groesse,
+        ).forEach { position -> ecken += GelaendeMeshEcke(position, normale) }
+        indizes += listOf(basis, basis + 1, basis + 2, basis, basis + 2, basis + 3)
+    }
+    return GelaendeMeshDaten(ecken, indizes)
+}
+
+private operator fun GelaendeMeshVektor.times(faktor: Float) = GelaendeMeshVektor(
+    x = x * faktor,
+    y = y * faktor,
+    z = z * faktor,
+)
+
+private operator fun GelaendeMeshVektor.plus(anderer: GelaendeMeshVektor) = GelaendeMeshVektor(
+    x = x + anderer.x,
+    y = y + anderer.y,
+    z = z + anderer.z,
+)
+
+private operator fun GelaendeMeshVektor.minus(anderer: GelaendeMeshVektor) = GelaendeMeshVektor(
+    x = x - anderer.x,
+    y = y - anderer.y,
+    z = z - anderer.z,
+)
+
+@SuppressLint("RestrictedApi")
+@Composable
+private fun SceneScope.SternenhimmelNode(
+    meshDaten: GelaendeMeshDaten,
+    materialInstance: MaterialInstance,
+    position: Position,
+) {
+    val node = remember(engine, meshDaten, materialInstance) {
+        val geometrie = Geometry.Builder()
+            .vertices(
+                meshDaten.ecken.map { ecke ->
+                    Geometry.Vertex(
+                        position = Position(
+                            x = ecke.position.x,
+                            y = ecke.position.y,
+                            z = ecke.position.z,
+                        ),
+                        normal = Direction(
+                            x = ecke.normale.x,
+                            y = ecke.normale.y,
+                            z = ecke.normale.z,
+                        ),
+                    )
+                },
+            )
+            .indices(meshDaten.indizes)
+            .build(engine)
+        GeometryNode(engine, geometrie, materialInstance)
+    }
+    SideEffect { node.position = position }
+    NodeLifecycle(node, content = null)
 }
 
 @SuppressLint("RestrictedApi")

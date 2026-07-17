@@ -70,6 +70,7 @@ fun KartenEditorDialog(
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
     var wirdGespeichert by remember { mutableStateOf(false) }
     val draufsichtStatus = rememberKartenDraufsichtStatus()
+    val bauHimmel = remember { HimmelsDarstellung.fuerUhrzeit(12f) }
     val scope = rememberCoroutineScope()
 
     fun uebernehme(neu: KartenVorlage) {
@@ -138,6 +139,11 @@ fun KartenEditorDialog(
                                     fehlermeldung = null
                                     uebernehme(entwurf.wendeWerkzeugAn(treffer, werkzeug))
                                 },
+                            )
+                            SpielbrettKompass(
+                                himmel = bauHimmel,
+                                kameraAzimutGrad = 0f,
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                             )
                             Text(
                                 text =

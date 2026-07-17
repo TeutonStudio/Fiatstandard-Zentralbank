@@ -88,6 +88,7 @@ data class SpielObjektTyp(
     val farbe: Color,
     val form: SpielObjektForm,
     val zustand: ObjektDarstellungsZustand = ObjektDarstellungsZustand.INTAKT,
+    val istVerwaltungsstandort: Boolean = false,
 )
 
 enum class SpielObjektForm {

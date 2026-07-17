@@ -89,6 +89,7 @@ fun Spielkarte.zu3DModell(
                     },
                     form = eintrag.typ.zuForm(),
                     zustand = zustand,
+                    istVerwaltungsstandort = zustand != ObjektDarstellungsZustand.ZERSTOERT,
                 ),
             )
         } + (hervorhebung as? KartenOrt.Ecke)?.let { markierung ->

@@ -38,6 +38,8 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
 import de.teutonstudio.zentralbank.spielbrett.KartenSpielBildschirm
+import de.teutonstudio.zentralbank.spielbrett.RundenwechselNacht
+import de.teutonstudio.zentralbank.spielbrett.spielzugZeitfenster
 
 private fun Screen.navigiere(navController: NavHostController): () -> Unit = { navController.navigate(route = this.route) }
 
@@ -80,6 +82,7 @@ sealed class Screen(val route: String) {
 fun Navigation(viewModel: GameViewModel) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
+    val rundenwechselZustand by viewModel.rundenwechselAnzeige.collectAsState()
 
     LaunchedEffect(viewModel) {
         viewModel.spielFehler.collect { meldung ->
@@ -87,14 +90,15 @@ fun Navigation(viewModel: GameViewModel) {
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { innenabstand ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.StartScreen.route,
-            modifier = Modifier.padding(innenabstand),
-        ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { innenabstand ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.StartScreen.route,
+                modifier = Modifier.padding(innenabstand),
+            ) {
             composable(route = Screen.StartScreen.route) {
                 Hauptmenü(
                     Screen.NewGame.navigiere(navController),
@@ -124,6 +128,14 @@ fun Navigation(viewModel: GameViewModel) {
             MitAktuellemSpiel(viewModel, navController) { spiel ->
                 val spielUebersicht = viewModel.spielUebersicht.collectAsState().value
                 val spielZustand = viewModel.spielZustand.collectAsState().value
+                val aktiverIndex = spielZustand?.let { zustand ->
+                    zustand.spieler.indexOfFirst { it.id == zustand.aktiverSpieler }
+                } ?: -1
+                val zugZeitText = spielZustand
+                    ?.takeIf { aktiverIndex >= 0 && it.spieler.isNotEmpty() }
+                    ?.let { zustand ->
+                        spielzugZeitfenster(aktiverIndex, zustand.spieler.size).text
+                    }
                 Spielmenü(
                     { navController.navigate(route = Screen.PlayerSaldo.route) },
                     { navController.navigate(route = Screen.DebtSaldo.route) },
@@ -136,6 +148,7 @@ fun Navigation(viewModel: GameViewModel) {
                     spiel = spiel,
                     aktiverSpielerName = spielZustand?.zugStatus?.spieler?.wert,
                     zugText = spielUebersicht?.zug?.text ?: "Kein Zug aktiv",
+                    zugZeitText = zugZeitText,
                 )
                 val zugStatus = spielZustand?.zugStatus
                 if (zugStatus?.phase == Phase.Ausgaben) {
@@ -279,6 +292,21 @@ fun Navigation(viewModel: GameViewModel) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
             }
         }
+            }
+        }
+
+        rundenwechselZustand?.let { zustand ->
+            RundenwechselNacht(
+                zustand = zustand,
+                modifier = Modifier.fillMaxSize(),
+                beiAbgeschlossen = {
+                    viewModel.rundenwechselAngezeigt()
+                    navController.navigate(Screen.Game.route) {
+                        popUpTo(Screen.StartScreen.route) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
     }
-}
 }
