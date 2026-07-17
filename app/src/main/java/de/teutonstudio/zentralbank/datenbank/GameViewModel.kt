@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 
+import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
+import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.ablauf.SpielAblauf
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis

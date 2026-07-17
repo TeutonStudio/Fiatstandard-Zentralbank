@@ -1,5 +1,12 @@
-package de.teutonstudio.zentralbank.datenbank
+package de.teutonstudio.zentralbank.daten.zuordnung
 
+import de.teutonstudio.zentralbank.datenbank.Bauteil
+import de.teutonstudio.zentralbank.datenbank.Handelslinie
+import de.teutonstudio.zentralbank.datenbank.Rohstoffe
+import de.teutonstudio.zentralbank.datenbank.Spiel
+import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
+import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
+import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp

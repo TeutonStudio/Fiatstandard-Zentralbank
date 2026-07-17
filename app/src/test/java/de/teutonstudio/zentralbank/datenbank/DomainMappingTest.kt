@@ -1,5 +1,7 @@
 package de.teutonstudio.zentralbank.datenbank
 
+import de.teutonstudio.zentralbank.daten.zuordnung.zuGeld
+import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
