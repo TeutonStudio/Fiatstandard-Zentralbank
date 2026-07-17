@@ -16,6 +16,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Geld
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
+import de.teutonstudio.zentralbank.fachlogik.modell.istInRundeNullPlatzierbar
 import kotlin.math.roundToInt
 import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe as FachAnleihe
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler as FachSpieler
@@ -40,6 +41,7 @@ fun Rohstoffe.zuRohstoff(): Rohstoff = when (this) {
 fun Bauteil.zuBauteilTyp(): BauteilTyp = when (this) {
     Handelslinie.LAND -> BauteilTyp.EISENBAHNLINIE
     Handelslinie.SEE -> BauteilTyp.FRACHTSCHIFF
+    Verwaltungsstandort.HAUPTBAHNHOF -> BauteilTyp.HAUPTBAHNHOF
     Verwaltungsstandort.BAHNHOF -> BauteilTyp.BAHNHOF
     Verwaltungsstandort.GROSSBAHNHOF -> BauteilTyp.GROSSBAHNHOF
     Verwaltungsstandort.HAFEN -> BauteilTyp.HAFEN
@@ -74,14 +76,45 @@ fun Spiel.zuSpielZustand(): SpielZustand {
         .groupBy { it.aktuellerBesitzer.name }
         .mapValues { (_, werte) -> werte.mapNotNull { anleiheIds[it] } }
     val spielerNamen = spielerIds.keys.map { it.name }.toSet()
-    val spielerOhneHauptbahnhof = spielerIds.values.filterTo(linkedSetOf()) { spielerId ->
-        karte?.belegung?.ecken.orEmpty().none { belegung ->
-            belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF && belegung.besitzer == spielerId
-        }
+    val fachSpieler = spielerListe.map { spieler ->
+        FachSpieler(
+            id = spielerIds.getValue(spieler),
+            name = spieler.name,
+            geldkonto = spielerSaldo.lastOrNull()?.get(spieler)?.zuGeld() ?: Geld.NULL,
+            anleihen = anleihenNachBesitzer[spieler.name].orEmpty(),
+            bauteile = spieler.erhalteBauSaldoZurRunde()
+                .mapKeys { (bauteil, _) -> bauteil.zuBauteilTyp() }
+                .filterValues { it != 0 },
+        )
     }
-    val istRundeNull = karte != null && aktuelleRunde <= 1 && spielerOhneHauptbahnhof.isNotEmpty()
+    val rundeNullRestbestand = if (karte != null && aktuelleRunde <= 1) {
+        fachSpieler.associate { spieler ->
+            val platzierteEcktypen = karte.belegung.ecken
+                .filter { belegung -> belegung.besitzer == spieler.id }
+                .map { belegung ->
+                    when (belegung.typ) {
+                        EckGebaeudeTyp.HAUPTBAHNHOF -> BauteilTyp.HAUPTBAHNHOF
+                        EckGebaeudeTyp.BAHNHOF -> BauteilTyp.BAHNHOF
+                        EckGebaeudeTyp.GROSSBAHNHOF -> BauteilTyp.GROSSBAHNHOF
+                        EckGebaeudeTyp.HAFEN -> BauteilTyp.HAFEN
+                        EckGebaeudeTyp.GROSSHAFEN -> BauteilTyp.GROSSHAFEN
+                    }
+                }
+                .groupingBy { it }
+                .eachCount()
+            spieler.id to spieler.bauteile
+                .filterKeys(BauteilTyp::istInRundeNullPlatzierbar)
+                .mapValues { (bauteil, menge) ->
+                    (menge - platzierteEcktypen.getOrDefault(bauteil, 0)).coerceAtLeast(0)
+                }
+                .filterValues { menge -> menge > 0 }
+        }.filterValues { rest -> rest.isNotEmpty() }
+    } else {
+        emptyMap()
+    }
+    val istRundeNull = karte != null && aktuelleRunde <= 1 && rundeNullRestbestand.isNotEmpty()
     val aktiverFachSpieler = if (istRundeNull) {
-        spielerIds.values.firstOrNull { it in spielerOhneHauptbahnhof }
+        fachSpieler.firstOrNull { it.id in rundeNullRestbestand }?.id
     } else {
         spielerListe.firstOrNull()?.let { spielerIds.getValue(it) }
     }
@@ -93,17 +126,12 @@ fun Spiel.zuSpielZustand(): SpielZustand {
         } else {
             Spielabschnitt.REGULAER
         },
-        spieler = spielerListe.map { spieler ->
-            FachSpieler(
-                id = spielerIds.getValue(spieler),
-                name = spieler.name,
-                geldkonto = spielerSaldo.lastOrNull()?.get(spieler)?.zuGeld() ?: Geld.NULL,
-                anleihen = anleihenNachBesitzer[spieler.name].orEmpty(),
-                bauteile = spieler.erhalteBauSaldoZurRunde()
-                    .mapKeys { (bauteil, _) -> bauteil.zuBauteilTyp() }
-                    .filterValues { it != 0 },
-            )
+        rundeNullRestbestand = if (karte != null && aktuelleRunde <= 1) {
+            rundeNullRestbestand
+        } else {
+            null
         },
+        spieler = fachSpieler,
         bankkonto = Geld.NULL,
         bankAnleihen = anleihenNachBesitzer
             .filterKeys { besitzer -> besitzer !in spielerNamen }

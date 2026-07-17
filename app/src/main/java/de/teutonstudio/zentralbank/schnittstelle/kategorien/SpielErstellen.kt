@@ -17,6 +17,7 @@ import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.datenbank.Spieler
 import de.teutonstudio.zentralbank.datenbank.entries
+import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.MAXIMALE_SPIELER_ANZAHL
@@ -45,7 +46,9 @@ fun SpielErstellen(
     val zentralbankZiele = remember { mutableListOf(15f,2f,.5f,2f) }
     val bauteileProSpieler = remember {
         List(MAXIMALE_SPIELER_ANZAHL) {
-            Bauteil.entries.associateWith { 0 }.toMutableMap()
+            Bauteil.entries.associateWith { bauteil ->
+                if (bauteil == Verwaltungsstandort.HAUPTBAHNHOF) 1 else 0
+            }.toMutableMap()
         }
     }
     val spielerNamen = spieler.keys.toList()

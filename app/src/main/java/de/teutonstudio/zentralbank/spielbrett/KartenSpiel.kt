@@ -32,6 +32,7 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
@@ -43,23 +44,45 @@ import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 private enum class SpielKartenWerkzeug(
     val beschriftung: String,
     val ziel: KartenZielModus,
+    val startBauteil: BauteilTyp? = null,
+    val nurRundeNull: Boolean = false,
 ) {
-    HAUPTBAHNHOF("Hauptbahnhof", KartenZielModus.ECKE),
-    BAHNHOF("Bahnhof", KartenZielModus.ECKE),
-    GROSSBAHNHOF("Großbahnhof", KartenZielModus.ECKE),
-    HAFEN("Hafen", KartenZielModus.ECKE),
-    GROSSHAFEN("Großhafen", KartenZielModus.ECKE),
+    HAUPTBAHNHOF("Hauptbahnhof", KartenZielModus.ECKE, BauteilTyp.HAUPTBAHNHOF),
+    BAHNHOF("Bahnhof", KartenZielModus.ECKE, BauteilTyp.BAHNHOF),
+    GROSSBAHNHOF("Großbahnhof", KartenZielModus.ECKE, BauteilTyp.GROSSBAHNHOF),
+    HAFEN("Hafen", KartenZielModus.ECKE, BauteilTyp.HAFEN),
+    GROSSHAFEN("Großhafen", KartenZielModus.ECKE, BauteilTyp.GROSSHAFEN),
     AUFWERTEN("Aufwerten", KartenZielModus.ECKE),
     ECKE_BELAGERN("Belagern", KartenZielModus.ECKE),
     ECKE_ZERSTOEREN("Zerstören", KartenZielModus.ECKE),
     ECKE_REPARIEREN("Reparieren", KartenZielModus.ECKE),
     ECKE_ENTFERNEN("Entfernen", KartenZielModus.ECKE),
-    SCHIENE("Handelslinie", KartenZielModus.KANTE),
+    SCHIENE("Handelslinie", KartenZielModus.KANTE, BauteilTyp.EISENBAHNLINIE),
     KANTE_ZERSTOEREN("Zerstören", KartenZielModus.KANTE),
     KANTE_REPARIEREN("Reparieren", KartenZielModus.KANTE),
     KANTE_ENTFERNEN("Entfernen", KartenZielModus.KANTE),
     ABBAUEINHEIT("Abbaueinheit", KartenZielModus.FELD),
-    GESCHAEFTSBANK("Geschäftsbank", KartenZielModus.FELD),
+    GESCHAEFTSBANK("Geschäftsbank", KartenZielModus.FELD, BauteilTyp.GESCHAEFTSBANK),
+    VIEHHOF("Viehhof", KartenZielModus.FELD, BauteilTyp.VIEHHOF, nurRundeNull = true),
+    ZIEGELBRENNER(
+        "Ziegelbrenner",
+        KartenZielModus.FELD,
+        BauteilTyp.ZIEGELBRENNER,
+        nurRundeNull = true,
+    ),
+    LEHMINE("Lehmmine", KartenZielModus.FELD, BauteilTyp.LEHMINE, nurRundeNull = true),
+    FOERSTER("Förster", KartenZielModus.FELD, BauteilTyp.FOERSTER, nurRundeNull = true),
+    BOHRTURM("Bohrturm", KartenZielModus.FELD, BauteilTyp.BOHRTURM, nurRundeNull = true),
+    RAFFINERIE("Raffinerie", KartenZielModus.FELD, BauteilTyp.RAFFINERIE, nurRundeNull = true),
+    SYNTHETIK_RAFFINERIE(
+        "Synthetik-Raffinerie",
+        KartenZielModus.FELD,
+        BauteilTyp.SYNTHETIK_RAFFINERIE,
+        nurRundeNull = true,
+    ),
+    KOHLEMINE("Kohlemine", KartenZielModus.FELD, BauteilTyp.KOHLEMINE, nurRundeNull = true),
+    STAHLFABRIK("Stahlfabrik", KartenZielModus.FELD, BauteilTyp.STAHLFABRIK, nurRundeNull = true),
+    EISENMINE("Eisenmine", KartenZielModus.FELD, BauteilTyp.EISENMINE, nurRundeNull = true),
     FELD_ZERSTOEREN("Zerstören", KartenZielModus.FELD),
     FELD_REAKTIVIEREN("Reaktivieren", KartenZielModus.FELD),
     FELD_ENTFERNEN("Entfernen", KartenZielModus.FELD),
@@ -88,10 +111,24 @@ fun KartenSpielBildschirm(
         return
     }
 
-    var werkzeug by remember(zustand.spielabschnitt) {
+    val rundeNullRestbestand = if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+        zustand.rundeNullRestbestand?.get(aktiverSpieler)
+            ?: mapOf(BauteilTyp.HAUPTBAHNHOF to 1)
+    } else {
+        emptyMap()
+    }
+    val rundeNullWerkzeuge = SpielKartenWerkzeug.entries.filter { eintrag ->
+        val bauteil = eintrag.startBauteil
+        bauteil != null && rundeNullRestbestand.getOrDefault(bauteil, 0) > 0
+    }
+    var werkzeug by remember(
+        zustand.spielabschnitt,
+        aktiverSpieler,
+        rundeNullRestbestand,
+    ) {
         mutableStateOf(
             if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
-                SpielKartenWerkzeug.HAUPTBAHNHOF
+                rundeNullWerkzeuge.firstOrNull() ?: SpielKartenWerkzeug.HAUPTBAHNHOF
             } else {
                 SpielKartenWerkzeug.BAHNHOF
             },
@@ -114,7 +151,8 @@ fun KartenSpielBildschirm(
                 Text("Spielkarte", style = MaterialTheme.typography.headlineSmall)
                 Text(
                     if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
-                        "Runde 0 · ${aktiverSpieler.wert} platziert den Hauptbahnhof"
+                        "Runde 0 · ${aktiverSpieler.wert} platziert Startbauwerke " +
+                            "(${rundeNullRestbestand.values.sum()} verbleibend)"
                     } else {
                         "Aktiver Spieler: ${aktiverSpieler.wert}"
                     },
@@ -149,6 +187,8 @@ fun KartenSpielBildschirm(
                     beiRueckgaengig = beiRueckgaengig,
                     beiWiederholen = beiWiederholen,
                     rundeNull = zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL,
+                    rundeNullWerkzeuge = rundeNullWerkzeuge,
+                    rundeNullRestbestand = rundeNullRestbestand,
                 )
             }
             val brett: @Composable (Modifier) -> Unit = { brettModifier ->
@@ -213,8 +253,12 @@ fun KartenSpielBildschirm(
                     Text(ziel.anzeigeText())
                     if (pruefung.isSuccess) {
                         Text(
-                            "Die Aktion ist regelkonform. Hinterlegte Baukosten und Bestand " +
-                                "werden gemeinsam mit der Kartenbelegung geändert.",
+                            if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+                                "Das Startbauwerk wird ohne zusätzliche Kosten platziert."
+                            } else {
+                                "Die Aktion ist regelkonform. Hinterlegte Baukosten und Bestand " +
+                                    "werden gemeinsam mit der Kartenbelegung geändert."
+                            },
                         )
                     } else {
                         Text(
@@ -252,6 +296,8 @@ private fun SpielWerkzeugleiste(
     beiRueckgaengig: () -> Unit,
     beiWiederholen: () -> Unit,
     rundeNull: Boolean,
+    rundeNullWerkzeuge: List<SpielKartenWerkzeug>,
+    rundeNullRestbestand: Map<BauteilTyp, Int>,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -276,27 +322,32 @@ private fun SpielWerkzeugleiste(
         if (rundeNull) {
             Text("Runde 0", style = MaterialTheme.typography.titleSmall)
             WerkzeugChips(
-                werkzeuge = listOf(SpielKartenWerkzeug.HAUPTBAHNHOF),
+                werkzeuge = rundeNullWerkzeuge,
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
+                mengen = rundeNullRestbestand,
             )
         } else {
             Text("Ecke", style = MaterialTheme.typography.titleSmall)
             WerkzeugChips(
                 werkzeuge = SpielKartenWerkzeug.entries.filter { it.ziel == KartenZielModus.ECKE }
-                    .filterNot { it == SpielKartenWerkzeug.HAUPTBAHNHOF },
+                    .filterNot { it == SpielKartenWerkzeug.HAUPTBAHNHOF || it.nurRundeNull },
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
             )
             Text("Kante", style = MaterialTheme.typography.titleSmall)
             WerkzeugChips(
-                werkzeuge = SpielKartenWerkzeug.entries.filter { it.ziel == KartenZielModus.KANTE },
+                werkzeuge = SpielKartenWerkzeug.entries.filter {
+                    it.ziel == KartenZielModus.KANTE && !it.nurRundeNull
+                },
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
             )
             Text("Feld", style = MaterialTheme.typography.titleSmall)
             WerkzeugChips(
-                werkzeuge = SpielKartenWerkzeug.entries.filter { it.ziel == KartenZielModus.FELD },
+                werkzeuge = SpielKartenWerkzeug.entries.filter {
+                    it.ziel == KartenZielModus.FELD && !it.nurRundeNull
+                },
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
             )
@@ -324,6 +375,7 @@ private fun WerkzeugChips(
     werkzeuge: List<SpielKartenWerkzeug>,
     ausgewaehlt: SpielKartenWerkzeug,
     beiWerkzeug: (SpielKartenWerkzeug) -> Unit,
+    mengen: Map<BauteilTyp, Int> = emptyMap(),
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -333,7 +385,10 @@ private fun WerkzeugChips(
             FilterChip(
                 selected = ausgewaehlt == eintrag,
                 onClick = { beiWerkzeug(eintrag) },
-                label = { Text(eintrag.beschriftung) },
+                label = {
+                    val menge = eintrag.startBauteil?.let { mengen[it] }
+                    Text(if (menge == null) eintrag.beschriftung else "${eintrag.beschriftung} · $menge")
+                },
             )
         }
     }
@@ -391,6 +446,20 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
             spieler,
             (ziel as KartenOrt.Feld).position,
             FeldAnlage.Geschaeftsbank,
+        )
+        SpielKartenWerkzeug.VIEHHOF,
+        SpielKartenWerkzeug.ZIEGELBRENNER,
+        SpielKartenWerkzeug.LEHMINE,
+        SpielKartenWerkzeug.FOERSTER,
+        SpielKartenWerkzeug.BOHRTURM,
+        SpielKartenWerkzeug.RAFFINERIE,
+        SpielKartenWerkzeug.SYNTHETIK_RAFFINERIE,
+        SpielKartenWerkzeug.KOHLEMINE,
+        SpielKartenWerkzeug.STAHLFABRIK,
+        SpielKartenWerkzeug.EISENMINE -> SpielEreignis.NeutraleAnlageErrichtet(
+            spieler,
+            (ziel as KartenOrt.Feld).position,
+            FeldAnlage.Wirtschaftsregion(requireNotNull(startBauteil)),
         )
         SpielKartenWerkzeug.FELD_ZERSTOEREN -> SpielEreignis.FeldAnlagenZustandGeaendert(
             spieler,

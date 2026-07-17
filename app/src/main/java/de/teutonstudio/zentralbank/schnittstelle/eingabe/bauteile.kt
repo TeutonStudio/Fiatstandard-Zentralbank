@@ -40,16 +40,22 @@ fun definiereBauteilMenge(
     bauteil: Bauteil,
     anzahl: MutableIntState,
 ) {
+    val minimum = if (bauteil == Verwaltungsstandort.HAUPTBAHNHOF) 1 else 0
+    val maximum = if (bauteil == Verwaltungsstandort.HAUPTBAHNHOF) 1 else Int.MAX_VALUE
     Row(verticalAlignment = Alignment.CenterVertically) {
         Image(
             painter = painterResource(R.drawable.minus),
             contentDescription = "Aus dem Warenkorb entnehmen",
-            modifier = ModiPad5.clickable { anzahl.intValue -= 1 }
+            modifier = ModiPad5.clickable(enabled = anzahl.intValue > minimum) {
+                anzahl.intValue -= 1
+            },
         )
         Image(
             painter = painterResource(R.drawable.plus),
             contentDescription = "Dem Warenkorb hinzufügen",
-            modifier = ModiPad5.clickable { anzahl.intValue += 1 }
+            modifier = ModiPad5.clickable(enabled = anzahl.intValue < maximum) {
+                anzahl.intValue += 1
+            },
         )
         Box(ModiPad10) { Text(text = "${anzahl.intValue}") }
         zeigeBauteil(bauteil, 25.sp, 36.dp, modifier = ModiPad5)

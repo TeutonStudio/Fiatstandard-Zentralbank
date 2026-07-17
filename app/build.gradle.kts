@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "de.teutonstudio.catanischezentralbank"
+        applicationId = "de.teutonstudio.zentralbank"
         minSdk = 35
         targetSdk = 37
         versionCode = 1

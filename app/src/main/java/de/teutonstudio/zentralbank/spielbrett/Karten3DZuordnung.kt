@@ -43,7 +43,6 @@ private val SpielerPalette = listOf(
 
 private val NeutralFarbe = Color(0xFF37474F)
 private val ZerstoertFarbe = Color(0xFF616161)
-private val VerlassenFarbe = Color(0xFF8D6E63)
 private val AuswahlFarbe = Color(0xFFFFD600)
 
 fun KartenVorlage.zu3DModell(
@@ -105,14 +104,13 @@ fun Spielkarte.zu3DModell(
         }.let(::listOfNotNull),
         kantenObjekte = belegung.kanten.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
-            val gewalthaber = KartenAuswertung.gewalthaber(this, eintrag.position)
             KantenObjektAuflage(
                 position = eintrag.position,
                 typ = SpielObjektTyp(
                     name = "Handelslinie",
                     farbe = if (zustand == ObjektDarstellungsZustand.ZERSTOERT) {
                         ZerstoertFarbe
-                    } else spielerFarbe(gewalthaber),
+                    } else NeutralFarbe,
                     form = SpielObjektForm.SCHIENE,
                     zustand = zustand,
                 ),
@@ -122,7 +120,7 @@ fun Spielkarte.zu3DModell(
                 position = KartenKante.zwischen(seeweg.hafenA, seeweg.hafenB),
                 typ = SpielObjektTyp(
                     name = "Frachtschiff ${seeweg.id}",
-                    farbe = spielerFarbe(seeweg.besitzer),
+                    farbe = NeutralFarbe,
                     form = SpielObjektForm.FRACHTSCHIFF,
                 ),
             )
@@ -145,15 +143,18 @@ fun Spielkarte.zu3DModell(
                     name = when (val anlage = eintrag.anlage) {
                         FeldAnlage.Geschaeftsbank -> "Geschäftsbank"
                         is FeldAnlage.Abbaueinheit -> "Abbaueinheit ${anlage.rohstoff.name}"
+                        is FeldAnlage.Wirtschaftsregion ->
+                            anlage.bauteil.text.replaceFirstChar(Char::uppercase)
                     },
                     farbe = when (effektiv) {
-                        AnlagenZustand.AKTIV -> NeutralFarbe
-                        AnlagenZustand.VERLASSEN -> VerlassenFarbe
+                        AnlagenZustand.AKTIV,
+                        AnlagenZustand.VERLASSEN -> NeutralFarbe
                         AnlagenZustand.ZERSTOERT -> ZerstoertFarbe
                     },
                     form = when (eintrag.anlage) {
                         FeldAnlage.Geschaeftsbank -> SpielObjektForm.GESCHAEFTSBANK
                         is FeldAnlage.Abbaueinheit -> SpielObjektForm.ABBAUEINHEIT
+                        is FeldAnlage.Wirtschaftsregion -> SpielObjektForm.ABBAUEINHEIT
                     },
                     zustand = when (effektiv) {
                         AnlagenZustand.AKTIV -> ObjektDarstellungsZustand.INTAKT

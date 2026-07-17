@@ -52,6 +52,7 @@ fun Bauteil.zuPreis(marktpreis: EnumMap<Rohstoffe, Zahlungsmittel>) = kosten * m
 val Bauteil.farbe: Color get() = when (this) {
     Handelslinie.LAND -> Color(0xFF527681)
     Handelslinie.SEE -> Color(0xFF8F6D56)
+    Verwaltungsstandort.HAUPTBAHNHOF -> Color(0xFF536D55)
     Verwaltungsstandort.BAHNHOF -> Color(0xFF687B55)
     Verwaltungsstandort.GROSSBAHNHOF -> Color(0xFF946570)
     Verwaltungsstandort.HAFEN -> Color(0xFF5F7392)
@@ -111,6 +112,7 @@ enum class Handelslinie(override val str: String, override val kosten: EnumMap<R
     SEE("frachtschiff",Rohstoffe.anzahl(stahl = 2)),
 }
 enum class Verwaltungsstandort(override val str: String, override val kosten: EnumMap<Rohstoffe,Int>, val verbrauch: Map<Rohstoffe,Int>): Bauteil {
+    HAUPTBAHNHOF("hauptbahnhof", Rohstoffe.anzahl(), Rohstoffe.anzahl()),
     BAHNHOF("bahnhof",Rohstoffe.anzahl(holz = 1, ziegel = 2) + Handelslinie.LAND.kosten,Rohstoffe.anzahl(nahrung=1,kohle=1)),
     GROSSBAHNHOF("großbahnhof",Rohstoffe.anzahl(holz = 2, ziegel = 3) + 2*Handelslinie.LAND.kosten,Rohstoffe.anzahl(nahrung=2,kohle=2)),
     HAFEN("hafen",Rohstoffe.anzahl(holz = 1, ziegel = 2) + Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=1,diesel=1)),

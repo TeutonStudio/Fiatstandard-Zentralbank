@@ -32,6 +32,13 @@ class SpielZustandSerialisierungTest {
                     ),
                 ),
             ),
+            spielabschnitt = Spielabschnitt.RUNDE_NULL,
+            rundeNullRestbestand = mapOf(
+                spielerId to mapOf(
+                    BauteilTyp.HAUPTBAHNHOF to 1,
+                    BauteilTyp.EISENBAHNLINIE to 2,
+                ),
+            ),
             bankkonto = Geld.mark(100),
             bankAnleihen = emptyList(),
             warenkorb = mapOf(Rohstoff.HOLZ to 3),

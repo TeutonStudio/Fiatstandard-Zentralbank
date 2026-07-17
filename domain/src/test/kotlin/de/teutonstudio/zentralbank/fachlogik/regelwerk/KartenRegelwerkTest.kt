@@ -64,6 +64,62 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun rundeNullVerbrauchtIndividuelleStartplatzierungenOhneBestandZuVerdoppeln() {
+        val annasFeld = KartenFeld(2, 2, DreieckHaelfte.UNTEN)
+        val annaEcke = annasFeld.ecken().first()
+        val annaKante = annasFeld.kanten().first { kante ->
+            annaEcke == kante.anfang || annaEcke == kante.ende
+        }
+        val bertEcke = KartenFeld(4, 4, DreieckHaelfte.OBEN).ecken().last()
+        val annasStartbestand = mapOf(
+            BauteilTyp.HAUPTBAHNHOF to 1,
+            BauteilTyp.EISENBAHNLINIE to 1,
+            BauteilTyp.VIEHHOF to 1,
+        )
+        val bertsStartbestand = mapOf(BauteilTyp.HAUPTBAHNHOF to 1)
+        val start = zustand(rundeNull = true).copy(
+            spieler = listOf(
+                Spieler(id = anna, name = "Anna", bauteile = annasStartbestand),
+                Spieler(id = bert, name = "Bert", bauteile = bertsStartbestand),
+            ),
+            rundeNullRestbestand = linkedMapOf(
+                anna to annasStartbestand,
+                bert to bertsStartbestand,
+            ),
+        )
+
+        val nachHauptbahnhof = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.HauptbahnhofPlatziert(anna, annaEcke),
+        ).getOrThrow()
+        val nachSchiene = SpielRegelwerk.wendeAn(
+            nachHauptbahnhof,
+            SpielEreignis.SchieneGebaut(anna, annaKante),
+        ).getOrThrow()
+        val nachViehhof = SpielRegelwerk.wendeAn(
+            nachSchiene,
+            SpielEreignis.NeutraleAnlageErrichtet(
+                errichter = anna,
+                feld = annasFeld,
+                anlage = FeldAnlage.Wirtschaftsregion(BauteilTyp.VIEHHOF),
+            ),
+        ).getOrThrow()
+        val danach = SpielRegelwerk.wendeAn(
+            nachViehhof,
+            SpielEreignis.HauptbahnhofPlatziert(bert, bertEcke),
+        ).getOrThrow()
+
+        assertEquals(anna, nachHauptbahnhof.aktiverSpieler)
+        assertEquals(anna, nachSchiene.aktiverSpieler)
+        assertEquals(bert, nachViehhof.aktiverSpieler)
+        assertEquals(Spielabschnitt.REGULAER, danach.spielabschnitt)
+        assertTrue(danach.rundeNullRestbestand.orEmpty().isEmpty())
+        assertEquals(annasStartbestand, danach.spieler.first { it.id == anna }.bauteile)
+        assertEquals(1, danach.karte?.belegung?.kanten?.size)
+        assertEquals(1, danach.karte?.belegung?.felder?.size)
+    }
+
+    @Test
     fun rundeNullLehntZuNahenHauptbahnhofAb() {
         val start = zustand(rundeNull = true)
         val annaEcke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()

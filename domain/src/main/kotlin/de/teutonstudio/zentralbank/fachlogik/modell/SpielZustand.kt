@@ -71,6 +71,8 @@ data class SpielZustand(
     val spieler: List<Spieler>,
     val karte: Spielkarte? = null,
     val spielabschnitt: Spielabschnitt = Spielabschnitt.REGULAER,
+    /** Noch zu platzierende, bereits zum Startbestand der Spieler gehörende Bauwerke. */
+    val rundeNullRestbestand: Map<SpielerId, Map<BauteilTyp, Int>>? = null,
     val bankkonto: Geld = Geld.NULL,
     val bankAnleihen: List<AnleiheId> = emptyList(),
     val warenkorb: Map<Rohstoff, Int> = emptyMap(),

@@ -2,6 +2,8 @@ package de.teutonstudio.zentralbank.spielbrett
 
 import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
+import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
@@ -21,7 +23,7 @@ class Karten3DZuordnungTest {
     private val bert = SpielerId("bert")
 
     @Test
-    fun handelslinienZeigenNurBeiAlleinigerGewaltDieSpielerfarbe() {
+    fun eckBauwerkeNutzenSpielerfarbenUndKantenSowieFelderDieselbeNeutraleFarbe() {
         val ecken = listOf(
             KartenEcke(6, 4),
             KartenEcke(8, 4),
@@ -42,18 +44,22 @@ class Karten3DZuordnungTest {
                     EckBelegung(ecken.first(), EckGebaeudeTyp.HAUPTBAHNHOF, anna),
                 ),
                 kanten = linien.map(::KantenBelegung),
+                felder = listOf(
+                    FeldBelegung(
+                        position = angrenzendeFelder(linien.first()).first(),
+                        anlage = FeldAnlage.Geschaeftsbank,
+                    ),
+                ),
             ),
         )
         val nurAnna = grundkarte.zu3DModell(spielerReihenfolge = listOf(anna, bert))
         val annasFarbe = nurAnna.eckObjekte.single().typ.farbe
 
-        assertEquals(
-            setOf(annasFarbe),
-            nurAnna.kantenObjekte
-                .filter { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
-                .map { objekt -> objekt.typ.farbe }
-                .toSet(),
-        )
+        val neutraleFarbe = nurAnna.kantenObjekte
+            .first { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
+            .typ.farbe
+        assertNotEquals(annasFarbe, neutraleFarbe)
+        assertEquals(neutraleFarbe, nurAnna.feldObjekte.single().typ.farbe)
 
         val gemeinsam = grundkarte.copy(
             belegung = grundkarte.belegung.copy(
@@ -64,13 +70,14 @@ class Karten3DZuordnungTest {
         val bertsFarbe = gemeinsam.eckObjekte.single { objekt ->
             objekt.position == ecken.last()
         }.typ.farbe
+        assertNotEquals(annasFarbe, bertsFarbe)
         val gemeinsameLinienfarben = gemeinsam.kantenObjekte
             .filter { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
             .map { objekt -> objekt.typ.farbe }
             .toSet()
 
         assertEquals(1, gemeinsameLinienfarben.size)
-        assertNotEquals(annasFarbe, gemeinsameLinienfarben.single())
+        assertEquals(neutraleFarbe, gemeinsameLinienfarben.single())
         assertNotEquals(bertsFarbe, gemeinsameLinienfarben.single())
     }
 }

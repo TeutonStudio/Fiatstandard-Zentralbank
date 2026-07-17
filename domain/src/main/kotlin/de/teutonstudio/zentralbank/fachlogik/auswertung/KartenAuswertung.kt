@@ -76,10 +76,13 @@ object KartenAuswertung {
         karte: Spielkarte,
         spieler: SpielerId,
     ): Map<Rohstoff, Int> = karte.belegung.felder
-        .mapNotNull { belegung ->
-            val anlage = belegung.anlage as? FeldAnlage.Abbaueinheit ?: return@mapNotNull null
-            val menge = ertrag(karte, belegung.position)[spieler] ?: return@mapNotNull null
-            anlage.rohstoff to menge
+        .flatMap { belegung ->
+            val menge = ertrag(karte, belegung.position)[spieler] ?: return@flatMap emptyList()
+            when (val anlage = belegung.anlage) {
+                is FeldAnlage.Abbaueinheit -> mapOf(anlage.rohstoff to 1)
+                is FeldAnlage.Wirtschaftsregion -> anlage.bauteil.ertrag
+                FeldAnlage.Geschaeftsbank -> emptyMap()
+            }.map { (rohstoff, ertrag) -> rohstoff to ertrag * menge }
         }
         .groupBy(Pair<Rohstoff, Int>::first, Pair<Rohstoff, Int>::second)
         .mapValues { (_, mengen) -> mengen.sum() }

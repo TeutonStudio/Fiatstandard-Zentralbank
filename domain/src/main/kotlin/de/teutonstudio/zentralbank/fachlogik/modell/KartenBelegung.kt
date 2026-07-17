@@ -98,6 +98,16 @@ sealed interface FeldAnlage {
     @Serializable
     @SerialName("geschaeftsbank")
     data object Geschaeftsbank : FeldAnlage
+
+    @Serializable
+    @SerialName("wirtschaftsregion")
+    data class Wirtschaftsregion(val bauteil: BauteilTyp) : FeldAnlage {
+        init {
+            require(bauteil.art == BauteilArt.WIRTSCHAFTSREGION) {
+                "Auf einem Dreieck kann nur eine Wirtschaftsregion platziert werden."
+            }
+        }
+    }
 }
 
 @Serializable

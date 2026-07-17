@@ -10,7 +10,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -21,6 +24,7 @@ import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.datenbank.Spiel
 import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AusgabenDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
@@ -149,6 +153,19 @@ fun Navigation(viewModel: GameViewModel) {
         composable(route = Screen.GameMap.route) {
             MitAktuellemSpiel(viewModel, navController) {
                 val zustand = viewModel.spielZustand.collectAsState().value
+                var rundeNullBegonnen by remember { mutableStateOf(false) }
+                LaunchedEffect(zustand?.spielabschnitt) {
+                    when (zustand?.spielabschnitt) {
+                        Spielabschnitt.RUNDE_NULL -> rundeNullBegonnen = true
+                        Spielabschnitt.REGULAER -> if (rundeNullBegonnen) {
+                            navController.navigate(Screen.Game.route) {
+                                popUpTo(Screen.StartScreen.route) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                        null -> Unit
+                    }
+                }
                 Titel(beiZurück = { navController.popBackStack() }) {
                     if (zustand == null) {
                         Text("Der Spielzustand wird geladen.")

@@ -17,6 +17,11 @@ enum class BauteilTyp(
     val ertrag: Map<Rohstoff, Int> = emptyMap(),
     val verbrauch: Map<Rohstoff, Int> = emptyMap(),
 ) {
+    HAUPTBAHNHOF(
+        text = "hauptbahnhof",
+        art = BauteilArt.VERWALTUNGSSTANDORT,
+        kosten = emptyMap(),
+    ),
     EISENBAHNLINIE(
         text = "eisenbahnlinie",
         art = BauteilArt.HANDELSLINIE,
@@ -121,6 +126,10 @@ enum class BauteilTyp(
         ertrag = rohstoffe(Rohstoff.EISEN to 1),
     ),
 }
+
+/** Bauteile, die in Runde 0 genau einer Ecke, Kante oder einem Dreieck zugeordnet werden. */
+val BauteilTyp.istInRundeNullPlatzierbar: Boolean
+    get() = this != BauteilTyp.FRACHTSCHIFF
 
 fun rohstoffe(vararg mengen: Pair<Rohstoff, Int>): Map<Rohstoff, Int> {
     return mengen.toMap().filterValues { it != 0 }

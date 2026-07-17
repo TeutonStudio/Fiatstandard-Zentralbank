@@ -9,6 +9,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 
 internal object ZugRegelwerk {
@@ -17,6 +18,10 @@ internal object ZugRegelwerk {
         ereignis: SpielEreignis,
     ) {
         if (ereignis is SpielEreignis.WarenkorbGeaendert) return
+        if (
+            zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL &&
+            ereignis.istRundeNullPlatzierung()
+        ) return
 
         val zug = zustand.zugStatus ?: return
         val faelligerSchuldenstrich =
@@ -43,6 +48,12 @@ internal object ZugRegelwerk {
             }
         }
     }
+
+    private fun SpielEreignis.istRundeNullPlatzierung(): Boolean =
+        this is SpielEreignis.HauptbahnhofPlatziert ||
+            this is SpielEreignis.EckGebaeudeGebaut ||
+            this is SpielEreignis.SchieneGebaut ||
+            this is SpielEreignis.NeutraleAnlageErrichtet
 
     fun schrittAbschliessen(
         zustand: SpielZustand,

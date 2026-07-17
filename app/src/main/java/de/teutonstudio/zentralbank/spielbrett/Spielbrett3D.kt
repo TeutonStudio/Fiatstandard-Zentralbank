@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import android.annotation.SuppressLint
 import android.view.MotionEvent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,12 +25,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.MaterialInstance
+import io.github.sceneview.SceneScope
 import io.github.sceneview.SceneView
+import io.github.sceneview.geometries.Geometry
 import io.github.sceneview.math.Direction
 import io.github.sceneview.math.Position
 import io.github.sceneview.math.Position2
 import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Size
+import io.github.sceneview.node.GeometryNode
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberMaterialLoader
@@ -44,7 +48,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 private const val BRETT_DICKE = 0.12f
-private const val OBERFLAECHEN_ABSTAND = 0.004f
+internal const val OBERFLAECHEN_ABSTAND = 0.004f
 private const val WASSER_MINDEST_SICHTWEITE = 10_000f
 private const val BRETT_RAND = 0.35f
 private const val KAMERA_FOKUS_HOEHE = AUFLAGEN_HOEHE * 0.2f
@@ -62,9 +66,8 @@ private val GrundFarbeDunkel = WasserRasterDunkel
  * Rendert [modell] als interaktives 3D-Spielbrett mit SceneView und Google Filament.
  *
  * Die Grundflaeche besteht aus gleichseitigen Dreiecken mit der geometrischen Hoehe 2.
- * Jede [DreieckAuflage] wird als deckungsgleiches dreiseitiges Prisma dargestellt. Land und
- * Geländeauflagen liegen dabei auf getrennten visuellen Ebenen. Ziehen dreht die Kamera, eine
- * Zwei-Finger-Geste verschiebt sie und Pinch zoomt.
+ * Land wird mit abgeschraegten Kanten dargestellt; Spezialauflagen liegen auf einer getrennten
+ * visuellen Ebene. Ziehen dreht die Kamera, eine Zwei-Finger-Geste verschiebt sie und Pinch zoomt.
  *
  * [betrachtungsStatus] enthaelt dieselbe Transformation, die auch die Gesten veraendern. Dadurch
  * kann die Ansicht von aussen beobachtet, ueber Schaltflaechen gesteuert oder gespeichert werden.
@@ -176,6 +179,9 @@ fun Spielbrett3D(
             )
         }
     }
+    val gelaendeMeshes = remember(geometrie, modell.auflagen) {
+        erstelleAbgeschraegteGelaendeMeshes(geometrie, modell.auflagen)
+    }
     val verwendeteObjektTypen = (
         modell.eckObjekte.map(EckObjektAuflage::typ) +
             modell.kantenObjekte.map(KantenObjektAuflage::typ) +
@@ -273,25 +279,27 @@ fun Spielbrett3D(
             }
         }
 
-        modell.auflagen.forEach { auflage ->
+        gelaendeMeshes.forEach { (typ, meshDaten) ->
+            key("abgeschraegtes-gelaende", typ) {
+                AbgeschraegtesGelaendeNode(
+                    meshDaten = meshDaten,
+                    materialInstance = auflagenMaterialien.getValue(typ),
+                )
+            }
+        }
+
+        modell.auflagen.filter { it.ebene == AuflagenEbene.SPEZIAL }.forEach { auflage ->
             key(auflage.position, auflage.ebene) {
                 val grundDreieck = geometrie.dreieck(auflage.position)
-                val basisHoehe = when (auflage.ebene) {
-                    AuflagenEbene.LAND -> 0f
-                    AuflagenEbene.SPEZIAL -> AUFLAGEN_HOEHE
-                }
-                val hoehe = when (auflage.ebene) {
-                    AuflagenEbene.LAND -> AUFLAGEN_HOEHE
-                    AuflagenEbene.SPEZIAL -> SPEZIAL_AUFLAGEN_HOEHE
-                }
                 CylinderNode(
                     radius = AUFLAGEN_RADIUS,
-                    height = hoehe,
+                    height = SPEZIAL_AUFLAGEN_HOEHE,
                     sideCount = 3,
                     materialInstance = auflagenMaterialien.getValue(auflage.typ),
                     position = Position(
                         x = grundDreieck.mittelpunkt.x,
-                        y = OBERFLAECHEN_ABSTAND + basisHoehe + hoehe / 2f,
+                        y = OBERFLAECHEN_ABSTAND + AUFLAGEN_HOEHE +
+                            SPEZIAL_AUFLAGEN_HOEHE / 2f,
                         z = grundDreieck.mittelpunkt.z,
                     ),
                     rotation = Rotation(
@@ -372,6 +380,41 @@ fun Spielbrett3D(
             }
         }
     }
+}
+
+@SuppressLint("RestrictedApi")
+@Composable
+private fun SceneScope.AbgeschraegtesGelaendeNode(
+    meshDaten: GelaendeMeshDaten,
+    materialInstance: MaterialInstance,
+) {
+    val node = remember(engine, meshDaten, materialInstance) {
+        val geometrie = Geometry.Builder()
+            .vertices(
+                meshDaten.ecken.map { ecke ->
+                    Geometry.Vertex(
+                        position = Position(
+                            x = ecke.position.x,
+                            y = ecke.position.y,
+                            z = ecke.position.z,
+                        ),
+                        normal = Direction(
+                            x = ecke.normale.x,
+                            y = ecke.normale.y,
+                            z = ecke.normale.z,
+                        ),
+                    )
+                },
+            )
+            .indices(meshDaten.indizes)
+            .build(engine)
+        GeometryNode(
+            engine = engine,
+            geometry = geometrie,
+            materialInstance = materialInstance,
+        )
+    }
+    NodeLifecycle(node, content = null)
 }
 
 private data class ObjektAbmessungen(

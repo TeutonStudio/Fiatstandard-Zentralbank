@@ -56,6 +56,7 @@ fun bauteilIcon(bauteil: Bauteil): Painter {
     return when (bauteil) {
         Handelslinie.LAND -> painterResource(R.drawable.empty) // TODO
         Handelslinie.SEE -> painterResource(R.drawable.empty) // TODO
+        Verwaltungsstandort.HAUPTBAHNHOF -> painterResource(R.drawable.empty) // TODO
         Verwaltungsstandort.BAHNHOF -> painterResource(R.drawable.empty) // TODO
         Verwaltungsstandort.GROSSBAHNHOF -> painterResource(R.drawable.empty) // TODO
         Verwaltungsstandort.HAFEN -> painterResource(R.drawable.empty) // TODO

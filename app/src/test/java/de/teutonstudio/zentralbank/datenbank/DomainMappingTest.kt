@@ -53,8 +53,8 @@ class DomainMappingTest {
 
     @Test
     fun neuesKartenspielBeginntBeiErstemSpielerOhneHauptbahnhofInRundeNull() {
-        val anna = Spieler("Anna", emptyMap())
-        val bert = Spieler("Bert", emptyMap())
+        val anna = Spieler("Anna", mapOf(Verwaltungsstandort.HAUPTBAHNHOF to 1))
+        val bert = Spieler("Bert", mapOf(Verwaltungsstandort.HAUPTBAHNHOF to 1))
         val annaId = SpielerId("Anna")
         val karte = Spielkarte(
             id = "runde-null",
@@ -87,5 +87,9 @@ class DomainMappingTest {
 
         assertEquals(Spielabschnitt.RUNDE_NULL, zustand.spielabschnitt)
         assertEquals(SpielerId("Bert"), zustand.aktiverSpieler)
+        assertEquals(
+            mapOf(BauteilTyp.HAUPTBAHNHOF to 1),
+            zustand.rundeNullRestbestand?.get(SpielerId("Bert")),
+        )
     }
 }

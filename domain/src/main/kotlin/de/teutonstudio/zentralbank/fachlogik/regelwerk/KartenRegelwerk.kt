@@ -38,6 +38,13 @@ internal object KartenRegelwerk {
         require(ereignis.spieler in zustand.spieler.map { it.id }) {
             "Unbekannter Spieler: ${ereignis.spieler.wert}."
         }
+        if (zustand.rundeNullRestbestand != null) {
+            pruefeRundeNullPlatzierung(
+                zustand = zustand,
+                spieler = ereignis.spieler,
+                bauteil = BauteilTyp.HAUPTBAHNHOF,
+            )
+        }
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
             "Die gewählte Ecke ist bereits belegt."
         }
@@ -63,6 +70,14 @@ internal object KartenRegelwerk {
         val neueKarte = karte.copy(
             belegung = karte.belegung.copy(ecken = neueEcken.eckenSortiert()),
         )
+        val mitPlatzierung = zustand.copy(karte = neueKarte)
+        if (zustand.rundeNullRestbestand != null) {
+            return schliesseRundeNullPlatzierungAb(
+                zustand = mitPlatzierung,
+                spieler = ereignis.spieler,
+                bauteil = BauteilTyp.HAUPTBAHNHOF,
+            )
+        }
         val ohneHauptbahnhof = zustand.spieler.filter { spieler ->
             neueEcken.none { belegung ->
                 belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF && belegung.besitzer == spieler.id
@@ -76,8 +91,7 @@ internal object KartenRegelwerk {
                 .map { versatz -> zustand.spieler[(index + versatz) % zustand.spieler.size].id }
                 .first { kandidat -> kandidat in ohneHauptbahnhof.map { it.id } }
         }
-        return zustand.copy(
-            karte = neueKarte,
+        return mitPlatzierung.copy(
             spielabschnitt = if (fertig) Spielabschnitt.REGULAER else Spielabschnitt.RUNDE_NULL,
             aktiverSpieler = naechster,
             zugStatus = zustand.zugStatus?.copy(spieler = naechster ?: zustand.zugStatus.spieler),
@@ -90,6 +104,9 @@ internal object KartenRegelwerk {
     ): SpielZustand {
         require(ereignis.typ != EckGebaeudeTyp.HAUPTBAHNHOF) {
             "Ein Hauptbahnhof braucht die Runde-0-Platzierung."
+        }
+        if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+            return startEckGebaeudePlatzieren(zustand, ereignis)
         }
         val karte = regulaereKarte(zustand)
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
@@ -149,6 +166,9 @@ internal object KartenRegelwerk {
         zustand: SpielZustand,
         ereignis: SpielEreignis.SchieneGebaut,
     ): SpielZustand {
+        if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+            return startSchienePlatzieren(zustand, ereignis)
+        }
         val karte = regulaereKarte(zustand)
         require(karte.belegung.kanten.none { it.position == ereignis.kante }) {
             "Die gewählte Kante ist bereits belegt."
@@ -181,6 +201,9 @@ internal object KartenRegelwerk {
         zustand: SpielZustand,
         ereignis: SpielEreignis.NeutraleAnlageErrichtet,
     ): SpielZustand {
+        if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+            return startAnlagePlatzieren(zustand, ereignis)
+        }
         val karte = regulaereKarte(zustand)
         require(ereignis.feld in karte.landNachPosition) {
             "Eine neutrale Anlage darf nur auf einem Geländefeld stehen."
@@ -469,6 +492,151 @@ internal object KartenRegelwerk {
         }
     }
 
+    private fun startEckGebaeudePlatzieren(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.EckGebaeudeGebaut,
+    ): SpielZustand {
+        val bauteil = requireNotNull(ereignis.typ.bauteilTyp())
+        pruefeRundeNullPlatzierung(zustand, ereignis.spieler, bauteil)
+        val karte = requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }
+        require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
+            "Die gewählte Ecke ist bereits belegt."
+        }
+        if (ereignis.typ == EckGebaeudeTyp.HAFEN || ereignis.typ == EckGebaeudeTyp.GROSSHAFEN) {
+            require(KartenAuswertung.istHafenstandort(karte, ereignis.ecke)) {
+                "Ein Hafen braucht mindestens zwei Wasser- und zwei angrenzende Geländefelder."
+            }
+        }
+        val danach = zustand.copy(
+            karte = karte.copy(
+                belegung = karte.belegung.copy(
+                    ecken = (karte.belegung.ecken + EckBelegung(
+                        position = ereignis.ecke,
+                        typ = ereignis.typ,
+                        besitzer = ereignis.spieler,
+                    )).eckenSortiert(),
+                ),
+            ),
+        )
+        return schliesseRundeNullPlatzierungAb(danach, ereignis.spieler, bauteil)
+    }
+
+    private fun startSchienePlatzieren(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.SchieneGebaut,
+    ): SpielZustand {
+        pruefeRundeNullPlatzierung(zustand, ereignis.spieler, BauteilTyp.EISENBAHNLINIE)
+        val karte = requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }
+        require(karte.belegung.kanten.none { it.position == ereignis.kante }) {
+            "Die gewählte Kante ist bereits belegt."
+        }
+        val nachbarn = angrenzendeFelder(ereignis.kante)
+        require(nachbarn.size == 2 && nachbarn.all { it in karte.landNachPosition }) {
+            "Eine Handelslinie ist nur zwischen zwei Geländefeldern erlaubt."
+        }
+        val neueKarte = karte.copy(
+            belegung = karte.belegung.copy(
+                kanten = (karte.belegung.kanten + KantenBelegung(ereignis.kante)).kantenSortiert(),
+            ),
+        )
+        require(ereignis.spieler in KartenAuswertung.verbundeneSpieler(neueKarte, ereignis.kante)) {
+            "Eine Handelslinie muss mit dem eigenen Hauptbahnhof oder Liniennetz verbunden sein."
+        }
+        return schliesseRundeNullPlatzierungAb(
+            zustand.copy(karte = neueKarte),
+            ereignis.spieler,
+            BauteilTyp.EISENBAHNLINIE,
+        )
+    }
+
+    private fun startAnlagePlatzieren(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.NeutraleAnlageErrichtet,
+    ): SpielZustand {
+        val bauteil = when (val anlage = ereignis.anlage) {
+            FeldAnlage.Geschaeftsbank -> BauteilTyp.GESCHAEFTSBANK
+            is FeldAnlage.Wirtschaftsregion -> anlage.bauteil
+            is FeldAnlage.Abbaueinheit -> error(
+                "In Runde 0 muss die konkrete Wirtschaftsregion ausgewählt werden.",
+            )
+        }
+        pruefeRundeNullPlatzierung(zustand, ereignis.errichter, bauteil)
+        val karte = requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }
+        require(ereignis.feld in karte.landNachPosition) {
+            "Eine neutrale Anlage darf nur auf einem Geländefeld stehen."
+        }
+        require(karte.belegung.felder.none { it.position == ereignis.feld }) {
+            "Das gewählte Feld ist bereits belegt."
+        }
+        val danach = zustand.copy(
+            karte = karte.copy(
+                belegung = karte.belegung.copy(
+                    felder = (karte.belegung.felder + FeldBelegung(
+                        position = ereignis.feld,
+                        anlage = ereignis.anlage,
+                    )).felderSortiert(),
+                ),
+            ),
+        )
+        return schliesseRundeNullPlatzierungAb(danach, ereignis.errichter, bauteil)
+    }
+
+    private fun pruefeRundeNullPlatzierung(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+        bauteil: BauteilTyp,
+    ) {
+        require(zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+            "Startbauwerke werden nur in Runde 0 platziert."
+        }
+        require(spieler == zustand.aktiverSpieler) {
+            "Nur der aktive Spieler darf seine Startbauwerke platzieren."
+        }
+        val restbestand = requireNotNull(zustand.rundeNullRestbestand) {
+            "Dieser Spielstand besitzt keinen individuellen Runde-0-Bestand."
+        }
+        require((restbestand[spieler]?.getOrDefault(bauteil, 0) ?: 0) > 0) {
+            "Für ${bauteil.text} ist keine weitere Startplatzierung vorgesehen."
+        }
+    }
+
+    private fun schliesseRundeNullPlatzierungAb(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+        bauteil: BauteilTyp,
+    ): SpielZustand {
+        val restbestand = requireNotNull(zustand.rundeNullRestbestand)
+        val neuerRestbestand = restbestand.mapValues { (id, bauteile) ->
+            if (id != spieler) {
+                bauteile
+            } else {
+                bauteile.mapValues { (typ, menge) ->
+                    if (typ == bauteil) menge - 1 else menge
+                }.filterValues { menge -> menge > 0 }
+            }
+        }.filterValues { bauteile -> bauteile.isNotEmpty() }
+        val fertig = neuerRestbestand.isEmpty()
+        val naechster = if (fertig) {
+            zustand.spieler.firstOrNull()?.id
+        } else if (spieler in neuerRestbestand) {
+            spieler
+        } else {
+            val index = zustand.spieler.indexOfFirst { it.id == spieler }
+            (1..zustand.spieler.size)
+                .asSequence()
+                .map { versatz -> zustand.spieler[(index + versatz) % zustand.spieler.size].id }
+                .first { kandidat -> kandidat in neuerRestbestand }
+        }
+        return zustand.copy(
+            spielabschnitt = if (fertig) Spielabschnitt.REGULAER else Spielabschnitt.RUNDE_NULL,
+            rundeNullRestbestand = neuerRestbestand,
+            aktiverSpieler = naechster,
+            zugStatus = zustand.zugStatus?.copy(
+                spieler = naechster ?: zustand.zugStatus.spieler,
+            ),
+        )
+    }
+
     private fun regulaereKarte(zustand: SpielZustand) =
         requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }.also {
             require(zustand.spielabschnitt == Spielabschnitt.REGULAER) {
@@ -575,6 +743,7 @@ internal object KartenRegelwerk {
     }
 
     private fun EckGebaeudeTyp.bauteilTyp(): BauteilTyp? = when (this) {
+        // Der Hauptbahnhof ist Startmaterial und wird nicht über reguläre Bau-/Abrissbuchungen geführt.
         EckGebaeudeTyp.HAUPTBAHNHOF -> null
         EckGebaeudeTyp.BAHNHOF -> BauteilTyp.BAHNHOF
         EckGebaeudeTyp.GROSSBAHNHOF -> BauteilTyp.GROSSBAHNHOF
