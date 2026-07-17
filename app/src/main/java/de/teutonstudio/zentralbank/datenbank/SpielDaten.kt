@@ -16,7 +16,7 @@ data class SpielDaten(
     val sAbweichung: Float,
 ): SpeicherDaten {
     constructor(warenkorb: Map<Rohstoffe,Int>, spieler:List<Spieler>, inflationswerte: Triple<Float, Float, Float>) : this(
-        spielID=(-1).toLong(),
+        spielID = 0,
         spieler=spieler.joinToString("/") { it.name },
         warenkorb=warenkorb.zuSpeicherWarenkorb(),
         inflationsziel=inflationswerte.first,

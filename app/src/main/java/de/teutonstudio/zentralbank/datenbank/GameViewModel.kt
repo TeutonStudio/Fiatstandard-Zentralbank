@@ -487,7 +487,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                 val gameID = withContext(Dispatchers.IO) {
                     legacySpeicher.insertSpielSatz(daten)
                 }
-                if (gameID == (-1).toLong()) {
+                if (gameID <= 0) {
                     _spielFehler.emit("Spielstand konnte nicht angelegt werden.")
                     return@launch
                 }
@@ -541,7 +541,9 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
     private suspend fun ladeSpielDaten(id: Long) {
         if (id == -1L) {
-            val testDaten = TestSpiel.zuSpeicherDaten()
+            val testDaten = TestSpiel.zuSpeicherDaten().let { (spiel, daten) ->
+                spiel.copy(spielID = -1) to daten
+            }
             setzeAktuellesSpiel(testDaten.second.zuLegacySpiel(testDaten.first), testDaten)
             return
         }

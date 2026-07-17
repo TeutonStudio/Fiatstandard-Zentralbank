@@ -20,4 +20,22 @@ object ZentralbankMigrationen {
             )
         }
     }
+
+    val VON_2_NACH_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            listOf(
+                "ContractData",
+                "CreditData",
+                "TradeData",
+                "RoundData",
+                "ControlData",
+                "BuildData",
+                "PlayerData",
+                "GameData",
+            ).forEach { tabelle ->
+                db.execSQL("DELETE FROM `$tabelle` WHERE `spielID` = -1")
+            }
+            db.execSQL("DELETE FROM `FachSpielstand` WHERE `spielId` = -1")
+        }
+    }
 }

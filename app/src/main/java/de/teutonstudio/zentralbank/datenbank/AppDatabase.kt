@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.flowOn
         VertragsDaten::class,
         SpielstandEntitaet::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -50,7 +50,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "zentralbankspeicher"
                 )
-                    .addMigrations(ZentralbankMigrationen.VON_1_NACH_2)
+                    .addMigrations(
+                        ZentralbankMigrationen.VON_1_NACH_2,
+                        ZentralbankMigrationen.VON_2_NACH_3,
+                    )
                     .build()
             }
             emit(INSTANCE!!)

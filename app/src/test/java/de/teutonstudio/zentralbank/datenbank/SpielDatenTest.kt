@@ -6,6 +6,17 @@ import org.junit.Test
 
 class SpielDatenTest {
     @Test
+    fun neuesSpielFordertAutomatischGenerierteIdAn() {
+        val daten = SpielDaten(
+            warenkorb = emptyMap(),
+            spieler = listOf(Spieler("Anna", emptyMap())),
+            inflationswerte = Triple(2f, 1f, 3f),
+        )
+
+        assertEquals(0L, daten.spielID)
+    }
+
+    @Test
     fun warenkorbWirdStabilUndOhneNullmengenGespeichert() {
         val warenkorb = mapOf(
             Rohstoffe.HOLZ to 3,
