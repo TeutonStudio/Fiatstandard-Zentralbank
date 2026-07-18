@@ -59,6 +59,7 @@ import kotlin.math.sqrt
 import kotlin.math.sin
 
 private const val BRETT_DICKE = 0.12f
+private const val WASSER_GRUND_NIVEAU = -0.012f
 internal const val OBERFLAECHEN_ABSTAND = 0.004f
 private const val WASSER_MINDEST_SICHTWEITE = 10_000f
 private const val BRETT_RAND = 0.35f
@@ -252,6 +253,15 @@ fun Spielbrett3D(
             null
         }
     }
+    val gebirgsPrismaMesh = remember(geometrie, modell.auflagen) {
+        erstelleGebirgsPrismaMesh(geometrie, modell.auflagen)
+    }
+    val gebirgsTyp = remember(modell.auflagen) {
+        modell.auflagen.firstOrNull { auflage ->
+            auflage.ebene == AuflagenEbene.LAND &&
+                auflage.typ.relief == DreieckRelief.GEBIRGE
+        }?.typ
+    }
     val verwendeteObjektTypen = (
         modell.eckObjekte.map(EckObjektAuflage::typ) +
             modell.kantenObjekte.map(KantenObjektAuflage::typ) +
@@ -398,7 +408,7 @@ fun Spielbrett3D(
                 materialInstance = wasserMaterial,
                 position = Position(
                     x = transformation.fokusX,
-                    y = -BRETT_DICKE / 2f,
+                    y = WASSER_GRUND_NIVEAU - BRETT_DICKE / 2f,
                     z = transformation.fokusZ,
                 ),
             )
@@ -434,6 +444,15 @@ fun Spielbrett3D(
                 AbgeschraegtesGelaendeNode(
                     meshDaten = meshDaten,
                     materialInstance = auflagenMaterialien.getValue(typ),
+                )
+            }
+        }
+
+        if (gebirgsPrismaMesh != null && gebirgsTyp != null) {
+            key("gebirgs-prismen") {
+                AbgeschraegtesGelaendeNode(
+                    meshDaten = gebirgsPrismaMesh,
+                    materialInstance = auflagenMaterialien.getValue(gebirgsTyp),
                 )
             }
         }

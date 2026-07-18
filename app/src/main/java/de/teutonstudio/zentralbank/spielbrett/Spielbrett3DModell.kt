@@ -66,12 +66,18 @@ data class DreieckTyp(
     val farbe: Color,
     val metallisch: Float = 0.05f,
     val rauheit: Float = 0.62f,
+    val relief: DreieckRelief = DreieckRelief.FLACH,
 ) {
     init {
         require(name.isNotBlank()) { "Der Name eines DreieckTyps darf nicht leer sein." }
         require(metallisch in 0f..1f) { "metallisch muss zwischen 0 und 1 liegen." }
         require(rauheit in 0f..1f) { "rauheit muss zwischen 0 und 1 liegen." }
     }
+}
+
+enum class DreieckRelief {
+    FLACH,
+    GEBIRGE,
 }
 
 /** Ein typisiertes Dreieck, das auf einem Grunddreieck des Bretts liegt. */

@@ -26,6 +26,7 @@ private val GelaendeDarstellung = mapOf(
         Color(0xFF757575),
         metallisch = 0.12f,
         rauheit = 0.78f,
+        relief = DreieckRelief.GEBIRGE,
     ),
     GelaendeTyp.WUESTE to DreieckTyp("Wüste", Color(0xFFD8B56A), rauheit = 0.96f),
     GelaendeTyp.SUMPF to DreieckTyp("Sumpf", Color(0xFF607D3B), rauheit = 0.72f),

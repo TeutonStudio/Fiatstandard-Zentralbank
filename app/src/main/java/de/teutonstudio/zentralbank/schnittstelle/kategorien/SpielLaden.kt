@@ -58,7 +58,10 @@ fun SpielLaden(
                     ) } else { CardDefaults.cardColors() }
                     ) {
                     Column(modifier = ModiPad5, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Spielnummer: ${daten.id}",fontSize=25.sp)
+                        Text(
+                            text = if (daten.id == -1L) "Testspiel" else "Spielnummer: ${daten.id}",
+                            fontSize = 25.sp,
+                        )
                         Text(text = "Die Siedler: ${daten.spielerNamen.joinToString(", ")}")
                         Text(text = "Siedeln seit: ${daten.runde} Runden")
                     }

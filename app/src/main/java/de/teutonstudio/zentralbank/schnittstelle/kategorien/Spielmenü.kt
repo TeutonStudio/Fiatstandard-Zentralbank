@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -55,6 +56,7 @@ fun Spielmenü(
     zugZeitText: String?,
     beiBereich: (SpielmenueBereich) -> Unit,
     beiZugBeenden: () -> Unit,
+    beiSpielBeenden: () -> Unit,
     modifier: Modifier = Modifier,
     kartenInhalt: @Composable BoxScope.() -> Unit,
 ) {
@@ -141,7 +143,7 @@ fun Spielmenü(
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
         ) {
             Column(
-                modifier = Modifier.padding(7.dp),
+                modifier = Modifier.padding(7.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 SpielmenueBereich.entries.forEach { bereich ->
@@ -165,6 +167,12 @@ fun Spielmenü(
                 ) {
                     Text("Zug beenden")
                 }
+                OutlinedButton(
+                    onClick = beiSpielBeenden,
+                    modifier = Modifier.widthIn(min = 110.dp),
+                ) {
+                    Text("Spielstand beenden")
+                }
                 Text(
                     text = zugText,
                     modifier = Modifier.widthIn(max = 110.dp),
@@ -176,6 +184,11 @@ fun Spielmenü(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
+                Text(
+                    text = "Änderungen werden laufend gespeichert.",
+                    modifier = Modifier.widthIn(max = 110.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
     }

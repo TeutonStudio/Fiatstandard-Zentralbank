@@ -168,6 +168,13 @@ fun Navigation(viewModel: GameViewModel) {
                         zugZeitText = zugZeitText,
                         beiBereich = { bereich -> geoeffneterBereich = bereich },
                         beiZugBeenden = viewModel::beendeZug,
+                        beiSpielBeenden = {
+                            viewModel.spielstandBeenden()
+                            navController.navigate(Screen.StartScreen.route) {
+                                popUpTo(Screen.StartScreen.route) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        },
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         KartenSpielBildschirm(

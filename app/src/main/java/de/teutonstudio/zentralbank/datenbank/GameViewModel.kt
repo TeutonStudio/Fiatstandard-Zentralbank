@@ -69,7 +69,12 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     private val letzteAblageAenderung = mutableMapOf<Long, Long>()
 
     private val _spielDatenListe = MutableStateFlow<Map<SpielDaten,List<SpeicherDaten>>>(emptyMap())
-    private val _spielstaende = MutableStateFlow<List<SpielstandUebersicht>>(emptyList())
+    private val testSpielstandUebersicht = SpielstandUebersicht(
+        id = -1,
+        spielerNamen = TestSpiel.spielerStringListe,
+        runde = TestSpiel.aktuelleRunde - 1,
+    )
+    private val _spielstaende = MutableStateFlow(listOf(testSpielstandUebersicht))
     private val _spielZustand = MutableStateFlow<SpielZustand?>(null)
     private val _spielUebersicht = MutableStateFlow<SpielUebersichtZustand?>(null)
     private val _rundenwechselAnzeige = MutableStateFlow<SpielZustand?>(null)
@@ -120,6 +125,12 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     fun meldeSpielFehler(meldung: String) {
         _spielFehler.tryEmit(meldung)
+    }
+
+    fun spielstandBeenden() {
+        // Fachereignisse werden bereits nach jeder Änderung gespeichert. Beim Verlassen wird der
+        // aktuelle Verlauf nochmals eingeplant, damit auch die letzte UI-Aktion sicher erfasst ist.
+        speichereAktuellenFachSpielstand()
     }
 
     fun baueMitAuslandseinkauf(
@@ -735,11 +746,8 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
                     }
                 }
                 spielAblage.spielstaendeBeobachten().collect { spielstaende ->
-                    _spielstaende.value = spielstaende + SpielstandUebersicht(
-                        id = -1,
-                        spielerNamen = TestSpiel.spielerStringListe,
-                        runde = TestSpiel.aktuelleRunde - 1,
-                    )
+                    _spielstaende.value = listOf(testSpielstandUebersicht) +
+                        spielstaende.filterNot { spielstand -> spielstand.id == -1L }
                 }
             } catch (throwable: Throwable) {
                 if (!datenbankBereit.isCompleted) { datenbankBereit.completeExceptionally(throwable) }
