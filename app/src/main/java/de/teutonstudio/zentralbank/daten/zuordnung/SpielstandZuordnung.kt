@@ -39,7 +39,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private const val AKTUELLE_FORMAT_VERSION = 1
+private const val AKTUELLE_FORMAT_VERSION = 2
 private const val AUSLAND_KENNUNG = "-ausland-"
 
 private val spielstandJson = Json {
@@ -59,7 +59,12 @@ fun GespeichertesSpiel.zuEntitaet(): SpielstandEntitaet = SpielstandEntitaet(
 
 fun SpielstandEntitaet.zuGespeichertemSpiel(): GespeichertesSpiel {
     require(formatVersion == AKTUELLE_FORMAT_VERSION) {
-        "Spielstand $spielId verwendet die nicht unterstützte Formatversion $formatVersion."
+        if (formatVersion == 1) {
+            "Spielstand $spielId verwendet das alte Zugformat 1. " +
+                "Es enthält keine nachweisbaren Prozug-Buchungen und kann deshalb nicht sicher geladen werden."
+        } else {
+            "Spielstand $spielId verwendet die nicht unterstützte Formatversion $formatVersion."
+        }
     }
     val startzustand = spielstandJson.decodeFromString(SpielZustand.serializer(), startzustandJson)
     return GespeichertesSpiel(

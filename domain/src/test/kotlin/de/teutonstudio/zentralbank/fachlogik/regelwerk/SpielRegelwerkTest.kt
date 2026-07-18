@@ -1,573 +1,325 @@
 package de.teutonstudio.zentralbank.fachlogik.regelwerk
 
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.Geld
-import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
-import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
-import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
-import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.auswertung.FinanzAuswertung
+import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
-import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
-import de.teutonstudio.zentralbank.fachlogik.ereignis.TransaktionsGrund
-import de.teutonstudio.zentralbank.fachlogik.auswertung.FinanzAuswertung
-import de.teutonstudio.zentralbank.fachlogik.modell.Phase
-import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
+import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
+import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.ProzugStatus
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
+import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpielRegelwerkTest {
-    private val annaId = SpielerId("Anna")
-    private val berndId = SpielerId("Bernd")
-    private val anleiheId = AnleiheId("anna-1")
-
-    private fun startState(): SpielZustand = SpielZustand(
-        spieler = listOf(
-            Spieler(
-                id = annaId,
-                name = "Anna",
-                rohstoffe = mapOf(Rohstoff.HOLZ to 2, Rohstoff.STAHL to 1),
-                geldkonto = Geld.mark(10),
-                anleihen = listOf(anleiheId),
-            ),
-            Spieler(
-                id = berndId,
-                name = "Bernd",
-                rohstoffe = emptyMap(),
-                geldkonto = Geld.mark(5),
-            ),
-        ),
-        bankkonto = Geld.mark(100),
-        anleihen = mapOf(
-            anleiheId to Anleihe(
-                id = anleiheId,
-                emittent = annaId,
-                nennwert = Geld.mark(8),
-                zinsBasispunkte = 500,
-                laufzeitRunden = 4,
-            ),
-        ),
-        zugStatus = null,
-    )
+    private val anna = SpielerId("anna")
+    private val bert = SpielerId("bert")
+    private val feld = KartenFeld(2, 2, DreieckHaelfte.UNTEN)
+    private val kante = feld.kanten().first()
 
     @Test
-    fun warenkorbAenderungErsetztZusammensetzungUndEntferntNullmengen() {
-        val state = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.WarenkorbGeaendert(
-                mapOf(
-                    Rohstoff.HOLZ to 4,
-                    Rohstoff.STAHL to 0,
-                )
-            ),
-        ).getOrThrow()
-
-        assertEquals(mapOf(Rohstoff.HOLZ to 4), state.warenkorb)
-    }
-
-    @Test
-    fun warenkorbAenderungLehntNegativeMengenAb() {
-        val result = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.WarenkorbGeaendert(mapOf(Rohstoff.HOLZ to -1)),
+    fun prozugBuchtAbbauGenauEinmal() {
+        val start = zustand(
+            karte = karte(FeldAnlage.Abbaueinheit(Rohstoff.NAHRUNG)),
         )
 
-        assertTrue(result.isFailure)
+        val begonnen = anwenden(start, SpielEreignis.ProzugBegonnen(1L))
+        val doppelt = SpielRegelwerk.wendeAn(begonnen, SpielEreignis.ProzugBegonnen(1L))
+
+        assertEquals(2, begonnen.spieler.first().rohstoffe[Rohstoff.NAHRUNG])
+        assertTrue(doppelt.isFailure)
+        assertEquals(2, begonnen.spieler.first().rohstoffe[Rohstoff.NAHRUNG])
     }
 
     @Test
-    fun rohstoffEinnahmeErhoehtBestand() {
-        val state = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.RohstoffEinnahme(annaId, mapOf(Rohstoff.HOLZ to 3)),
-        ).getOrThrow()
+    fun verarbeitungBuchtEinsatzUndAlleProdukteAtomar() {
+        val start = zustand(
+            annaRohstoffe = mapOf(Rohstoff.ROHOEL to 4),
+            karte = karte(FeldAnlage.Wirtschaftsregion(BauteilTyp.RAFFINERIE)),
+        )
+        val begonnen = anwenden(start, SpielEreignis.ProzugBegonnen(1L))
 
-        assertEquals(5, state.spieler.first { it.id == annaId }.rohstoffe[Rohstoff.HOLZ])
+        val verarbeitet = anwenden(
+            begonnen,
+            SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 2),
+        )
+        val annaDanach = verarbeitet.spieler.first()
+
+        assertEquals(null, annaDanach.rohstoffe[Rohstoff.ROHOEL])
+        assertEquals(4, annaDanach.rohstoffe[Rohstoff.DIESEL])
+        assertEquals(2, annaDanach.rohstoffe[Rohstoff.SCHWEROEL])
+        assertEquals(
+            begonnen,
+            SpielRegelwerk.wendeAn(
+                begonnen,
+                SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 3),
+            ).getOrNull() ?: begonnen,
+        )
     }
 
     @Test
-    fun rohstoffAusgabeLehntNegativenBestandAb() {
-        val result = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.RohstoffAusgabe(berndId, mapOf(Rohstoff.HOLZ to 1)),
+    fun fehlenderEinsatzLaesstZustandUnveraendert() {
+        val begonnen = anwenden(
+            zustand(
+                annaRohstoffe = mapOf(Rohstoff.ROHOEL to 1),
+                karte = karte(FeldAnlage.Wirtschaftsregion(BauteilTyp.RAFFINERIE)),
+            ),
+            SpielEreignis.ProzugBegonnen(1L),
         )
 
-        assertTrue(result.isFailure)
-    }
-
-    @Test
-    fun transaktionIstSummenneutral() {
-        val start = startState()
-        val state = SpielRegelwerk.wendeAn(
-            start,
-            SpielEreignis.Transaktion(
-                von = KontoId.Spieler(annaId),
-                an = KontoId.Spieler(berndId),
-                betrag = Geld.mark(3),
-                grund = TransaktionsGrund.SONSTIGES,
-            ),
-        ).getOrThrow()
-
-        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
-        assertEquals(Geld.mark(7), state.spieler.first { it.id == annaId }.geldkonto)
-        assertEquals(Geld.mark(8), state.spieler.first { it.id == berndId }.geldkonto)
-    }
-
-    @Test
-    fun transaktionLehntUnterdeckungAb() {
-        val result = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.Transaktion(
-                von = KontoId.Spieler(berndId),
-                an = KontoId.Bank,
-                betrag = Geld.mark(6),
-                grund = TransaktionsGrund.SONSTIGES,
-            ),
+        val ergebnis = SpielRegelwerk.wendeAn(
+            begonnen,
+            SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 1),
         )
 
-        assertTrue(result.isFailure)
+        assertTrue(ergebnis.isFailure)
+        assertEquals(mapOf(Rohstoff.ROHOEL to 1), begonnen.spieler.first().rohstoffe)
     }
 
     @Test
-    fun rohstoffHandelVerschiebtRohstoffUndGeldSummenneutral() {
-        val start = startState()
-        val state = SpielRegelwerk.wendeAn(
-            start,
-            SpielEreignis.RohstoffHandel(
-                kaeufer = berndId,
-                verkaeufer = annaId,
-                rohstoff = Rohstoff.HOLZ,
-                menge = 1,
-                preis = Geld.mark(2),
+    fun verwaltungsstandortMussMitVollstaendigemRezeptVersorgtWerden() {
+        val begonnen = anwenden(
+            zustand(
+                annaRohstoffe = mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.KOHLE to 1),
+                karte = karte(FeldAnlage.Geschaeftsbank),
             ),
-        ).getOrThrow()
+            SpielEreignis.ProzugBegonnen(1L),
+        )
+        val ecke = feld.ecken().last()
 
-        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
-        assertEquals(1, state.spieler.first { it.id == annaId }.rohstoffe[Rohstoff.HOLZ])
-        assertEquals(1, state.spieler.first { it.id == berndId }.rohstoffe[Rohstoff.HOLZ])
-        assertEquals(Geld.mark(12), state.spieler.first { it.id == annaId }.geldkonto)
-        assertEquals(Geld.mark(3), state.spieler.first { it.id == berndId }.geldkonto)
+        val versorgt = anwenden(
+            begonnen,
+            SpielEreignis.VerwaltungsstandortVersorgt(1L, ecke),
+        )
+
+        assertTrue(versorgt.spieler.first().rohstoffe.isEmpty())
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                versorgt,
+                SpielEreignis.VerwaltungsstandortVersorgt(1L, ecke),
+            ).isFailure,
+        )
     }
 
     @Test
-    fun anleiheVerkauftVerschiebtAnleiheUndGeldSummenneutral() {
-        val start = startState()
-        val state = SpielRegelwerk.wendeAn(
-            start,
-            SpielEreignis.AnleiheVerkauft(
-                anleihe = anleiheId,
-                verkaeufer = annaId,
-                kaeufer = KontoId.Spieler(berndId),
-                preis = Geld.mark(4),
+    fun faelligeZahlungHatFestgeschriebenenEmpfaengerUndIstSummenneutral() {
+        val anleiheId = AnleiheId("a-1")
+        val start = zustand(
+            annaGeld = Geld.mark(10),
+            bertGeld = Geld.mark(2),
+        ).copy(
+            rundenzähler = 1,
+            anleihen = mapOf(
+                anleiheId to Anleihe(
+                    id = anleiheId,
+                    emittent = anna,
+                    nennwert = Geld.mark(20),
+                    zinsBasispunkte = 500,
+                    laufzeitRunden = 3,
+                    zinsbetrag = Geld.mark(1),
+                    emissionsRunde = 0,
+                ),
             ),
-        ).getOrThrow()
-
-        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
-        assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
-        assertTrue(anleiheId in state.spieler.first { it.id == berndId }.anleihen)
-        assertEquals(Geld.mark(14), state.spieler.first { it.id == annaId }.geldkonto)
-        assertEquals(Geld.mark(1), state.spieler.first { it.id == berndId }.geldkonto)
-    }
-
-    @Test
-    fun anleiheFaelligZahltNennwertUndEntferntAnleihe() {
-        val start = startState().copy(
-            spieler = startState().spieler.map { spieler ->
-                when (spieler.id) {
-                    annaId -> spieler.copy(anleihen = emptyList())
-                    berndId -> spieler.copy(anleihen = listOf(anleiheId))
-                    else -> spieler
-                }
+            spieler = zustand(Geld.mark(10), Geld.mark(2)).spieler.map { spieler ->
+                if (spieler.id == bert) spieler.copy(anleihen = listOf(anleiheId)) else spieler
             },
         )
-        val state = SpielRegelwerk.wendeAn(
-            start,
-            SpielEreignis.AnleiheFaellig(anleiheId),
-        ).getOrThrow()
+        val begonnen = anwenden(start, SpielEreignis.ProzugBegonnen(1L))
+        val verbindlichkeit = begonnen.zugStatus!!.prozug.verbindlichkeiten.single()
 
-        assertTrue(anleiheId !in state.spieler.first { it.id == annaId }.anleihen)
-        assertTrue(anleiheId !in state.spieler.first { it.id == berndId }.anleihen)
-        assertEquals(FinanzAuswertung.geldsumme(start), FinanzAuswertung.geldsumme(state))
-        assertEquals(Geld.mark(2), state.spieler.first { it.id == annaId }.geldkonto)
-        assertEquals(Geld.mark(13), state.spieler.first { it.id == berndId }.geldkonto)
-        assertEquals(0, state.anleihen.values.count { it.id == anleiheId })
-    }
-
-    @Test
-    fun expansionVerbrauchtRohstoffeUndErhoehtBauteilbestand() {
-        val state = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.Expansion(
-                spieler = annaId,
-                bauteil = BauteilTyp.EISENBAHNLINIE,
-            ),
-        ).getOrThrow()
-
-        val anna = state.spieler.first { it.id == annaId }
-        assertEquals(1, anna.rohstoffe[Rohstoff.HOLZ])
-        assertEquals(null, anna.rohstoffe[Rohstoff.STAHL])
-        assertEquals(1, anna.bauteile[BauteilTyp.EISENBAHNLINIE])
-    }
-
-    @Test
-    fun kriegErklaertUndBeendetKonflikt() {
-        val imKrieg = SpielRegelwerk.wendeAn(
-            startState(),
-            SpielEreignis.KriegErklaert(
-                aggressor = annaId,
-                verteidiger = berndId,
-            ),
-        ).getOrThrow()
-
-        assertEquals(1, imKrieg.konflikte.size)
-
-        val frieden = SpielRegelwerk.wendeAn(
-            imKrieg,
-            SpielEreignis.KriegBeendet(
-                spielerA = berndId,
-                spielerB = annaId,
-            ),
-        ).getOrThrow()
-
-        assertEquals(0, frieden.konflikte.size)
-    }
-
-    @Test
-    fun schuldenstrichBautAbZahltSpieleranleihenFrischAusUndUeberspringtAktionen() {
-        val bankAnleihe = AnleiheId("anna-bank")
-        val spielerAnleihe = AnleiheId("anna-player")
-        val start = SpielZustand(
-            spieler = listOf(
-                Spieler(
-                    id = annaId,
-                    name = "Anna",
-                    geldkonto = Geld.mark(1),
-                    bauteile = mapOf(
-                        BauteilTyp.BAHNHOF to 2,
-                        BauteilTyp.HAFEN to 1,
-                        BauteilTyp.GROSSBAHNHOF to 1,
-                        BauteilTyp.GROSSHAFEN to 1,
-                        BauteilTyp.EISENBAHNLINIE to 5,
-                    ),
-                ),
-                Spieler(
-                    id = berndId,
-                    name = "Bernd",
-                    geldkonto = Geld.mark(5),
-                    anleihen = listOf(spielerAnleihe),
-                ),
-            ),
-            bankAnleihen = listOf(bankAnleihe),
-            anleihen = mapOf(
-                bankAnleihe to Anleihe(
-                    id = bankAnleihe,
-                    emittent = annaId,
-                    nennwert = Geld.mark(7),
-                    zinsBasispunkte = 500,
-                    laufzeitRunden = 4,
-                ),
-                spielerAnleihe to Anleihe(
-                    id = spielerAnleihe,
-                    emittent = annaId,
-                    nennwert = Geld.mark(8),
-                    zinsBasispunkte = 500,
-                    laufzeitRunden = 4,
-                ),
-            ),
-            aktiverSpieler = annaId,
-            zugStatus = ZugStatus(
-                spieler = annaId,
-                phase = Phase.Ausgaben,
-                erledigteSchritte = setOf(SchrittTyp.ROHSTOFF_AUSGABEN),
-            ),
+        val bezahlt = anwenden(
+            begonnen,
+            SpielEreignis.VerbindlichkeitBeglichen(1L, verbindlichkeit.id),
         )
 
-        val state = SpielRegelwerk.wendeAn(
-            start,
-            SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 3),
-        ).getOrThrow()
-
-        val anna = state.spieler.first { it.id == annaId }
-        val bernd = state.spieler.first { it.id == berndId }
-        assertEquals(null, anna.bauteile[BauteilTyp.GROSSBAHNHOF])
-        assertEquals(null, anna.bauteile[BauteilTyp.GROSSHAFEN])
-        assertEquals(1, anna.bauteile[BauteilTyp.BAHNHOF])
-        assertEquals(1, anna.bauteile[BauteilTyp.HAFEN])
-        assertEquals(2, anna.bauteile[BauteilTyp.EISENBAHNLINIE])
-        assertEquals(Geld.mark(13), bernd.geldkonto)
-        assertTrue(state.bankAnleihen.isEmpty())
-        assertTrue(state.anleihen.isEmpty())
-        assertTrue(state.spieler.all { it.anleihen.isEmpty() })
-        assertEquals(1, state.schuldenstriche.size)
-        assertEquals(Geld.mark(8), state.schuldenstriche.single().ausgezahlterBetrag)
-        assertEquals(berndId, state.aktiverSpieler)
-        assertEquals(Phase.Einnahmen, state.zugStatus?.phase)
+        assertEquals(FinanzAuswertung.geldsumme(begonnen), FinanzAuswertung.geldsumme(bezahlt))
+        assertEquals(Geld.mark(9), bezahlt.spieler.first { it.id == anna }.geldkonto)
+        assertEquals(Geld.mark(3), bezahlt.spieler.first { it.id == bert }.geldkonto)
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                bezahlt,
+                SpielEreignis.VerbindlichkeitBeglichen(1L, verbindlichkeit.id),
+            ).isFailure,
+        )
     }
 
     @Test
-    fun schuldenstrichImKriegWirdAbgelehnt() {
-        val result = SpielRegelwerk.wendeAn(
-            startState().copy(
-                bankAnleihen = listOf(anleiheId),
-                konflikte = setOf(Konflikt(annaId, berndId)),
-                aktiverSpieler = annaId,
-                zugStatus = ZugStatus(
-                    spieler = annaId,
-                    phase = Phase.Ausgaben,
-                    erledigteSchritte = setOf(SchrittTyp.ROHSTOFF_AUSGABEN),
-                ),
+    fun prozugMitOffenemPostenKannNichtAbgeschlossenWerden() {
+        val begonnen = anwenden(
+            zustand(
+                annaRohstoffe = mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.KOHLE to 1),
+                karte = karte(FeldAnlage.Geschaeftsbank),
             ),
-            SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 0),
+            SpielEreignis.ProzugBegonnen(1L),
         )
 
-        assertTrue(result.isFailure)
+        val gesperrt = SpielRegelwerk.wendeAn(
+            begonnen,
+            SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
+        )
+        val versorgt = anwenden(
+            begonnen,
+            SpielEreignis.VerwaltungsstandortVersorgt(1L, feld.ecken().last()),
+        )
+        val epizug = anwenden(
+            versorgt,
+            SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
+        )
+
+        assertTrue(gesperrt.isFailure)
+        assertEquals(ZugPhase.Epizug, epizug.zugStatus?.phase)
+        assertEquals(anna, epizug.aktiverSpieler)
     }
 
     @Test
-    fun zugendeZaehltFriedlicheUeberschuldungUndMarkiertWarnungUndFaelligkeit() {
-        var state = ueberschuldeterAnnaZug()
+    fun handelIstImProzugErlaubtAberBauUndKriegSindGesperrt() {
+        val begonnen = anwenden(
+            zustand(
+                annaGeld = Geld.mark(5),
+                bertRohstoffe = mapOf(Rohstoff.HOLZ to 1),
+            ),
+            SpielEreignis.ProzugBegonnen(1L),
+        )
 
-        repeat(3) {
-            state = annaZugBeenden(state)
-        }
-
-        val warnung = state.ueberschuldungen.single()
-        assertEquals(3, warnung.friedlicheUeberschuldeteZuege)
-        assertEquals(Geld.mark(110), warnung.schuldensumme)
-        assertEquals(Geld.mark(7), warnung.marktwert)
-        assertTrue(warnung.warnungAktiv)
-        assertFalse(warnung.schuldenstrichFaellig)
-
-        state = annaZugBeenden(state)
-
-        val faellig = state.ueberschuldungen.single()
-        assertEquals(4, faellig.friedlicheUeberschuldeteZuege)
-        assertTrue(faellig.warnungAktiv)
-        assertTrue(faellig.schuldenstrichFaellig)
-        assertEquals(annaId, state.aktiverSpieler)
-        assertEquals(Phase.Aktionen, state.zugStatus?.phase)
-    }
-
-    @Test
-    fun faelligerAutomatischerSchuldenstrichBlockiertBisZurBahnwegEingabe() {
-        val faellig = (1..4).fold(ueberschuldeterAnnaZug()) { state, _ ->
-            annaZugBeenden(state)
-        }
-
-        val handel = SpielRegelwerk.wendeAn(
-            faellig,
+        val gehandelt = anwenden(
+            begonnen,
             SpielEreignis.RohstoffHandel(
-                kaeufer = annaId,
-                verkaeufer = berndId,
+                kaeufer = anna,
+                verkaeufer = bert,
                 rohstoff = Rohstoff.HOLZ,
                 menge = 1,
                 preis = Geld.mark(1),
             ),
         )
 
-        assertTrue(handel.isFailure)
-
-        val nachSchuldenstrich = SpielRegelwerk.wendeAn(
-            faellig,
-            SpielEreignis.Schuldenstrich(annaId, entfernteBahnwege = 1),
-        ).getOrThrow()
-
-        val anna = nachSchuldenstrich.spieler.first { it.id == annaId }
-        assertTrue(nachSchuldenstrich.ueberschuldungen.isEmpty())
-        assertTrue(nachSchuldenstrich.bankAnleihen.isEmpty())
-        assertTrue(nachSchuldenstrich.anleihen.isEmpty())
-        assertEquals(null, anna.bauteile[BauteilTyp.EISENBAHNLINIE])
-        assertEquals(berndId, nachSchuldenstrich.aktiverSpieler)
-        assertEquals(Phase.Einnahmen, nachSchuldenstrich.zugStatus?.phase)
-    }
-
-    @Test
-    fun ueberschuldungZaehltNurBankgehalteneAnleihen() {
-        val anleihe = AnleiheId("spieler-anleihe")
-        val state = SpielZustand(
-            spieler = listOf(
-                Spieler(
-                    id = annaId,
-                    name = "Anna",
-                    bauteile = mapOf(
-                        BauteilTyp.BAHNHOF to 1,
-                        BauteilTyp.EISENBAHNLINIE to 1,
-                    ),
-                ),
-                Spieler(
-                    id = berndId,
-                    name = "Bernd",
-                    anleihen = listOf(anleihe),
-                ),
-            ),
-            anleihen = mapOf(
-                anleihe to Anleihe(
-                    id = anleihe,
-                    emittent = annaId,
-                    nennwert = Geld.mark(100),
-                    zinsBasispunkte = 1_000,
-                    laufzeitRunden = 1,
-                ),
-            ),
-            marktpreise = mapOf(
-                Rohstoff.HOLZ to Geld.mark(1),
-                Rohstoff.ZIEGEL to Geld.mark(1),
-                Rohstoff.STAHL to Geld.mark(1),
-            ),
-            aktiverSpieler = annaId,
-            zugStatus = ZugStatus(annaId, Phase.Aktionen),
+        assertEquals(1, gehandelt.spieler.first { it.id == anna }.rohstoffe[Rohstoff.HOLZ])
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                begonnen,
+                SpielEreignis.Expansion(anna, BauteilTyp.EISENBAHNLINIE),
+            ).isFailure,
         )
-
-        val nachZugende = SpielRegelwerk.wendeAn(state, SpielEreignis.ZugBeendet).getOrThrow()
-
-        assertTrue(nachZugende.ueberschuldungen.isEmpty())
-    }
-
-    @Test
-    fun kriegUnterbrichtFriedlicheUeberschuldungsserie() {
-        val einmalUeberschuldet = annaZugBeenden(ueberschuldeterAnnaZug())
-        val imKrieg = einmalUeberschuldet.copy(
-            konflikte = setOf(Konflikt(annaId, berndId)),
-        )
-
-        val nachZugende = annaZugBeenden(imKrieg)
-
-        assertTrue(nachZugende.ueberschuldungen.isEmpty())
-    }
-
-    @Test
-    fun schrittPhaseUndZugendeWechselnAktivenSpieler() {
-        val nachSchritt = SpielRegelwerk.wendeAn(
-            startState().copy(
-                aktiverSpieler = annaId,
-                zugStatus = ZugStatus(annaId, Phase.Einnahmen),
-            ),
-            SpielEreignis.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_EINNAHMEN),
-        ).getOrThrow()
-
-        val ausgaben = SpielRegelwerk.wendeAn(
-            nachSchritt,
-            SpielEreignis.PhaseAbgeschlossen(Phase.Einnahmen),
-        ).getOrThrow()
-
-        val ausgabenFertig = listOf(
-            SpielEreignis.SchrittAbgeschlossen(SchrittTyp.ROHSTOFF_AUSGABEN),
-            SpielEreignis.SchrittAbgeschlossen(SchrittTyp.FINANZ_AUSGABEN),
-        ).fold(ausgaben) { state, event -> SpielRegelwerk.wendeAn(state, event).getOrThrow() }
-
-        val aktionen = SpielRegelwerk.wendeAn(
-            ausgabenFertig,
-            SpielEreignis.PhaseAbgeschlossen(Phase.Ausgaben),
-        ).getOrThrow()
-
-        val naechsterSpieler = SpielRegelwerk.wendeAn(aktionen, SpielEreignis.ZugBeendet).getOrThrow()
-
-        assertEquals(berndId, naechsterSpieler.aktiverSpieler)
-        assertEquals(Phase.Einnahmen, naechsterSpieler.zugStatus?.phase)
-    }
-
-    @Test
-    fun neueRundeBeginntErstNachdemJederSpielerEinmalAmZugWar() {
-        val claraId = SpielerId("Clara")
-        var state = SpielZustand(
-            spieler = listOf(
-                Spieler(annaId, "Anna"),
-                Spieler(berndId, "Bernd"),
-                Spieler(claraId, "Clara"),
-            ),
-            rundenzähler = 2,
-            aktiverSpieler = annaId,
-            zugStatus = ZugStatus(annaId, Phase.Aktionen),
-        )
-
-        state = SpielRegelwerk.wendeAn(state, SpielEreignis.ZugBeendet).getOrThrow()
-        assertEquals(berndId, state.aktiverSpieler)
-        assertEquals(2, state.rundenzähler)
-
-        state = SpielRegelwerk.wendeAn(
-            state.copy(zugStatus = ZugStatus(berndId, Phase.Aktionen)),
-            SpielEreignis.ZugBeendet,
-        ).getOrThrow()
-        assertEquals(claraId, state.aktiverSpieler)
-        assertEquals(2, state.rundenzähler)
-
-        state = SpielRegelwerk.wendeAn(
-            state.copy(zugStatus = ZugStatus(claraId, Phase.Aktionen)),
-            SpielEreignis.ZugBeendet,
-        ).getOrThrow()
-        assertEquals(annaId, state.aktiverSpieler)
-        assertEquals(3, state.rundenzähler)
-        assertEquals(Phase.Einnahmen, state.zugStatus?.phase)
-    }
-
-    @Test
-    fun phasenfremderSchrittWirdAbgelehnt() {
-        val result = SpielRegelwerk.wendeAn(
-            startState().copy(
-                aktiverSpieler = annaId,
-                zugStatus = ZugStatus(annaId, Phase.Einnahmen),
-            ),
-            SpielEreignis.RohstoffHandel(
-                kaeufer = annaId,
-                verkaeufer = berndId,
-                rohstoff = Rohstoff.HOLZ,
-                menge = 1,
-                preis = Geld.mark(1),
-            ),
-        )
-
-        assertTrue(result.isFailure)
-    }
-
-    private fun ueberschuldeterAnnaZug(): SpielZustand {
-        val anleihe = AnleiheId("bank-anleihe")
-        return SpielZustand(
-            spieler = listOf(
-                Spieler(
-                    id = annaId,
-                    name = "Anna",
-                    bauteile = mapOf(
-                        BauteilTyp.BAHNHOF to 1,
-                        BauteilTyp.EISENBAHNLINIE to 1,
-                    ),
-                ),
-                Spieler(
-                    id = berndId,
-                    name = "Bernd",
-                ),
-            ),
-            bankAnleihen = listOf(anleihe),
-            anleihen = mapOf(
-                anleihe to Anleihe(
-                    id = anleihe,
-                    emittent = annaId,
-                    nennwert = Geld.mark(100),
-                    zinsBasispunkte = 1_000,
-                    laufzeitRunden = 1,
-                ),
-            ),
-            marktpreise = mapOf(
-                Rohstoff.HOLZ to Geld.mark(1),
-                Rohstoff.ZIEGEL to Geld.mark(1),
-                Rohstoff.STAHL to Geld.mark(1),
-            ),
-            aktiverSpieler = annaId,
-            zugStatus = ZugStatus(annaId, Phase.Aktionen),
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                begonnen,
+                SpielEreignis.KriegErklaert(anna, bert),
+            ).isFailure,
         )
     }
 
-    private fun annaZugBeenden(state: SpielZustand): SpielZustand {
-        return SpielRegelwerk.wendeAn(
-            state.copy(
-                aktiverSpieler = annaId,
-                zugStatus = ZugStatus(annaId, Phase.Aktionen),
-            ),
-            SpielEreignis.ZugBeendet,
-        ).getOrThrow()
+    @Test
+    fun kriegserklaerungUndFriedenFunktionierenImEpizug() {
+        val begonnen = anwenden(zustand(), SpielEreignis.ProzugBegonnen(1L))
+        val epizug = anwenden(
+            begonnen,
+            SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
+        )
+
+        val imKrieg = anwenden(epizug, SpielEreignis.KriegErklaert(anna, bert))
+        val imFrieden = anwenden(imKrieg, SpielEreignis.KriegBeendet(anna, bert))
+
+        assertTrue(imKrieg.konflikte.single().betrifft(anna, bert))
+        assertTrue(imFrieden.konflikte.isEmpty())
     }
+
+    @Test
+    fun bankEmissionSchoepftGeldUndErzeugtKeineSofortigeFaelligkeit() {
+        val begonnen = anwenden(zustand(), SpielEreignis.ProzugBegonnen(1L))
+        val anleihe = Anleihe(
+            id = AnleiheId("neu"),
+            emittent = anna,
+            nennwert = Geld.mark(10),
+            zinsBasispunkte = 500,
+            laufzeitRunden = 2,
+            emissionsRunde = 0,
+        )
+
+        val danach = anwenden(
+            begonnen,
+            SpielEreignis.AnleiheEmittiert(anleihe, KontoId.Bank, Geld.mark(10)),
+        )
+
+        assertEquals(Geld.mark(10), danach.spieler.first { it.id == anna }.geldkonto)
+        assertEquals(Geld.NULL, danach.bankkonto)
+        assertTrue(anleihe.id in danach.bankAnleihen)
+        assertTrue(danach.zugStatus!!.prozug.verbindlichkeiten.isEmpty())
+    }
+
+    @Test
+    fun zugendeIstNurImEpizugMoeglichUndErhoehtZugkennung() {
+        val start = zustand()
+        assertTrue(SpielRegelwerk.wendeAn(start, SpielEreignis.ZugBeendet).isFailure)
+        val begonnen = anwenden(start, SpielEreignis.ProzugBegonnen(1L))
+        val epizug = anwenden(
+            begonnen,
+            SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
+        )
+
+        val naechster = anwenden(epizug, SpielEreignis.ZugBeendet)
+
+        assertEquals(bert, naechster.aktiverSpieler)
+        assertEquals(2L, naechster.zugStatus?.zugId)
+        assertEquals(ZugPhase.Prozug, naechster.zugStatus?.phase)
+        assertFalse(naechster.zugStatus!!.prozug.begonnen)
+    }
+
+    private fun zustand(
+        annaGeld: Geld = Geld.NULL,
+        bertGeld: Geld = Geld.NULL,
+        annaRohstoffe: Map<Rohstoff, Int> = emptyMap(),
+        bertRohstoffe: Map<Rohstoff, Int> = emptyMap(),
+        karte: Spielkarte? = null,
+    ) = SpielZustand(
+        spieler = listOf(
+            Spieler(anna, "Anna", rohstoffe = annaRohstoffe, geldkonto = annaGeld),
+            Spieler(bert, "Bert", rohstoffe = bertRohstoffe, geldkonto = bertGeld),
+        ),
+        karte = karte,
+        aktiverSpieler = anna,
+        zugStatus = ZugStatus(1L, anna, ZugPhase.Prozug),
+    )
+
+    private fun karte(anlage: FeldAnlage): Spielkarte {
+        val land = angrenzendeFelder(kante).map { GelaendeFeld(it, GelaendeTyp.EBENE) }
+        return Spielkarte(
+            id = "prozug-test",
+            name = "Prozug-Test",
+            hexagon = KartenHexagon(radius = 8),
+            gelaendefelder = land,
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(kante.anfang, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                    EckBelegung(feld.ecken().last(), EckGebaeudeTyp.BAHNHOF, anna),
+                ),
+                kanten = listOf(KantenBelegung(kante)),
+                felder = listOf(FeldBelegung(feld, anlage)),
+            ),
+        )
+    }
+
+    private fun anwenden(zustand: SpielZustand, ereignis: SpielEreignis): SpielZustand =
+        SpielRegelwerk.wendeAn(zustand, ereignis).getOrThrow()
 }

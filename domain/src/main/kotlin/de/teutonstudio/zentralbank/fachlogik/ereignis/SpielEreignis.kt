@@ -1,6 +1,7 @@
 package de.teutonstudio.zentralbank.fachlogik.ereignis
 
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
@@ -14,14 +15,43 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
-import de.teutonstudio.zentralbank.fachlogik.modell.Phase
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
-import de.teutonstudio.zentralbank.fachlogik.modell.SchrittTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
+import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 import kotlinx.serialization.Serializable
 
 @Serializable
 sealed interface SpielEreignis {
+    @Serializable
+    data class ProzugBegonnen(
+        val zugId: Long,
+    ) : SpielEreignis
+
+    @Serializable
+    data class VerarbeitungAusgefuehrt(
+        val zugId: Long,
+        val feld: KartenFeld,
+        val laeufe: Int,
+    ) : SpielEreignis
+
+    @Serializable
+    data class VerwaltungsstandortVersorgt(
+        val zugId: Long,
+        val ecke: KartenEcke,
+    ) : SpielEreignis
+
+    @Serializable
+    data class VerbindlichkeitBeglichen(
+        val zugId: Long,
+        val verbindlichkeit: VerbindlichkeitId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class ProzugErfolgreichAbgeschlossen(
+        val zugId: Long,
+    ) : SpielEreignis
+
     @Serializable
     data class WarenkorbGeaendert(
         val warenkorb: Map<Rohstoff, Int>,
@@ -69,12 +99,35 @@ sealed interface SpielEreignis {
     ) : SpielEreignis
 
     @Serializable
+    data class AnleiheEmittiert(
+        val anleihe: Anleihe,
+        val erwerber: KontoId,
+        val erloes: Geld,
+    ) : SpielEreignis
+
+    @Serializable
+    data class AnleiheFreiwilligZurueckgekauft(
+        val anleihe: AnleiheId,
+        val emittent: SpielerId,
+        val preis: Geld,
+    ) : SpielEreignis
+
+    @Serializable
     data class RohstoffHandel(
         val kaeufer: SpielerId,
         val verkaeufer: SpielerId,
         val rohstoff: Rohstoff,
         val menge: Int,
         val preis: Geld,
+    ) : SpielEreignis
+
+    @Serializable
+    data class AuslandsHandel(
+        val spieler: SpielerId,
+        val rohstoff: Rohstoff,
+        val menge: Int,
+        val preis: Geld,
+        val art: AussenhandelsArt,
     ) : SpielEreignis
 
     @Serializable
@@ -189,17 +242,20 @@ sealed interface SpielEreignis {
     ) : SpielEreignis
 
     @Serializable
-    data class SchrittAbgeschlossen(
-        val schritt: SchrittTyp,
-    ) : SpielEreignis
-
-    @Serializable
-    data class PhaseAbgeschlossen(
-        val phase: Phase,
+    data class RundenwerteAktualisiert(
+        val runde: Int,
+        val marktpreise: Map<Rohstoff, Geld>,
+        val leitzins: Basispunkte,
     ) : SpielEreignis
 
     @Serializable
     data object ZugBeendet : SpielEreignis
+}
+
+@Serializable
+enum class AussenhandelsArt {
+    IMPORT,
+    EXPORT,
 }
 
 @Serializable

@@ -39,6 +39,7 @@ internal object FinanzRegelwerk {
             require(neuerStand >= Geld.NULL) { "Bankkonto darf nicht negativ werden." }
             zustand.copy(bankkonto = neuerStand)
         }
+        KontoId.Ausland -> zustand.copy(auslandskonto = zustand.auslandskonto + aenderung)
         is KontoId.Spieler -> SpielerRegelwerk.aendereSpieler(zustand, konto.id) { spieler ->
             val neuerStand = spieler.geldkonto + aenderung
             require(neuerStand >= Geld.NULL) { "${spieler.name} hat nicht genug Geld." }

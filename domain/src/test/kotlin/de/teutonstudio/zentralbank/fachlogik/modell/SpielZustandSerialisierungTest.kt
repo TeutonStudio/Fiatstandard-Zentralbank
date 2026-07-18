@@ -56,6 +56,30 @@ class SpielZustandSerialisierungTest {
             leitzins = Basispunkte(250),
             rundenzähler = 3,
             aktiverSpieler = spielerId,
+            zugStatus = ZugStatus(
+                zugId = 12L,
+                spieler = spielerId,
+                phase = ZugPhase.Prozug,
+                prozug = ProzugStatus(
+                    begonnen = true,
+                    abbauErtraege = mapOf(Rohstoff.HOLZ to 2),
+                    verwaltungsVerpflichtungen = listOf(
+                        VerwaltungsVerpflichtung(
+                            id = VerwaltungsVerpflichtungId(12L, KartenEcke(2, 4)),
+                            typ = EckGebaeudeTyp.BAHNHOF,
+                            bedarf = mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.KOHLE to 1),
+                        ),
+                    ),
+                    produktionsBuchungen = listOf(
+                        ProduktionsBuchung(
+                            ProduktionsStandortId(
+                                KartenFeld(1, 2, DreieckHaelfte.OBEN),
+                            ),
+                            1,
+                        ),
+                    ),
+                ),
+            ),
         )
 
         val json = Json.encodeToString(state)

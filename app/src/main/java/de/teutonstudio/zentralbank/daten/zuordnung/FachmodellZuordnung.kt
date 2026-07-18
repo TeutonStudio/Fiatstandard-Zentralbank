@@ -152,6 +152,9 @@ fun Spiel.zuSpielZustand(): SpielZustand {
                 nennwert = anzeige.sondervermoegen.zuGeld(),
                 zinsBasispunkte = anzeige.anleihe.erhalteZinssatz() * 100,
                 laufzeitRunden = anzeige.laufzeit,
+                zinsbetrag = anzeige.unvermoegen.zuGeld(),
+                emissionsRunde = anzeige.emittiert,
+                faelligkeitsRunde = anzeige.faelligkeit,
             )
         }.toMap(),
         marktpreise = aktuelleMarktpreise

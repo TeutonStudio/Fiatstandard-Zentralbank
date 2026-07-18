@@ -5,6 +5,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
@@ -12,10 +13,25 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.ProduktionsArt
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import java.util.ArrayDeque
+
+data class VerarbeitungsStandort(
+    val feld: KartenFeld,
+    val typ: BauteilTyp,
+    val maximaleLaeufe: Int,
+    val einsatzJeLauf: Map<Rohstoff, Int>,
+    val ertragJeLauf: Map<Rohstoff, Int>,
+)
+
+data class VerwaltungsStandort(
+    val ecke: KartenEcke,
+    val typ: EckGebaeudeTyp,
+    val bedarf: Map<Rohstoff, Int>,
+)
 
 object KartenAuswertung {
     fun istHafenstandort(karte: Spielkarte, ecke: KartenEcke): Boolean {
@@ -72,7 +88,7 @@ object KartenAuswertung {
         }
     }
 
-    fun rohstoffErtrag(
+    fun abbauErtrag(
         karte: Spielkarte,
         spieler: SpielerId,
     ): Map<Rohstoff, Int> = karte.belegung.felder
@@ -80,12 +96,80 @@ object KartenAuswertung {
             val menge = ertrag(karte, belegung.position)[spieler] ?: return@flatMap emptyList()
             when (val anlage = belegung.anlage) {
                 is FeldAnlage.Abbaueinheit -> mapOf(anlage.rohstoff to 1)
-                is FeldAnlage.Wirtschaftsregion -> anlage.bauteil.ertrag
+                is FeldAnlage.Wirtschaftsregion -> if (
+                    anlage.bauteil.produktionsArt == ProduktionsArt.ABBAU
+                ) {
+                    anlage.bauteil.ertrag
+                } else {
+                    emptyMap()
+                }
                 FeldAnlage.Geschaeftsbank -> emptyMap()
             }.map { (rohstoff, ertrag) -> rohstoff to ertrag * menge }
         }
         .groupBy(Pair<Rohstoff, Int>::first, Pair<Rohstoff, Int>::second)
         .mapValues { (_, mengen) -> mengen.sum() }
+
+    fun verarbeitungsStandorte(
+        karte: Spielkarte,
+        spieler: SpielerId,
+    ): List<VerarbeitungsStandort> = karte.belegung.felder.mapNotNull { belegung ->
+        val wirtschaft = belegung.anlage as? FeldAnlage.Wirtschaftsregion
+            ?: return@mapNotNull null
+        val typ = wirtschaft.bauteil
+        if (typ.produktionsArt != ProduktionsArt.VERARBEITUNG) return@mapNotNull null
+        val kapazitaet = ertrag(karte, belegung.position)[spieler] ?: return@mapNotNull null
+        VerarbeitungsStandort(
+            feld = belegung.position,
+            typ = typ,
+            maximaleLaeufe = kapazitaet,
+            einsatzJeLauf = typ.verbrauch,
+            ertragJeLauf = typ.ertrag,
+        )
+    }.sortedWith(
+        compareBy<VerarbeitungsStandort> { it.feld.zeile }
+            .thenBy { it.feld.spalte }
+            .thenBy { it.feld.haelfte },
+    )
+
+    fun verwaltungsStandorte(
+        karte: Spielkarte,
+        spieler: SpielerId,
+    ): List<VerwaltungsStandort> = karte.belegung.ecken
+        .asSequence()
+        .filter { belegung ->
+            belegung.besitzer == spieler &&
+                belegung.zustand == BauwerkZustand.INTAKT &&
+                belegung.typ != EckGebaeudeTyp.HAUPTBAHNHOF
+        }
+        .map { belegung ->
+            val bauteil = when (belegung.typ) {
+                EckGebaeudeTyp.HAUPTBAHNHOF -> BauteilTyp.HAUPTBAHNHOF
+                EckGebaeudeTyp.BAHNHOF -> BauteilTyp.BAHNHOF
+                EckGebaeudeTyp.GROSSBAHNHOF -> BauteilTyp.GROSSBAHNHOF
+                EckGebaeudeTyp.HAFEN -> BauteilTyp.HAFEN
+                EckGebaeudeTyp.GROSSHAFEN -> BauteilTyp.GROSSHAFEN
+            }
+            VerwaltungsStandort(belegung.position, belegung.typ, bauteil.verbrauch)
+        }
+        .sortedBy { it.ecke }
+        .toList()
+
+    fun kannAussenhandelBetreiben(
+        karte: Spielkarte,
+        spieler: SpielerId,
+    ): Boolean {
+        val eigeneIntakteHaefen = karte.belegung.ecken
+            .filter { belegung ->
+                belegung.besitzer == spieler &&
+                    belegung.zustand == BauwerkZustand.INTAKT &&
+                    belegung.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN)
+            }
+            .mapTo(mutableSetOf()) { it.position }
+        return karte.belegung.seewege.any { seeweg ->
+            seeweg.besitzer == spieler &&
+                (seeweg.hafenA in eigeneIntakteHaefen || seeweg.hafenB in eigeneIntakteHaefen)
+        }
+    }
 
     fun kontrolliertGeschaeftsbank(
         karte: Spielkarte,

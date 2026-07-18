@@ -22,6 +22,7 @@
 \usepackage{xcolor}
 \usepackage{framed}
 \setlist{nosep,leftmargin=*}
+\setlist[description]{style=nextline,leftmargin=0pt,labelindent=0pt}
 \renewcommand{\arraystretch}{1.25}
 
 % Links und PDF-Metadaten
@@ -42,8 +43,8 @@
 \cfoot{\pagemark}
 
 % Makros
-\newcommand{\DFVersion}{Arbeitsfassung 0.2}
-\newcommand{\DFStand}{Mai 2026}
+\newcommand{\DFVersion}{Arbeitsfassung 0.3}
+\newcommand{\DFStand}{18. Juli 2026}
 \newcommand{\begriff}[1]{\textbf{#1}}
 \newcommand{\marker}[1]{\textsf{#1}}
 \newcommand{\offen}[1]{\begin{framed}\noindent\textbf{Offen / zu entscheiden:} #1\end{framed}}
@@ -136,7 +137,7 @@ Frachtschiffe & Spielerabhaengige Einheiten zur Verbindung von zwei Haefen. Jede
 Panzer & Spielerabhaengige Kriegseinheiten. Sie erscheinen nur waehrend eines Krieges auf dem Spielfeld. \\
 Kriegsschiffe & Spielerabhaengige Kriegseinheiten. Sie erscheinen nur waehrend eines Krieges auf dem Spielfeld. \\
 Ereigniskarten & Karten in den Kategorien 1 bis 6. Die Kategorie ergibt sich durch einen Wuerfelwurf. \\
-Rohstoffkarten & Karten fuer Oel, Stahl, Ziegel und Nahrung. \\
+Rohstoffkarten & Karten fuer Nahrung, Lehm, Ziegel, Holz, Rohoel, Schweroel, Diesel, Kohle, Stahl und Eisen. \\
 Waehrungsscheine & Scheine der Waehrung Mark. \\
 Anleihenkarten & Ausfuellbare Vorlagen fuer Anleihen zwischen Spielern oder gegenueber Geschaeftsbanken. \\
 App & Verwaltet Anleihen, Rohstoffhandel, Anleihenhandel, Zahlungen, Marktwert und Auslandshandelskosten. \\
@@ -150,16 +151,26 @@ In diesem Spiel wird zwischen \begriff{Geld} und \begriff{Waehrung} unterschiede
 
 \section{Zentrale Begriffe}
 \begin{description}
+  \item[Spielzug] Der Zug eines Spielers in einer regulaeren Runde. Er besteht aus Prozug und Epizug.
+  \item[Prozug] Verpflichtende Versorgungs- und Zahlungsphase. Sie beginnt automatisch und kann nur nach tatsaechlicher Versorgung und Zahlung erfolgreich abgeschlossen werden.
+  \item[Epizug] Freie Aktionsphase nach einem erfolgreichen Prozug. Hier wird gebaut, gehandelt, Krieg erklaert oder der Spielzug beendet.
+  \item[Verwaltungsstandort] Eigener intakter Bahnhof, Grossbahnhof, Hafen oder Grosshafen. Jeder dieser Standorte erzeugt zu Beginn des Prozuges eine konkrete Versorgungspflicht.
+  \item[Wirtschaftsstandort] Neutrale Anlage auf einem Gelaendefeld. Sie ist entweder Abbau-, Verarbeitungs- oder Bankstandort.
+  \item[Abbaustandort] Wirtschaftsstandort ohne Einsatzrezept. Sein Ertrag wird zu Beginn des Prozuges automatisch gutgeschrieben.
+  \item[Verarbeitungsstandort] Wirtschaftsstandort mit Einsatzrezept. Der Spieler entscheidet im Prozug freiwillig ueber null bis zur Anschlussstaerke viele Produktionslaeufe.
+  \item[Versorgung] Atomare Abgabe des vollstaendigen Rohstoffrezepts fuer genau einen Verwaltungsstandort.
+  \item[Faellige Verbindlichkeit] Zu Beginn des Prozuges festgeschriebene Zins- oder Rueckkaufzahlung mit Anleihekennung, Betrag und Empfaenger.
+  \item[Rueckkauf bei Faelligkeit] Verpflichtende Zahlung des Sondervermoegens in der Faelligkeitsrunde; sie ist kein freiwilliger Anleihenhandel.
   \item[Warenkorb] Vor Runde 0 von den Spielern festgelegte Zusammenstellung von Rohstoffen. Aus seiner Preisentwicklung wird die Preisinflation berechnet.
   \item[Preisinflation] Veraenderung des Warenkorbpreises. Sie bestimmt, ob der Leitzinssatz nach einer vollen Runde erhoeht oder verringert wird.
   \item[Leitzinssatz] Zinssatz fuer Anleihen, die nicht von Spielern gekauft werden, sondern ueber kontrollierte Geschaeftsbanken laufen.
   \item[Sondervermoegen] Der Nennbetrag einer Anleihe, die eine Geschaeftsbank kauft. Der Begriff ist moralisch flexibel, wie es sich gehoert.
-  \item[Unvermoegen] Der gerundete Zinsbetrag einer Geschaeftsbank-Anleihe nach der Formel: Sondervermoegen mal Zinssatz in Prozent.
+  \item[Unvermoegen] Der vereinbarte Zinsbetrag einer Anleihe. Er wird in jedem Spielzug des Emittenten ab der Runde nach der Emission bis vor der Faelligkeitsrunde im Prozug faellig.
   \item[Marktwert] Von der App bestimmter Wert eines Spielers. Gebaute Anlagen werden eingetragen und fliessen in die Berechnung ein.
   \item[Ueberschuldung] Zustand, in dem die Summe der Sondervermoegen aus eigenen Geschaeftsbank-Anleihen den Marktwert des Spielers uebersteigt.
-  \item[Verzettelung] Zustand, in dem ein Spieler weniger Geschaeftsbanken kontrolliert, als er Anleihen ueber das Bankensystem verkauft hat.
-  \item[Schuldenstrich] Sanierungsereignis bei gleichzeitiger Ueberschuldung und Verzettelung: Schulden verschwinden, aber Infrastruktur wird schwer beschaedigt.
-  \item[Zahlungsunfaehigkeit] Ausscheiden eines Spielers, wenn eine Rueckzahlung faellig wird und weder Zahlung noch ausreichende Neuaufnahme moeglich ist.
+  \item[Verzettelung] Historischer Arbeitsbegriff fuer weniger kontrollierte Geschaeftsbanken als ausgegebene Bankanleihen; bis zur Konsolidierung der Insolvenzregel kein eigener technischer Ausloeser.
+  \item[Schuldenstrich] Bestehendes Sanierungsereignis nach mehr als drei friedlichen, aufeinanderfolgenden ueberschuldeten Spielzuegen. Die kuenftige Beziehung zu einem gescheiterten Prozug ist noch offen.
+  \item[Zahlungsunfaehigkeit] Ein im Prozug nicht deckbarer Pflichtposten. Eine automatische Aufgabe oder ein Ausscheiden findet vor Festlegung der Schuldenfolge nicht statt.
 \end{description}
 
 \chapter{Spielfeld und Aufbau der Welt}
@@ -188,25 +199,29 @@ Jede bebaute Ecke muss mindestens drei Kanten Abstand zur naechsten bebauten Eck
 \section{Rohstoffzuordnung der Gelaendefelder}
 Die Rohstoffzuordnung der Gelaendefelder ist noch offen. Fest steht bisher nur: Gelaendefelder bilden die Grundlage fuer Abbaueinheiten und Geschaeftsbanken.
 
-\offen{Festlegen, welche Gelaendetypen Oel, Stahl, Ziegel und Nahrung erlauben. Moegliche Varianten: feste Gelaendetypen, zufaellige Rohstoffmarker, mehrere Rohstoffe pro Feldtyp oder App-generierte Karte.}
+\offen{Festlegen, welche Gelaendetypen die zehn Rohstoffe erlauben. Moegliche Varianten: feste Gelaendetypen, zufaellige Rohstoffmarker, mehrere Rohstoffe pro Feldtyp oder App-generierte Karte.}
 
 \chapter{Rohstoffe, Waehrung und Preise}
 
 \section{Rohstoffe}
-In der aktuellen Fassung gibt es vier Rohstoffe:
+Die Fachregeln verwenden zehn Rohstoffe:
 \begin{description}
-  \item[Oel] Wird je Runde von Bahnhoefen und Haefen verbraucht. Panzer und Kriegsschiffe verbrauchen Oel, wenn sie eingesetzt werden.
-  \item[Stahl] Wird voraussichtlich fuer Infrastruktur, Schienen, Schiffe und Kriegsmaterial benoetigt.
-  \item[Ziegel] Wird voraussichtlich fuer Gebaeude und Ausbau verwendet.
-  \item[Nahrung] Wird je Runde von Bahnhoefen und Haefen verbraucht und kann fuer Versorgung und Krieg relevant sein.
+  \item[Nahrung] Abbauprodukt des Viehhofs und Versorgungsgut aller Bahn- und Hafenstandorte.
+  \item[Lehm] Abbauprodukt der Lehmmine und Einsatz des Ziegelbrenners.
+  \item[Ziegel] Produkt des Ziegelbrenners und Baumaterial.
+  \item[Holz] Abbauprodukt des Foersters und Baumaterial.
+  \item[Rohoel] Abbauprodukt des Bohrturms und Einsatz der Raffinerie.
+  \item[Schweroel] Produkt der Raffinerien.
+  \item[Diesel] Produkt der Raffinerien und Versorgungsgut fuer Haefen.
+  \item[Kohle] Abbauprodukt der Kohlemine sowie Einsatz fuer Bahnversorgung, synthetische Raffinerie und Stahlfabrik.
+  \item[Stahl] Produkt der Stahlfabrik und Baumaterial.
+  \item[Eisen] Abbauprodukt der Eisenmine und Einsatz der Stahlfabrik.
 \end{description}
-
-\offen{Die genauen Baukosten der Gebaeude und Einheiten sind noch nicht festgelegt.}
 
 \section{Die Mark}
 Die Mark ist die von der Zentralbank emittierte Waehrung. Rohstoffe duerfen nicht direkt gegen Rohstoffe getauscht werden. Jeder Rohstoffhandel laeuft ueber die Mark.
 
-Diese Regel ist zentral: Die Spieler handeln nicht \enquote{Oel gegen Stahl}, sondern verkaufen Oel gegen Mark und kaufen Stahl gegen Mark. Damit entstehen Preise. Ohne Preise gibt es keine Preisinflation, und ohne Preisinflation waere die Zentralbank nur ein huebscher Pappkreis mit Selbstbewusstsein.
+Diese Regel ist zentral: Die Spieler handeln nicht \enquote{Rohoel gegen Stahl}, sondern verkaufen Rohoel gegen Mark und kaufen Stahl gegen Mark. Damit entstehen Preise. Ohne Preise gibt es keine Preisinflation, und ohne Preisinflation waere die Zentralbank nur ein huebscher Pappkreis mit Selbstbewusstsein.
 
 \section{Preisbildung}
 Preise entstehen durch Handel zwischen Spielern. Sobald Preise vorhanden sind, werden auch Import- und Exportgeschaefte des Auslandshandels in die Preisbildung einbezogen.
@@ -235,12 +250,16 @@ Das Spiel unterscheidet zwischen spielerabhaengigen Gebaeuden, neutralen Anlagen
 Element & Ort & Funktion \\
 \midrule
 Hauptbahnhof & Ecke & Start- und Kerngebaeude eines Spielers. Von ihm aus wird Infrastruktur gedacht und Kriegskosten werden gemessen. \\
-Bahnhof & Ecke & Erhoeht Ertrag angrenzender Abbaueinheiten auf 2, wenn die Voraussetzungen erfuellt sind. Verbraucht je Runde Oel und Nahrung. \\
-Grossbahnhof & Ecke & Erhoeht Ertrag angrenzender Abbaueinheiten auf 3. Verbraucht je Runde Oel und Nahrung. \\
-Hafen & Ecke & Ermoeglicht Seeanschluss und Auslandshandel. Hat Kapazitaet fuer 1 Frachtschiff. Verbraucht je Runde Oel und Nahrung. \\
-Grosshafen & Ecke & Staerkerer Hafen mit Kapazitaet fuer 2 Frachtschiffe. Verbraucht je Runde Oel und Nahrung. \\
+Bahnhof & Ecke & Anschlussstaerke 2. Muss im Prozug mit 1 Nahrung und 1 Kohle versorgt werden. \\
+Grossbahnhof & Ecke & Anschlussstaerke 3. Muss im Prozug mit 2 Nahrung und 2 Kohle versorgt werden. \\
+Hafen & Ecke & Ermoeglicht Seeanschluss und Auslandshandel. Kapazitaet fuer 1 Frachtschiff; Versorgung mit 1 Nahrung und 1 Diesel. \\
+Grosshafen & Ecke & Kapazitaet fuer 2 Frachtschiffe; Versorgung mit 2 Nahrung und 2 Diesel. \\
 Schiene & Kante & Verbindung auf einer Kante zwischen zwei Gelaendefeldern. Ermoeglicht Ertrag 1 an angrenzenden Abbaueinheiten. \\
-Abbaueinheit & Gelaendefeld & Neutrale Rohstoffanlage. Ertraege gehen an angeschlossene Spieler, nicht an einen festen Besitzer. \\
+Viehhof, Lehmmine, Foerster, Bohrturm, Kohlemine, Eisenmine & Gelaendefeld & Abbaustandorte. Ertraege gehen beim Prozugbeginn automatisch an angeschlossene Spieler. \\
+Ziegelbrenner & Gelaendefeld & Verarbeitung: 1 Lehm zu 1 Ziegel je Lauf. \\
+Raffinerie & Gelaendefeld & Verarbeitung: 2 Rohoel zu 2 Diesel und 1 Schweroel je Lauf. \\
+Synthetische Raffinerie & Gelaendefeld & Verarbeitung: 3 Kohle zu 2 Diesel und 1 Schweroel je Lauf. \\
+Stahlfabrik & Gelaendefeld & Verarbeitung: 1 Eisen und 1 Kohle zu 2 Stahl je Lauf. \\
 Geschaeftsbank & Gelaendefeld & Neutrales Bankgebaeude in Zentralbankfarbe. Kann statt einer Abbaueinheit gebaut werden und wird durch angrenzende Infrastruktur genutzt. \\
 Frachtschiff & Seeweg & Verbindet zwei Haefen. Import- und Exportrichtung werden durch zwei Faehnchen markiert. \\
 Panzer & Krieg & Kriegseinheit gegen Landziele. Befindet sich nur waehrend eines Krieges auf dem Spielfeld. \\
@@ -249,38 +268,46 @@ Kriegsschiff & Krieg & Kriegseinheit gegen Haefen und Seewege. Befindet sich nur
 \end{longtable}
 
 \section{Bauen}
-Ein Spieler darf waehrend seiner Bau- und Handelsphase so lange bauen, bis ihm Rohstoffe oder Mark fuer weitere Rohstoffe ausgehen.
+Ein Spieler darf ausschliesslich im Epizug und ohne Aktionspunktgrenze bauen, solange er alle Baukosten decken kann.
 
-\section{Fixkosten}
-Bahnhoefe und Haefen verbrauchen je Runde Oel und Nahrung. Diese Fixkosten werden in der Phase \enquote{Fixkosten} des Spielerzugs bezahlt.
+\section{Versorgung im Prozug}
+Jeder eigene intakte Verwaltungsstandort wird zu Beginn des Prozuges festgeschrieben und muss einzeln vollstaendig versorgt werden. Hauptbahnhoefe verbrauchen nichts. Belagerte und zerstoerte Standorte erzeugen in dieser Fassung keine Versorgungspflicht.
 
-\offen{Die exakte Hoehe der Fixkosten fuer Bahnhof, Grossbahnhof, Hafen und Grosshafen muss noch als Tabelle festgelegt werden.}
+\begin{center}
+\begin{tabular}{>{\bfseries}l l}
+\toprule
+Standort & Versorgung je Prozug \\
+\midrule
+Bahnhof & 1 Nahrung, 1 Kohle \\
+Grossbahnhof & 2 Nahrung, 2 Kohle \\
+Hafen & 1 Nahrung, 1 Diesel \\
+Grosshafen & 2 Nahrung, 2 Diesel \\
+Hauptbahnhof & keine \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Eine Teilversorgung ist unzulaessig. Reicht der Bestand nicht, bleibt der Standort offen; der Spieler kann im selben Prozug verarbeiten, handeln oder eine Anleihe emittieren.
 
 \section{Baukosten}
-Die Baukosten sind noch nicht final. Fuer die fertige Anleitung wird eine zentrale Baukostentabelle benoetigt.
+Die derzeit im Fachmodell gebuchten Infrastrukturkosten lauten:
 
 \begin{table}[h]
 \centering
-\begin{tabularx}{\textwidth}{>{\bfseries}lXXXX}
+\begin{tabularx}{\textwidth}{>{\bfseries}lX}
 \toprule
-Bauwerk / Einheit & Oel & Stahl & Ziegel & Nahrung \\
+Bauwerk / Einheit & Rohstoffkosten \\
 \midrule
-Bahnhof & offen & offen & offen & offen \\
-Grossbahnhof & offen & offen & offen & offen \\
-Hafen & offen & offen & offen & offen \\
-Grosshafen & offen & offen & offen & offen \\
-Schiene & offen & offen & offen & offen \\
-Abbaueinheit Oel & offen & offen & offen & offen \\
-Abbaueinheit Stahl & offen & offen & offen & offen \\
-Abbaueinheit Ziegel & offen & offen & offen & offen \\
-Abbaueinheit Nahrung & offen & offen & offen & offen \\
-Geschaeftsbank & offen & offen & offen & offen \\
-Frachtschiff & offen & offen & offen & offen \\
-Panzer & offen & offen & offen & offen \\
-Kriegsschiff & offen & offen & offen & offen \\
+Bahnhof & 2 Holz, 2 Ziegel, 1 Stahl \\
+Grossbahnhof & 4 Holz, 3 Ziegel, 2 Stahl \\
+Hafen & 1 Holz, 2 Ziegel, 2 Stahl \\
+Grosshafen & 2 Holz, 3 Ziegel, 4 Stahl \\
+Eisenbahnlinie & 1 Holz, 1 Stahl \\
+Frachtschiff & 2 Stahl \\
+Hauptbahnhof und Wirtschaftsstandorte & Startbestand beziehungsweise derzeit keine zusaetzlichen Rohstoffkosten \\
 \bottomrule
 \end{tabularx}
-\caption{Vorlaeufige Baukostentabelle}
+\caption{Im Fachmodell verwendete Baukosten}
 \end{table}
 
 \chapter{Eigentum, Kontrolle und neutrale Anlagen}
@@ -288,8 +315,8 @@ Kriegsschiff & offen & offen & offen & offen \\
 \section{Grundsatz}
 Abbaueinheiten und Geschaeftsbanken gehoeren keinem Spieler dauerhaft. Sie werden genutzt, kontrolliert oder verlassen. Das ist ein kleiner, aber wichtiger Unterschied, den Menschen ueblicherweise erst beachten, nachdem etwas brennt.
 
-\section{Ertrag aus Abbaueinheiten}
-Eine Abbaueinheit steht auf einem Gelaendefeld. Spieler erhalten Ertrag, wenn sie an dieses Feld angeschlossen sind.
+\section{Automatischer Abbau}
+Ein Abbaustandort steht auf einem Gelaendefeld. Beim Beginn jedes Prozuges erhalten angeschlossene Spieler seinen Ertrag automatisch und genau einmal.
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{0.34\textwidth}X}
@@ -304,9 +331,10 @@ Kein angeschlossener Spieler & kein Ertrag; die Anlage gilt als verlassen \\
 \end{tabularx}
 \end{center}
 
-Ist mehr als ein Spieler angeschlossen, erhaelt jeder Spieler den Ertrag nach seiner besten eigenen Anschlussart, sofern die konkrete Rohstoff- und Versorgungsregel dies nicht einschraenkt.
+Ist mehr als ein Spieler angeschlossen, besitzt jeder Spieler seine eigene Anschlusskapazitaet und erhaelt beziehungsweise verarbeitet nach seiner besten eigenen Anschlussart.
 
-\offen{Bestaetigen, ob mehrere Spieler gleichzeitig aus derselben Abbaueinheit Ertrag erhalten duerfen oder ob die staerkste Anschlussart Vorrang hat.}
+\section{Freiwillige Verarbeitung}
+Verarbeitungsstandorte erzeugen niemals automatischen Ertrag. Im Prozug waehlt der Spieler je Standort null bis zur Anschlussstaerke viele Laeufe. Einsatz und saemtliche Produkte eines Laufs werden atomar gebucht. Mehrere Teilbestueckungen sind bis zur Gesamtkapazitaet erlaubt; fehlt auch nur ein Einsatzstoff, findet die betreffende Buchung nicht statt.
 
 \section{Verlassene Anlagen}
 Eine Abbaueinheit wird verlassen, wenn kein Spieler mehr ueber eine Kante oder Ecke an ihrem Feld angeschlossen ist. Eine verlassene Anlage produziert fuer niemanden.
@@ -337,11 +365,11 @@ Bei einer Geschaeftsbank-Anleihe waehlt der Spieler eine Laufzeit:
   \item langfristig: 10 Runden.
 \end{itemize}
 
-Der Zinssatz entspricht dem aktuellen Leitzinssatz. Der Betrag der Anleihe heisst Sondervermoegen. Der gerundete Zinsbetrag aus Sondervermoegen mal Zinssatz in Prozent heisst Unvermoegen.
+Der Zinssatz entspricht dem aktuellen Leitzinssatz. Der Betrag der Anleihe heisst Sondervermoegen. Der vereinbarte Zinsbetrag aus Sondervermoegen mal Zinssatz heisst Unvermoegen.
 
-Nach Ablauf der Laufzeit muss der Spieler das Sondervermoegen an den Anleihenhalter zurueckzahlen.
+Die Emissionsrunde selbst erzeugt keine Zinszahlung. Ab der Runde nach der Emission wird das Unvermoegen in jedem Prozug des Emittenten bis vor der Faelligkeitsrunde gezahlt. Die Faelligkeitsrunde ist Emissionsrunde plus Laufzeit plus eins. In ihr wird nur das Sondervermoegen verpflichtend zurueckgekauft.
 
-\offen{Klaeren, ob das Unvermoegen zusaetzlich zum Sondervermoegen am Ende der Laufzeit gezahlt wird, laufend faellig ist oder nur als Kennwert fuer Ueberschuldung dient.}
+Empfaenger ist der Besitzer der Anleihe zu Beginn des Prozuges. Dieser Empfaenger wird fuer die faellige Forderung festgeschrieben; ein spaeterer Handel aendert sie nicht. Solange die Forderung offen ist, darf die betroffene Anleihe nicht gehandelt werden. Jede Zahlung wird ueber ihre eindeutige Forderungskennung genau einmal gebucht.
 
 \section{Grenze fuer Sondervermoegen}
 Eine Geschaeftsbank darf Anleihen nur bis zu einer Grenze kaufen. Als Arbeitsregel gilt:
@@ -355,12 +383,14 @@ Die groesste Bankmacht kann diese Grenze erhoehen.
 \offen{Festlegen, ob die Grenze \enquote{Marktwert / 10} pro kontrollierter Geschaeftsbank, pro einzelner Anleihe oder fuer alle Geschaeftsbank-Anleihen zusammen gilt.}
 
 \section{Rueckkauf von Anleihen}
-Ein Spieler kann eigene Anleihen jederzeit zurueckkaufen.
+Ein Spieler kann eigene, nicht mit einer offenen Pflichtforderung belegte Anleihen im Prozug oder Epizug freiwillig zurueckkaufen.
 
 \begin{itemize}
   \item Bei Geschaeftsbank-Anleihen erfolgt der Rueckkauf zum urspruenglichen Betrag.
   \item Bei Spieler-Anleihen wird der Rueckkaufpreis zwischen den beteiligten Spielern ausgehandelt.
 \end{itemize}
+
+Dieser freiwillige Handel ist vom verpflichtenden Rueckkauf des Sondervermoegens in der Faelligkeitsrunde zu unterscheiden.
 
 \section{Leitzins und Inflation}
 Nach jeder vollen Runde, also nachdem jeder Spieler einmal an der Reihe war, wird die Preisentwicklung des Warenkorbs betrachtet. Aus ihr ergibt sich, ob der Leitzinssatz erhoeht oder verringert wird.
@@ -370,9 +400,7 @@ Nach jeder vollen Runde, also nachdem jeder Spieler einmal an der Reihe war, wir
 \section{Ueberschuldung, Verzettelung und Schuldenstrich}
 Ein Spieler ist \begriff{ueberschuldet}, wenn die Summe der Sondervermoegen seiner Geschaeftsbank-Anleihen seinen Marktwert uebersteigt.
 
-Ein Spieler ist \begriff{verzettelt}, wenn er weniger Geschaeftsbanken kontrolliert, als er Anleihen ueber das Bankensystem verkauft hat.
-
-Ist ein Spieler gleichzeitig ueberschuldet und verzettelt, erfolgt ein \begriff{Schuldenstrich}:
+Die derzeit implementierte Bestandsregel prueft nur bankgehaltene Anleihen. Nach mehr als drei friedlichen, aufeinanderfolgenden ueberschuldeten Spielzuegen wird der Schuldenstrich faellig:
 \begin{itemize}
   \item Alle Schulden des Spielers entfallen.
   \item Alle Bahnhoefe und Haefen des Spielers werden entfernt.
@@ -384,7 +412,7 @@ Ist ein Spieler gleichzeitig ueberschuldet und verzettelt, erfolgt ein \begriff{
 Waehrend eines Krieges wird kein Schuldenstrich durchgefuehrt. Nach Friedensvertraegen wird ein waehrend des Krieges ausgesetzter Schuldenstrich nicht nachgeholt.
 
 \section{Zahlungsunfaehigkeit}
-Ein Spieler scheidet aus, wenn eine Anleihe rueckzahlungsnotwendig wird und er den faelligen Betrag weder zahlen noch ausreichend neu aufnehmen kann. Das kann insbesondere eintreten, wenn sein Marktwert gesunken ist und nicht genug Liquiditaet beschafft werden kann.
+Kann ein Spieler eine Versorgung oder Forderung nicht decken, bleibt der Prozug offen. Handelspartner koennen weiterhin helfen; auch Aussenhandel und Emission bleiben erreichbar. Eine ausdrueckliche Aktion \enquote{Prozug scheitern lassen} wird erst eingefuehrt, wenn Folgen fuer Schulden, Glaeubiger, Infrastruktur, Krieg und Ausscheiden gemeinsam festgelegt sind.
 
 \chapter{Spielvorbereitung und Beginn des Spiels}
 
@@ -419,13 +447,13 @@ In Runde 0 setzen die Spieler reihum ihre Hauptbahnhoefe. Der Abstand zwischen b
 Eine Spielrunde besteht daraus, dass jeder Spieler einmal an der Reihe ist. Nachdem alle Spieler ihren Zug abgeschlossen haben, wird der Leitzinssatz anhand der Preisinflation angepasst.
 
 \section{Spielerzug}
-Ein Spielerzug besteht aus folgenden Phasen:
+Jeder regulaere Spielerzug besteht genau aus zwei Phasen:
 \begin{enumerate}
-  \item \begriff{Ertraege erhalten.} Der Spieler erhaelt Rohstoffe aus angeschlossenen Abbaueinheiten.
-  \item \begriff{Fixkosten zahlen.} Der Spieler zahlt Mark- und Rohstoffkosten fuer laufende Infrastruktur, insbesondere Oel und Nahrung fuer Bahnhoefe und Haefen.
-  \item \begriff{Ereignis wuerfeln und ausfuehren.} Der Spieler wuerfelt mit einem Wuerfel und zieht eine Ereigniskarte der entsprechenden Kategorie.
-  \item \begriff{Bauen und handeln.} Der Spieler darf Rohstoffe ueber Mark handeln, Gebaeude bauen, Anleihen verkaufen, Anleihen kaufen und eigene Anleihen zurueckkaufen.
+  \item \begriff{Prozug.} Der verpflichtende Dialog oeffnet automatisch. Abbauertraege werden genau einmal gutgeschrieben. Der Spieler kann Verarbeitungsstandorte bestuecken, handeln und Anleihen emittieren. Danach versorgt er jeden festgeschriebenen Verwaltungsstandort und begleicht jede festgeschriebene Zins- oder Rueckkaufforderung. Nur echte Buchungen erfuellen diese Pflichten.
+  \item \begriff{Epizug.} Nach erfolgreichem Prozug darf der Spieler ohne Aktionspunktgrenze bauen, Rohstoffe und Anleihen handeln, Aussenhandel betreiben, Anleihen emittieren, Krieg erklaeren oder den Spielzug ohne weitere Aktion beenden.
 \end{enumerate}
+
+Der Prozug kann nicht durch Zurueckgehen, Antippen ausserhalb des Dialogs oder eine manuelle Erledigt-Markierung umgangen werden. Nach dem Zugende beginnt der naechste Spieler mit einer neuen Zugkennung und einem neuen Prozug. Nach dem letzten Spieler werden zusaetzlich Marktpreise und Leitzins fuer die neue Runde berechnet.
 
 \section{Ereigniswurf}
 Jeder Spieler wuerfelt in seinem Zug mit einem Wuerfel fuer ein Ereignis. Die Augenzahl bestimmt die Kategorie:
@@ -447,16 +475,18 @@ Wurf & Ereignisstaerke \\
 
 \offen{Die Begriffe der Kategorien und die konkreten Ereigniskarten sind noch Arbeitsnamen und koennen ersetzt werden.}
 
-\section{Bau- und Handelsfreiheit}
-In der Bau- und Handelsphase gibt es keine feste Aktionspunktgrenze. Ein Spieler darf weiter bauen und handeln, bis ihm Rohstoffe, Mark oder handelbare Moeglichkeiten ausgehen.
+\offen{Der Ereigniswurf soll voraussichtlich als erzwungener Beginn des Epizuges eingeordnet werden. Seine endgueltige Position im Ablauf ist noch zu entscheiden.}
+
+\section{Aktions- und Handelsfreiheit}
+Im Epizug gibt es keine feste Aktionspunktgrenze. Handel ist zusaetzlich bereits im Prozug erlaubt, damit Rohstoff- und Liquiditaetsluecken geschlossen werden koennen. Bauen, Kriegserklaerung und Zugende bleiben bis zum Epizug gesperrt.
 
 \chapter{Handel, Ausland und Seewege}
 
 \section{Handel zwischen Spielern}
-Rohstoffe werden ausschliesslich ueber die Mark gehandelt. Die App verwaltet Rohstoffhandel, Anleihenhandel und die daraus folgenden Zahlungen.
+Rohstoffe werden ausschliesslich ueber die Mark gehandelt. Spielerhandel und Anleihenhandel sind sowohl im Prozug als auch im Epizug erlaubt. Im Prozug kehrt die App nach dem Unterdialog in denselben Pflichtdialog zurueck und berechnet Bestand und Defizite neu.
 
 \section{Auslandshandel}
-Der Auslandshandel wird ueber die App abgewickelt. Die Anzahl und Qualitaet der Haefen beeinflusst Importaufschlaege und Exportabschlaege.
+Der Auslandshandel wird im Prozug und Epizug ueber die App abgewickelt. Er benoetigt einen eigenen intakten Hafen mit Frachtschiffverbindung. Die Anzahl und Qualitaet der Haefen beeinflusst Importaufschlaege und Exportabschlaege.
 
 Mehr Hafeninfrastruktur verbessert damit die Bedingungen fuer Auslandshandel. Weniger Hafeninfrastruktur macht Handel mit dem Ausland teurer oder weniger attraktiv. So entsteht Aussenhandelspolitik, nur mit weniger Pressekonferenzen und vermutlich klareren Regeln.
 
@@ -496,7 +526,7 @@ Folgende Ereignisarten passen zur aktuellen Spielidee:
   \item Inflationsschub,
   \item Deflationsdruck,
   \item Bankenkrise,
-  \item Oelschock,
+  \item Rohoelschock,
   \item Nahrungsknappheit,
   \item Rohstoffboom,
   \item Hafensperre,
@@ -515,7 +545,7 @@ Ereignisse duerfen tendenziell Schulden, Zinssaetze, Rohstoffpreise, Marktwerte 
 \chapter{Krieg, Belagerung und Infrastrukturverlust}
 
 \section{Kriegserklaerung}
-Ein Krieg beginnt durch eine Kriegserklaerung. Dabei wird festgehalten, welche Spieler beteiligt sind, welches Ziel angegriffen wird und welche Kriegseinheiten eingesetzt werden.
+Ein Krieg beginnt durch eine Kriegserklaerung im Epizug. Im Prozug ist sie gesperrt. Dabei wird festgehalten, welche Spieler beteiligt sind, welches Ziel angegriffen wird und welche Kriegseinheiten eingesetzt werden.
 
 \section{Kriegseinheiten}
 Es gibt zwei Kriegseinheiten:
@@ -526,15 +556,15 @@ Es gibt zwei Kriegseinheiten:
 
 Panzer und Kriegsschiffe befinden sich nur waehrend eines Krieges auf dem Spielfeld.
 
-\section{Oelverbrauch im Krieg}
-Kriegseinheiten verbrauchen Oel nach Bewegungsmenge.
+\section{Treibstoffverbrauch im Krieg}
+Der Treibstoffverbrauch der Kriegseinheiten nach Bewegungsmenge ist noch nicht abschliessend einem Rohstoff zugeordnet.
 
 \begin{itemize}
-  \item Bei Panzern bestimmt die Bewegung vom Hauptbahnhof zum Kriegspunkt den Oelverbrauch.
-  \item Bei Kriegsschiffen bestimmt die Bewegung vom naechsten Hafen zum Kriegspunkt den Oelverbrauch.
+  \item Bei Panzern bestimmt die Bewegung vom Hauptbahnhof zum Kriegspunkt den Verbrauch.
+  \item Bei Kriegsschiffen bestimmt die Bewegung vom naechsten Hafen zum Kriegspunkt den Verbrauch.
 \end{itemize}
 
-\offen{Die genaue Oelformel pro Bewegungsschritt muss noch festgelegt werden.}
+\offen{Treibstoffart und genaue Verbrauchsformel pro Bewegungsschritt festlegen.}
 
 \section{Blockade und Belagerung}
 Haefen koennen durch Kriegsschiffe blockiert werden. Bahnhoefe, Grossbahnhoefe, Haefen und Grosshaefen koennen durch Panzer belagert werden.
@@ -556,9 +586,7 @@ Ein Krieg endet durch Friedensvertrag oder durch Ausscheiden einer Kriegspartei.
 \chapter{Spielende und Ausscheiden}
 
 \section{Ausscheiden}
-Ein Spieler scheidet aus, wenn er zahlungsunfaehig wird oder wenn seine Spielfaehigkeit durch Krieg und Infrastrukturverlust nicht mehr besteht.
-
-Zahlungsunfaehigkeit tritt ein, wenn eine Rueckzahlung faellig ist und der Spieler weder zahlen noch ausreichend neues Sondervermoegen aufnehmen kann.
+Ein Spieler scheidet aus, wenn seine Spielfaehigkeit durch eine abschliessend definierte Kriegs- oder Insolvenzfolge nicht mehr besteht. Ein lediglich offener Prozug scheidet den Spieler in dieser Fassung nicht automatisch aus.
 
 \section{Spielende}
 Das Spiel endet auf eine von zwei Arten:
@@ -578,7 +606,7 @@ Die groesste Bankmacht ist ein Sonderstatus. Sie erlaubt einem Spieler, bei Gesc
 \chapter{Mögliche Spieltaktiken}
 
 \section{Rohstoffkontrolle}
-Ein Spieler kann versuchen, bestimmte Rohstoffe ueber Abbaueinheiten und angrenzende Infrastruktur zu kontrollieren. Besonders wirksam ist dies bei Oel und Nahrung, weil beide fuer laufende Kosten und Krieg relevant sind.
+Ein Spieler kann versuchen, bestimmte Rohstoffe ueber Abbaustandorte und angrenzende Infrastruktur zu kontrollieren. Nahrung, Kohle und Diesel sind wegen der Prozug-Versorgung besonders wichtig.
 
 \section{Hafen- und Auslandstaktik}
 Wer viele Haefen und Grosshaefen kontrolliert, kann Importaufschlaege und Exportabschlaege verbessern. Das macht Auslandshandel attraktiver und kann Inseln wirtschaftlich anbinden.
@@ -590,7 +618,7 @@ Geschaeftsbanken erlauben die Aufnahme von Sondervermoegen zum Leitzinssatz. Wer
 Verschuldung kann ein legitimer Beschleuniger sein. Sie erlaubt fruehen Ausbau, Kriegsvorbereitung oder Hafenexpansion. Gleichzeitig drohen Ueberschuldung, Verzettelung, Schuldenstrich und Zahlungsunfaehigkeit.
 
 \section{Kriegstaktik}
-Krieg kann je nach Spielsituation stark oder riskant sein. Er kann Infrastruktur ausschalten, Ertraege stoppen und Schienenlinien zerreissen. Gleichzeitig verbraucht Krieg Oel und bindet Ressourcen.
+Krieg kann je nach Spielsituation stark oder riskant sein. Er kann Infrastruktur ausschalten, Ertraege stoppen und Schienenlinien zerreissen. Gleichzeitig bindet Krieg Einheiten und Ressourcen.
 
 Ein Vorteil des Krieges ist, dass waehrenddessen kein Schuldenstrich durchgefuehrt wird. Nach Friedensvertraegen wird der ausgesetzte Schuldenstrich nicht nachgeholt. Das macht Krieg zu einer moeglichen, aber gefaehrlichen Flucht aus der Bilanz.
 
@@ -603,21 +631,19 @@ Dieses Kapitel sammelt alle Punkte, die fuer eine vollstaendige Fassung noch ent
 
 \section{Spielfeld und Rohstoffe}
 \begin{itemize}
-  \item Welche Gelaendetypen erlauben Oel, Stahl, Ziegel und Nahrung?
+  \item Welche Gelaendetypen erlauben welche der zehn Rohstoffe?
   \item Wird der Warenkorb frei gewaehlt oder aus der Anzahl der Rohstofffelder gebildet?
   \item Gilt der Drei-Kanten-Abstand nur in Runde 0 oder dauerhaft fuer alle Eckgebaeude?
 \end{itemize}
 
-\section{Baukosten und Fixkosten}
+\section{Baukosten und Kriegskosten}
 \begin{itemize}
-  \item Baukosten fuer alle Gebaeude, Einheiten und neutralen Anlagen festlegen.
-  \item Oel- und Nahrungskosten pro Runde fuer Bahnhof, Grossbahnhof, Hafen und Grosshafen festlegen.
-  \item Oelverbrauch von Panzern und Kriegsschiffen pro Bewegungsschritt festlegen.
+  \item Noch fehlende Kosten fuer Wirtschafts- und Kriegseinheiten festlegen.
+  \item Treibstoffart und Verbrauch von Panzern und Kriegsschiffen pro Bewegungsschritt festlegen.
 \end{itemize}
 
 \section{Bankensystem}
 \begin{itemize}
-  \item Genau klaeren, wie das Unvermoegen faellig wird.
   \item Grenze Marktwert / 10 fuer Sondervermoegen praezisieren.
   \item Bestimmen, ob Geschaeftsbanken mehrfach kontrolliert werden koennen.
   \item Groesste Bankmacht definieren.
@@ -637,16 +663,26 @@ Dieses Kapitel sammelt alle Punkte, die fuer eine vollstaendige Fassung noch ent
   \item Wirkungsbereich festlegen: aktiver Spieler, alle Spieler, Region, Rohstoff oder Infrastrukturtyp.
 \end{itemize}
 
+\section{Prozug-Fehlschlag und Insolvenz}
+\begin{itemize}
+  \item Endgueltige Position des Ereigniswurfs festlegen.
+  \item Definieren, wann ein Spieler den Prozug ausdruecklich aufgeben darf.
+  \item Folgen eines gescheiterten Prozuges fuer Forderungen, Glaeubiger, Infrastruktur, Krieg und Ausscheiden festlegen.
+  \item Bestehenden Ueberschuldungs-Schuldenstrich und kuenftigen Prozug-Fehlschlag zu einer widerspruchsfreien Regel konsolidieren.
+\end{itemize}
+
 \appendix
 
 \chapter{Kurzreferenz}
 
 \section{Spielerzug}
 \begin{enumerate}
-  \item Ertraege erhalten.
-  \item Fixkosten zahlen.
-  \item Ereignis wuerfeln und ausfuehren.
-  \item Bauen und handeln.
+  \item Prozug automatisch beginnen und Abbauertraege gutschreiben.
+  \item Optional verarbeiten, handeln oder Anleihen emittieren.
+  \item Alle Verwaltungsstandorte versorgen und alle faelligen Forderungen bezahlen.
+  \item Prozug erfolgreich abschliessen.
+  \item Im Epizug bauen, handeln, Krieg erklaeren oder nichts weiter tun.
+  \item Spielzug beenden.
 \end{enumerate}
 
 \section{Rundenende}
@@ -675,13 +711,17 @@ Kein Anschluss & 0 \\
 
 \begin{framed}
 \noindent\formline{Anleiheschuldner}\\[1.2em]
+\formline{Eindeutige Anleihekennung}\\[1.2em]
 \formline{Anleihenhalter}\\[1.2em]
 \formline{Art der Anleihe: Spieler-Anleihe / Geschaeftsbank-Anleihe}\\[1.2em]
 \formline{Sondervermoegen / Betrag in Mark}\\[1.2em]
 \formline{Zinssatz}\\[1.2em]
 \formline{Unvermoegen}\\[1.2em]
 \formline{Laufzeit: 3 / 5 / 10 Runden / frei verhandelt}\\[1.2em]
-\formline{Faellig in Runde}\\[1.2em]
+\formline{Emissionsrunde}\\[1.2em]
+\formline{Erste Zinsfaelligkeit}\\[1.2em]
+\formline{Rueckkauf faellig in Runde}\\[1.2em]
+\formline{Bisherige Zahlungen / Zahlungsstatus}\\[1.2em]
 \formline{Rueckkaufregel / Sonderabrede}\\[2.2em]
 \formline{Unterschrift Schuldner}\\[1.2em]
 \formline{Unterschrift Halter}
@@ -696,7 +736,7 @@ Kein Anschluss & 0 \\
 \formline{Eingesetzte Panzer}\\[1.2em]
 \formline{Eingesetzte Kriegsschiffe}\\[1.2em]
 \formline{Startpunkt der Bewegung}\\[1.2em]
-\formline{Oelverbrauch}\\[1.2em]
+\formline{Treibstoffverbrauch}\\[1.2em]
 \formline{Beginn in Runde}\\[1.2em]
 \formline{Besondere Bedingungen}\\[2.2em]
 \formline{Unterschrift Angreifer}

@@ -1,7 +1,8 @@
 package de.teutonstudio.zentralbank.schnittstelle.domain
 
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ProzugAuswertung
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 
 data class ZugAnzeige(
     val text: String,
@@ -12,9 +13,15 @@ fun SpielZustand.zuZugAnzeige(): ZugAnzeige {
     val zug = zugStatus ?: return ZugAnzeige(kopf)
     val spielerName = spieler.firstOrNull { it.id == zug.spieler }?.name ?: zug.spieler.wert
     val aktion = when (zug.phase) {
-        Phase.Einnahmen -> "$spielerName: Einnahmen abschließen"
-        Phase.Ausgaben -> "$spielerName: Ausgaben abschließen"
-        Phase.Aktionen -> "Zug von $spielerName beenden"
+        ZugPhase.Prozug -> {
+            val plan = ProzugAuswertung.plan(this)
+            val offen = plan?.let {
+                it.verwaltungsVerpflichtungen.count { post -> post.id !in zug.prozug.versorgteStandorte } +
+                    it.verbindlichkeiten.count { post -> post.id !in zug.prozug.beglicheneVerbindlichkeiten }
+            } ?: 0
+            "$spielerName: Prozug · $offen Pflichtposten offen"
+        }
+        ZugPhase.Epizug -> "Epizug von $spielerName · Spielzug beenden"
     }
     return ZugAnzeige("$kopf\n$aktion")
 }

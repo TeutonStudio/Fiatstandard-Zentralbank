@@ -10,6 +10,16 @@ object SpielRegelwerk {
     ): Result<SpielZustand> = runCatching {
         ZugRegelwerk.pruefeFreigabe(zustand, ereignis)
         when (ereignis) {
+            is SpielEreignis.ProzugBegonnen ->
+                ProzugRegelwerk.beginnen(zustand, ereignis)
+            is SpielEreignis.VerarbeitungAusgefuehrt ->
+                ProzugRegelwerk.verarbeiten(zustand, ereignis)
+            is SpielEreignis.VerwaltungsstandortVersorgt ->
+                ProzugRegelwerk.verwaltungsstandortVersorgen(zustand, ereignis)
+            is SpielEreignis.VerbindlichkeitBeglichen ->
+                ProzugRegelwerk.verbindlichkeitBegleichen(zustand, ereignis)
+            is SpielEreignis.ProzugErfolgreichAbgeschlossen ->
+                ProzugRegelwerk.erfolgreichAbschliessen(zustand, ereignis)
             is SpielEreignis.WarenkorbGeaendert ->
                 RohstoffRegelwerk.warenkorbAendern(zustand, ereignis)
             is SpielEreignis.RohstoffEinnahme ->
@@ -20,6 +30,12 @@ object SpielRegelwerk {
                 FinanzRegelwerk.geldUebertragen(zustand, ereignis)
             is SpielEreignis.RohstoffHandel ->
                 HandelsRegelwerk.rohstoffHandeln(zustand, ereignis)
+            is SpielEreignis.AuslandsHandel ->
+                HandelsRegelwerk.mitAuslandHandeln(zustand, ereignis)
+            is SpielEreignis.AnleiheEmittiert ->
+                AnleihenRegelwerk.anleiheEmittieren(zustand, ereignis)
+            is SpielEreignis.AnleiheFreiwilligZurueckgekauft ->
+                AnleihenRegelwerk.freiwilligZurueckkaufen(zustand, ereignis)
             is SpielEreignis.AnleiheGekauft ->
                 AnleihenRegelwerk.anleiheKaufen(zustand, ereignis)
             is SpielEreignis.AnleiheVerkauft ->
@@ -58,10 +74,10 @@ object SpielRegelwerk {
                 KonfliktRegelwerk.kriegBeenden(zustand, ereignis)
             is SpielEreignis.Schuldenstrich ->
                 InsolvenzRegelwerk.schuldenstrichBuchen(zustand, ereignis)
-            is SpielEreignis.SchrittAbgeschlossen ->
-                ZugRegelwerk.schrittAbschliessen(zustand, ereignis)
-            is SpielEreignis.PhaseAbgeschlossen ->
-                ZugRegelwerk.phaseAbschliessen(zustand, ereignis)
+            is SpielEreignis.RundenwerteAktualisiert -> zustand.copy(
+                marktpreise = ereignis.marktpreise,
+                leitzins = ereignis.leitzins,
+            )
             SpielEreignis.ZugBeendet -> ZugRegelwerk.zugBeenden(zustand)
         }
     }

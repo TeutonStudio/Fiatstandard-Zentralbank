@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Database
+import de.teutonstudio.zentralbank.daten.raumdatenbank.ZentralbankMigrationen
 import de.teutonstudio.zentralbank.daten.raumdatenbank.entitaet.SpielstandEntitaet
 import de.teutonstudio.zentralbank.daten.raumdatenbank.zugriff.SpielstandDao
 
@@ -49,7 +50,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "zentralbankspeicher"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .addMigrations(
+                        ZentralbankMigrationen.VON_1_NACH_2,
+                        ZentralbankMigrationen.VON_2_NACH_3,
+                        ZentralbankMigrationen.VON_3_NACH_4,
+                    )
                     .build()
             }
             emit(INSTANCE!!)

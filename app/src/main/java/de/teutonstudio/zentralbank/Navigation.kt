@@ -20,13 +20,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.GameViewModel
 import de.teutonstudio.zentralbank.datenbank.Spiel
-import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
-import de.teutonstudio.zentralbank.schnittstelle.eingabe.AusgabenDialog
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.ProzugDialog
+import de.teutonstudio.zentralbank.schnittstelle.domain.zuProzugAnzeigeZustand
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.HandelDialog
@@ -144,20 +144,27 @@ fun Navigation(viewModel: GameViewModel) {
                     { navController.navigate(route = Screen.NewTrade.route) },
                     { navController.navigate(route = Screen.NewCredit.route) },
                     { navController.navigate(route = Screen.GameMap.route) },
-                    viewModel::naechsterZugabschnitt,
+                    {
+                        if (spielZustand?.zugStatus?.phase == ZugPhase.Epizug) {
+                            viewModel.beendeZug()
+                        }
+                    },
                     spiel = spiel,
                     aktiverSpielerName = spielZustand?.zugStatus?.spieler?.wert,
                     zugText = spielUebersicht?.zug?.text ?: "Kein Zug aktiv",
                     zugZeitText = zugZeitText,
                 )
-                val zugStatus = spielZustand?.zugStatus
-                if (zugStatus?.phase == Phase.Ausgaben) {
-                    AusgabenDialog(
-                        plan = spiel.erhalteAusgabenplan(
-                            spielerName = zugStatus.spieler.wert,
-                            runde = spielZustand.rundenzähler,
-                        ),
-                        onClose = viewModel::naechsterZugabschnitt,
+                val prozugAnzeige = spielZustand?.zuProzugAnzeigeZustand()
+                if (prozugAnzeige != null) {
+                    ProzugDialog(
+                        zustand = prozugAnzeige,
+                        onVerarbeiten = viewModel::verarbeitungAusfuehren,
+                        onVersorgen = viewModel::verwaltungsstandortVersorgen,
+                        onBezahlen = viewModel::verbindlichkeitBegleichen,
+                        onHandel = { navController.navigate(Screen.NewTrade.route) },
+                        onAussenhandel = { navController.navigate(Screen.NewTrade.route) },
+                        onAnleihe = { navController.navigate(Screen.NewCredit.route) },
+                        onAbschliessen = viewModel::prozugAbschliessen,
                     )
                 }
             }
@@ -195,25 +202,20 @@ fun Navigation(viewModel: GameViewModel) {
             }
         }
 
-        var ausgewähltesBauwerk: Bauteil
         composable(route = Screen.PlayerSaldo.route) { // TODO
             MitAktuellemSpiel(viewModel, navController) { spiel ->
+                val zugPhase = viewModel.spielZustand.collectAsState().value?.zugStatus?.phase
                 Titel(Screen.Game.navigiere(navController)) {
-                    zeigeSpieler(spiel, {
-                        navController.navigate(route = "new_build")
-                        ausgewähltesBauwerk = it
-                    }, { spieler, bauteil, wahr ->
-                    }, { (aggressor,verteidiger) ->
-                        viewModel.kriegErklaeren(aggressor,verteidiger)
-                    }, { (aggressor,verteidiger) ->
-                        if (aggressor.second >= verteidiger.second) { // Sieg
-                            viewModel.militaerergebnisErfassen(aggressor.first,aggressor.second)
-                        } else { // Niederlage
-                            viewModel.militaerergebnisErfassen(verteidiger.first,verteidiger.second)
-                        }
-                    }, { (aggressor,verteidiger) ->
-                        viewModel.friedenSchliessen(aggressor,verteidiger)
-                    } )
+                    zeigeSpieler(
+                        spiel = spiel,
+                        konfliktAktionenAktiv = zugPhase == ZugPhase.Epizug,
+                        onDeclareWar = { (aggressor, verteidiger) ->
+                            viewModel.kriegErklaeren(aggressor, verteidiger)
+                        },
+                        onDeclarePeace = { (spielerA, spielerB) ->
+                            viewModel.friedenSchliessen(spielerA, spielerB)
+                        },
+                    )
                 }
             }
         }

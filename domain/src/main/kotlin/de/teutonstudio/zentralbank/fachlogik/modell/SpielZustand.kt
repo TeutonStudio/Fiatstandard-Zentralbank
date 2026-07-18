@@ -13,6 +13,9 @@ sealed interface KontoId {
 
     @Serializable
     data object Bank : KontoId
+
+    @Serializable
+    data object Ausland : KontoId
 }
 
 @Serializable
@@ -60,9 +63,16 @@ data class Anleihe(
     val nennwert: Geld,
     val zinsBasispunkte: Int,
     val laufzeitRunden: Int,
+    val zinsbetrag: Geld? = null,
+    val emissionsRunde: Int = 0,
+    val faelligkeitsRunde: Int = emissionsRunde + laufzeitRunden + 1,
 ) {
     init {
         require(laufzeitRunden > 0) { "Laufzeit muss positiv sein." }
+        require(emissionsRunde >= 0) { "Emissionsrunde darf nicht negativ sein." }
+        require(faelligkeitsRunde > emissionsRunde) {
+            "Fälligkeitsrunde muss nach der Emissionsrunde liegen."
+        }
     }
 }
 
@@ -74,6 +84,7 @@ data class SpielZustand(
     /** Noch zu platzierende, bereits zum Startbestand der Spieler gehörende Bauwerke. */
     val rundeNullRestbestand: Map<SpielerId, Map<BauteilTyp, Int>>? = null,
     val bankkonto: Geld = Geld.NULL,
+    val auslandskonto: Geld = Geld.NULL,
     val bankAnleihen: List<AnleiheId> = emptyList(),
     val warenkorb: Map<Rohstoff, Int> = emptyMap(),
     val anleihen: Map<AnleiheId, Anleihe> = emptyMap(),
@@ -84,7 +95,9 @@ data class SpielZustand(
     val leitzins: Basispunkte = Basispunkte.NULL,
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
-    val zugStatus: ZugStatus? = aktiverSpieler?.let { ZugStatus(it, Phase.Einnahmen) },
+    val zugStatus: ZugStatus? = aktiverSpieler?.let {
+        ZugStatus(zugId = 1L, spieler = it, phase = ZugPhase.Prozug)
+    },
 )
 
 @Serializable

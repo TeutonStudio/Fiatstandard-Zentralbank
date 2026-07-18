@@ -20,6 +20,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
 
@@ -94,7 +96,15 @@ internal object KartenRegelwerk {
         return mitPlatzierung.copy(
             spielabschnitt = if (fertig) Spielabschnitt.REGULAER else Spielabschnitt.RUNDE_NULL,
             aktiverSpieler = naechster,
-            zugStatus = zustand.zugStatus?.copy(spieler = naechster ?: zustand.zugStatus.spieler),
+            zugStatus = if (fertig && naechster != null) {
+                ZugStatus(
+                    zugId = zustand.zugStatus?.zugId ?: 1L,
+                    spieler = naechster,
+                    phase = ZugPhase.Prozug,
+                )
+            } else {
+                zustand.zugStatus?.copy(spieler = naechster ?: zustand.zugStatus.spieler)
+            },
         )
     }
 
@@ -631,9 +641,17 @@ internal object KartenRegelwerk {
             spielabschnitt = if (fertig) Spielabschnitt.REGULAER else Spielabschnitt.RUNDE_NULL,
             rundeNullRestbestand = neuerRestbestand,
             aktiverSpieler = naechster,
-            zugStatus = zustand.zugStatus?.copy(
-                spieler = naechster ?: zustand.zugStatus.spieler,
-            ),
+            zugStatus = if (fertig && naechster != null) {
+                ZugStatus(
+                    zugId = zustand.zugStatus?.zugId ?: 1L,
+                    spieler = naechster,
+                    phase = ZugPhase.Prozug,
+                )
+            } else {
+                zustand.zugStatus?.copy(
+                    spieler = naechster ?: zustand.zugStatus.spieler,
+                )
+            },
         )
     }
 

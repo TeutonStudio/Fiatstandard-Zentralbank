@@ -782,55 +782,6 @@ class SpielFinanzdatenTest {
     }
 
     @Test
-    fun ausgabenplanNenntZahlungsempfaengerUndRohstoffverbrauchJeGebaeude() {
-        val annaMitGebaeuden = Spieler(
-            "Anna",
-            mapOf(
-                Verwaltungsstandort.BAHNHOF to 2,
-                Wirtschaftsregionen.ZIEGELBRENNER to 1,
-            ),
-        )
-        val spiel = neuesSpiel(
-            annaMitGebaeuden to 100.toZahlungsmittel(),
-            bernd to 100.toZahlungsmittel(),
-        )
-        val anleihe = Anleihe(
-            schuldiger = annaMitGebaeuden,
-            sondervermögen = 40.toZahlungsmittel(),
-            unvermögen = 3.toZahlungsmittel(),
-            laufzeit = 2,
-        )
-        spiel.neueRundenDatenDefinieren(
-            spielerDaten = emptyMap(),
-            handelDaten = setOf(
-                Anleihenhandel(
-                    besitzer = annaMitGebaeuden,
-                    erwerber = bernd,
-                    anleihe = anleihe,
-                    preis = 40.toZahlungsmittel(),
-                )
-            ),
-            konfliktDaten = emptySet(),
-        )
-        spiel.fügeLeereRundeHinzu()
-
-        val plan = spiel.erhalteAusgabenplan(annaMitGebaeuden.name, runde = 2)
-
-        assertEquals(listOf(bernd), plan.zahlungen.map { zahlung -> zahlung.empfaenger })
-        assertEquals(listOf(3), plan.zahlungen.map { zahlung -> zahlung.betrag.toIntOderNull() })
-        assertEquals(
-            setOf(
-                Triple(Verwaltungsstandort.BAHNHOF, Rohstoffe.NAHRUNG, 2),
-                Triple(Verwaltungsstandort.BAHNHOF, Rohstoffe.KOHLE, 2),
-                Triple(Wirtschaftsregionen.ZIEGELBRENNER, Rohstoffe.LEHM, 1),
-            ),
-            plan.rohstoffVerwendungen.map { verwendung ->
-                Triple(verwendung.bauteil, verwendung.rohstoff, verwendung.rohstoffAnzahl)
-            }.toSet(),
-        )
-    }
-
-    @Test
     fun bestehendeAnleiheKannVomBesitzerVerkauftUndVomEmittentenZurueckgekauftWerden() {
         val spiel = neuesSpiel(
             anna to 100.toZahlungsmittel(),

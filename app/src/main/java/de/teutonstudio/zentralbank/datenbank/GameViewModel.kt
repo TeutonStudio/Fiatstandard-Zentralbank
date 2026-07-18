@@ -10,13 +10,19 @@ import de.teutonstudio.zentralbank.daten.RaumSpielAblage
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpiel
 import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
+import de.teutonstudio.zentralbank.daten.zuordnung.zuGeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.ablauf.SpielAblauf
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
-import de.teutonstudio.zentralbank.fachlogik.modell.Phase
-import de.teutonstudio.zentralbank.fachlogik.modell.SchrittZustand
-import de.teutonstudio.zentralbank.fachlogik.auswertung.ZugAuswertung
-import de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt
+import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.SpielAblage
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.SpielstandUebersicht
@@ -91,6 +97,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         spielAblauf = ablauf
         _rundenwechselAnzeige.value = null
         aktualisiereSpielZustand(ablauf.zustand)
+        starteProzugFallsNoetig()
     }
 
     fun ereignisAnwenden(ereignis: SpielEreignis) {
@@ -140,37 +147,28 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
     }
 
-    fun naechsterZugabschnitt() {
-        val zustand = spielAblauf?.zustand
-        val zug = zustand?.zugStatus
-        if (zustand == null || zug == null) {
+    fun prozugAbschliessen() {
+        val zug = spielAblauf?.zustand?.zugStatus
+        if (zug == null) {
             _spielFehler.tryEmit("Kein Zug aktiv.")
             return
         }
+        wendeEreignisseAn(listOf(SpielEreignis.ProzugErfolgreichAbgeschlossen(zug.zugId)))
+    }
 
-        when (zug.phase) {
-            Phase.Einnahmen,
-            Phase.Ausgaben -> {
-                val kartenEinnahme = if (zug.phase == Phase.Einnahmen) {
-                    zustand.karte
-                        ?.let { karte -> KartenAuswertung.rohstoffErtrag(karte, zug.spieler) }
-                        ?.takeIf { mengen -> mengen.isNotEmpty() }
-                        ?.let { mengen -> SpielEreignis.RohstoffEinnahme(zug.spieler, mengen) }
-                } else {
-                    null
-                }
-                val schrittEreignisse = ZugAuswertung.schritte(zustand)
-                    .filter { schritt ->
-                        schritt.typ.pflicht && schritt.zustand == SchrittZustand.VERFUEGBAR
-                    }
-                    .map { schritt -> SpielEreignis.SchrittAbgeschlossen(schritt.typ) }
-                wendeEreignisseAn(
-                    listOfNotNull(kartenEinnahme) + schrittEreignisse +
-                        SpielEreignis.PhaseAbgeschlossen(zug.phase),
-                )
-            }
-            Phase.Aktionen -> beendeZug()
-        }
+    fun verarbeitungAusfuehren(feld: KartenFeld, laeufe: Int) {
+        val zugId = spielAblauf?.zustand?.zugStatus?.zugId ?: return
+        wendeEreignisseAn(listOf(SpielEreignis.VerarbeitungAusgefuehrt(zugId, feld, laeufe)))
+    }
+
+    fun verwaltungsstandortVersorgen(ecke: KartenEcke) {
+        val zugId = spielAblauf?.zustand?.zugStatus?.zugId ?: return
+        wendeEreignisseAn(listOf(SpielEreignis.VerwaltungsstandortVersorgt(zugId, ecke)))
+    }
+
+    fun verbindlichkeitBegleichen(verbindlichkeit: VerbindlichkeitId) {
+        val zugId = spielAblauf?.zustand?.zugStatus?.zugId ?: return
+        wendeEreignisseAn(listOf(SpielEreignis.VerbindlichkeitBeglichen(zugId, verbindlichkeit)))
     }
 
     fun beendeZug() {
@@ -204,6 +202,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         } else {
             aktualisiereSpielZustand(nachher)
+            starteProzugFallsNoetig()
         }
         speichereAktuellenFachSpielstand()
     }
@@ -226,13 +225,18 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         aktuelleDaten = spielDaten to neueDatenListe
 
         val aktuelleWirtschaftsdaten = aktuellesSpiel.zuSpielZustand()
-        val synchronisiert = nachZugende.copy(
+        val ablauf = requireNotNull(spielAblauf)
+        val aktualisierung = SpielEreignis.RundenwerteAktualisiert(
+            runde = nachZugende.rundenzähler,
             marktpreise = aktuelleWirtschaftsdaten.marktpreise,
             leitzins = aktuelleWirtschaftsdaten.leitzins,
-            rundenzähler = aktuelleWirtschaftsdaten.rundenzähler,
         )
-        spielAblauf = SpielAblauf(synchronisiert)
+        val synchronisiert = ablauf.ereignisAnwenden(aktualisierung).getOrElse { fehler ->
+            _spielFehler.tryEmit(fehler.message ?: "Rundenwerte konnten nicht übernommen werden.")
+            return null
+        }
         aktualisiereSpielZustand(synchronisiert)
+        starteProzugFallsNoetig()
 
         if (spielDaten.spielID == (-1).toLong()) return synchronisiert
 
@@ -250,6 +254,22 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         return synchronisiert
+    }
+
+    private fun starteProzugFallsNoetig() {
+        val ablauf = spielAblauf ?: return
+        val zug = ablauf.zustand.zugStatus ?: return
+        if (ablauf.zustand.spielabschnitt != de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt.REGULAER ||
+            zug.phase != ZugPhase.Prozug || zug.prozug.begonnen
+        ) return
+        ablauf.ereignisAnwenden(SpielEreignis.ProzugBegonnen(zug.zugId))
+            .onSuccess { zustand ->
+                aktualisiereSpielZustand(zustand)
+                speichereAktuellenFachSpielstand()
+            }
+            .onFailure { fehler ->
+                _spielFehler.tryEmit(fehler.message ?: "Prozug konnte nicht begonnen werden.")
+            }
     }
 
     fun rundenwechselAngezeigt() {
@@ -310,9 +330,14 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
     }
 
-    fun erfasseRohstoffhandel(handel: RohstoffHandel): Boolean =
-        erfasseHandel(
+    fun erfasseRohstoffhandel(handel: RohstoffHandel): Boolean {
+        val fachEreignis = runCatching { handel.zuFachEreignis() }.getOrElse { fehler ->
+            _spielFehler.tryEmit(fehler.message ?: "Handel kann nicht zugeordnet werden.")
+            return false
+        }
+        return erfasseHandel(
             handel = handel,
+            fachEreignis = fachEreignis,
             speicherdatum = {
                 HandelsDaten(
                     aktuelleRundenDaten(),
@@ -322,10 +347,16 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             speichern = tabellenSpeicher::insertHandel,
             fehlermeldung = "Handel konnte nicht gespeichert werden.",
         )
+    }
 
-    fun emittiereAnleihe(handel: Anleihenhandel): Boolean =
-        erfasseHandel(
+    fun emittiereAnleihe(handel: Anleihenhandel): Boolean {
+        val fachEreignis = runCatching { handel.zuEmissionsEreignis() }.getOrElse { fehler ->
+            _spielFehler.tryEmit(fehler.message ?: "Anleihe kann nicht zugeordnet werden.")
+            return false
+        }
+        return erfasseHandel(
             handel = handel,
+            fachEreignis = fachEreignis,
             speicherdatum = {
                 AnleiheDaten(
                     aktuelleRundenDaten(),
@@ -335,6 +366,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             speichern = tabellenSpeicher::insertAnleihe,
             fehlermeldung = "Anleihe konnte nicht gespeichert werden.",
         )
+    }
 
     fun erfasseAnleihenhandel(handel: Anleihenhandel): Boolean {
         val bestehendeAnleihe = aktuellesSpiel.anleihen
@@ -343,6 +375,14 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val bisherigesDatum = aktuelleDaten.second
             .filterIsInstance<AnleiheDaten>()
             .firstOrNull { daten -> daten.passtZu(bestehendeAnleihe) }
+
+        val fachEreignis = runCatching {
+            handel.zuAnleihenHandelsEreignis(bestehendeAnleihe)
+        }.getOrElse { fehler ->
+            _spielFehler.tryEmit(fehler.message ?: "Anleihehandel kann nicht zugeordnet werden.")
+            return false
+        }
+        if (!pruefeFachEreignis(fachEreignis)) return false
 
         val neueAnzeige = try {
             aktuellesSpiel.fuegeHandelZurAktuellenRundeHinzu(handel)
@@ -369,7 +409,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
         }
         aktuelleDaten = spielDaten to neueDatenListe
-        synchronisiereSpielZustandNachTabellenAenderung()
+        if (!uebernehmeFachEreignis(fachEreignis)) return false
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -389,6 +429,111 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         return true
     }
 
+    private fun RohstoffHandel.zuFachEreignis(): SpielEreignis {
+        val verkaeufer = besitzer
+        val kaeufer = erwerber
+        return when {
+            verkaeufer == Ausland -> SpielEreignis.AuslandsHandel(
+                spieler = kaeufer.zuSpielerId(),
+                rohstoff = rohstoff.zuRohstoff(),
+                menge = anzahl,
+                preis = betrag.zuGeld(),
+                art = AussenhandelsArt.IMPORT,
+            )
+            kaeufer == Ausland -> SpielEreignis.AuslandsHandel(
+                spieler = verkaeufer.zuSpielerId(),
+                rohstoff = rohstoff.zuRohstoff(),
+                menge = anzahl,
+                preis = betrag.zuGeld(),
+                art = AussenhandelsArt.EXPORT,
+            )
+            else -> SpielEreignis.RohstoffHandel(
+                kaeufer = kaeufer.zuSpielerId(),
+                verkaeufer = verkaeufer.zuSpielerId(),
+                rohstoff = rohstoff.zuRohstoff(),
+                menge = anzahl,
+                preis = betrag.zuGeld(),
+            )
+        }
+    }
+
+    private fun Anleihenhandel.zuEmissionsEreignis(): SpielEreignis.AnleiheEmittiert {
+        val runde = aktuelleRundenDaten().index
+        val emittent = anleihe.schuldiger.zuSpielerId()
+        val id = AnleiheId(
+            listOf(
+                runde,
+                anleihe.schuldiger.name,
+                anleihe.sondervermögen.speichereString(),
+                anleihe.unvermögen.speichereString(),
+                anleihe.laufzeit,
+            ).joinToString("#"),
+        )
+        return SpielEreignis.AnleiheEmittiert(
+            anleihe = de.teutonstudio.zentralbank.fachlogik.modell.Anleihe(
+                id = id,
+                emittent = emittent,
+                nennwert = anleihe.sondervermögen.zuGeld(),
+                zinsBasispunkte = anleihe.erhalteZinssatz() * 100,
+                laufzeitRunden = anleihe.laufzeit,
+                zinsbetrag = anleihe.unvermögen.zuGeld(),
+                emissionsRunde = runde,
+                faelligkeitsRunde = anleihe.faelligkeitsrunde(runde),
+            ),
+            erwerber = erwerber.zuKontoId(),
+            erloes = preis.zuGeld(),
+        )
+    }
+
+    private fun Anleihenhandel.zuAnleihenHandelsEreignis(
+        anzeige: AnleiheAnzeige,
+    ): SpielEreignis {
+        val id = AnleiheId(
+            listOf(
+                anzeige.emittiert,
+                anzeige.schuldiger.name,
+                anzeige.sondervermoegen.speichereString(),
+                anzeige.unvermoegen.speichereString(),
+                anzeige.laufzeit,
+            ).joinToString("#"),
+        )
+        return if (erwerber.name == anzeige.schuldiger.name) {
+            SpielEreignis.AnleiheFreiwilligZurueckgekauft(
+                anleihe = id,
+                emittent = anzeige.schuldiger.zuSpielerId(),
+                preis = preis.zuGeld(),
+            )
+        } else {
+            when (val kaeufer = erwerber.zuKontoId()) {
+                is KontoId.Spieler -> SpielEreignis.AnleiheGekauft(
+                    anleihe = id,
+                    kaeufer = kaeufer.id,
+                    verkaeufer = besitzer.zuKontoId(),
+                    preis = preis.zuGeld(),
+                )
+                KontoId.Bank -> SpielEreignis.AnleiheVerkauft(
+                    anleihe = id,
+                    verkaeufer = besitzer.zuSpielerId(),
+                    kaeufer = KontoId.Bank,
+                    preis = preis.zuGeld(),
+                )
+                KontoId.Ausland -> error("Das Ausland handelt keine Anleihen.")
+            }
+        }
+    }
+
+    private fun JuristischePerson.zuSpielerId(): SpielerId {
+        val zustand = requireNotNull(spielAblauf?.zustand) { "Kein Spiel geladen." }
+        return zustand.spieler.firstOrNull { spieler -> spieler.name == name }?.id
+            ?: error("Unbekannter Spieler: $name")
+    }
+
+    private fun JuristischePerson.zuKontoId(): KontoId = when (this) {
+        Geschäftsbank -> KontoId.Bank
+        Ausland -> KontoId.Ausland
+        else -> KontoId.Spieler(zuSpielerId())
+    }
+
     private fun aktuelleRundenDaten(): RundeDaten {
         val runde = (aktuellesSpiel.aktuelleRunde - 1).coerceAtLeast(0)
         return RundeDaten(
@@ -399,10 +544,12 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     private fun <T : SpeicherDaten> erfasseHandel(
         handel: Handel,
+        fachEreignis: SpielEreignis,
         speicherdatum: () -> T,
         speichern: suspend (T) -> Long,
         fehlermeldung: String,
     ): Boolean {
+        if (!pruefeFachEreignis(fachEreignis)) return false
         val datum = try {
             aktuellesSpiel.fuegeHandelZurAktuellenRundeHinzu(handel)
             speicherdatum()
@@ -415,7 +562,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         val neueDatenListe = aktuelleDaten.second + datum
         aktuelleDaten = spielDaten to neueDatenListe
 
-        synchronisiereSpielZustandNachTabellenAenderung()
+        if (!uebernehmeFachEreignis(fachEreignis)) return false
 
         if (spielDaten.spielID == (-1).toLong()) return true
 
@@ -434,25 +581,30 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         return true
     }
 
-    private fun synchronisiereSpielZustandNachTabellenAenderung() {
-        val bisherigerSpielZustand = spielAblauf?.zustand
-        val abgebildeterSpielZustand = aktuellesSpiel.zuSpielZustand()
-        val spielZustand = if (bisherigerSpielZustand == null) {
-            abgebildeterSpielZustand
-        } else {
-            abgebildeterSpielZustand.copy(
-                karte = bisherigerSpielZustand.karte,
-                spielabschnitt = bisherigerSpielZustand.spielabschnitt,
-                rundenzähler = bisherigerSpielZustand.rundenzähler,
-                aktiverSpieler = bisherigerSpielZustand.aktiverSpieler,
-                zugStatus = bisherigerSpielZustand.zugStatus,
-                schuldenstriche = bisherigerSpielZustand.schuldenstriche,
-                ueberschuldungen = bisherigerSpielZustand.ueberschuldungen,
-            )
-        }
-        spielAblauf = SpielAblauf(spielZustand)
-        aktualisiereSpielZustand(spielZustand)
-        speichereAktuellenFachSpielstand()
+    private fun pruefeFachEreignis(ereignis: SpielEreignis): Boolean {
+        val zustand = spielAblauf?.zustand ?: return false
+        return SpielRegelwerk.wendeAn(zustand, ereignis).fold(
+            onSuccess = { true },
+            onFailure = { fehler ->
+                _spielFehler.tryEmit(fehler.message ?: "Handel wurde fachlich abgelehnt.")
+                false
+            },
+        )
+    }
+
+    private fun uebernehmeFachEreignis(ereignis: SpielEreignis): Boolean {
+        val ablauf = spielAblauf ?: return false
+        return ablauf.ereignisAnwenden(ereignis).fold(
+            onSuccess = { zustand ->
+                aktualisiereSpielZustand(zustand)
+                speichereAktuellenFachSpielstand()
+                true
+            },
+            onFailure = { fehler ->
+                _spielFehler.tryEmit(fehler.message ?: "Handel wurde fachlich abgelehnt.")
+                false
+            },
+        )
     }
 
     private fun aktualisiereSpielZustand(zustand: SpielZustand) {
@@ -614,18 +766,24 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
 
     fun kriegErklaeren(aggressor: String, verteidiger: String) {
-        meldeNichtVerfuegbarenKonfliktbereich("Kriegserklärung $aggressor gegen $verteidiger")
-    }
-
-    fun militaerergebnisErfassen(spieler: String, staerke: Int) {
-        meldeNichtVerfuegbarenKonfliktbereich("Militärergebnis $spieler mit Stärke $staerke")
+        val zustand = spielAblauf?.zustand
+        val aggressorId = zustand?.spieler?.firstOrNull { it.name == aggressor }?.id
+        val verteidigerId = zustand?.spieler?.firstOrNull { it.name == verteidiger }?.id
+        if (aggressorId == null || verteidigerId == null) {
+            _spielFehler.tryEmit("Die Kriegsparteien konnten nicht zugeordnet werden.")
+            return
+        }
+        ereignisAnwenden(SpielEreignis.KriegErklaert(aggressorId, verteidigerId))
     }
 
     fun friedenSchliessen(spielerA: String, spielerB: String) {
-        meldeNichtVerfuegbarenKonfliktbereich("Friedensschluss $spielerA mit $spielerB")
-    }
-
-    private fun meldeNichtVerfuegbarenKonfliktbereich(aktion: String) {
-        _spielFehler.tryEmit("$aktion ist im Konfliktbereich noch nicht verfügbar.")
+        val zustand = spielAblauf?.zustand
+        val spielerAId = zustand?.spieler?.firstOrNull { it.name == spielerA }?.id
+        val spielerBId = zustand?.spieler?.firstOrNull { it.name == spielerB }?.id
+        if (spielerAId == null || spielerBId == null) {
+            _spielFehler.tryEmit("Die Friedensparteien konnten nicht zugeordnet werden.")
+            return
+        }
+        ereignisAnwenden(SpielEreignis.KriegBeendet(spielerAId, spielerBId))
     }
 }

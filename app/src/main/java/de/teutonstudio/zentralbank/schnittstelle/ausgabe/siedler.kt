@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.DropdownMenu
@@ -204,18 +205,15 @@ fun SpielerBilanz(
 @Composable
 fun zeigeSpieler(
     spiel: Spiel,
-    onBuild: (Bauteil) -> Unit,
-    onBuildByPlayer: (String, Bauteil, Boolean) -> Unit,
+    konfliktAktionenAktiv: Boolean,
     onDeclareWar: (Pair<String, String>) -> Unit,
-    onDeclareMilitary: (Pair<Pair<String, Int>, Pair<String, Int>>) -> Unit,
     onDeclarePeace: (Pair<String, String>) -> Unit,
 ) {
     val siedlerFarben = erhalteSpielerFarben(spiel.spielerListe)
     var isWarExpanded by remember { mutableStateOf(false) }
-    var isMilitaryExpanded by remember { mutableStateOf(false) }
     var isPeaceExpanded by remember { mutableStateOf(false) }
 
-    if (!isWarExpanded && !isMilitaryExpanded && !isPeaceExpanded) {
+    if (!isWarExpanded && !isPeaceExpanded) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -238,6 +236,20 @@ fun zeigeSpieler(
                         istBearbeitbar = false,
                         onManipulateData = { _, _, _ -> },
                     )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Button(
+                    onClick = { isWarExpanded = true },
+                    enabled = konfliktAktionenAktiv,
+                ) {
+                    Text("Krieg erklären")
+                }
+                Button(
+                    onClick = { isPeaceExpanded = true },
+                    enabled = konfliktAktionenAktiv,
+                ) {
+                    Text("Frieden schließen")
                 }
             }
         }
@@ -280,188 +292,33 @@ fun zeigeSpieler(
                 }
             }
         }
-    } else if (isMilitaryExpanded) {
+    } else if (isPeaceExpanded) {
         Card(modifier = Modifier.padding(25.dp)) {
-            val military = listOf("Ritter lvl 1", "Ritter lvl 2", "Ritter lvl 3")
-
-            val inputAggressor = remember { mutableStateOf("Aggressor wählen") }
-            val inputVerteidiger = remember { mutableStateOf("Verteidiger wählen") }
-            val inputAggressorRitter = remember { mutableStateOf("Ritter wählen") }
-            val inputVerteidigerRitter = remember { mutableStateOf("Ritter wählen") }
+            val inputSpielerA = remember { mutableStateOf("Spieler wählen") }
+            val inputSpielerB = remember { mutableStateOf("Spieler wählen") }
 
             Column {
                 Text(
-                    text = "Militäreinsatz",
+                    text = "Frieden schließen",
                     fontSize = 40.sp,
                     modifier = ModiPad10,
                 )
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    modifier = ModiPad15,
+                    modifier = Modifier.padding(15.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    item { Text(text = "Aggressor: ", fontSize = 25.sp) }
+                    item { Text(text = "Spieler A: ", fontSize = 25.sp) }
+                    item { spielerAuswahl(spiel.spielerListe, inputSpielerA) }
 
-                    /*item {
-                        Column {
-                            var expandedAggressor by remember { mutableStateOf(false) }
-
-                            Box(
-                                modifier = Modifier
-                                    .padding(15.dp)
-                                    .clickable { expandedAggressor = !expandedAggressor }
-                            ) {
-                                Text(text = inputAggressor.value, fontSize = 25.sp)
-                            }
-
-                            DropdownMenu(
-                                expanded = expandedAggressor,
-                                onDismissRequest = { expandedAggressor = false }
-                            ) {
-                                siedlerListe.forEach { siedler ->
-                                    DropdownMenuItem(
-                                        text = { Text(text = siedler) },
-                                        onClick = {
-                                            inputAggressor.value = siedler
-                                            expandedAggressor = false
-                                        }
-                                    )
-                                }
-                            }
-
-                            var expandedAggressorRitter by remember { mutableStateOf(false) }
-
-                            Box(
-                                modifier = ModiPad15.clickable { expandedAggressorRitter = !expandedAggressorRitter }
-                            ) {
-                                Text(text = inputAggressorRitter.value, fontSize = 25.sp)
-                            }
-
-                            DropdownMenu(
-                                expanded = expandedAggressorRitter,
-                                onDismissRequest = { expandedAggressorRitter = false }
-                            ) {
-                                military.forEach { ritter ->
-                                    DropdownMenuItem(
-                                        text = { Text(text = ritter) },
-                                        onClick = {
-                                            inputAggressorRitter.value = ritter
-                                            expandedAggressorRitter = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }*/
-
-                    item { Text(text = "Verteidiger: ", fontSize = 25.sp) }
-
-                    /*item {
-                        Column {
-                            var expandedVerteidiger by remember { mutableStateOf(false) }
-
-                            Box(
-                                modifier = ModiPad15.clickable { expandedVerteidiger = !expandedVerteidiger }
-                            ) {
-                                Text(text = inputVerteidiger.value, fontSize = 25.sp)
-                            }
-
-                            DropdownMenu(
-                                expanded = expandedVerteidiger,
-                                onDismissRequest = { expandedVerteidiger = false }
-                            ) {
-                                siedlerListe.forEach { siedler ->
-                                    DropdownMenuItem(
-                                        text = { Text(text = siedler) },
-                                        onClick = {
-                                            inputVerteidiger.value = siedler
-                                            expandedVerteidiger = false
-                                        }
-                                    )
-                                }
-                            }
-
-                            var expandedVerteidigerRitter by remember { mutableStateOf(false) }
-
-                            Box(
-                                modifier = ModiPad15.clickable { expandedVerteidigerRitter = !expandedVerteidigerRitter }
-                            ) {
-                                Text(text = inputVerteidigerRitter.value, fontSize = 25.sp)
-                            }
-
-                            DropdownMenu(
-                                expanded = expandedVerteidigerRitter,
-                                onDismissRequest = { expandedVerteidigerRitter = false }
-                            ) {
-                                military.forEach { ritter ->
-                                    DropdownMenuItem(
-                                        text = { Text(text = ritter) },
-                                        onClick = {
-                                            inputVerteidigerRitter.value = ritter
-                                            expandedVerteidigerRitter = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }*/
+                    item { Text(text = "Spieler B: ", fontSize = 25.sp) }
+                    item { spielerAuswahl(spiel.spielerListe, inputSpielerB) }
                 }
 
                 Column(
                     modifier = Modifier.fillMaxWidth().clickable {
-                        onDeclareMilitary(
-                            Pair( Pair(
-                                inputAggressor.value,
-                                military.indexOf(inputAggressorRitter.value) + 1
-                            ), Pair(
-                                inputVerteidiger.value,
-                                military.indexOf(inputVerteidigerRitter.value) + 1
-                            ) )
-                        )
-                        isMilitaryExpanded = false
-                    },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = "Schlacht führen",
-                        fontSize = 30.sp,
-                        modifier = ModiPad10,
-                    )
-                }
-            }
-        }
-    } else if (isPeaceExpanded) {
-        Card(modifier = Modifier.padding(25.dp)) {
-            val inputPeaceVariant = remember { mutableStateOf("Friedenserklärung wählen") }
-
-            Column {
-                var expandedPeaceTreaty by remember { mutableStateOf(false) }
-
-                Text(
-                    text = inputPeaceVariant.value,
-                    fontSize = 40.sp,
-                    modifier = ModiPad10.clickable { expandedPeaceTreaty = true },
-                )
-
-                DropdownMenu(
-                    expanded = expandedPeaceTreaty,
-                    onDismissRequest = { expandedPeaceTreaty = false }
-                ) {
-                    listOf("Hegemonialfrieden", "Verhandlungsfrieden").forEach { frieden ->
-                        DropdownMenuItem(
-                            text = { Text(text = frieden) },
-                            onClick = {
-                                inputPeaceVariant.value = frieden
-                                expandedPeaceTreaty = false
-                            }
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        onDeclarePeace(inputPeaceVariant.value to inputPeaceVariant.value)
+                        onDeclarePeace(inputSpielerA.value to inputSpielerB.value)
                         isPeaceExpanded = false
                     },
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1126,6 +983,11 @@ private fun Float.renditeFarbe(): Color? = when {
 fun SpielerPreview() {
     val spiel = remember { TestSpiel }
     Column {
-        zeigeSpieler(spiel,{},{spieler,bauteil,wahr -> },{},{},{})
+        zeigeSpieler(
+            spiel = spiel,
+            konfliktAktionenAktiv = true,
+            onDeclareWar = {},
+            onDeclarePeace = {},
+        )
     }
 }

@@ -8,6 +8,61 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 
 internal object AnleihenRegelwerk {
+    fun anleiheEmittieren(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.AnleiheEmittiert,
+    ): SpielZustand {
+        val anleihe = ereignis.anleihe
+        require(anleihe.id !in zustand.anleihen) { "Die Anleihe-ID ist bereits vergeben." }
+        require(anleihe.emissionsRunde == zustand.rundenzähler) {
+            "Die Emissionsrunde muss der laufenden Runde entsprechen."
+        }
+        require(ereignis.erloes > Geld.NULL) { "Der Emissionserlös muss positiv sein." }
+        require(ereignis.erwerber != KontoId.Spieler(anleihe.emittent)) {
+            "Der Emittent kann seine neue Anleihe nicht selbst erwerben."
+        }
+        val mitAnleihe = zustand.copy(anleihen = zustand.anleihen + (anleihe.id to anleihe))
+        val mitErloes = when (ereignis.erwerber) {
+            KontoId.Bank -> SpielerRegelwerk.aendereSpieler(mitAnleihe, anleihe.emittent) { spieler ->
+                spieler.copy(geldkonto = spieler.geldkonto + ereignis.erloes)
+            }
+            KontoId.Ausland -> error("Das Ausland erwirbt keine Anleihen.")
+            is KontoId.Spieler -> FinanzRegelwerk.geldUebertragen(
+                mitAnleihe,
+                ereignis.erwerber,
+                KontoId.Spieler(anleihe.emittent),
+                ereignis.erloes,
+            )
+        }
+        return anleiheZuKontoHinzufuegen(mitErloes, anleihe.id, ereignis.erwerber)
+    }
+
+    fun freiwilligZurueckkaufen(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.AnleiheFreiwilligZurueckgekauft,
+    ): SpielZustand {
+        val anleihe = zustand.anleihen[ereignis.anleihe]
+            ?: error("Unbekannte Anleihe: ${ereignis.anleihe.wert}")
+        require(anleihe.emittent == ereignis.emittent) { "Nur der Emittent darf zurückkaufen." }
+        val besitzer = AnleihenAuswertung.besitzer(zustand, ereignis.anleihe)
+            ?: error("Die Anleihe besitzt keinen Gläubiger.")
+        require(besitzer != KontoId.Spieler(ereignis.emittent)) {
+            "Der Emittent besitzt die Anleihe bereits."
+        }
+        require(besitzer != KontoId.Ausland) { "Das Ausland hält keine Anleihen." }
+        val nachZahlung = FinanzRegelwerk.geldUebertragen(
+            zustand,
+            KontoId.Spieler(ereignis.emittent),
+            besitzer,
+            ereignis.preis,
+        )
+        return anleiheVerschieben(
+            nachZahlung,
+            ereignis.anleihe,
+            besitzer,
+            KontoId.Spieler(ereignis.emittent),
+        )
+    }
     fun anleiheKaufen(
         zustand: SpielZustand,
         ereignis: SpielEreignis.AnleiheGekauft,
@@ -69,8 +124,7 @@ internal object AnleihenRegelwerk {
             an = besitzer,
             betrag = anleihe.nennwert,
         )
-        val ohneBesitzer = anleiheEntfernen(nachZahlung, ereignis.anleihe)
-        return ohneBesitzer.copy(anleihen = ohneBesitzer.anleihen - ereignis.anleihe)
+        return anleiheAusloesen(nachZahlung, ereignis.anleihe)
     }
 
     private fun anleiheVerschieben(
@@ -95,6 +149,7 @@ internal object AnleihenRegelwerk {
             }
             zustand.copy(bankAnleihen = zustand.bankAnleihen - anleihe)
         }
+        KontoId.Ausland -> error("Das Ausland hält keine Anleihen.")
         is KontoId.Spieler -> SpielerRegelwerk.aendereSpieler(zustand, konto.id) { spieler ->
             require(anleihe in spieler.anleihen) {
                 "${spieler.name} besitzt Anleihe ${anleihe.wert} nicht."
@@ -113,6 +168,7 @@ internal object AnleihenRegelwerk {
         }
         return when (konto) {
             KontoId.Bank -> zustand.copy(bankAnleihen = zustand.bankAnleihen + anleihe)
+            KontoId.Ausland -> error("Das Ausland hält keine Anleihen.")
             is KontoId.Spieler -> SpielerRegelwerk.aendereSpieler(zustand, konto.id) { spieler ->
                 spieler.copy(anleihen = spieler.anleihen + anleihe)
             }
@@ -128,4 +184,12 @@ internal object AnleihenRegelwerk {
             spieler.copy(anleihen = spieler.anleihen - anleihe)
         },
     )
+
+    fun anleiheAusloesen(
+        zustand: SpielZustand,
+        anleihe: AnleiheId,
+    ): SpielZustand {
+        val ohneBesitzer = anleiheEntfernen(zustand, anleihe)
+        return ohneBesitzer.copy(anleihen = ohneBesitzer.anleihen - anleihe)
+    }
 }

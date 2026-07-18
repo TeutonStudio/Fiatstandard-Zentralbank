@@ -17,7 +17,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
-import de.teutonstudio.zentralbank.fachlogik.modell.Phase
+import de.teutonstudio.zentralbank.fachlogik.modell.ProzugStatus
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
@@ -435,7 +436,7 @@ class KartenRegelwerkTest {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val start = zustand().copy(
             aktiverSpieler = bert,
-            zugStatus = ZugStatus(bert, Phase.Aktionen),
+            zugStatus = epizug(bert),
             karte = zustand().karte?.copy(
                 belegung = KartenBelegung(
                     ecken = listOf(EckBelegung(ecke, EckGebaeudeTyp.BAHNHOF, anna)),
@@ -484,7 +485,18 @@ class KartenRegelwerkTest {
             ),
             spielabschnitt = if (rundeNull) Spielabschnitt.RUNDE_NULL else Spielabschnitt.REGULAER,
             aktiverSpieler = anna,
-            zugStatus = ZugStatus(anna, if (rundeNull) Phase.Einnahmen else Phase.Aktionen),
+            zugStatus = if (rundeNull) {
+                ZugStatus(1L, anna, ZugPhase.Prozug)
+            } else {
+                epizug(anna)
+            },
         )
     }
+
+    private fun epizug(spieler: SpielerId) = ZugStatus(
+        zugId = 1L,
+        spieler = spieler,
+        phase = ZugPhase.Epizug,
+        prozug = ProzugStatus(begonnen = true, erfolgreichAbgeschlossen = true),
+    )
 }

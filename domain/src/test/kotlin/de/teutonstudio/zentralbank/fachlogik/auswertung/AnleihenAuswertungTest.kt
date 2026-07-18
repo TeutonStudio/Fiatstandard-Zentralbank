@@ -7,6 +7,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitArt
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -40,5 +41,28 @@ class AnleihenAuswertungTest {
             Geld.mark(120),
             AnleihenAuswertung.bankgehalteneSchuldensumme(zustand, anna),
         )
+    }
+
+    @Test
+    fun plantUnvermoegenAbFolgerundeUndRueckkaufInFaelligkeitsrunde() {
+        val zustand = SpielZustand(
+            spieler = listOf(Spieler(anna, "Anna")),
+            bankAnleihen = listOf(anleiheId),
+            anleihen = mapOf(anleiheId to anleihe),
+            rundenzähler = 1,
+        )
+
+        val zins = AnleihenAuswertung.faelligeVerbindlichkeiten(zustand, anna, 8L).single()
+        val rueckkauf = AnleihenAuswertung.faelligeVerbindlichkeiten(
+            zustand.copy(rundenzähler = anleihe.faelligkeitsRunde),
+            anna,
+            9L,
+        ).single()
+
+        assertEquals(VerbindlichkeitArt.UNVERMOEGEN, zins.id.art)
+        assertEquals(Geld.mark(5), zins.betrag)
+        assertEquals(KontoId.Bank, zins.empfaenger)
+        assertEquals(VerbindlichkeitArt.RUECKKAUF, rueckkauf.id.art)
+        assertEquals(Geld.mark(100), rueckkauf.betrag)
     }
 }

@@ -1,7 +1,6 @@
 package de.teutonstudio.zentralbank.fachlogik.schnittstelle
 
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
-import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
@@ -21,10 +20,7 @@ class SpielAblageVertragTest {
             spieler = listOf(Spieler(id = anna, name = "Anna")),
         ),
         ereignisse = listOf(
-            SpielEreignis.RohstoffEinnahme(
-                spieler = anna,
-                mengen = mapOf(Rohstoff.HOLZ to 2),
-            ),
+            SpielEreignis.ProzugBegonnen(1L),
         ),
     )
 
@@ -46,13 +42,12 @@ class SpielAblageVertragTest {
             ablage.spielstaendeBeobachten().first(),
         )
         assertEquals(
-            2,
+            true,
             ablage.spielLaden(spiel.id)
                 ?.aktuellerZustand()
-                ?.spieler
-                ?.single()
-                ?.rohstoffe
-                ?.get(Rohstoff.HOLZ),
+                ?.zugStatus
+                ?.prozug
+                ?.begonnen,
         )
 
         ablage.spielLoeschen(spiel.id)

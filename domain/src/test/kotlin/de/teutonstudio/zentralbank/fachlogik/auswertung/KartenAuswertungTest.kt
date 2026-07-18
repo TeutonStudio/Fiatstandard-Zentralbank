@@ -9,6 +9,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
@@ -43,7 +44,7 @@ class KartenAuswertungTest {
         )
 
         assertEquals(mapOf(anna to 3), KartenAuswertung.ertrag(karte, feld))
-        assertEquals(mapOf(Rohstoff.NAHRUNG to 3), KartenAuswertung.rohstoffErtrag(karte, anna))
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 3), KartenAuswertung.abbauErtrag(karte, anna))
     }
 
     @Test
@@ -53,6 +54,20 @@ class KartenAuswertungTest {
 
         assertEquals(AnlagenZustand.VERLASSEN, KartenAuswertung.effektiverZustand(karte, belegung))
         assertTrue(KartenAuswertung.ertrag(karte, feld).isEmpty())
+    }
+
+    @Test
+    fun verarbeitungWirdNichtAlsAutomatischerAbbauGewertet() {
+        val karte = karte(
+            anlage = FeldAnlage.Wirtschaftsregion(BauteilTyp.ZIEGELBRENNER),
+            kanten = listOf(KantenBelegung(kante)),
+        )
+
+        assertTrue(KartenAuswertung.abbauErtrag(karte, anna).isEmpty())
+        val standort = KartenAuswertung.verarbeitungsStandorte(karte, anna).single()
+        assertEquals(1, standort.maximaleLaeufe)
+        assertEquals(mapOf(Rohstoff.LEHM to 1), standort.einsatzJeLauf)
+        assertEquals(mapOf(Rohstoff.ZIEGEL to 1), standort.ertragJeLauf)
     }
 
     @Test

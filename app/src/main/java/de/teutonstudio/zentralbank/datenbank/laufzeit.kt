@@ -738,61 +738,6 @@ open class Spiel(
         )
     }
 
-    fun erhalteAusgabenplan(
-        spielerName: String,
-        runde: Int = (aktuelleRunde - 1).coerceAtLeast(0),
-    ): Ausgabenplan {
-        require(runde in 0 until aktuelleRunde) { "Unbekannte Runde: $runde" }
-        val spieler = spielerListe.firstOrNull { eintrag -> eintrag.name == spielerName }
-            ?: error("Unbekannter Spieler: $spielerName")
-
-        val zahlungen = anleihen
-            .flatMap { anleihe -> anleihe.erhalteAblauf() }
-            .filter { eintrag ->
-                eintrag.runde == runde &&
-                    eintrag.von == spieler &&
-                    (eintrag.art == AnleiheAblaufArt.ZINS ||
-                        eintrag.art == AnleiheAblaufArt.RUECKKAUF)
-            }
-            .map { eintrag ->
-                AusgabenZahlung(
-                    art = eintrag.art,
-                    empfaenger = eintrag.an,
-                    betrag = eintrag.betrag,
-                )
-            }
-            .sortedWith(
-                compareBy<AusgabenZahlung> { zahlung -> zahlung.empfaenger.name }
-                    .thenBy { zahlung -> zahlung.art.reihenfolge }
-            )
-
-        val rohstoffVerwendungen = spieler.erhalteBauSaldoZurRunde(runde)
-            .filterValues { anzahl -> anzahl > 0 }
-            .flatMap { (bauteil, gebaeudeAnzahl) ->
-                bauteil.erhalteVerbrauch()
-                    .filterValues { menge -> menge > 0 }
-                    .map { (rohstoff, mengeJeGebaeude) ->
-                        AusgabenRohstoffVerwendung(
-                            bauteil = bauteil,
-                            gebaeudeAnzahl = gebaeudeAnzahl,
-                            rohstoff = rohstoff,
-                            rohstoffAnzahl = mengeJeGebaeude * gebaeudeAnzahl,
-                        )
-                    }
-            }
-            .sortedWith(
-                compareBy<AusgabenRohstoffVerwendung> { verwendung -> verwendung.bauteil.str }
-                    .thenBy { verwendung -> verwendung.rohstoff.ordinal }
-            )
-
-        return Ausgabenplan(
-            runde = runde,
-            spieler = spieler,
-            zahlungen = zahlungen,
-            rohstoffVerwendungen = rohstoffVerwendungen,
-        )
-    }
-
     private fun erhaltePreisWarenkorb(
         marktpreise: Map<Rohstoffe, Zahlungsmittel>,
     ): Zahlungsmittel = preisinflationswarenkorb.entries.summeGeld { (rohstoff, menge) ->
@@ -1119,32 +1064,6 @@ private fun AnleiheAnzeige.erwarteteRenditeProzent(
         erwarteteZahlungen / handelspreis
     }
     return (verhältnis - 1f) * 100f
-}
-
-data class Ausgabenplan(
-    val runde: Int,
-    val spieler: Spieler,
-    val zahlungen: List<AusgabenZahlung>,
-    val rohstoffVerwendungen: List<AusgabenRohstoffVerwendung>,
-)
-
-data class AusgabenZahlung(
-    val art: AnleiheAblaufArt,
-    val empfaenger: JuristischePerson,
-    val betrag: Zahlungsmittel,
-)
-
-data class AusgabenRohstoffVerwendung(
-    val bauteil: Bauteil,
-    val gebaeudeAnzahl: Int,
-    val rohstoff: Rohstoffe,
-    val rohstoffAnzahl: Int,
-)
-
-private fun Bauteil.erhalteVerbrauch(): Map<Rohstoffe, Int> = when (this) {
-    is Verwaltungsstandort -> verbrauch
-    is Wirtschaftsregionen -> verbrauch
-    is Handelslinie -> emptyMap()
 }
 
 data class Anleihenhandel(
