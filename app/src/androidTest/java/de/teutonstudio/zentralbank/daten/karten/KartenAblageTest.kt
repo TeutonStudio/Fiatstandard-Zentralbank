@@ -27,6 +27,7 @@ class KartenAblageTest {
                 id = "instrumentierter-entwurf",
                 name = "Instrumentierte Karte",
             ),
+            referenz = null,
         )
         try {
             val neuGeladen = ablage.alleKartenLaden()
@@ -68,6 +69,43 @@ class KartenAblageTest {
             })
         } finally {
             alteKarte.delete()
+        }
+    }
+
+    @Test
+    fun ReferenzbildWirdMitEigenerKarteGespeichertGeladenUndGeloescht() = runBlocking {
+        val kontext = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val ablage = KartenAblage(kontext)
+        val quellbild = File(kontext.cacheDir, "karten-referenz-ablage-test.bild").apply {
+            writeBytes(byteArrayOf(1, 2, 3, 4, 5))
+        }
+        val referenz = KartenReferenz(
+            bildDatei = quellbild,
+            metadaten = KartenReferenzMetadaten(
+                zentrumX = 3.5f,
+                zentrumZ = -7f,
+                breiteInBrettEinheiten = 42f,
+                deckkraft = 0.55f,
+            ),
+        )
+        val gespeichert = ablage.eigeneKarteSpeichern(
+            vorlage = KartenVorlage(id = "referenz-test", name = "Referenztest"),
+            referenz = referenz,
+        )
+
+        try {
+            val geladen = requireNotNull(ablage.referenzLaden(gespeichert.id))
+            val eintrag = ablage.alleKartenLaden()
+                .single { es -> es.vorlage.id == gespeichert.id }
+
+            assertEquals(referenz.metadaten, geladen.metadaten)
+            assertTrue(geladen.bildDatei.readBytes().contentEquals(quellbild.readBytes()))
+            assertTrue(eintrag.hatReferenzbild)
+            assertTrue(ablage.eigeneKarteLoeschen(gespeichert.id))
+            assertEquals(null, ablage.referenzLaden(gespeichert.id))
+        } finally {
+            ablage.eigeneKarteLoeschen(gespeichert.id)
+            quellbild.delete()
         }
     }
 }

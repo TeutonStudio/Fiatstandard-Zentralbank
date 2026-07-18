@@ -37,6 +37,7 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.HandelDialog
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.AnleihenRegister
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Hauptmenü
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.LebensraeumeVerwalten
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielErstellen
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielLaden
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
@@ -78,6 +79,7 @@ sealed class Screen(val route: String) {
     object StartScreen: Screen(route = "main_screen")
     object NewGame: Screen(route = "new_game")
     object LoadGame: Screen(route = "load_game")
+    object Lebensraeume: Screen(route = "lebensraeume")
     object Game: Screen(route = "game")
     object GameMap: Screen(route = "game_map")
     object PlayerSaldo: Screen(route = "player_saldo")
@@ -114,8 +116,15 @@ fun Navigation(viewModel: GameViewModel) {
             composable(route = Screen.StartScreen.route) {
                 Hauptmenü(
                     Screen.NewGame.navigiere(navController),
-                    Screen.LoadGame.navigiere(navController)
+                    Screen.LoadGame.navigiere(navController),
+                    Screen.Lebensraeume.navigiere(navController),
                 )
+            }
+
+            composable(route = Screen.Lebensraeume.route) {
+                Titel(beiZurück = { navController.popBackStack() }) {
+                    LebensraeumeVerwalten(modifier = Modifier.fillMaxSize())
+                }
             }
 
             composable(route = Screen.NewGame.route) {

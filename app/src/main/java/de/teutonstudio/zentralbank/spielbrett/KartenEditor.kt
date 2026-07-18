@@ -1,5 +1,7 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,13 +17,17 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -31,15 +37,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import de.teutonstudio.zentralbank.daten.karten.KartenAblage
+import de.teutonstudio.zentralbank.daten.karten.KartenReferenz
+import de.teutonstudio.zentralbank.daten.karten.KartenReferenzMetadaten
+import de.teutonstudio.zentralbank.daten.karten.MAX_REFERENZ_BREITE
+import de.teutonstudio.zentralbank.daten.karten.MIN_REFERENZ_BREITE
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import kotlinx.coroutines.launch
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.roundToInt
 
 enum class KartenModus(val beschriftung: String) {
     BAUEN("Bauen"),
@@ -69,9 +83,66 @@ fun KartenEditorDialog(
     var werkzeug by remember { mutableStateOf(KartenWerkzeug.EBENE) }
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
     var wirdGespeichert by remember { mutableStateOf(false) }
+    var referenzWirdGeladen by remember(ausgangsvorlage) { mutableStateOf(true) }
+    var referenzBild by remember(ausgangsvorlage) { mutableStateOf<ImageBitmap?>(null) }
+    var referenzAusrichten by remember(ausgangsvorlage) { mutableStateOf(false) }
     val draufsichtStatus = rememberKartenDraufsichtStatus()
+    val referenzStatus = remember(ausgangsvorlage) { KartenReferenzEditorStatus() }
     val bauHimmel = remember { HimmelsDarstellung.fuerUhrzeit(12f) }
     val scope = rememberCoroutineScope()
+    val bildAuswahl = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) {
+            referenzWirdGeladen = true
+            fehlermeldung = null
+            scope.launch {
+                var importierteReferenz: KartenReferenz? = null
+                runCatching {
+                    val referenz = ablage.referenzImportieren(
+                        uri = uri,
+                        initialeBreiteInBrettEinheiten = entwurf.empfohleneReferenzBreite(),
+                    )
+                    importierteReferenz = referenz
+                    referenz to referenz.bildDatei.ladeReferenzImageBitmap()
+                }.onSuccess { (referenz, bild) ->
+                    ablage.referenzEntwurfVerwerfen(referenzStatus.referenz)
+                    referenzStatus.setze(referenz)
+                    referenzBild = bild
+                    referenzAusrichten = true
+                    referenzWirdGeladen = false
+                }.onFailure { fehler ->
+                    ablage.referenzEntwurfVerwerfen(importierteReferenz)
+                    referenzWirdGeladen = false
+                    fehlermeldung = fehler.message ?: "Referenzbild konnte nicht geladen werden."
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(ablage, ausgangsvorlage.id) {
+        if (referenzStatus.initialisiert) {
+            referenzWirdGeladen = false
+            return@LaunchedEffect
+        }
+        runCatching {
+            val referenz = ablage.referenzLaden(ausgangsvorlage.id)
+            referenz to referenz?.bildDatei?.ladeReferenzImageBitmap()
+        }.onSuccess { (referenz, bild) ->
+            referenzStatus.initialisiere(referenz)
+            referenzBild = bild
+            referenzWirdGeladen = false
+        }.onFailure { fehler ->
+            referenzStatus.initialisiere(null)
+            referenzWirdGeladen = false
+            fehlermeldung = fehler.message ?: "Referenzbild konnte nicht geladen werden."
+        }
+    }
+
+    fun abbrechen() {
+        ablage.referenzEntwurfVerwerfen(referenzStatus.referenz)
+        beiAbbruch()
+    }
 
     fun uebernehme(neu: KartenVorlage) {
         if (neu == entwurf) return
@@ -81,7 +152,7 @@ fun KartenEditorDialog(
     }
 
     Dialog(
-        onDismissRequest = beiAbbruch,
+        onDismissRequest = { if (!wirdGespeichert) abbrechen() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
@@ -123,6 +194,20 @@ fun KartenEditorDialog(
                             werkzeug = werkzeug,
                             beiWerkzeug = { werkzeug = it },
                             beiAnsichtZuruecksetzen = draufsichtStatus::zuruecksetzen,
+                            referenz = referenzStatus.referenz,
+                            referenzWirdGeladen = referenzWirdGeladen,
+                            referenzAusrichten = referenzAusrichten,
+                            beiReferenzAuswaehlen = { bildAuswahl.launch("image/*") },
+                            beiReferenzAusrichten = { referenzAusrichten = it },
+                            beiReferenzMetadaten = { metadaten ->
+                                referenzStatus.aktualisiereMetadaten { metadaten }
+                            },
+                            beiReferenzEntfernen = {
+                                ablage.referenzEntwurfVerwerfen(referenzStatus.referenz)
+                                referenzStatus.setze(null)
+                                referenzBild = null
+                                referenzAusrichten = false
+                            },
                             kannRueckgaengig = verlaufIndex > 0,
                             kannWiederholen = verlaufIndex < verlauf.lastIndex,
                             beiRueckgaengig = { if (verlaufIndex > 0) verlaufIndex-- },
@@ -134,6 +219,9 @@ fun KartenEditorDialog(
                             KartenEditorDraufsicht(
                                 karte = entwurf,
                                 status = draufsichtStatus,
+                                referenzStatus = referenzStatus,
+                                referenzBild = referenzBild,
+                                referenzAusrichten = referenzAusrichten,
                                 modifier = Modifier.fillMaxSize(),
                                 onDreieckBeruehrt = { treffer ->
                                     fehlermeldung = null
@@ -146,8 +234,11 @@ fun KartenEditorDialog(
                                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                             )
                             Text(
-                                text =
-                                    "Tippen: Gelände bearbeiten · Ziehen: verschieben · Pinch: zoomen",
+                                text = if (referenzAusrichten) {
+                                    "Referenz ausrichten · Ziehen: verschieben · Pinch: skalieren"
+                                } else {
+                                    "Tippen: Gelände bearbeiten · Ziehen: verschieben · Pinch: zoomen"
+                                },
                                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                                 style = MaterialTheme.typography.labelSmall,
                             )
@@ -180,12 +271,12 @@ fun KartenEditorDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedButton(onClick = beiAbbruch, enabled = !wirdGespeichert) {
+                    OutlinedButton(onClick = ::abbrechen, enabled = !wirdGespeichert) {
                         Text("Abbrechen")
                     }
                     Button(
                         modifier = Modifier.padding(start = 8.dp),
-                        enabled = name.isNotBlank() && !wirdGespeichert,
+                        enabled = name.isNotBlank() && !wirdGespeichert && !referenzWirdGeladen,
                         onClick = {
                             wirdGespeichert = true
                             fehlermeldung = null
@@ -193,6 +284,7 @@ fun KartenEditorDialog(
                                 runCatching {
                                     ablage.eigeneKarteSpeichern(
                                         vorlage = entwurf.copy(name = name.trim()),
+                                        referenz = referenzStatus.referenz,
                                     )
                                 }.onSuccess(beiGespeichert).onFailure { fehler ->
                                     wirdGespeichert = false
@@ -219,6 +311,13 @@ private fun KartenWerkzeugleiste(
     werkzeug: KartenWerkzeug,
     beiWerkzeug: (KartenWerkzeug) -> Unit,
     beiAnsichtZuruecksetzen: () -> Unit,
+    referenz: KartenReferenz?,
+    referenzWirdGeladen: Boolean,
+    referenzAusrichten: Boolean,
+    beiReferenzAuswaehlen: () -> Unit,
+    beiReferenzAusrichten: (Boolean) -> Unit,
+    beiReferenzMetadaten: (KartenReferenzMetadaten) -> Unit,
+    beiReferenzEntfernen: () -> Unit,
     kannRueckgaengig: Boolean,
     kannWiederholen: Boolean,
     beiRueckgaengig: () -> Unit,
@@ -251,6 +350,34 @@ private fun KartenWerkzeugleiste(
         Text("Ansicht", style = MaterialTheme.typography.titleSmall)
         OutlinedButton(onClick = beiAnsichtZuruecksetzen) {
             Text("Zentrieren")
+        }
+        Text("Referenzbild", style = MaterialTheme.typography.titleSmall)
+        when {
+            referenzWirdGeladen -> Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator()
+                Text("Referenzbild wird geladen …")
+            }
+            referenz == null -> {
+                OutlinedButton(onClick = beiReferenzAuswaehlen) {
+                    Text("Referenzbild auswählen")
+                }
+                Text(
+                    "Das Bild wird nur als lokale Hilfe im Baumodus verwendet.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            else -> ReferenzWerkzeuge(
+                referenz = referenz,
+                karte = karte,
+                ausrichten = referenzAusrichten,
+                beiAuswaehlen = beiReferenzAuswaehlen,
+                beiAusrichten = beiReferenzAusrichten,
+                beiMetadaten = beiReferenzMetadaten,
+                beiEntfernen = beiReferenzEntfernen,
+            )
         }
         Text("Gelände", style = MaterialTheme.typography.titleSmall)
         FlowRow(
@@ -300,6 +427,119 @@ private fun KartenWerkzeug.gelaendeOderNull(): GelaendeTyp? = when (this) {
     KartenWerkzeug.GEBIRGE -> GelaendeTyp.GEBIRGE
     KartenWerkzeug.WUESTE -> GelaendeTyp.WUESTE
     KartenWerkzeug.SUMPF -> GelaendeTyp.SUMPF
+}
+
+@Composable
+private fun ReferenzWerkzeuge(
+    referenz: KartenReferenz,
+    karte: KartenVorlage,
+    ausrichten: Boolean,
+    beiAuswaehlen: () -> Unit,
+    beiAusrichten: (Boolean) -> Unit,
+    beiMetadaten: (KartenReferenzMetadaten) -> Unit,
+    beiEntfernen: () -> Unit,
+) {
+    val metadaten = referenz.metadaten
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Anzeigen")
+        Switch(
+            checked = metadaten.sichtbar,
+            onCheckedChange = { sichtbar ->
+                beiMetadaten(metadaten.copy(sichtbar = sichtbar))
+                if (!sichtbar) beiAusrichten(false)
+            },
+        )
+    }
+    FilterChip(
+        selected = ausrichten,
+        enabled = metadaten.sichtbar,
+        onClick = { beiAusrichten(!ausrichten) },
+        label = { Text("Bild ausrichten") },
+    )
+    Text(
+        "Breite: ${metadaten.breiteInBrettEinheiten.anzeigeWert()} Brett-Einheiten",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Slider(
+        value = metadaten.breiteInBrettEinheiten.zuReferenzRegler(),
+        onValueChange = { wert ->
+            beiMetadaten(
+                metadaten.copy(breiteInBrettEinheiten = wert.ausReferenzRegler()),
+            )
+        },
+        valueRange = 0f..1f,
+    )
+    Text(
+        "Deckkraft: ${(metadaten.deckkraft * 100).roundToInt()} %",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Slider(
+        value = metadaten.deckkraft,
+        onValueChange = { deckkraft ->
+            beiMetadaten(metadaten.copy(deckkraft = deckkraft))
+        },
+        valueRange = 0f..1f,
+    )
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        OutlinedButton(
+            onClick = {
+                beiMetadaten(
+                    metadaten.copy(
+                        zentrumX = 0f,
+                        zentrumZ = 0f,
+                        breiteInBrettEinheiten = karte.empfohleneReferenzBreite(),
+                    ),
+                )
+            },
+        ) {
+            Text("Auf Karte einpassen")
+        }
+        OutlinedButton(
+            onClick = {
+                beiMetadaten(metadaten.copy(zentrumX = 0f, zentrumZ = 0f))
+            },
+        ) {
+            Text("Zentrieren")
+        }
+        OutlinedButton(onClick = beiAuswaehlen) {
+            Text("Ersetzen")
+        }
+        OutlinedButton(onClick = beiEntfernen) {
+            Text("Entfernen")
+        }
+    }
+}
+
+private fun KartenVorlage.empfohleneReferenzBreite(): Float =
+    (hexagon.radius * 2f * GRUNDDREIECK_SEITENLAENGE)
+        .coerceAtLeast(12f)
+        .coerceIn(MIN_REFERENZ_BREITE, MAX_REFERENZ_BREITE)
+
+private fun Float.zuReferenzRegler(): Float {
+    val minimum = ln(MIN_REFERENZ_BREITE)
+    val maximum = ln(MAX_REFERENZ_BREITE)
+    return ((ln(coerceIn(MIN_REFERENZ_BREITE, MAX_REFERENZ_BREITE)) - minimum) /
+        (maximum - minimum)).coerceIn(0f, 1f)
+}
+
+private fun Float.ausReferenzRegler(): Float {
+    val minimum = ln(MIN_REFERENZ_BREITE)
+    val maximum = ln(MAX_REFERENZ_BREITE)
+    return exp(minimum + coerceIn(0f, 1f) * (maximum - minimum))
+        .coerceIn(MIN_REFERENZ_BREITE, MAX_REFERENZ_BREITE)
+}
+
+private fun Float.anzeigeWert(): String = when {
+    this >= 1_000f -> roundToInt().toString()
+    this >= 10f -> ((this * 10).roundToInt() / 10f).toString()
+    else -> ((this * 100).roundToInt() / 100f).toString()
 }
 
 private fun Map<KartenFeld, GelaendeTyp>.zuSortiertenGelaendefeldern(): List<GelaendeFeld> =

@@ -15,7 +15,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.drawWithCache
@@ -124,6 +126,9 @@ private val KartenDraufsichtStatusSaver = listSaver<KartenDraufsichtStatus, Floa
 internal fun KartenEditorDraufsicht(
     karte: KartenVorlage,
     status: KartenDraufsichtStatus,
+    referenzStatus: KartenReferenzEditorStatus,
+    referenzBild: ImageBitmap?,
+    referenzAusrichten: Boolean,
     modifier: Modifier = Modifier,
     onDreieckBeruehrt: (DreieckTreffer) -> Unit,
 ) {
@@ -142,25 +147,36 @@ internal fun KartenEditorDraufsicht(
             .semantics {
                 contentDescription =
                     "Draufsicht der bearbeitbaren Karte mit ${karte.gelaendefelder.size} " +
-                    "Geländedreiecken"
+                    "Geländedreiecken" +
+                    if (referenzBild == null) "" else " und Referenzbild"
             }
-            .pointerInput(status, basisMassstab) {
+            .pointerInput(status, referenzStatus, basisMassstab, referenzAusrichten) {
                 detectTransformGestures(panZoomLock = true) {
                         schwerpunkt,
                         verschiebung,
                         zoomFaktor,
                         _,
                     ->
-                    status.verarbeiteGeste(
-                        vorherigerSchwerpunkt = schwerpunkt,
-                        verschiebung = verschiebung,
-                        zoomFaktor = zoomFaktor,
-                        ansichtsGroesse = size,
-                        basisMassstab = basisMassstab,
-                    )
+                    if (referenzAusrichten && referenzStatus.referenz != null) {
+                        referenzStatus.verarbeiteAusrichtungsGeste(
+                            verschiebungBildschirmX = verschiebung.x,
+                            verschiebungBildschirmZ = verschiebung.y,
+                            zoomFaktor = zoomFaktor,
+                            bildschirmMassstab = basisMassstab * status.transformation.zoom,
+                        )
+                    } else {
+                        status.verarbeiteGeste(
+                            vorherigerSchwerpunkt = schwerpunkt,
+                            verschiebung = verschiebung,
+                            zoomFaktor = zoomFaktor,
+                            ansichtsGroesse = size,
+                            basisMassstab = basisMassstab,
+                        )
+                    }
                 }
             }
-            .pointerInput(status, geometrie, basisMassstab) {
+            .pointerInput(status, geometrie, basisMassstab, referenzAusrichten) {
+                if (referenzAusrichten) return@pointerInput
                 detectTapGestures { bildschirmPunkt ->
                     val brettPunkt = status.transformation.bildschirmZuBrett(
                         bildschirmPunkt = bildschirmPunkt,
@@ -198,6 +214,7 @@ internal fun KartenEditorDraufsicht(
                 }
                 val rasterStrichBreite = 1.dp.toPx()
                 val gelaendeStrichBreite = 1.5.dp.toPx()
+                val referenzRahmenBreite = 2.dp.toPx()
 
                 onDrawBehind {
                     drawRect(DraufsichtHintergrund)
@@ -215,6 +232,45 @@ internal fun KartenEditorDraufsicht(
                                 left = -transformation.fokusX,
                                 top = -transformation.fokusZ,
                             ) {
+                                gelaendePfade.forEach { (typ, pfad) ->
+                                    drawPath(
+                                        path = pfad,
+                                        color = DraufsichtGelaendeFarben.getValue(typ),
+                                    )
+                                }
+                                val referenz = referenzStatus.referenz?.metadaten
+                                if (referenzBild != null && referenz?.sichtbar == true) {
+                                    val bildMassstab =
+                                        referenz.breiteInBrettEinheiten / referenzBild.width
+                                    val bildHoehe = referenzBild.height * bildMassstab
+                                    translate(
+                                        left = referenz.zentrumX -
+                                            referenz.breiteInBrettEinheiten / 2f,
+                                        top = referenz.zentrumZ - bildHoehe / 2f,
+                                    ) {
+                                        scale(scale = bildMassstab, pivot = Offset.Zero) {
+                                            drawImage(
+                                                image = referenzBild,
+                                                alpha = referenz.deckkraft,
+                                            )
+                                        }
+                                    }
+                                    if (referenzAusrichten) {
+                                        drawRect(
+                                            color = Color.White,
+                                            topLeft = Offset(
+                                                referenz.zentrumX -
+                                                    referenz.breiteInBrettEinheiten / 2f,
+                                                referenz.zentrumZ - bildHoehe / 2f,
+                                            ),
+                                            size = Size(
+                                                referenz.breiteInBrettEinheiten,
+                                                bildHoehe,
+                                            ),
+                                            style = Stroke(width = referenzRahmenBreite / massstab),
+                                        )
+                                    }
+                                }
                                 translate(
                                     left = rasterVerschiebung.x,
                                     top = rasterVerschiebung.z,
@@ -223,12 +279,6 @@ internal fun KartenEditorDraufsicht(
                                         path = rasterPfad,
                                         color = RasterFarbe,
                                         style = Stroke(width = rasterStrichBreite / massstab),
-                                    )
-                                }
-                                gelaendePfade.forEach { (typ, pfad) ->
-                                    drawPath(
-                                        path = pfad,
-                                        color = DraufsichtGelaendeFarben.getValue(typ),
                                     )
                                 }
                                 drawPath(

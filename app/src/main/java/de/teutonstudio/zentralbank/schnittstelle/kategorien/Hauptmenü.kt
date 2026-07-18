@@ -9,11 +9,22 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.ImageCard
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 
 @Composable
-fun Hauptmenü(beiNeu: () -> Unit, beiLade: () -> Unit) {
+fun Hauptmenü(
+    beiNeu: () -> Unit,
+    beiLade: () -> Unit,
+    beiLebensraeume: () -> Unit,
+) {
     Titel { RowOrColumnByOrientation(
         {},
         { ImageCard(bild_index = R.drawable.newgameicon, bild_label = "Neues Spiel", beiKlick = beiNeu ) },
         { ImageCard(bild_index = R.drawable.loadgameicon, bild_label = "Spiel Laden", beiKlick = beiLade ) },
+        {
+            ImageCard(
+                bild_index = R.drawable.lebensraeume,
+                bild_label = "Lebensräume Verwalten",
+                beiKlick = beiLebensraeume,
+            )
+        },
     ) }
 }
 
@@ -22,6 +33,6 @@ fun Hauptmenü(beiNeu: () -> Unit, beiLade: () -> Unit) {
 @Composable
 private fun HauptmenüPreview() {
     Column() {
-        Hauptmenü({},{})
+        Hauptmenü({}, {}, {})
     }
 }
