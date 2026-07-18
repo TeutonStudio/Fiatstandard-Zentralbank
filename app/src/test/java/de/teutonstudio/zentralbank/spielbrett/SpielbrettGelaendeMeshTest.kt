@@ -136,6 +136,42 @@ class SpielbrettGelaendeMeshTest {
     }
 
     @Test
+    fun `Wasser-Rand verbindet tiefe Aussenflaeche mit dem Hexagon`() {
+        val aussenY = -0.04f
+        val innenKontur = geometrie.aussenKontur()
+        val rand = erstelleAbgeschraegtenWasserRand(geometrie, aussenY)
+
+        assertEquals(innenKontur.size, rand.aussenKontur.size)
+        assertEquals(innenKontur.size * 4, rand.mesh.ecken.size)
+        assertEquals(innenKontur.size * 6, rand.mesh.indizes.size)
+        rand.mesh.ecken.chunked(4).forEachIndexed { index, ecken ->
+            assertEquals(aussenY, ecken[0].position.y, 0.0001f)
+            assertEquals(aussenY, ecken[1].position.y, 0.0001f)
+            assertEquals(
+                WASSER_DREIECK_HOEHE - WASSER_BEVEL_HOEHE,
+                ecken[2].position.y,
+                0.0001f,
+            )
+            assertEquals(
+                WASSER_DREIECK_HOEHE - WASSER_BEVEL_HOEHE,
+                ecken[3].position.y,
+                0.0001f,
+            )
+            assertEquals(innenKontur[index].x, ecken[3].position.x, 0.0001f)
+            assertEquals(innenKontur[index].z, ecken[3].position.z, 0.0001f)
+            assertTrue(ecken.all { ecke -> ecke.normale.y > 0f })
+        }
+        rand.mesh.indizes.chunked(3).forEach { dreieck ->
+            val a = rand.mesh.ecken[dreieck[0]]
+            val b = rand.mesh.ecken[dreieck[1]]
+            val c = rand.mesh.ecken[dreieck[2]]
+            val flaechenNormale = b.position.minus(a.position)
+                .kreuz(c.position.minus(a.position))
+            assertTrue(flaechenNormale.skalarprodukt(a.normale) > 0f)
+        }
+    }
+
+    @Test
     fun `Spezialauflagen werden nicht abgeschraegt`() {
         val meshes = erstelleAbgeschraegteGelaendeMeshes(
             geometrie = geometrie,

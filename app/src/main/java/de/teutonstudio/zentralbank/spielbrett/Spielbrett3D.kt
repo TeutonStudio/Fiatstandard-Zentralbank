@@ -297,6 +297,16 @@ fun Spielbrett3D(
             null
         }
     }
+    val wasserRandMesh = remember(geometrie, modell.zeigeWasserFlaeche) {
+        if (modell.zeigeWasserFlaeche) {
+            erstelleAbgeschraegtenWasserRand(
+                geometrie = geometrie,
+                aussenY = WASSER_GRUND_NIVEAU,
+            )
+        } else {
+            null
+        }
+    }
     val gebirgsPyramidenMesh = remember(geometrie, modell.auflagen) {
         erstelleGebirgsPyramidenMesh(geometrie, modell.auflagen)
     }
@@ -407,7 +417,7 @@ fun Spielbrett3D(
         erstelleSternenhimmelMesh(himmelsRadius)
     }
     val wasserAusdehnung = max(szenengroesse * 64f, WASSER_MINDEST_SICHTWEITE)
-    val wasserGrundPfad = remember(geometrie, wasserAusdehnung) {
+    val wasserGrundPfad = remember(geometrie, wasserRandMesh, wasserAusdehnung) {
         val halbeAusdehnung = wasserAusdehnung / 2f
         val aussenKontur = listOf(
             Position2(x = -halbeAusdehnung, y = halbeAusdehnung),
@@ -415,9 +425,10 @@ fun Spielbrett3D(
             Position2(x = halbeAusdehnung, y = -halbeAusdehnung),
             Position2(x = -halbeAusdehnung, y = -halbeAusdehnung),
         )
-        val brettAussparung = geometrie.aussenKontur().map { punkt ->
-            Position2(x = punkt.x, y = -punkt.z)
-        }
+        val brettAussparung = (wasserRandMesh?.aussenKontur ?: geometrie.aussenKontur())
+            .map { punkt ->
+                Position2(x = punkt.x, y = -punkt.z)
+            }
         aussenKontur + brettAussparung
     }
     val kameraAbstand = szenengroesse * 1.15f + AUFLAGEN_HOEHE * 2f
@@ -560,6 +571,14 @@ fun Spielbrett3D(
                     position = Position(y = WASSER_GRUND_NIVEAU),
                     rotation = Rotation(x = -90f),
                 )
+                wasserRandMesh?.let { randDaten ->
+                    key("wasser-hexagon-bevel") {
+                        AbgeschraegtesGelaendeNode(
+                            meshDaten = randDaten.mesh,
+                            materialInstance = wasserMaterial,
+                        )
+                    }
+                }
                 wasserMesh?.let { meshDaten ->
                     key("abgeschraegtes-wasser") {
                         AbgeschraegtesGelaendeNode(

@@ -31,6 +31,11 @@ internal data class GelaendeMeshDaten(
     }
 }
 
+internal data class WasserRandMeshDaten(
+    val aussenKontur: List<BrettPunkt>,
+    val mesh: GelaendeMeshDaten,
+)
+
 /**
  * Erzeugt je Gelaendetyp ein gemeinsames Mesh. Nur Landauflagen werden aufgenommen;
  * Spezialauflagen behalten ihre bisherige, nicht abgeschraegte Darstellung.
@@ -78,6 +83,78 @@ internal fun erstelleAbgeschraegtesWasserMesh(
     ).apply {
         wasserDreiecke.forEach(::fuegeDreieckHinzu)
     }.baue()
+}
+
+/**
+ * Verbindet die tiefer liegende, große Wasserfläche lückenlos mit der Außenkontur des Bretts.
+ * Die innere Kante endet auf der Höhe, auf der auch das Bevel der Wasserdreiecke beginnt.
+ */
+internal fun erstelleAbgeschraegtenWasserRand(
+    geometrie: SpielbrettGeometrie,
+    aussenY: Float,
+): WasserRandMeshDaten {
+    val innenKontur = geometrie.aussenKontur()
+    require(innenKontur.size >= 3)
+    val mitte = BrettPunkt(
+        x = innenKontur.sumOf { punkt -> punkt.x.toDouble() }.toFloat() / innenKontur.size,
+        z = innenKontur.sumOf { punkt -> punkt.z.toDouble() }.toFloat() / innenKontur.size,
+    )
+    val innenRadius = innenKontur.indices.minOf { index ->
+        abstandZuGerade(
+            punkt = mitte,
+            a = innenKontur[index],
+            b = innenKontur[(index + 1) % innenKontur.size],
+        )
+    }
+    require(innenRadius > 0f)
+    val aussenFaktor = 1f + WASSER_BEVEL_BREITE / innenRadius
+    val aussenKontur = innenKontur.map { punkt ->
+        BrettPunkt(
+            x = mitte.x + (punkt.x - mitte.x) * aussenFaktor,
+            z = mitte.z + (punkt.z - mitte.z) * aussenFaktor,
+        )
+    }
+    val innenY = WASSER_DREIECK_HOEHE - WASSER_BEVEL_HOEHE
+    val ecken = mutableListOf<GelaendeMeshEcke>()
+    val indizes = mutableListOf<Int>()
+
+    innenKontur.indices.forEach { index ->
+        val naechsterIndex = (index + 1) % innenKontur.size
+        val innenA = innenKontur[index]
+        val innenB = innenKontur[naechsterIndex]
+        val aussenA = aussenKontur[index]
+        val aussenB = aussenKontur[naechsterIndex]
+        val tangenteX = aussenB.x - aussenA.x
+        val tangenteZ = aussenB.z - aussenA.z
+        val nachInnenX = innenA.x - aussenA.x
+        val nachInnenY = innenY - aussenY
+        val nachInnenZ = innenA.z - aussenA.z
+        val normale = normalisiere(
+            x = nachInnenY * tangenteZ,
+            y = nachInnenZ * tangenteX - nachInnenX * tangenteZ,
+            z = -nachInnenY * tangenteX,
+        )
+        val ersterIndex = ecken.size
+        listOf(
+            GelaendeMeshVektor(aussenA.x, aussenY, aussenA.z),
+            GelaendeMeshVektor(aussenB.x, aussenY, aussenB.z),
+            GelaendeMeshVektor(innenB.x, innenY, innenB.z),
+            GelaendeMeshVektor(innenA.x, innenY, innenA.z),
+        ).forEach { position -> ecken += GelaendeMeshEcke(position, normale) }
+        indizes += listOf(
+            ersterIndex,
+            ersterIndex + 2,
+            ersterIndex + 1,
+            ersterIndex,
+            ersterIndex + 3,
+            ersterIndex + 2,
+        )
+    }
+
+    return WasserRandMeshDaten(
+        aussenKontur = aussenKontur,
+        mesh = GelaendeMeshDaten(ecken = ecken, indizes = indizes),
+    )
 }
 
 private class GelaendeMeshErsteller(
