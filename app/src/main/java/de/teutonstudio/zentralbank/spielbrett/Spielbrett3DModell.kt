@@ -106,6 +106,7 @@ data class SpielObjektInfoEintrag(
 )
 
 enum class SpielObjektForm {
+    TEICH,
     HAUPTBAHNHOF,
     BAHNHOF,
     GROSSBAHNHOF,

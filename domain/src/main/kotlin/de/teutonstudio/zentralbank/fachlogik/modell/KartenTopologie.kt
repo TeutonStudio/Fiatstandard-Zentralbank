@@ -97,6 +97,19 @@ fun angrenzendeFelder(kante: KartenKante): List<KartenFeld> =
         .toList()
         .sortedMitKartenPosition()
 
+/** Die sechs vom Mittelpunkt zu den äußeren Ecken eines Spezialfelds laufenden Kanten. */
+fun Spezialfeld.gesperrteKanten(): Set<KartenKante> = positionen
+    .asSequence()
+    .flatMap { feld -> feld.kanten().asSequence() }
+    .filter { kante -> kante.anfang == mittelpunkt || kante.ende == mittelpunkt }
+    .toSet()
+
+fun Spielkarte.istSpezialfeldMittelpunkt(ecke: KartenEcke): Boolean =
+    spezialfelder.any { spezialfeld -> spezialfeld.mittelpunkt == ecke }
+
+fun Spielkarte.istSpezialfeldInnenkante(kante: KartenKante): Boolean =
+    spezialfelder.any { spezialfeld -> kante in spezialfeld.gesperrteKanten() }
+
 fun benachbarteEcken(ecke: KartenEcke): Set<KartenEcke> =
     angrenzendeFelder(ecke)
         .flatMap(KartenFeld::ecken)

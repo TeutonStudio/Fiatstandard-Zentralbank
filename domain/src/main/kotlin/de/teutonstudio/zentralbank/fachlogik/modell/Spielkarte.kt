@@ -40,9 +40,17 @@ data class KartenVorlage(
     val hexagon: KartenHexagon = KartenHexagon(),
     @SerialName("landfelder")
     val gelaendefelder: List<GelaendeFeld> = emptyList(),
+    val spezialfelder: List<Spezialfeld> = emptyList(),
 ) {
     init {
-        pruefeKartenGrundlage(formatVersion, id, name, hexagon, gelaendefelder)
+        pruefeKartenGrundlage(
+            formatVersion,
+            id,
+            name,
+            hexagon,
+            gelaendefelder,
+            spezialfelder,
+        )
     }
 
     val landfelder: List<GelaendeFeld> get() = gelaendefelder
@@ -54,6 +62,7 @@ data class KartenVorlage(
         name = name,
         hexagon = hexagon,
         gelaendefelder = gelaendefelder,
+        spezialfelder = spezialfelder,
     )
 }
 
@@ -66,10 +75,18 @@ data class Spielkarte(
     val hexagon: KartenHexagon = KartenHexagon(),
     @SerialName("landfelder")
     val gelaendefelder: List<GelaendeFeld> = emptyList(),
+    val spezialfelder: List<Spezialfeld> = emptyList(),
     val belegung: KartenBelegung = KartenBelegung(),
 ) {
     init {
-        pruefeKartenGrundlage(formatVersion, id, name, hexagon, gelaendefelder)
+        pruefeKartenGrundlage(
+            formatVersion,
+            id,
+            name,
+            hexagon,
+            gelaendefelder,
+            spezialfelder,
+        )
         belegung.pruefeFuer(this)
     }
 
@@ -82,6 +99,7 @@ data class Spielkarte(
         name = name,
         hexagon = hexagon,
         gelaendefelder = gelaendefelder,
+        spezialfelder = spezialfelder,
     )
 }
 
@@ -117,12 +135,27 @@ enum class GelaendeTyp {
     SUMPF,
 }
 
+/** Ein aus den sechs Geländedreiecken um [mittelpunkt] gebildetes Sonderfeld. */
+@Serializable
+data class Spezialfeld(
+    val typ: SpezialfeldTyp,
+    val mittelpunkt: KartenEcke,
+) {
+    val positionen: List<KartenFeld> get() = angrenzendeFelder(mittelpunkt)
+}
+
+@Serializable
+enum class SpezialfeldTyp {
+    TEICH,
+}
+
 private fun pruefeKartenGrundlage(
     formatVersion: Int,
     id: String,
     name: String,
     hexagon: KartenHexagon,
     gelaendefelder: List<GelaendeFeld>,
+    spezialfelder: List<Spezialfeld>,
 ) {
     require(formatVersion == AKTUELLE_KARTEN_FORMAT_VERSION) {
         "Nicht unterstützte Kartenformatversion: $formatVersion."
@@ -137,6 +170,26 @@ private fun pruefeKartenGrundlage(
     positionen.forEach { position ->
         require(hexagon.enthaelt(position)) {
             "Dreieck liegt außerhalb des Kartenhexagons: $position."
+        }
+    }
+
+    val landPositionen = positionen.toSet()
+    val vonSpezialfeldernBelegt = mutableSetOf<KartenFeld>()
+    spezialfelder.forEach { spezialfeld ->
+        val spezialPositionen = spezialfeld.positionen
+        require(spezialPositionen.size == 6) {
+            "Ein Spezialfeld muss aus genau sechs Dreiecken bestehen."
+        }
+        spezialPositionen.forEach { position ->
+            require(position in landPositionen) {
+                "Ein Spezialfeld darf nur auf Gelände liegen: $position."
+            }
+            require(hexagon.enthaelt(position)) {
+                "Spezialfeld-Dreieck liegt außerhalb des Kartenhexagons: $position."
+            }
+            require(vonSpezialfeldernBelegt.add(position)) {
+                "Spezialfelder dürfen sich nicht überlagern: $position."
+            }
         }
     }
 }

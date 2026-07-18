@@ -14,6 +14,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
+import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -23,6 +25,25 @@ import org.junit.Test
 class Karten3DZuordnungTest {
     private val anna = SpielerId("anna")
     private val bert = SpielerId("bert")
+
+    @Test
+    fun teichWirdAlsFlachesObjektAufDerSpezialfeldmitteDargestellt() {
+        val mitte = KartenEcke(6, 4)
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, mitte)
+        val modell = Spielkarte(
+            id = "teich",
+            name = "Teich",
+            hexagon = KartenHexagon(radius = 5),
+            gelaendefelder = spezialfeld.positionen.map { position ->
+                GelaendeFeld(position, GelaendeTyp.EBENE)
+            },
+            spezialfelder = listOf(spezialfeld),
+        ).zu3DModell()
+
+        val teich = modell.eckObjekte.single()
+        assertEquals(mitte, teich.position)
+        assertEquals(SpielObjektForm.TEICH, teich.typ.form)
+    }
 
     @Test
     fun schienenNutzenJeNachEndpunktenSpielerfarbeOderNeutraleFarbe() {

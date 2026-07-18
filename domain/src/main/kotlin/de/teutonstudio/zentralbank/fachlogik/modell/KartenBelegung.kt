@@ -269,6 +269,10 @@ data class KartenBelegung(
             require(karte.liegtImBearbeitungsUmfeld(belegung.position)) {
                 "Eckbelegung liegt außerhalb der Karte: ${belegung.position}."
             }
+            require(!karte.istSpezialfeldMittelpunkt(belegung.position)) {
+                "Die Teichmitte eines Spezialfelds darf nicht bebaut werden: " +
+                    "${belegung.position}."
+            }
         }
         kanten.forEach { belegung ->
             require(
@@ -280,6 +284,10 @@ data class KartenBelegung(
             val nachbarn = angrenzendeFelder(belegung.position)
             require(nachbarn.size == 2 && nachbarn.all { it in karte.landNachPosition }) {
                 "Eine Handelslinie darf nur zwischen zwei Geländefeldern liegen: " +
+                    "${belegung.position}."
+            }
+            require(!karte.istSpezialfeldInnenkante(belegung.position)) {
+                "Eine zur Teichmitte führende Kante darf nicht bebaut werden: " +
                     "${belegung.position}."
             }
         }

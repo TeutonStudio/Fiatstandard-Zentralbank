@@ -1200,6 +1200,7 @@ private fun erstelleBauwerkHoverZiele(
 
 private val SpielObjektTyp.istBauwerk: Boolean
     get() = when (form) {
+        SpielObjektForm.TEICH,
         SpielObjektForm.FRACHTSCHIFF,
         SpielObjektForm.PANZER,
         SpielObjektForm.KRIEGSSCHIFF,
@@ -1320,6 +1321,7 @@ private fun quadratischerAbstandZwischenStrahlUndStrecke(
 }
 
 private fun SpielObjektTyp.eckAbmessungen(): ObjektAbmessungen = when (form) {
+    SpielObjektForm.TEICH -> ObjektAbmessungen(0.58f, 0.04f, 32)
     SpielObjektForm.HAUPTBAHNHOF -> ObjektAbmessungen(0.34f, 0.92f, 6)
     SpielObjektForm.BAHNHOF -> ObjektAbmessungen(0.28f, 0.64f, 4)
     SpielObjektForm.GROSSBAHNHOF -> ObjektAbmessungen(0.36f, 0.88f, 4)
@@ -1739,7 +1741,11 @@ private fun SpielbrettVorschau(
             val punkt = geometrie.punkt(objekt.position) ?: return@forEach
             drawCircle(
                 color = objekt.typ.farbe,
-                radius = if (objekt.typ.form == SpielObjektForm.MARKIERUNG) 9.dp.toPx() else 7.dp.toPx(),
+                radius = when (objekt.typ.form) {
+                    SpielObjektForm.MARKIERUNG -> 9.dp.toPx()
+                    SpielObjektForm.TEICH -> 11.dp.toPx()
+                    else -> 7.dp.toPx()
+                },
                 center = VorschauWeltPunkt(punkt.x, OBJEKT_BASIS_HOEHE, punkt.z).alsOffset(),
             )
         }

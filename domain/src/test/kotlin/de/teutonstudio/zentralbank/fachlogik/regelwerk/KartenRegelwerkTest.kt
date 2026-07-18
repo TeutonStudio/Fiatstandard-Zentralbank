@@ -30,10 +30,13 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
+import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.benachbarteEcken
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.gesperrteKanten
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -151,6 +154,37 @@ class KartenRegelwerkTest {
 
         assertTrue(ergebnis.isFailure)
         assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("sechs Geländefeldern"))
+    }
+
+    @Test
+    fun teichmitteIstAuchBeiSechsGelaendefeldernNichtBebaubar() {
+        val mitte = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, mitte)
+        val start = zustand(rundeNull = true).mitSpezialfeld(spezialfeld)
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.HauptbahnhofPlatziert(anna, mitte),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("Teichmitte"))
+    }
+
+    @Test
+    fun kantenZurTeichmitteSindNichtMitHandelslinienBebaubar() {
+        val mitte = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, mitte)
+        val start = zustand().mitSpezialfeld(spezialfeld)
+        val innenkante = spezialfeld.gesperrteKanten().first()
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.SchieneGebaut(anna, innenkante),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("Teichmitte"))
     }
 
     @Test
@@ -761,6 +795,11 @@ class KartenRegelwerkTest {
         phase = ZugPhase.Epizug,
         prozug = ProzugStatus(begonnen = true, erfolgreichAbgeschlossen = true),
     )
+
+    private fun SpielZustand.mitSpezialfeld(spezialfeld: Spezialfeld): SpielZustand {
+        val karte = requireNotNull(karte)
+        return copy(karte = karte.copy(spezialfelder = listOf(spezialfeld)))
+    }
 
     private fun SpielZustand.mitHandelslinieZu(
         ecke: KartenEcke,

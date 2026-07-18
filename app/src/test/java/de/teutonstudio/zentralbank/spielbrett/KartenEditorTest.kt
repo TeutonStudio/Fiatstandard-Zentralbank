@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.spielbrett
 
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -55,6 +56,59 @@ class KartenEditorTest {
 
         assertTrue(gross.hexagon.radius > 1)
         assertEquals(1, wiederLeer.hexagon.radius)
+    }
+
+    @Test
+    fun teichWerkzeugErzeugtEinHexagonAusSechsEbenenMitGemeinsamerMitte() {
+        val treffer = DreieckTreffer(
+            DreieckPosition(2, 2, DreieckAusrichtung.UNTEN),
+            naechsteEcke = 0,
+        )
+
+        val bearbeitet = leereKarte().wendeWerkzeugAn(treffer, KartenWerkzeug.TEICH)
+        val teich = bearbeitet.spezialfelder.single()
+
+        assertEquals(SpezialfeldTyp.TEICH, teich.typ)
+        assertEquals(6, teich.positionen.distinct().size)
+        assertTrue(teich.positionen.all { position -> position in bearbeitet.landNachPosition })
+        assertTrue(teich.positionen.all { position -> bearbeitet.enthaeltFeld(position) })
+        assertTrue(
+            teich.positionen.all { position ->
+                bearbeitet.landNachPosition[position] == GelaendeTyp.EBENE
+            },
+        )
+    }
+
+    @Test
+    fun spezialfeldEntfernenLaesstDieSechsGelaendedreieckeStehen() {
+        val treffer = DreieckTreffer(
+            DreieckPosition(2, 2, DreieckAusrichtung.UNTEN),
+            naechsteEcke = 0,
+        )
+        val mitTeich = leereKarte().wendeWerkzeugAn(treffer, KartenWerkzeug.TEICH)
+
+        val entfernt = mitTeich.wendeWerkzeugAn(treffer, KartenWerkzeug.SPEZIAL_ENTFERNEN)
+
+        assertTrue(entfernt.spezialfelder.isEmpty())
+        assertEquals(6, entfernt.gelaendefelder.size)
+    }
+
+    @Test
+    fun wasserAufEinemTeichdreieckEntferntAuchDasSpezialfeld() {
+        val treffer = DreieckTreffer(
+            DreieckPosition(2, 2, DreieckAusrichtung.UNTEN),
+            naechsteEcke = 0,
+        )
+        val mitTeich = leereKarte().wendeWerkzeugAn(treffer, KartenWerkzeug.TEICH)
+        val teichDreieck = mitTeich.spezialfelder.single().positionen.first()
+
+        val bearbeitet = mitTeich.wendeWerkzeugAn(
+            DreieckTreffer(teichDreieck.zu3DPosition(), naechsteEcke = 0),
+            KartenWerkzeug.WASSER,
+        )
+
+        assertTrue(bearbeitet.spezialfelder.isEmpty())
+        assertEquals(5, bearbeitet.gelaendefelder.size)
     }
 
     private fun leereKarte() = KartenVorlage(

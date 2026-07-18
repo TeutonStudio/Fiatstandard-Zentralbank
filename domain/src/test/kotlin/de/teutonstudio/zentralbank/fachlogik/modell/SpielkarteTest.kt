@@ -61,6 +61,82 @@ class SpielkarteTest {
     }
 
     @Test
+    fun teichSpezialfeldWirdMitSechsGelaendedreieckenSerialisiert() {
+        val mitte = KartenEcke(6, 4)
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, mitte)
+        val vorlage = KartenVorlage(
+            id = "teich",
+            name = "Teichlandschaft",
+            hexagon = KartenHexagon(radius = 5),
+            gelaendefelder = spezialfeld.positionen.map { position ->
+                GelaendeFeld(position, GelaendeTyp.EBENE)
+            },
+            spezialfelder = listOf(spezialfeld),
+        )
+
+        val geladen = json.decodeFromString<KartenVorlage>(json.encodeToString(vorlage))
+        val spielkarte = geladen.alsSpielkarte()
+
+        assertEquals(vorlage, geladen)
+        assertEquals(6, geladen.spezialfelder.single().positionen.size)
+        assertEquals(listOf(spezialfeld), spielkarte.spezialfelder)
+    }
+
+    @Test
+    fun spezialfeldOhneSechsGelaendedreieckeWirdAbgelehnt() {
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, KartenEcke(6, 4))
+
+        val fehler = assertThrows(IllegalArgumentException::class.java) {
+            KartenVorlage(
+                id = "ungueltiger-teich",
+                name = "Ungültiger Teich",
+                hexagon = KartenHexagon(radius = 5),
+                spezialfelder = listOf(spezialfeld),
+            )
+        }
+
+        assertTrue(fehler.message.orEmpty().contains("nur auf Gelände"))
+    }
+
+    @Test
+    fun geladeneBelegungDarfWederTeichmitteNochInnenkanteBebauen() {
+        val mitte = KartenEcke(6, 4)
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, mitte)
+        val gelaende = spezialfeld.positionen.map { position ->
+            GelaendeFeld(position, GelaendeTyp.EBENE)
+        }
+        val innenkante = spezialfeld.gesperrteKanten().first()
+
+        val eckFehler = assertThrows(IllegalArgumentException::class.java) {
+            Spielkarte(
+                id = "teich-ecke",
+                name = "Teich mit Gebäude",
+                hexagon = KartenHexagon(radius = 5),
+                gelaendefelder = gelaende,
+                spezialfelder = listOf(spezialfeld),
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(mitte, EckGebaeudeTyp.BAHNHOF, SpielerId("anna")),
+                    ),
+                ),
+            )
+        }
+        val kantenFehler = assertThrows(IllegalArgumentException::class.java) {
+            Spielkarte(
+                id = "teich-kante",
+                name = "Teich mit Handelslinie",
+                hexagon = KartenHexagon(radius = 5),
+                gelaendefelder = gelaende,
+                spezialfelder = listOf(spezialfeld),
+                belegung = KartenBelegung(kanten = listOf(KantenBelegung(innenkante))),
+            )
+        }
+
+        assertTrue(eckFehler.message.orEmpty().contains("Teichmitte"))
+        assertTrue(kantenFehler.message.orEmpty().contains("Teichmitte"))
+    }
+
+    @Test
     fun wasserMussNichtAlsEinzelfeldGespeichertWerden() {
         val karte = Spielkarte(
             id = "wasser",

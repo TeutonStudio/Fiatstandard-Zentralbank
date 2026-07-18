@@ -191,7 +191,8 @@ private fun KartenListe(
                     Text(
                         "Hexagonradius ${eintrag.vorlage.hexagon.radius} · " +
                             "${eintrag.vorlage.hexagon.anzahlFelder} Dreiecke · " +
-                            "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke",
+                            "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke · " +
+                            "${eintrag.vorlage.spezialfelder.size} Spezialfelder",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -222,7 +223,8 @@ private fun KartenVorschau(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(karte.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${karte.gelaendefelder.size} Geländedreiecke · unbelegte Vorlage",
+                        "${karte.gelaendefelder.size} Geländedreiecke · " +
+                            "${karte.spezialfelder.size} Spezialfelder · unbelegte Vorlage",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

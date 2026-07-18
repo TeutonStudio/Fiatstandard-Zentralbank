@@ -50,6 +50,10 @@ import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
+import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import kotlinx.coroutines.launch
 import kotlin.math.exp
 import kotlin.math.ln
@@ -67,6 +71,8 @@ internal enum class KartenWerkzeug(val beschriftung: String) {
     GEBIRGE("Gebirge"),
     WUESTE("Wüste"),
     SUMPF("Sumpf"),
+    TEICH("Teich"),
+    SPEZIAL_ENTFERNEN("Spezialfeld entfernen"),
 }
 
 @Composable
@@ -236,7 +242,7 @@ fun KartenEditorDialog(
                                 text = if (referenzAusrichten) {
                                     "Referenz ausrichten · Ziehen: verschieben · Pinch: skalieren"
                                 } else {
-                                    "Tippen: Gelände bearbeiten · Ziehen: verschieben · Pinch: zoomen"
+                                    "Tippen: Karte bearbeiten · Ziehen: verschieben · Pinch: zoomen"
                                 },
                                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                                 style = MaterialTheme.typography.labelSmall,
@@ -383,7 +389,7 @@ private fun KartenWerkzeugleiste(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            KartenWerkzeug.entries.forEach { eintrag ->
+            KartenWerkzeug.entries.filter(KartenWerkzeug::istGelaendeWerkzeug).forEach { eintrag ->
                 FilterChip(
                     selected = werkzeug == eintrag,
                     onClick = { beiWerkzeug(eintrag) },
@@ -391,13 +397,29 @@ private fun KartenWerkzeugleiste(
                 )
             }
         }
+        Text("Spezialfelder", style = MaterialTheme.typography.titleSmall)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            KartenWerkzeug.entries.filterNot(KartenWerkzeug::istGelaendeWerkzeug)
+                .forEach { eintrag ->
+                    FilterChip(
+                        selected = werkzeug == eintrag,
+                        onClick = { beiWerkzeug(eintrag) },
+                        label = { Text(eintrag.beschriftung) },
+                    )
+                }
+        }
         Text(
             "Beim Setzen außerhalb wächst der Radius automatisch. Wasser wird nicht als Fläche " +
-                "gespeichert oder dargestellt.",
+                "gespeichert oder dargestellt. Ein Teich belegt die sechs Dreiecke um die " +
+                "nächstgelegene Ecke und ergänzt fehlendes Gelände als Ebene.",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            "${karte.gelaendefelder.size} Geländedreiecke",
+            "${karte.gelaendefelder.size} Geländedreiecke · " +
+                "${karte.spezialfelder.size} Spezialfelder",
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -408,10 +430,54 @@ internal fun KartenVorlage.wendeWerkzeugAn(
     werkzeug: KartenWerkzeug,
 ): KartenVorlage {
     val position = treffer.position.zuKartenFeld()
-    val gelaende = werkzeug.gelaendeOderNull()
-    val land = landNachPosition.toMutableMap().apply {
-        if (gelaende == null) remove(position) else put(position, gelaende)
+
+    if (werkzeug == KartenWerkzeug.WASSER) {
+        val land = landNachPosition.toMutableMap().apply { remove(position) }
+        val neueFelder = land.zuSortiertenGelaendefeldern()
+        return copy(
+            hexagon = hexagon.mitMindestradiusFuer(neueFelder.map(GelaendeFeld::position)),
+            gelaendefelder = neueFelder,
+            spezialfelder = spezialfelder.filterNot { spezialfeld ->
+                position in spezialfeld.positionen
+            },
+        )
     }
+
+    if (werkzeug == KartenWerkzeug.SPEZIAL_ENTFERNEN) {
+        return copy(
+            spezialfelder = spezialfelder.filterNot { spezialfeld ->
+                position in spezialfeld.positionen
+            },
+        )
+    }
+
+    if (werkzeug == KartenWerkzeug.TEICH) {
+        val mittelpunkt = position.ecken().getOrNull(treffer.naechsteEcke) ?: return this
+        val spezialfeld = Spezialfeld(SpezialfeldTyp.TEICH, mittelpunkt)
+        val positionen = angrenzendeFelder(mittelpunkt)
+        if (positionen.size != 6) return this
+
+        val land = landNachPosition.toMutableMap()
+        positionen.forEach { spezialPosition ->
+            land.putIfAbsent(spezialPosition, GelaendeTyp.EBENE)
+        }
+        val neueFelder = land.zuSortiertenGelaendefeldern()
+        val neueSpezialfelder = spezialfelder
+            .filter { vorhanden -> vorhanden.positionen.none(positionen::contains) }
+            .plus(spezialfeld)
+            .sortedWith(
+                compareBy<Spezialfeld> { it.mittelpunkt.y }
+                    .thenBy { it.mittelpunkt.x },
+            )
+        return copy(
+            hexagon = hexagon.mitMindestradiusFuer(neueFelder.map(GelaendeFeld::position)),
+            gelaendefelder = neueFelder,
+            spezialfelder = neueSpezialfelder,
+        )
+    }
+
+    val gelaende = requireNotNull(werkzeug.gelaendeOderNull())
+    val land = landNachPosition.toMutableMap().apply { put(position, gelaende) }
     val neueFelder = land.zuSortiertenGelaendefeldern()
     return copy(
         hexagon = hexagon.mitMindestradiusFuer(neueFelder.map(GelaendeFeld::position)),
@@ -426,6 +492,19 @@ private fun KartenWerkzeug.gelaendeOderNull(): GelaendeTyp? = when (this) {
     KartenWerkzeug.GEBIRGE -> GelaendeTyp.GEBIRGE
     KartenWerkzeug.WUESTE -> GelaendeTyp.WUESTE
     KartenWerkzeug.SUMPF -> GelaendeTyp.SUMPF
+    KartenWerkzeug.TEICH,
+    KartenWerkzeug.SPEZIAL_ENTFERNEN -> null
+}
+
+private fun KartenWerkzeug.istGelaendeWerkzeug(): Boolean = when (this) {
+    KartenWerkzeug.WASSER,
+    KartenWerkzeug.EBENE,
+    KartenWerkzeug.WALD,
+    KartenWerkzeug.GEBIRGE,
+    KartenWerkzeug.WUESTE,
+    KartenWerkzeug.SUMPF -> true
+    KartenWerkzeug.TEICH,
+    KartenWerkzeug.SPEZIAL_ENTFERNEN -> false
 }
 
 @Composable

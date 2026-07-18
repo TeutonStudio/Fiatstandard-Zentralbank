@@ -47,6 +47,7 @@ private val SpielerPalette = listOf(
 private val NeutralFarbe = Color(0xFF37474F)
 private val ZerstoertFarbe = Color(0xFF616161)
 private val AuswahlFarbe = Color(0xFFFFD600)
+private val TeichFarbe = Color(0xFF1565A8)
 
 fun KartenVorlage.zu3DModell(
     zeigeBearbeitungsRaster: Boolean = false,
@@ -78,7 +79,16 @@ fun Spielkarte.zu3DModell(
                 ebene = AuflagenEbene.LAND,
             )
         },
-        eckObjekte = belegung.ecken.map { eintrag ->
+        eckObjekte = spezialfelder.map { spezialfeld ->
+            EckObjektAuflage(
+                position = spezialfeld.mittelpunkt,
+                typ = SpielObjektTyp(
+                    name = "Teich",
+                    farbe = TeichFarbe,
+                    form = SpielObjektForm.TEICH,
+                ),
+            )
+        } + belegung.ecken.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
             val name = eintrag.typ.anzeigeName()
             EckObjektAuflage(

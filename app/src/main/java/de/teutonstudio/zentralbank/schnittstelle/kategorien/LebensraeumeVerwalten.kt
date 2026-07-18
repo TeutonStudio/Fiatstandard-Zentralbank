@@ -252,7 +252,8 @@ private fun LebensraumListe(
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Text(
-                        "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke" +
+                        "${eintrag.vorlage.gelaendefelder.size} Geländedreiecke · " +
+                            "${eintrag.vorlage.spezialfelder.size} Spezialfelder" +
                             if (eintrag.hatReferenzbild) " · mit Referenzbild" else "",
                         style = MaterialTheme.typography.bodySmall,
                     )

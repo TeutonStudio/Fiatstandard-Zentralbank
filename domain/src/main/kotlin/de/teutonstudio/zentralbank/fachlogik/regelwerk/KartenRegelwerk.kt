@@ -25,6 +25,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.istSpezialfeldInnenkante
+import de.teutonstudio.zentralbank.fachlogik.modell.istSpezialfeldMittelpunkt
 import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
 
 internal object KartenRegelwerk {
@@ -51,6 +53,9 @@ internal object KartenRegelwerk {
         }
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
             "Die gewählte Ecke ist bereits belegt."
+        }
+        require(!karte.istSpezialfeldMittelpunkt(ereignis.ecke)) {
+            "Die Teichmitte eines Spezialfelds darf nicht bebaut werden."
         }
         require(karte.belegung.ecken.none {
             it.typ == EckGebaeudeTyp.HAUPTBAHNHOF && it.besitzer == ereignis.spieler
@@ -121,6 +126,9 @@ internal object KartenRegelwerk {
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
             "Die gewählte Ecke ist bereits belegt."
         }
+        require(!karte.istSpezialfeldMittelpunkt(ereignis.ecke)) {
+            "Die Teichmitte eines Spezialfelds darf nicht bebaut werden."
+        }
         pruefeEckMindestabstand(karte, ereignis.ecke)
         pruefeHandelslinienAnschluss(karte, ereignis.ecke)
         if (ereignis.typ == EckGebaeudeTyp.HAFEN || ereignis.typ == EckGebaeudeTyp.GROSSHAFEN) {
@@ -190,6 +198,9 @@ internal object KartenRegelwerk {
         val karte = regulaereKarte(zustand)
         require(karte.belegung.kanten.none { it.position == ereignis.kante }) {
             "Die gewählte Kante ist bereits belegt."
+        }
+        require(!karte.istSpezialfeldInnenkante(ereignis.kante)) {
+            "Eine zur Teichmitte führende Kante darf nicht bebaut werden."
         }
         val nachbarn = angrenzendeFelder(ereignis.kante)
         require(nachbarn.size == 2 && nachbarn.all { it in karte.landNachPosition }) {
@@ -532,6 +543,9 @@ internal object KartenRegelwerk {
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
             "Die gewählte Ecke ist bereits belegt."
         }
+        require(!karte.istSpezialfeldMittelpunkt(ereignis.ecke)) {
+            "Die Teichmitte eines Spezialfelds darf nicht bebaut werden."
+        }
         pruefeEckMindestabstand(karte, ereignis.ecke)
         pruefeHandelslinienAnschluss(karte, ereignis.ecke)
         if (ereignis.typ == EckGebaeudeTyp.HAFEN || ereignis.typ == EckGebaeudeTyp.GROSSHAFEN) {
@@ -562,6 +576,9 @@ internal object KartenRegelwerk {
         val karte = requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }
         require(karte.belegung.kanten.none { it.position == ereignis.kante }) {
             "Die gewählte Kante ist bereits belegt."
+        }
+        require(!karte.istSpezialfeldInnenkante(ereignis.kante)) {
+            "Eine zur Teichmitte führende Kante darf nicht bebaut werden."
         }
         val nachbarn = angrenzendeFelder(ereignis.kante)
         require(nachbarn.size == 2 && nachbarn.all { it in karte.landNachPosition }) {

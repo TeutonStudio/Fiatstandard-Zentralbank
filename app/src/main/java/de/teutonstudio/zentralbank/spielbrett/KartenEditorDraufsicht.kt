@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -41,6 +43,10 @@ private val DREIECK_HOEHE_AUF_BILDSCHIRM = 36.dp
 private val DraufsichtHintergrund = Color(0xFF0B3D66)
 private val RasterFarbe = Color(0x5AFFFFFF)
 private val GelaendeUmrissFarbe = Color(0xB3000000)
+private val SpezialfeldUmrissFarbe = Color(0xE6E0F2F1)
+private val TeichFarbe = Color(0xFF1976B9)
+private val TeichRandFarbe = Color(0xFF0A4F7A)
+private const val TEICH_RADIUS = 0.58f
 private val DraufsichtGelaendeFarben = mapOf(
     GelaendeTyp.EBENE to Color(0xFF8DBB61),
     GelaendeTyp.WALD to Color(0xFF2E7D32),
@@ -147,7 +153,7 @@ internal fun KartenEditorDraufsicht(
             .semantics {
                 contentDescription =
                     "Draufsicht der bearbeitbaren Karte mit ${karte.gelaendefelder.size} " +
-                    "Geländedreiecken" +
+                    "Geländedreiecken und ${karte.spezialfelder.size} Spezialfeldern" +
                     if (referenzBild == null) "" else " und Referenzbild"
             }
             .pointerInput(status, referenzStatus, basisMassstab, referenzAusrichten) {
@@ -212,8 +218,33 @@ internal fun KartenEditorDraufsicht(
                     gelaendePfade.getValue(feld.gelaende).fuegeHinzu(dreieck)
                     gelaendeUmriss.fuegeHinzu(dreieck)
                 }
+                val spezialfeldUmriss = Path()
+                val teichMittelpunkte = karte.spezialfelder.mapNotNull { spezialfeld ->
+                    val mitte = geometrie.punkt(spezialfeld.mittelpunkt) ?: return@mapNotNull null
+                    val aussenEcken = spezialfeld.positionen
+                        .flatMap { position -> position.ecken() }
+                        .distinct()
+                        .filterNot { ecke -> ecke == spezialfeld.mittelpunkt }
+                        .mapNotNull(geometrie::punkt)
+                        .sortedBy { punkt ->
+                            atan2(
+                                (punkt.z - mitte.z).toDouble(),
+                                (punkt.x - mitte.x).toDouble(),
+                            )
+                        }
+                    if (aussenEcken.size == 6) {
+                        spezialfeldUmriss.moveTo(aussenEcken.first().x, aussenEcken.first().z)
+                        aussenEcken.drop(1).forEach { punkt ->
+                            spezialfeldUmriss.lineTo(punkt.x, punkt.z)
+                        }
+                        spezialfeldUmriss.close()
+                    }
+                    mitte
+                }
                 val rasterStrichBreite = 1.dp.toPx()
                 val gelaendeStrichBreite = 1.5.dp.toPx()
+                val spezialfeldStrichBreite = 2.5.dp.toPx()
+                val teichRandBreite = 2.dp.toPx()
                 val referenzRahmenBreite = 2.dp.toPx()
 
                 onDrawBehind {
@@ -286,6 +317,25 @@ internal fun KartenEditorDraufsicht(
                                     color = GelaendeUmrissFarbe,
                                     style = Stroke(width = gelaendeStrichBreite / massstab),
                                 )
+                                drawPath(
+                                    path = spezialfeldUmriss,
+                                    color = SpezialfeldUmrissFarbe,
+                                    style = Stroke(width = spezialfeldStrichBreite / massstab),
+                                )
+                                teichMittelpunkte.forEach { mitte ->
+                                    val zentrum = Offset(mitte.x, mitte.z)
+                                    drawCircle(
+                                        color = TeichFarbe,
+                                        radius = TEICH_RADIUS,
+                                        center = zentrum,
+                                    )
+                                    drawCircle(
+                                        color = TeichRandFarbe,
+                                        radius = TEICH_RADIUS,
+                                        center = zentrum,
+                                        style = Stroke(width = teichRandBreite / massstab),
+                                    )
+                                }
                             }
                         }
                     }
