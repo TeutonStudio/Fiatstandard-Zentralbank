@@ -136,13 +136,13 @@ enum class Rohstoffe(val str: String, val farbe: Color) {
     NAHRUNG("nahrung", Color(0xFF8A6D8F)),
     LEHM("lehm", Color(0xFFB58B5A)),
     ZIEGEL("ziegel", Color(0xFFA75D5D)),
-    HOLZ("holz", Color(0xFF6F8061)),
-    ROHÖL("rohöl", Color(0xFF66737D)),
+    HOLZ("holz", Color(0xFFC9826B)),
+    ROHÖL("rohöl", Color(0xFF6F8061)),
     SCHWERÖL("schweröl", Color(0xFF795F7C)),
     DIESEL("diesel", Color(0xFF8A7A45)),
     KOHLE("kohle", Color(0xFF697078)),
     STAHL("stahl", Color(0xFF718096)),
-    EISEN("eisen", Color(0xFF8C6F63));
+    EISEN("eisen", Color(0xFF858585));
 
     companion object
 }
