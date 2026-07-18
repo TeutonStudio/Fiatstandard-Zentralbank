@@ -1,6 +1,11 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -9,7 +14,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -26,6 +34,8 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereLeitzinsatzZie
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereWarenkorb
 import java.util.UUID
+
+internal const val STARTBAUWERKE_LAZY_ROW = "startbauwerke_spieler"
 
 @Composable
 fun SpielErstellen(
@@ -52,7 +62,7 @@ fun SpielErstellen(
         }
     }
     val spielerNamen = spieler.keys.toList()
-    val abschlussSeite = 5 + spielerNamen.size
+    val abschlussSeite = 6
     Titel(
         beiZurück = {
             if (seite.intValue > 1) {
@@ -82,11 +92,22 @@ fun SpielErstellen(
                     beiAuswahl = { karte -> ausgewaehlteKarte.value = karte },
                 )
             }
-            in 5 until abschlussSeite -> {
-                val idx = seite.intValue - 5
-                val fürWenn = "für ${spielerNamen[idx]}"
-
-                definiereBauteile(fürWenn, bauteileProSpieler[idx])
+            5 -> {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag(STARTBAUWERKE_LAZY_ROW),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    itemsIndexed(spielerNamen) { idx, spielerName ->
+                        Box(modifier = Modifier.fillParentMaxSize()) {
+                            definiereBauteile(
+                                fürWenn = "für $spielerName",
+                                inhalt = bauteileProSpieler[idx],
+                            )
+                        }
+                    }
+                }
             }
             abschlussSeite -> {
                 val ausgabe = spielerNamen.mapIndexed { idx, name ->

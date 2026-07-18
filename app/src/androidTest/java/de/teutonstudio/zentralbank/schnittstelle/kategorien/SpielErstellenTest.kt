@@ -7,8 +7,10 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -75,6 +77,28 @@ class SpielErstellenTest {
     }
 
     @Test
+    fun startbauwerkeAllerSpielerStehenAufEinerHorizontalenSeite() {
+        composeTestRule.setContent {
+            SpielErstellen(
+                nachAbbruch = {},
+                erstelleSpiel = { _, _ -> },
+                nachAbschluß = {},
+                seite = remember { mutableIntStateOf(5) },
+            )
+        }
+
+        composeTestRule
+            .onNodeWithText("Bauteile für Spieler 1")
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithTag(STARTBAUWERKE_LAZY_ROW)
+            .performScrollToIndex(2)
+        composeTestRule
+            .onNodeWithText("Bauteile für Spieler 3")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun abschlussLegtSpielEinmalAnUndNavigiertErstNachErfolg() {
         var anlageAufrufe = 0
         var navigationsAufrufe = 0
@@ -90,7 +114,7 @@ class SpielErstellenTest {
                     nachErstellen = nachErfolg
                 },
                 nachAbschluß = { navigationsAufrufe += 1 },
-                seite = remember { mutableIntStateOf(8) },
+                seite = remember { mutableIntStateOf(6) },
                 vorbelegteKarte = KartenVorlage(
                     id = "test-vorlage",
                     name = "Testkarte",
