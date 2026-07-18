@@ -1,12 +1,40 @@
 package de.teutonstudio.zentralbank.spielbrett
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
 import io.github.sceneview.math.Position
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpielbrettBauwerkHoverTest {
+    @Test
+    fun `Infofenster bleibt ausserhalb der Statusleisten`() {
+        val groesse = IntSize(width = 300, height = 220)
+        val ansicht = IntSize(width = 1_280, height = 720)
+        val sicher = BauwerkInfoSicherheitsBereich(
+            links = 140f,
+            oben = 146f,
+            rechts = 16f,
+            unten = 56f,
+        )
+
+        listOf(
+            Offset(0f, 0f),
+            Offset(1_280f, 0f),
+            Offset(0f, 720f),
+            Offset(1_280f, 720f),
+        ).forEach { anker ->
+            val position = begrenzeBauwerkInfoPosition(anker, groesse, ansicht, sicher)
+            assertTrue(position.x >= sicher.links)
+            assertTrue(position.y >= sicher.oben)
+            assertTrue(position.x + groesse.width <= ansicht.width - sicher.rechts)
+            assertTrue(position.y + groesse.height <= ansicht.height - sicher.unten)
+        }
+    }
+
     @Test
     fun `hoher Hauptbahnhof wird entlang seiner gesamten Hoehe getroffen`() {
         val hauptbahnhof = ziel(

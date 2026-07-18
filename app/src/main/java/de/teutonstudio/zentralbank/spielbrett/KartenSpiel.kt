@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -309,6 +310,7 @@ fun KartenSpielBildschirm(
 
         BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val breiteAnsicht = maxWidth >= 840.dp
+            val verfuegbareBreite = maxWidth
             val warenkorbEingebettet = !kompakteZentrale &&
                 planungsmodus && maxWidth >= 1180.dp
             val werkzeugleiste: @Composable (Modifier) -> Unit = { leistenModifier ->
@@ -401,6 +403,20 @@ fun KartenSpielBildschirm(
                         betrachtungsStatus = betrachtungsStatus,
                         kameraInteraktionsModus = kameraModus,
                         himmel = himmel,
+                        bauwerkInfoFreiraum = if (kompakteZentrale) {
+                            PaddingValues(
+                                start = 140.dp,
+                                top = 146.dp,
+                                end = if (
+                                    planungsmodus && verfuegbareBreite >= 720.dp
+                                ) 352.dp else 0.dp,
+                                bottom = if (
+                                    planungsmodus || vorgewaehltesBauteil != null
+                                ) 56.dp else 0.dp,
+                            )
+                        } else {
+                            PaddingValues(bottom = 56.dp)
+                        },
                         onDreieckBeruehrt = beruehrung@ { treffer ->
                             if (planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null) {
                                 val ziel = treffer.zuKartenOrt(werkzeug.ziel)

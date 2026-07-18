@@ -3,15 +3,22 @@ package de.teutonstudio.zentralbank.spielbrett
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -37,6 +44,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -142,6 +150,7 @@ fun Spielbrett3D(
     statischeVorschau: Boolean = false,
     himmel: HimmelsDarstellung = HimmelsDarstellung.fuerUhrzeit(12f),
     eingabeAktiv: Boolean = true,
+    bauwerkInfoFreiraum: PaddingValues = PaddingValues(),
 ) {
     if (LocalInspectionMode.current || statischeVorschau) {
         SpielbrettVorschau(
@@ -752,6 +761,7 @@ fun Spielbrett3D(
             ziele = sichtbareBauwerkInfos,
             positionen = bauwerkInfoPositionen,
             ansichtsGroesse = ansichtsGroesse,
+            freiraum = bauwerkInfoFreiraum,
             modifier = Modifier.matchParentSize(),
         )
     }
@@ -762,28 +772,70 @@ private fun BauwerkInfoEbene(
     ziele: List<BauwerkHoverZiel>,
     positionen: Map<String, Offset>,
     ansichtsGroesse: IntSize,
+    freiraum: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val dichte = LocalDensity.current
+    val layoutRichtung = LocalLayoutDirection.current
+    val systemFreiraum = WindowInsets.safeDrawing.asPaddingValues()
     val randPixel = with(dichte) { 8.dp.toPx() }
+    val sicherheitsBereich = BauwerkInfoSicherheitsBereich(
+        links = max(
+            randPixel,
+            max(
+                with(dichte) { freiraum.calculateLeftPadding(layoutRichtung).toPx() },
+                with(dichte) { systemFreiraum.calculateLeftPadding(layoutRichtung).toPx() },
+            ),
+        ),
+        oben = max(
+            randPixel,
+            max(
+                with(dichte) { freiraum.calculateTopPadding().toPx() },
+                with(dichte) { systemFreiraum.calculateTopPadding().toPx() },
+            ),
+        ),
+        rechts = max(
+            randPixel,
+            max(
+                with(dichte) { freiraum.calculateRightPadding(layoutRichtung).toPx() },
+                with(dichte) { systemFreiraum.calculateRightPadding(layoutRichtung).toPx() },
+            ),
+        ),
+        unten = max(
+            randPixel,
+            max(
+                with(dichte) { freiraum.calculateBottomPadding().toPx() },
+                with(dichte) { systemFreiraum.calculateBottomPadding().toPx() },
+            ),
+        ),
+    )
+    val verfuegbareBreitePixel = (
+        ansichtsGroesse.width - sicherheitsBereich.links - sicherheitsBereich.rechts
+        ).coerceAtLeast(0f)
+    val verfuegbareHoehePixel = (
+        ansichtsGroesse.height - sicherheitsBereich.oben - sicherheitsBereich.unten
+        ).coerceAtLeast(0f)
     val kartenBreitePixel = min(
-        with(dichte) { 320.dp.toPx() },
-        (ansichtsGroesse.width - randPixel * 2f).coerceAtLeast(0f),
+        with(dichte) { 300.dp.toPx() },
+        verfuegbareBreitePixel,
     )
     var kartenGroessen by remember {
         mutableStateOf<Map<String, IntSize>>(emptyMap())
     }
-    if (kartenBreitePixel <= 0f) return
+    if (kartenBreitePixel <= 0f || verfuegbareHoehePixel <= 0f) return
     val kartenBreite = with(dichte) { kartenBreitePixel.toDp() }
+    val maximaleKartenHoehe = with(dichte) { verfuegbareHoehePixel.toDp() }
 
     Box(modifier = modifier) {
         ziele.forEach { ziel ->
             val position = positionen[ziel.schluessel] ?: return@forEach
             key("bauwerk-info-karte", ziel.schluessel) {
                 val kartenGroesse = kartenGroessen[ziel.schluessel] ?: IntSize.Zero
+                val scrollStatus = rememberScrollState()
                 Surface(
                     modifier = Modifier
                         .width(kartenBreite)
+                        .heightIn(max = maximaleKartenHoehe)
                         .onSizeChanged { neueGroesse ->
                             if (kartenGroessen[ziel.schluessel] != neueGroesse) {
                                 kartenGroessen = kartenGroessen +
@@ -791,19 +843,11 @@ private fun BauwerkInfoEbene(
                             }
                         }
                         .offset {
-                            val maximaleXPosition =
-                                (ansichtsGroesse.width - kartenGroesse.width - randPixel)
-                                    .coerceAtLeast(randPixel)
-                            val maximaleYPosition =
-                                (ansichtsGroesse.height - kartenGroesse.height - randPixel)
-                                    .coerceAtLeast(randPixel)
-                            IntOffset(
-                                x = (position.x - kartenGroesse.width / 2f)
-                                    .coerceIn(randPixel, maximaleXPosition)
-                                    .roundToInt(),
-                                y = (position.y - kartenGroesse.height - randPixel)
-                                    .coerceIn(randPixel, maximaleYPosition)
-                                    .roundToInt(),
+                            begrenzeBauwerkInfoPosition(
+                                anker = position,
+                                kartenGroesse = kartenGroesse,
+                                ansichtsGroesse = ansichtsGroesse,
+                                sicherheitsBereich = sicherheitsBereich,
                             )
                         },
                     shape = MaterialTheme.shapes.medium,
@@ -816,12 +860,14 @@ private fun BauwerkInfoEbene(
                     shadowElevation = 10.dp,
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                        modifier = Modifier
+                            .verticalScroll(scrollStatus)
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
                         Text(
                             text = "Bauwerksdetails",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                         )
                         val infos = ziel.typ.infos.ifEmpty {
@@ -830,11 +876,11 @@ private fun BauwerkInfoEbene(
                         infos.forEach { info ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Text(
                                     text = info.bezeichnung,
-                                    modifier = Modifier.width(116.dp),
+                                    modifier = Modifier.width(104.dp),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -850,6 +896,35 @@ private fun BauwerkInfoEbene(
             }
         }
     }
+}
+
+internal data class BauwerkInfoSicherheitsBereich(
+    val links: Float,
+    val oben: Float,
+    val rechts: Float,
+    val unten: Float,
+)
+
+internal fun begrenzeBauwerkInfoPosition(
+    anker: Offset,
+    kartenGroesse: IntSize,
+    ansichtsGroesse: IntSize,
+    sicherheitsBereich: BauwerkInfoSicherheitsBereich,
+): IntOffset {
+    val maximaleXPosition = (
+        ansichtsGroesse.width - kartenGroesse.width - sicherheitsBereich.rechts
+        ).coerceAtLeast(sicherheitsBereich.links)
+    val maximaleYPosition = (
+        ansichtsGroesse.height - kartenGroesse.height - sicherheitsBereich.unten
+        ).coerceAtLeast(sicherheitsBereich.oben)
+    return IntOffset(
+        x = (anker.x - kartenGroesse.width / 2f)
+            .coerceIn(sicherheitsBereich.links, maximaleXPosition)
+            .roundToInt(),
+        y = (anker.y - kartenGroesse.height - 8f)
+            .coerceIn(sicherheitsBereich.oben, maximaleYPosition)
+            .roundToInt(),
+    )
 }
 
 private fun HimmelsDarstellung.himmelsFarbe(): Color = if (nachtAnteil > 0f) {
