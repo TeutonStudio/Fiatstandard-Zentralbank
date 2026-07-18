@@ -127,10 +127,22 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         _spielFehler.tryEmit(meldung)
     }
 
-    fun spielstandBeenden() {
-        // Fachereignisse werden bereits nach jeder Änderung gespeichert. Beim Verlassen wird der
-        // aktuelle Verlauf nochmals eingeplant, damit auch die letzte UI-Aktion sicher erfasst ist.
-        speichereAktuellenFachSpielstand()
+    fun spielstandBeenden(nachBeenden: () -> Unit) {
+        val speicherauftrag = aktuellerSpielstandSpeicherauftrag()
+        if (speicherauftrag == null) {
+            nachBeenden()
+            return
+        }
+        viewModelScope.launch {
+            try {
+                speichereSpielstand(speicherauftrag)
+                nachBeenden()
+            } catch (throwable: Throwable) {
+                _spielFehler.emit(
+                    throwable.message ?: "Spielstand konnte nicht gespeichert werden.",
+                )
+            }
+        }
     }
 
     fun baueMitAuslandseinkauf(
@@ -695,22 +707,50 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         _spielUebersicht.value = zustand.zuSpielUebersichtZustand()
     }
 
-    private fun speichereAktuellenFachSpielstand() {
-        val ablauf = spielAblauf ?: return
+    private data class SpielstandSpeicherauftrag(
+        val spielId: Long,
+        val aenderungsNummer: Long,
+        val spielstand: GespeichertesSpiel,
+    )
+
+    private fun aktuellerSpielstandSpeicherauftrag(): SpielstandSpeicherauftrag? {
+        val ablauf = spielAblauf ?: return null
         val spielId = aktuelleDaten.first.spielID
-        if (spielId < 0) return
-        val zuSpeicherndesSpiel = GespeichertesSpiel(
-            id = spielId,
-            startzustand = ablauf.startzustand,
-            ereignisse = ablauf.ereignisVerlauf.angewandteEreignisse,
+        if (spielId < 0) return null
+        return SpielstandSpeicherauftrag(
+            spielId = spielId,
+            aenderungsNummer = naechsteAblageAenderung.incrementAndGet(),
+            spielstand = GespeichertesSpiel(
+                id = spielId,
+                startzustand = ablauf.startzustand,
+                ereignisse = ablauf.ereignisVerlauf.angewandteEreignisse,
+            ),
         )
-        val aenderungsNummer = naechsteAblageAenderung.incrementAndGet()
-        viewModelScope.launch(Dispatchers.IO) {
+    }
+
+    private suspend fun speichereSpielstand(auftrag: SpielstandSpeicherauftrag) {
+        datenbankBereit.await()
+        val gespeichert = withContext(Dispatchers.IO) {
+            ablageAendern(auftrag.spielId, auftrag.aenderungsNummer) {
+                spielSpeichern(auftrag.spielstand)
+            }
+        }
+        if (gespeichert) {
+            val uebersicht = auftrag.spielstand.zuUebersicht()
+            _spielstaende.update { spielstaende ->
+                listOf(testSpielstandUebersicht) +
+                    (spielstaende.filter { spielstand ->
+                        spielstand.id >= 0 && spielstand.id != auftrag.spielId
+                    } + uebersicht).sortedBy(SpielstandUebersicht::id)
+            }
+        }
+    }
+
+    private fun speichereAktuellenFachSpielstand() {
+        val speicherauftrag = aktuellerSpielstandSpeicherauftrag() ?: return
+        viewModelScope.launch {
             try {
-                datenbankBereit.await()
-                ablageAendern(spielId, aenderungsNummer) {
-                    spielSpeichern(zuSpeicherndesSpiel)
-                }
+                speichereSpielstand(speicherauftrag)
             } catch (throwable: Throwable) {
                 _spielFehler.tryEmit(
                     throwable.message ?: "Spielstand konnte nicht gespeichert werden.",
@@ -723,13 +763,12 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         spielId: Long,
         aenderungsNummer: Long,
         aenderung: suspend SpielAblage.() -> Unit,
-    ) {
-        ablageSperre.withLock {
-            val letzteNummer = letzteAblageAenderung[spielId] ?: Long.MIN_VALUE
-            if (aenderungsNummer < letzteNummer) return@withLock
-            spielAblage.aenderung()
-            letzteAblageAenderung[spielId] = aenderungsNummer
-        }
+    ): Boolean = ablageSperre.withLock {
+        val letzteNummer = letzteAblageAenderung[spielId] ?: Long.MIN_VALUE
+        if (aenderungsNummer < letzteNummer) return@withLock false
+        spielAblage.aenderung()
+        letzteAblageAenderung[spielId] = aenderungsNummer
+        true
     }
 
     init {
@@ -773,7 +812,9 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
                 val gespeicherteDaten = daten.first.copy(spielID = gameID) to daten.second
                 setzeAktuellesSpiel(spiel, gespeicherteDaten)
-                speichereAktuellenFachSpielstand()
+                aktuellerSpielstandSpeicherauftrag()?.let { speicherauftrag ->
+                    speichereSpielstand(speicherauftrag)
+                }
                 nachErstellen()
             } catch (throwable: Throwable) {
                 _spielFehler.emit(
@@ -828,12 +869,18 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         }
         val gespeichertesSpiel = spielAblage.spielLaden(id)
             ?: error("Spielstand $id wurde nicht gefunden.")
-        val (spielDaten, tabellenDaten) = _spielDatenListe.value.entries
+        val wirtschaftsdaten = _spielDatenListe.value.entries
             .firstOrNull { (spiel, _) -> spiel.spielID == id }
             ?.let { (spiel, daten) -> spiel to daten }
+            ?: if (::aktuelleDaten.isInitialized && aktuelleDaten.first.spielID == id) {
+                aktuelleDaten
+            } else {
+                null
+            }
             ?: error(
                 "Spielstand $id besitzt keine Wirtschaftsdaten für die Oberfläche.",
             )
+        val (spielDaten, tabellenDaten) = wirtschaftsdaten
         setzeAktuellesSpiel(
             spiel = tabellenDaten.zuSpiel(
                 daten = spielDaten,

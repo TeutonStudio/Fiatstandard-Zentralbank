@@ -169,10 +169,11 @@ fun Navigation(viewModel: GameViewModel) {
                         beiBereich = { bereich -> geoeffneterBereich = bereich },
                         beiZugBeenden = viewModel::beendeZug,
                         beiSpielBeenden = {
-                            viewModel.spielstandBeenden()
-                            navController.navigate(Screen.StartScreen.route) {
-                                popUpTo(Screen.StartScreen.route) { inclusive = false }
-                                launchSingleTop = true
+                            viewModel.spielstandBeenden {
+                                navController.navigate(Screen.StartScreen.route) {
+                                    popUpTo(Screen.StartScreen.route) { inclusive = false }
+                                    launchSingleTop = true
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxSize(),
