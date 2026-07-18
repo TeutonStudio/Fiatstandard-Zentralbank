@@ -70,11 +70,15 @@ import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
+import de.teutonstudio.zentralbank.schnittstelle.bilanzDiagrammYBereich
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteilPreis
 import de.teutonstudio.zentralbank.schnittstelle.auslandFarbe
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
+import de.teutonstudio.zentralbank.schnittstelle.leererDiagrammEintrag
+import de.teutonstudio.zentralbank.schnittstelle.leeresLinienDiagrammModell
+import de.teutonstudio.zentralbank.schnittstelle.leeresSaeulenDiagrammModell
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberExklusivenDiagrammLegendenStatus
@@ -83,6 +87,7 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberVollrundenachse
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.rundenDiagrammMaxX
 import de.teutonstudio.zentralbank.schnittstelle.rundenXWerteOhneSubrunden
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 
@@ -128,11 +133,13 @@ private fun List<Map<Rohstoffe, Zahlungsmittel>>.zuWarenkorbpreisen(
 @Composable
 private fun List<List<Int>>.zuLinienChart(
     zeitpunkt: SpielZeitpunkt,
-): CartesianChartModel =
-    remember(this, zeitpunkt) {
+): CartesianChartModel? {
+    val reihen = filter { werte -> werte.isNotEmpty() }
+    return remember(reihen, zeitpunkt) {
+        if (reihen.isEmpty()) return@remember null
         CartesianChartModel(
             LineCartesianLayerModel.build {
-                forEach { werte ->
+                reihen.forEach { werte ->
                     seriesMitGepunkteterAktuellerRunde(
                         x = werte.indices.toList(),
                         y = werte,
@@ -141,12 +148,14 @@ private fun List<List<Int>>.zuLinienChart(
                 }
             }
         )
+    }
 }
 
 @Composable
 private fun List<Map<Rohstoffe, Int>>.zuStueckDifferenzChart(
     rohstoffe: List<Rohstoffe>,
-): CartesianChartModel = remember(this, rohstoffe) {
+): CartesianChartModel? = remember(this, rohstoffe) {
+    if (isEmpty() || rohstoffe.isEmpty()) return@remember null
     CartesianChartModel(
         ColumnCartesianLayerModel.build {
             rohstoffe.forEach { rohstoff ->
@@ -161,6 +170,40 @@ private fun List<Map<Rohstoffe, Int>>.zuStueckDifferenzChart(
 
 private fun <A> List<Map<A, Zahlungsmittel>>.werteFuer(arg: A): List<Int> =
     map { werte -> werte[arg]?.toIntOderNull() ?: 0 }
+
+@Composable
+private fun LeeresMarktpreisDiagramm(zeitpunkt: SpielZeitpunkt) {
+    Card(modifier = ModiPad5) {
+        Column(modifier = ModiPad5) {
+            Text(
+                text = MarktpreisKategorie.HANDELSGUETER.überschrift,
+                fontSize = 24.sp,
+                modifier = ModiPad5,
+            )
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(
+                        lineProvider = series(
+                            *rememberLinienMitGepunkteterAktuellerRunde(
+                                listOf(leererDiagrammEintrag),
+                            ).toTypedArray(),
+                        ),
+                    ),
+                    endAxis = VerticalAxis.rememberEnd(
+                        valueFormatter = markAchsenFormatter,
+                    ),
+                    bottomAxis = rememberRundenachse(zeitpunkt),
+                ),
+                model = leeresLinienDiagrammModell(
+                    rundenDiagrammMaxX(zeitpunkt, rundenAnzahl = 0),
+                ),
+                scrollState = rememberVicoScrollState(),
+                zoomState = rememberVicoZoomState(initialZoom = Zoom.Content),
+            )
+        }
+    }
+}
 
 @Composable
 fun zeigeMarktplatz(
@@ -313,7 +356,35 @@ fun zeigeMarktplatz(
                 }
 
                 val bilanzModifier = ModiPad5
-                val linien = rememberLinienMitGepunkteterAktuellerRunde(sichtbareLegende)
+                val diagrammEintraege = if (chartModel == null) {
+                    listOf(leererDiagrammEintrag)
+                } else {
+                    sichtbareLegende
+                }
+                val rundenAnzahl = when (marktpreisKategorie) {
+                    MarktpreisKategorie.HANDELSGUETER -> handelsgueterWerte
+                        .maxOfOrNull(List<Int>::size)
+                        ?: 0
+
+                    MarktpreisKategorie.HANDELSDIFFERENZ -> spiel.marktpreise.size
+                }
+                val dargestelltesChartModel = chartModel ?: if (
+                    marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ &&
+                    handelsdifferenzEinheit == HandelsdifferenzEinheit.STUECK
+                ) {
+                    leeresSaeulenDiagrammModell((rundenAnzahl - 1).coerceAtLeast(1))
+                } else {
+                    leeresLinienDiagrammModell(
+                        rundenDiagrammMaxX(spiel.aktuellerZeitpunkt, rundenAnzahl),
+                    )
+                }
+                val istLeereInnenhandelsbilanz =
+                    marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ &&
+                        chartModel == null
+                val yBereich = remember(istLeereInnenhandelsbilanz) {
+                    bilanzDiagrammYBereich(istLeer = istLeereInnenhandelsbilanz)
+                }
+                val linien = rememberLinienMitGepunkteterAktuellerRunde(diagrammEintraege)
 
                 Column {
                         Row(
@@ -354,79 +425,74 @@ fun zeigeMarktplatz(
                             modifier = ModiPad5,
                         )
 
-                        if (chartModel == null) {
-                            Text(
-                                text = "Keine Datenreihe ausgewählt",
-                                modifier = ModiPad5,
+                        if (
+                            marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ &&
+                            handelsdifferenzEinheit == HandelsdifferenzEinheit.STUECK
+                        ) {
+                            CartesianChartHost(
+                                modifier = bilanzModifier,
+                                chart = rememberCartesianChart(
+                                    rememberColumnCartesianLayer(
+                                        columnProvider =
+                                            rememberSaeulenMitGepunkteterAktuellerRunde(
+                                                eintraege = diagrammEintraege,
+                                                prognoseAbX = spiel.aktuellerZeitpunkt.runde,
+                                            ),
+                                        rangeProvider = yBereich,
+                                    ),
+                                    endAxis = VerticalAxis.rememberEnd(
+                                        valueFormatter = richtungsAchsenFormatter(
+                                            positiveRichtung = "Verkauf",
+                                            negativeRichtung = "Einkauf",
+                                            einheit = handelsdifferenzEinheit.achsenEinheit,
+                                        ),
+                                        itemPlacer = if (
+                                            handelsdifferenzEinheit ==
+                                                HandelsdifferenzEinheit.STUECK
+                                        ) {
+                                            ganzzahligerStueckAchsenItemPlacer
+                                        } else {
+                                            VerticalAxis.ItemPlacer.step()
+                                        },
+                                    ),
+                                    bottomAxis = rememberVollrundenachse(),
+                                ),
+                                model = dargestelltesChartModel,
+                                scrollState = rememberVicoScrollState(),
+                                zoomState = rememberVicoZoomState(
+                                    initialZoom = remember { Zoom.Content }
+                                )
                             )
                         } else {
-                            if (
-                                marktpreisKategorie == MarktpreisKategorie.HANDELSDIFFERENZ &&
-                                handelsdifferenzEinheit == HandelsdifferenzEinheit.STUECK
-                            ) {
-                                CartesianChartHost(
-                                    modifier = bilanzModifier,
-                                    chart = rememberCartesianChart(
-                                        rememberColumnCartesianLayer(
-                                            columnProvider =
-                                                rememberSaeulenMitGepunkteterAktuellerRunde(
-                                                    eintraege = sichtbareLegende,
-                                                    prognoseAbX = spiel.aktuellerZeitpunkt.runde,
-                                                ),
-                                        ),
-                                        endAxis = VerticalAxis.rememberEnd(
-                                            valueFormatter = richtungsAchsenFormatter(
+                            CartesianChartHost(
+                                modifier = bilanzModifier,
+                                chart = rememberCartesianChart(
+                                    rememberLineCartesianLayer(
+                                        lineProvider = series(*linien.toTypedArray()),
+                                        rangeProvider = yBereich,
+                                    ),
+                                    endAxis = VerticalAxis.rememberEnd(
+                                        valueFormatter = if (
+                                            marktpreisKategorie ==
+                                                MarktpreisKategorie.HANDELSDIFFERENZ
+                                        ) {
+                                            richtungsAchsenFormatter(
                                                 positiveRichtung = "Verkauf",
                                                 negativeRichtung = "Einkauf",
-                                                einheit = handelsdifferenzEinheit.achsenEinheit,
-                                            ),
-                                            itemPlacer = if (
-                                                handelsdifferenzEinheit ==
-                                                HandelsdifferenzEinheit.STUECK
-                                            ) {
-                                                ganzzahligerStueckAchsenItemPlacer
-                                            } else {
-                                                VerticalAxis.ItemPlacer.step()
-                                            },
-                                        ),
-                                        bottomAxis = rememberVollrundenachse(),
+                                                einheit = HandelsdifferenzEinheit.MARK.achsenEinheit,
+                                            )
+                                        } else {
+                                            markAchsenFormatter
+                                        },
                                     ),
-                                    model = chartModel,
-                                    scrollState = rememberVicoScrollState(),
-                                    zoomState = rememberVicoZoomState(
-                                        initialZoom = remember { Zoom.Content }
-                                    )
+                                    bottomAxis = rememberRundenachse(spiel.aktuellerZeitpunkt),
+                                ),
+                                model = dargestelltesChartModel,
+                                scrollState = rememberVicoScrollState(),
+                                zoomState = rememberVicoZoomState(
+                                    initialZoom = remember { Zoom.Content }
                                 )
-                            } else {
-                                CartesianChartHost(
-                                    modifier = bilanzModifier,
-                                    chart = rememberCartesianChart(
-                                        rememberLineCartesianLayer(
-                                            lineProvider = series(*linien.toTypedArray())
-                                        ),
-                                        endAxis = VerticalAxis.rememberEnd(
-                                            valueFormatter = if (
-                                                marktpreisKategorie ==
-                                                MarktpreisKategorie.HANDELSDIFFERENZ
-                                            ) {
-                                                richtungsAchsenFormatter(
-                                                    positiveRichtung = "Verkauf",
-                                                    negativeRichtung = "Einkauf",
-                                                    einheit = HandelsdifferenzEinheit.MARK.achsenEinheit,
-                                                )
-                                            } else {
-                                                markAchsenFormatter
-                                            },
-                                        ),
-                                        bottomAxis = rememberRundenachse(spiel.aktuellerZeitpunkt),
-                                    ),
-                                    model = chartModel,
-                                    scrollState = rememberVicoScrollState(),
-                                    zoomState = rememberVicoZoomState(
-                                        initialZoom = remember { Zoom.Content }
-                                    )
-                                )
-                            }
+                            )
                         }
 
                         if (marktpreisKategorie == MarktpreisKategorie.HANDELSGUETER) {
@@ -493,12 +559,7 @@ fun zeigeMarktplatz(
                 }
             }
         } else {
-            Card(modifier = ModiPad5) {
-                Text(
-                    text = "Noch keine Marktpreise vorhanden",
-                    modifier = ModiPad5
-                )
-            }
+            LeeresMarktpreisDiagramm(spiel.aktuellerZeitpunkt)
         }
 
         if (spiel.marktpreise.isNotEmpty()) {

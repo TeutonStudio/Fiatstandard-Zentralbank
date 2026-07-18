@@ -47,8 +47,12 @@ import de.teutonstudio.zentralbank.datenbank.zuMark
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
+import de.teutonstudio.zentralbank.schnittstelle.bilanzDiagrammYBereich
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
+import de.teutonstudio.zentralbank.schnittstelle.leererDiagrammEintrag
+import de.teutonstudio.zentralbank.schnittstelle.leeresLinienDiagrammModell
+import de.teutonstudio.zentralbank.schnittstelle.leeresSaeulenDiagrammModell
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
@@ -56,6 +60,7 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberVollrundenachse
 import de.teutonstudio.zentralbank.schnittstelle.richtungsAchsenFormatter
+import de.teutonstudio.zentralbank.schnittstelle.rundenDiagrammMaxX
 import de.teutonstudio.zentralbank.schnittstelle.rundenXWerteOhneSubrunden
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 
@@ -98,11 +103,6 @@ fun zeigeAussenhandel(
 
 @Composable
 private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
-    if (spiel.aussenhandelsbilanzNachRohstoff.isEmpty()) {
-        HinweisKarte("Noch keine Rohstoffdaten für den Außenhandel vorhanden")
-        return
-    }
-
     var einheit by remember { mutableStateOf(BilanzEinheit.PREIS) }
     val rohstoffe = Rohstoffe.entries.toList()
     val legende = rohstoffe.map { rohstoff ->
@@ -148,22 +148,37 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
             }
         }
     }
+    val darstellbareReihen = sichtbareReihen.filter { (_, werte) -> werte.isNotEmpty() }
+    val rundenAnzahl = maxOf(werteNachRohstoff.size, gesamtWerte.size)
+    val diagrammEintraege = darstellbareReihen
+        .map { (eintrag, _) -> eintrag }
+        .ifEmpty { listOf(leererDiagrammEintrag) }
+    val yBereich = remember(darstellbareReihen.isEmpty()) {
+        bilanzDiagrammYBereich(istLeer = darstellbareReihen.isEmpty())
+    }
 
     val zeitpunkt = spiel.aktuellerZeitpunkt
     val chartModel = remember(
         einheit,
-        werteNachRohstoff,
-        gesamtWerte,
-        sichtbareReihen,
+        darstellbareReihen,
+        rundenAnzahl,
         zeitpunkt,
     ) {
-        if (sichtbareReihen.isEmpty()) {
-            null
+        if (darstellbareReihen.isEmpty()) {
+            when (einheit) {
+                BilanzEinheit.PREIS -> leeresLinienDiagrammModell(
+                    rundenDiagrammMaxX(zeitpunkt, rundenAnzahl),
+                )
+
+                BilanzEinheit.STUECK -> leeresSaeulenDiagrammModell(
+                    (rundenAnzahl - 1).coerceAtLeast(1),
+                )
+            }
         } else {
             when (einheit) {
                 BilanzEinheit.PREIS -> CartesianChartModel(
                     LineCartesianLayerModel.build {
-                        sichtbareReihen.forEach { (_, werte) ->
+                        darstellbareReihen.forEach { (_, werte) ->
                             seriesMitGepunkteterAktuellerRunde(
                                 x = werte.indices.toList(),
                                 y = werte,
@@ -175,7 +190,7 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
 
                 BilanzEinheit.STUECK -> CartesianChartModel(
                     ColumnCartesianLayerModel.build {
-                        sichtbareReihen.forEach { (_, werte) ->
+                        darstellbareReihen.forEach { (_, werte) ->
                             series(
                                 x = rundenXWerteOhneSubrunden(
                                     anzahl = werte.size,
@@ -211,53 +226,51 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
                 fontSize = 24.sp,
                 modifier = ModiPad5,
             )
-            if (chartModel == null) {
-                Text(text = "Keine Datenreihe ausgewählt", modifier = ModiPad5)
-            } else {
-                CartesianChartHost(
-                    modifier = ModiPad5,
-                    chart = rememberCartesianChart(
-                        when (einheit) {
-                            BilanzEinheit.PREIS -> rememberLineCartesianLayer(
-                                lineProvider = LineCartesianLayer.LineProvider.series(
-                                    rememberLinienMitGepunkteterAktuellerRunde(
-                                        sichtbareReihen.map { (eintrag, _) -> eintrag }
-                                    )
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = rememberCartesianChart(
+                    when (einheit) {
+                        BilanzEinheit.PREIS -> rememberLineCartesianLayer(
+                            lineProvider = LineCartesianLayer.LineProvider.series(
+                                rememberLinienMitGepunkteterAktuellerRunde(
+                                    diagrammEintraege,
                                 )
-                            )
-
-                            BilanzEinheit.STUECK -> rememberColumnCartesianLayer(
-                                columnProvider = rememberSaeulenMitGepunkteterAktuellerRunde(
-                                    eintraege = sichtbareReihen.map { (eintrag, _) -> eintrag },
-                                    prognoseAbX = zeitpunkt.runde,
-                                )
-                            )
-                        },
-                        endAxis = VerticalAxis.rememberEnd(
-                            valueFormatter = richtungsAchsenFormatter(
-                                positiveRichtung = "Export",
-                                negativeRichtung = "Import",
-                                einheit = when (einheit) {
-                                    BilanzEinheit.PREIS -> "ℳ"
-                                    BilanzEinheit.STUECK -> "Stk"
-                                },
                             ),
-                            itemPlacer = if (einheit == BilanzEinheit.STUECK) {
-                                ganzzahligerStueckAchsenItemPlacer
-                            } else {
-                                VerticalAxis.ItemPlacer.step()
+                            rangeProvider = yBereich,
+                        )
+
+                        BilanzEinheit.STUECK -> rememberColumnCartesianLayer(
+                            columnProvider = rememberSaeulenMitGepunkteterAktuellerRunde(
+                                eintraege = diagrammEintraege,
+                                prognoseAbX = zeitpunkt.runde,
+                            ),
+                            rangeProvider = yBereich,
+                        )
+                    },
+                    endAxis = VerticalAxis.rememberEnd(
+                        valueFormatter = richtungsAchsenFormatter(
+                            positiveRichtung = "Export",
+                            negativeRichtung = "Import",
+                            einheit = when (einheit) {
+                                BilanzEinheit.PREIS -> "ℳ"
+                                BilanzEinheit.STUECK -> "Stk"
                             },
                         ),
-                        bottomAxis = when (einheit) {
-                            BilanzEinheit.PREIS -> rememberRundenachse(zeitpunkt)
-                            BilanzEinheit.STUECK -> rememberVollrundenachse()
+                        itemPlacer = if (einheit == BilanzEinheit.STUECK) {
+                            ganzzahligerStueckAchsenItemPlacer
+                        } else {
+                            VerticalAxis.ItemPlacer.step()
                         },
                     ),
-                    model = chartModel,
-                    scrollState = rememberVicoScrollState(),
-                    zoomState = rememberVicoZoomState(initialZoom = Zoom.Content),
-                )
-            }
+                    bottomAxis = when (einheit) {
+                        BilanzEinheit.PREIS -> rememberRundenachse(zeitpunkt)
+                        BilanzEinheit.STUECK -> rememberVollrundenachse()
+                    },
+                ),
+                model = chartModel,
+                scrollState = rememberVicoScrollState(),
+                zoomState = rememberVicoZoomState(initialZoom = Zoom.Content),
+            )
 
             UmschaltbareDiagrammLegende(
                 eintraege = if (einheit == BilanzEinheit.PREIS) {
@@ -350,13 +363,6 @@ private fun HafenPreisKarte(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun HinweisKarte(text: String) {
-    Card(modifier = ModiPad5) {
-        Text(text = text, modifier = ModiPad5)
     }
 }
 

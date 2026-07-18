@@ -94,6 +94,7 @@ import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
+import de.teutonstudio.zentralbank.schnittstelle.leererDiagrammEintrag
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.markBeschriftung
 import de.teutonstudio.zentralbank.schnittstelle.mitAblaufRundentrenner
@@ -102,6 +103,7 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rememberSaeulenMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.rundenDiagrammMaxX
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.stueckAchsenFormatter
 import java.util.Locale
@@ -386,11 +388,6 @@ private fun BalanceChart(
         spiel.spielerMarktwert.size,
         spiel.spielerKombinierteSchulden.size,
     )
-    if (reihenLängen.any { länge -> länge == 0 }) {
-        SchuldenGraphHinweisCard("Keine Bilanzdaten vorhanden.", tabAuswahl)
-        return
-    }
-
     if (reihenLängen.distinct().size != 1) {
         SchuldenGraphHinweisCard(
             "Bilanzdaten haben unterschiedliche Längen.",
@@ -468,16 +465,30 @@ private fun BalanceChart(
     val sichtbareReihen = reihen.filter { reihe ->
         legendenStatus.istSichtbar(reihe.eintrag.id)
     }
-    val maximalbetrag = sichtbareReihen
+    val darstellbareReihen = sichtbareReihen.filter { reihe ->
+        reihe.runden.isNotEmpty() && reihe.werte.isNotEmpty()
+    }
+    val maximalbetrag = darstellbareReihen
         .flatMap { reihe -> reihe.werte }
         .maxOfOrNull { wert -> abs(wert.toDouble()) }
         ?: 0.0
+    val diagrammEintraege = darstellbareReihen
+        .map(SchuldenDiagrammReihe::eintrag)
+        .ifEmpty { listOf(leererDiagrammEintrag) }
 
-    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag, zeitpunkt) {
-        if (sichtbareReihen.isNotEmpty()) {
-            modelProducer.runTransaction {
-                lineSeries {
-                    sichtbareReihen.forEach { reihe ->
+    LaunchedEffect(darstellbareReihen, yAchsenExponent, maximalbetrag, zeitpunkt) {
+        modelProducer.runTransaction {
+            lineSeries {
+                if (darstellbareReihen.isEmpty()) {
+                    series(
+                        x = listOf(
+                            0.0,
+                            rundenDiagrammMaxX(zeitpunkt, prognoseRunden.size),
+                        ),
+                        y = listOf(0, 0),
+                    )
+                } else {
+                    darstellbareReihen.forEach { reihe ->
                         seriesMitGepunkteterAktuellerRunde(
                             x = reihe.runden,
                             y = reihe.werte.map { wert ->
@@ -494,37 +505,30 @@ private fun BalanceChart(
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
             tabAuswahl?.invoke()
-            if (sichtbareReihen.isEmpty()) {
-                Text(
-                    text = "Keine Datenreihe ausgewählt",
-                    modifier = ModiPad5,
-                )
-            } else {
-                CartesianChartHost(
-                    modifier = ModiPad5,
-                    chart = rememberCartesianChart(
-                        rememberLineCartesianLayer(
-                            lineProvider = LineCartesianLayer.LineProvider.series(
-                                rememberLinienMitGepunkteterAktuellerRunde(
-                                    eintraege = sichtbareReihen.map { reihe -> reihe.eintrag },
-                                )
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(
+                        lineProvider = LineCartesianLayer.LineProvider.series(
+                            rememberLinienMitGepunkteterAktuellerRunde(
+                                eintraege = diagrammEintraege,
                             )
                         ),
-                        endAxis = VerticalAxis.rememberEnd(
-                            valueFormatter = exponentiellerMarkAchsenFormatter(
-                                exponent = yAchsenExponent,
-                                maximalbetrag = maximalbetrag,
-                            ),
+                    ),
+                    endAxis = VerticalAxis.rememberEnd(
+                        valueFormatter = exponentiellerMarkAchsenFormatter(
+                            exponent = yAchsenExponent,
+                            maximalbetrag = maximalbetrag,
                         ),
-                        bottomAxis = rememberRundenachse(zeitpunkt),
                     ),
-                    modelProducer = modelProducer,
-                    scrollState = rememberVicoScrollState(),
-                    zoomState = rememberVicoZoomState(
-                        initialZoom = Zoom.Content,
-                    ),
-                )
-            }
+                    bottomAxis = rememberRundenachse(zeitpunkt),
+                ),
+                modelProducer = modelProducer,
+                scrollState = rememberVicoScrollState(),
+                zoomState = rememberVicoZoomState(
+                    initialZoom = Zoom.Content,
+                ),
+            )
 
             SchuldenLegendenZeile(
                 yAchsenExponent = yAchsenExponent,
@@ -559,11 +563,6 @@ private fun GlobalBalanceChart(
         .bisRundeFortgeschrieben(letztePrognoseRunde)
     val zeitpunkt = spiel.aktuellerZeitpunkt
 
-    if (globalesBarvermögen.isEmpty()) {
-        SchuldenGraphHinweisCard("Keine globalen Bilanzwerte vorhanden.", tabAuswahl)
-        return
-    }
-
     val modelProducer = remember { CartesianChartModelProducer() }
     val legende = listOf(
         DiagrammLegendenEintrag(
@@ -597,16 +596,30 @@ private fun GlobalBalanceChart(
     val sichtbareReihen = reihen.filter { reihe ->
         legendenStatus.istSichtbar(reihe.eintrag.id)
     }
-    val maximalbetrag = sichtbareReihen
+    val darstellbareReihen = sichtbareReihen.filter { reihe ->
+        reihe.runden.isNotEmpty() && reihe.werte.isNotEmpty()
+    }
+    val maximalbetrag = darstellbareReihen
         .flatMap { reihe -> reihe.werte }
         .maxOfOrNull { wert -> abs(wert.toDouble()) }
         ?: 0.0
+    val diagrammEintraege = darstellbareReihen
+        .map(SchuldenDiagrammReihe::eintrag)
+        .ifEmpty { listOf(leererDiagrammEintrag) }
 
-    LaunchedEffect(sichtbareReihen, yAchsenExponent, maximalbetrag, zeitpunkt) {
-        if (sichtbareReihen.isNotEmpty()) {
-            modelProducer.runTransaction {
-                lineSeries {
-                    sichtbareReihen.forEach { reihe ->
+    LaunchedEffect(darstellbareReihen, yAchsenExponent, maximalbetrag, zeitpunkt) {
+        modelProducer.runTransaction {
+            lineSeries {
+                if (darstellbareReihen.isEmpty()) {
+                    series(
+                        x = listOf(
+                            0.0,
+                            rundenDiagrammMaxX(zeitpunkt, prognoseRunden.size),
+                        ),
+                        y = listOf(0, 0),
+                    )
+                } else {
+                    darstellbareReihen.forEach { reihe ->
                         seriesMitGepunkteterAktuellerRunde(
                             x = reihe.runden,
                             y = reihe.werte.map { wert ->
@@ -623,37 +636,30 @@ private fun GlobalBalanceChart(
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
             tabAuswahl?.invoke()
-            if (sichtbareReihen.isEmpty()) {
-                Text(
-                    text = "Keine Datenreihe ausgewählt",
-                    modifier = ModiPad5,
-                )
-            } else {
-                CartesianChartHost(
-                    modifier = ModiPad5,
-                    chart = rememberCartesianChart(
-                        rememberLineCartesianLayer(
-                            lineProvider = LineCartesianLayer.LineProvider.series(
-                                rememberLinienMitGepunkteterAktuellerRunde(
-                                    eintraege = sichtbareReihen.map { reihe -> reihe.eintrag },
-                                )
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(
+                        lineProvider = LineCartesianLayer.LineProvider.series(
+                            rememberLinienMitGepunkteterAktuellerRunde(
+                                eintraege = diagrammEintraege,
                             )
                         ),
-                        endAxis = VerticalAxis.rememberEnd(
-                            valueFormatter = exponentiellerMarkAchsenFormatter(
-                                exponent = yAchsenExponent,
-                                maximalbetrag = maximalbetrag,
-                            ),
+                    ),
+                    endAxis = VerticalAxis.rememberEnd(
+                        valueFormatter = exponentiellerMarkAchsenFormatter(
+                            exponent = yAchsenExponent,
+                            maximalbetrag = maximalbetrag,
                         ),
-                        bottomAxis = rememberRundenachse(zeitpunkt),
                     ),
-                    modelProducer = modelProducer,
-                    scrollState = rememberVicoScrollState(),
-                    zoomState = rememberVicoZoomState(
-                        initialZoom = Zoom.Content,
-                    ),
-                )
-            }
+                    bottomAxis = rememberRundenachse(zeitpunkt),
+                ),
+                modelProducer = modelProducer,
+                scrollState = rememberVicoScrollState(),
+                zoomState = rememberVicoZoomState(
+                    initialZoom = Zoom.Content,
+                ),
+            )
 
             SchuldenLegendenZeile(
                 yAchsenExponent = yAchsenExponent,
@@ -841,11 +847,7 @@ private fun ManagementChart(
     anleihen: Iterable<AnleiheAnzeige>,
 ) {
     val currentRound = selectedRound ?: aktuelleRunde
-
-    if (selectedPlayer == GLOBAL_PLAYER) {
-        EmptyInfoCard("Für die Verwaltungsansicht bitte einen Spieler wählen.")
-        return
-    }
+    val spielerAusgewaehlt = selectedPlayer != GLOBAL_PLAYER
 
     val bauSaldo = spielerBauSaldo[selectedPlayer].orEmpty()
 
@@ -884,13 +886,18 @@ private fun ManagementChart(
     )
     val legendenStatus = rememberDiagrammLegendenStatus(legende)
     val sichtbareReihen = reihen.filter { (eintrag, _) ->
-        legendenStatus.istSichtbar(eintrag.id)
+        spielerAusgewaehlt && legendenStatus.istSichtbar(eintrag.id)
     }
+    val diagrammEintraege = sichtbareReihen
+        .map { (eintrag, _) -> eintrag }
+        .ifEmpty { listOf(leererDiagrammEintrag) }
 
     LaunchedEffect(sichtbareReihen) {
-        if (sichtbareReihen.isNotEmpty()) {
-            modelProducer.runTransaction {
-                columnSeries {
+        modelProducer.runTransaction {
+            columnSeries {
+                if (sichtbareReihen.isEmpty()) {
+                    series(listOf(0, 0, 0))
+                } else {
                     sichtbareReihen.forEach { (_, werte) ->
                         series(werte)
                     }
@@ -907,42 +914,35 @@ private fun ManagementChart(
 
     Card(modifier = ModiPad5) {
         Column(modifier = ModiPad5) {
-            if (sichtbareReihen.isEmpty()) {
-                Text(
-                    text = "Keine Datenreihe ausgewählt",
-                    modifier = ModiPad5,
-                )
-            } else {
-                CartesianChartHost(
-                    modifier = ModiPad5,
-                    chart = rememberCartesianChart(
-                        rememberColumnCartesianLayer(
-                            columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                                sichtbareReihen.map { (eintrag, _) ->
-                                    rememberLineComponent(
-                                        fill = Fill(eintrag.farbe),
-                                        thickness = 8.dp,
-                                    )
-                                }
-                            )
-                        ),
-                        endAxis = VerticalAxis.rememberEnd(
-                            valueFormatter = stueckAchsenFormatter,
-                            itemPlacer = ganzzahligerStueckAchsenItemPlacer,
-                        ),
-                        bottomAxis = HorizontalAxis.rememberBottom(
-                            valueFormatter = CartesianValueFormatter { _, value, _ ->
-                                labels.getOrNull(value.toInt()) ?: ""
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = rememberCartesianChart(
+                    rememberColumnCartesianLayer(
+                        columnProvider = ColumnCartesianLayer.ColumnProvider.series(
+                            diagrammEintraege.map { eintrag ->
+                                rememberLineComponent(
+                                    fill = Fill(eintrag.farbe),
+                                    thickness = 8.dp,
+                                )
                             }
-                        ),
+                        )
                     ),
-                    modelProducer = modelProducer,
-                    scrollState = rememberVicoScrollState(),
-                    zoomState = rememberVicoZoomState(
-                        initialZoom = Zoom.Content,
+                    endAxis = VerticalAxis.rememberEnd(
+                        valueFormatter = stueckAchsenFormatter,
+                        itemPlacer = ganzzahligerStueckAchsenItemPlacer,
                     ),
-                )
-            }
+                    bottomAxis = HorizontalAxis.rememberBottom(
+                        valueFormatter = CartesianValueFormatter { _, value, _ ->
+                            labels.getOrNull(value.toInt()) ?: ""
+                        }
+                    ),
+                ),
+                modelProducer = modelProducer,
+                scrollState = rememberVicoScrollState(),
+                zoomState = rememberVicoZoomState(
+                    initialZoom = Zoom.Content,
+                ),
+            )
 
             UmschaltbareDiagrammLegende(
                 eintraege = legende,

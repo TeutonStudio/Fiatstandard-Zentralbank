@@ -1,12 +1,50 @@
 package de.teutonstudio.zentralbank.schnittstelle
 
+import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
+import com.patrykandpatrick.vico.compose.common.data.MutableExtraStore
 import de.teutonstudio.zentralbank.datenbank.SpielZeitpunkt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DiagrammAktuelleRundeTest {
+    @Test
+    fun leereBilanzVerwendetEinenSymmetrischenYBereich() {
+        val bereich = bilanzDiagrammYBereich(istLeer = true)
+        val extraStore = MutableExtraStore()
+
+        assertEquals(-1.0, bereich.getMinY(0.0, 0.0, extraStore), 0.0)
+        assertEquals(1.0, bereich.getMaxY(0.0, 0.0, extraStore), 0.0)
+    }
+
+    @Test
+    fun leereDiagrammeBehaltenEinenUnsichtbarenWertebereich() {
+        val linienModell = leeresLinienDiagrammModell(maxX = 8)
+        val saeulenModell = leeresSaeulenDiagrammModell(maxX = 5)
+
+        val linie = linienModell.models.single() as LineCartesianLayerModel
+        val saeule = saeulenModell.models.single() as ColumnCartesianLayerModel
+
+        assertEquals(listOf(0.0, 8.0), linie.series.single().map { eintrag -> eintrag.x })
+        assertEquals(listOf(0.0, 0.0), linie.series.single().map { eintrag -> eintrag.y })
+        assertEquals(listOf(0.0, 5.0), saeule.series.single().map { eintrag -> eintrag.x })
+        assertEquals(listOf(0.0, 0.0), saeule.series.single().map { eintrag -> eintrag.y })
+        assertEquals(0f, leererDiagrammEintrag.farbe.alpha)
+    }
+
+    @Test
+    fun leererRundenGraphSkaliertBisZurVorhandenenLetztenRunde() {
+        val zeitpunkt = SpielZeitpunkt(
+            runde = 3,
+            aktiverSpielerIndex = 2,
+            spielerAnzahl = 7,
+        )
+
+        assertEquals(28.0, rundenDiagrammMaxX(zeitpunkt, rundenAnzahl = 5), 0.0)
+        assertEquals(7.0, rundenDiagrammMaxX(zeitpunkt, rundenAnzahl = 0), 0.0)
+    }
+
     @Test
     fun rundenwerteOhneSubrundenEnthaltenNurVolleRunden() {
         assertEquals(

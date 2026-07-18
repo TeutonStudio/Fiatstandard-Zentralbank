@@ -82,6 +82,8 @@ import de.teutonstudio.zentralbank.schnittstelle.ModiPad15
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.schnittstelle.leererDiagrammEintrag
+import de.teutonstudio.zentralbank.schnittstelle.leeresLinienDiagrammModell
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import de.teutonstudio.zentralbank.schnittstelle.markAchsenFormatter
 import de.teutonstudio.zentralbank.schnittstelle.mitAblaufRundentrenner
@@ -89,6 +91,7 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberDiagrammLegendenStatus
 import de.teutonstudio.zentralbank.schnittstelle.rememberAblaufSpaltenbreite
 import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAktuellerRunde
 import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
+import de.teutonstudio.zentralbank.schnittstelle.rundenDiagrammMaxX
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
 import java.util.Locale
 import kotlin.math.abs
@@ -101,104 +104,93 @@ fun SpielerBilanz(
 ) {
     val spielerSaldo = spiel.spielerSaldo
     val zeitpunkt = spiel.aktuellerZeitpunkt
-    val spielerListe = spielerSaldo.first().keys.toList()
+    val spielerListe = spielerSaldo.firstOrNull()?.keys?.toList() ?: spiel.spielerListe
     Card(modifier = ModiPad5) {
-            //val spielerNamen = spielerListe.map { it.erhalteNamen() }
-            val spielerFarben = erhalteSpielerFarben(spielerListe)
+        val spielerFarben = erhalteSpielerFarben(spielerListe)
 
-            val scrollState = rememberVicoScrollState()
-            val zoomState = rememberVicoZoomState(initialZoom = remember { Zoom.Content })
+        val scrollState = rememberVicoScrollState()
+        val zoomState = rememberVicoZoomState(initialZoom = remember { Zoom.Content })
 
-            val endAxis = VerticalAxis.rememberEnd(
-                valueFormatter = markAchsenFormatter,
-            )
-            val bottomAxis = rememberRundenachse(zeitpunkt)
+        val endAxis = VerticalAxis.rememberEnd(
+            valueFormatter = markAchsenFormatter,
+        )
+        val bottomAxis = rememberRundenachse(zeitpunkt)
 
-            val serien = remember(spielerListe, spielerSaldo) {
-                spielerListe.mapNotNull { spieler ->
-                    val yWerte: List<Number> = spielerSaldo.map { saldoProRunde ->
-                        saldoProRunde[spieler]?.toIntOderNull() ?: 0
-                    }
-
-                    if (yWerte.isEmpty()) null else spieler to yWerte
+        val serien = remember(spielerListe, spielerSaldo) {
+            spielerListe.mapNotNull { spieler ->
+                val yWerte: List<Number> = spielerSaldo.map { saldoProRunde ->
+                    saldoProRunde[spieler]?.toIntOderNull() ?: 0
                 }
-            }
 
-            val legende = spielerListe.map { spieler ->
-                DiagrammLegendenEintrag(
-                    id = "spieler:${spieler.name}",
-                    bezeichnung = spieler.name,
-                    farbe = spielerFarben[spieler] ?: Color.Black,
+                if (yWerte.isEmpty()) null else spieler to yWerte
+            }
+        }
+
+        val legende = spielerListe.map { spieler ->
+            DiagrammLegendenEintrag(
+                id = "spieler:${spieler.name}",
+                bezeichnung = spieler.name,
+                farbe = spielerFarben[spieler] ?: Color.Black,
+            )
+        }
+        val legendenStatus = rememberDiagrammLegendenStatus(legende)
+        val sichtbareSerien = serien.filter { (spieler, _) ->
+            legendenStatus.istSichtbar("spieler:${spieler.name}")
+        }
+
+        val chartModel = remember(sichtbareSerien, spielerSaldo.size, zeitpunkt) {
+            if (sichtbareSerien.isEmpty()) {
+                leeresLinienDiagrammModell(
+                    rundenDiagrammMaxX(zeitpunkt, spielerSaldo.size),
+                )
+            } else {
+                CartesianChartModel(
+                    LineCartesianLayerModel.build {
+                        sichtbareSerien.forEach { (_, yWerte) ->
+                            seriesMitGepunkteterAktuellerRunde(
+                                x = yWerte.indices.toList(),
+                                y = yWerte,
+                                zeitpunkt = zeitpunkt,
+                            )
+                        }
+                    }
                 )
             }
-            val legendenStatus = rememberDiagrammLegendenStatus(legende)
-            val sichtbareSerien = serien.filter { (spieler, _) ->
-                legendenStatus.istSichtbar("spieler:${spieler.name}")
+        }
+        val diagrammEintraege = sichtbareSerien.map { (spieler, _) ->
+            DiagrammLegendenEintrag(
+                id = "spieler:${spieler.name}",
+                bezeichnung = spieler.name,
+                farbe = spielerFarben[spieler] ?: Color.Black,
+            )
+        }.ifEmpty { listOf(leererDiagrammEintrag) }
+
+        Column(modifier = ModiPad5) {
+            CartesianChartHost(
+                modifier = ModiPad5,
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(
+                        lineProvider = LineCartesianLayer.LineProvider.series(
+                            rememberLinienMitGepunkteterAktuellerRunde(
+                                diagrammEintraege,
+                            )
+                        )
+                    ),
+                    endAxis = endAxis,
+                    bottomAxis = bottomAxis,
+                ),
+                model = chartModel,
+                scrollState = scrollState,
+                zoomState = zoomState,
+            )
+
+            if (legende.isNotEmpty()) {
+                UmschaltbareDiagrammLegende(
+                    eintraege = legende,
+                    status = legendenStatus,
+                )
             }
-
-            val chartModel = remember(sichtbareSerien, zeitpunkt) {
-                if (sichtbareSerien.isEmpty()) {
-                    null
-                } else {
-                    CartesianChartModel(
-                        LineCartesianLayerModel.build {
-                            sichtbareSerien.forEach { (_, yWerte) ->
-                                seriesMitGepunkteterAktuellerRunde(
-                                    x = yWerte.indices.toList(),
-                                    y = yWerte,
-                                    zeitpunkt = zeitpunkt,
-                                )
-                            }
-                        }
-                    )
-                }
-            }
-
-            Column(modifier = ModiPad5) {
-                when {
-                    serien.isEmpty() -> Text(
-                        text = "Noch keine Bilanzdaten vorhanden",
-                        modifier = Modifier.padding(16.dp)
-                    )
-
-                    chartModel == null -> Text(
-                        text = "Keine Datenreihe ausgewählt",
-                        modifier = Modifier.padding(16.dp),
-                    )
-
-                    else -> CartesianChartHost(
-                        modifier = ModiPad5,
-                        chart = rememberCartesianChart(
-                            rememberLineCartesianLayer(
-                                lineProvider = LineCartesianLayer.LineProvider.series(
-                                    rememberLinienMitGepunkteterAktuellerRunde(
-                                        sichtbareSerien.map { (spieler, _) ->
-                                            DiagrammLegendenEintrag(
-                                                id = "spieler:${spieler.name}",
-                                                bezeichnung = spieler.name,
-                                                farbe = spielerFarben[spieler] ?: Color.Black,
-                                            )
-                                        }
-                                    )
-                                )
-                            ),
-                            endAxis = endAxis,
-                            bottomAxis = bottomAxis,
-                        ),
-                        model = chartModel,
-                        scrollState = scrollState,
-                        zoomState = zoomState
-                    )
-                }
-
-                if (serien.isNotEmpty()) {
-                    UmschaltbareDiagrammLegende(
-                        eintraege = legende,
-                        status = legendenStatus,
-                    )
-                }
-
-            }
+        }
     }
 }
 

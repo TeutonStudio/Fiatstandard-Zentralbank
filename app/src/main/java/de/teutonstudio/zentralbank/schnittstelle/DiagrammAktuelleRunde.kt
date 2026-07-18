@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.schnittstelle
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -10,6 +11,8 @@ import com.patrykandpatrick.vico.compose.cartesian.CartesianDrawingContext
 import com.patrykandpatrick.vico.compose.cartesian.axis.Axis
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberAxisGuidelineComponent
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.data.LineCartesianLayerModel
@@ -31,6 +34,51 @@ internal data class DiagrammSubrundenDaten(
     val y: List<Number>,
     val prognoseAbX: Double,
 )
+
+internal val leererDiagrammEintrag = DiagrammLegendenEintrag(
+    id = "diagramm-leerzustand",
+    bezeichnung = "",
+    farbe = Color.Transparent,
+)
+
+internal fun bilanzDiagrammYBereich(istLeer: Boolean): CartesianLayerRangeProvider =
+    if (istLeer) {
+        CartesianLayerRangeProvider.fixed(minY = -1.0, maxY = 1.0)
+    } else {
+        CartesianLayerRangeProvider.auto()
+    }
+
+internal fun rundenDiagrammMaxX(
+    zeitpunkt: SpielZeitpunkt,
+    rundenAnzahl: Int,
+): Double {
+    val letzteRunde = (rundenAnzahl - 1).coerceAtLeast(1)
+    return if (zeitpunkt.runde == 0) {
+        letzteRunde.toDouble()
+    } else {
+        letzteRunde * zeitpunkt.spielerAnzahl.toDouble()
+    }
+}
+
+internal fun leeresLinienDiagrammModell(maxX: Number): CartesianChartModel =
+    CartesianChartModel(
+        LineCartesianLayerModel.build {
+            series(
+                x = listOf(0.0, maxX.toDouble().coerceAtLeast(1.0)),
+                y = listOf(0, 0),
+            )
+        }
+    )
+
+internal fun leeresSaeulenDiagrammModell(maxX: Number): CartesianChartModel =
+    CartesianChartModel(
+        ColumnCartesianLayerModel.build {
+            series(
+                x = listOf(0.0, maxX.toDouble().coerceAtLeast(1.0)),
+                y = listOf(0, 0),
+            )
+        }
+    )
 
 internal fun rundenXWerteOhneSubrunden(
     anzahl: Int,
