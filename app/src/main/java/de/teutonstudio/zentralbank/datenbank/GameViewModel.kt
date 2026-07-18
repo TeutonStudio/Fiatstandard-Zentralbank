@@ -906,7 +906,13 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             val testDaten = TestSpiel.zuSpeicherDaten().let { (spiel, daten) ->
                 spiel.copy(spielID = -1) to daten
             }
-            setzeAktuellesSpiel(testDaten.second.zuSpiel(testDaten.first), testDaten)
+            setzeAktuellesSpiel(
+                spiel = testDaten.second.zuSpiel(
+                    daten = testDaten.first,
+                    karte = TestSpiel.karte,
+                ),
+                daten = testDaten,
+            )
             return
         }
         val gespeichertesSpiel = spielAblage.spielLaden(id)

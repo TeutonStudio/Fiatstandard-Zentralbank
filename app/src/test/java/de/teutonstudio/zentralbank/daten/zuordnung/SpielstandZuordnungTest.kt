@@ -71,10 +71,14 @@ class SpielstandZuordnungTest {
     fun tabellendatenWerdenAlsSpielRekonstruiert() {
         val (spielDaten, fachDaten) = TestSpiel.zuSpeicherDaten()
 
-        val rekonstruiert = fachDaten.zuSpiel(spielDaten)
+        val rekonstruiert = fachDaten.zuSpiel(
+            daten = spielDaten,
+            karte = TestSpiel.karte,
+        )
 
         assertEquals(TestSpiel.spielerStringListe, rekonstruiert.spielerStringListe)
         assertEquals(TestSpiel.aktuelleRunde, rekonstruiert.aktuelleRunde)
         assertEquals(TestSpiel.warenkorb, rekonstruiert.warenkorb)
+        assertEquals(TestSpiel.karte, rekonstruiert.karte)
     }
 }
