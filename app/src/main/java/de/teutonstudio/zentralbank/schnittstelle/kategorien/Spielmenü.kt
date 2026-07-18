@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -37,6 +38,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
+import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarbe
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 
 enum class SpielmenueBereich(
@@ -63,6 +65,15 @@ fun Spielmenü(
     val aktiverSpieler = zustand.spieler.firstOrNull { spieler ->
         spieler.id == zustand.aktiverSpieler
     }
+    val aktiverSpielerIndex = zustand.spieler.indexOfFirst { spieler ->
+        spieler.id == zustand.aktiverSpieler
+    }
+    val leistenFarbe = if (aktiverSpielerIndex >= 0) {
+        erhalteSpielerFarbe(aktiverSpielerIndex)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val leistenInhaltFarbe = leistenFarbe.lesbareSchriftfarbe()
 
     Box(modifier = modifier.fillMaxSize().padding(12.dp)) {
         kartenInhalt()
@@ -75,7 +86,8 @@ fun Spielmenü(
             shape = MaterialTheme.shapes.large,
             tonalElevation = 5.dp,
             shadowElevation = 4.dp,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            color = leistenFarbe,
+            contentColor = leistenInhaltFarbe,
         ) {
             Row(
                 modifier = Modifier
@@ -140,7 +152,8 @@ fun Spielmenü(
             shape = MaterialTheme.shapes.large,
             tonalElevation = 5.dp,
             shadowElevation = 4.dp,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+            color = leistenFarbe,
+            contentColor = leistenInhaltFarbe,
         ) {
             Column(
                 modifier = Modifier.padding(7.dp).verticalScroll(rememberScrollState()),
@@ -150,6 +163,9 @@ fun Spielmenü(
                     OutlinedButton(
                         onClick = { beiBereich(bereich) },
                         modifier = Modifier.widthIn(min = 110.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = leistenInhaltFarbe,
+                        ),
                     ) {
                         Image(
                             painter = painterResource(bereich.icon),
@@ -170,6 +186,9 @@ fun Spielmenü(
                 OutlinedButton(
                     onClick = beiSpielBeenden,
                     modifier = Modifier.widthIn(min = 110.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = leistenInhaltFarbe,
+                    ),
                 ) {
                     Text("Spielstand beenden")
                 }

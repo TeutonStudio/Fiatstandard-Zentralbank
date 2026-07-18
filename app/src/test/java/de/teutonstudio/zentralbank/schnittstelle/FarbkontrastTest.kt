@@ -9,6 +9,7 @@ import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.farbe
 import kotlin.math.max
 import kotlin.math.min
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,6 +19,15 @@ class FarbkontrastTest {
             Bauteil.entries.map { bauteil -> bauteil.farbe } +
             erhalteSpielerFarben(TestSpiel.spielerListe).values +
             auslandFarbe
+
+    @Test
+    fun einzelneSpielerfarbeEntsprichtDerFarbeInDerSpielerliste() {
+        val farben = erhalteSpielerFarben(TestSpiel.spielerListe)
+
+        TestSpiel.spielerListe.forEachIndexed { index, spieler ->
+            assertEquals(farben.getValue(spieler), erhalteSpielerFarbe(index))
+        }
+    }
 
     @Test
     fun fachfarbenErhaltenEineLesbareSchriftfarbe() {

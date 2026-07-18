@@ -15,9 +15,12 @@ private val spielerFarben = listOf(
 
 val auslandFarbe = Color(0xFF607681)
 
+fun erhalteSpielerFarbe(spielerIndex: Int): Color =
+    spielerFarben.getOrElse(spielerIndex) { Color(0xFF707070) }
+
 fun erhalteSpielerFarben(spielerListe: List<Spieler>): Map<Spieler, Color> =
     spielerListe
         .mapIndexed { index, spieler ->
-            spieler to spielerFarben.getOrElse(index) { Color(0xFF707070) }
+            spieler to erhalteSpielerFarbe(index)
         }
         .toMap()
