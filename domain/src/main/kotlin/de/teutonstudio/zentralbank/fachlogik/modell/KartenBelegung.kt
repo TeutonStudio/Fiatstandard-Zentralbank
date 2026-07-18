@@ -66,8 +66,12 @@ data class EckBelegung(
     val typ: EckGebaeudeTyp,
     val besitzer: SpielerId? = null,
     val zustand: BauwerkZustand = BauwerkZustand.INTAKT,
+    val gebautInRunde: Int? = null,
 ) {
     init {
+        require(gebautInRunde == null || gebautInRunde >= 0) {
+            "Die Baurunde eines Eckgebäudes darf nicht negativ sein."
+        }
         require(zustand == BauwerkZustand.ZERSTOERT || besitzer != null) {
             "Ein intaktes oder belagertes Eckgebäude braucht einen Besitzer."
         }
@@ -81,8 +85,12 @@ data class EckBelegung(
 data class KantenBelegung(
     val position: KartenKante,
     val zustand: BauwerkZustand = BauwerkZustand.INTAKT,
+    val gebautInRunde: Int? = null,
 ) {
     init {
+        require(gebautInRunde == null || gebautInRunde >= 0) {
+            "Die Baurunde einer Handelslinie darf nicht negativ sein."
+        }
         require(zustand != BauwerkZustand.BELAGERT) {
             "Eine Handelslinie kann nicht belagert sein."
         }
@@ -122,7 +130,14 @@ data class FeldBelegung(
     val position: KartenFeld,
     val anlage: FeldAnlage,
     val zustand: AnlagenZustand = AnlagenZustand.AKTIV,
-)
+    val gebautInRunde: Int? = null,
+) {
+    init {
+        require(gebautInRunde == null || gebautInRunde >= 0) {
+            "Die Baurunde einer Feldanlage darf nicht negativ sein."
+        }
+    }
+}
 
 @Serializable
 enum class FrachtRichtung {

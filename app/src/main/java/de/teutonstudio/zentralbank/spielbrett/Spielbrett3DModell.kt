@@ -95,6 +95,14 @@ data class SpielObjektTyp(
     val form: SpielObjektForm,
     val zustand: ObjektDarstellungsZustand = ObjektDarstellungsZustand.INTAKT,
     val istVerwaltungsstandort: Boolean = false,
+    val infos: List<SpielObjektInfoEintrag> = emptyList(),
+    val spieler: Set<String> = emptySet(),
+)
+
+@Immutable
+data class SpielObjektInfoEintrag(
+    val bezeichnung: String,
+    val wert: String,
 )
 
 enum class SpielObjektForm {

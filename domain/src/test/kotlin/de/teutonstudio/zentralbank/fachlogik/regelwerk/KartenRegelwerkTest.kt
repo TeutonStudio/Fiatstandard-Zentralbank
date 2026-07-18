@@ -156,7 +156,7 @@ class KartenRegelwerkTest {
     @Test
     fun bahnhofBuchtKostenUndOrtAtomar() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
-        val start = zustand().mitHandelslinieZu(ecke)
+        val start = zustand().copy(rundenzähler = 4).mitHandelslinieZu(ecke)
 
         val danach = SpielRegelwerk.wendeAn(
             start,
@@ -169,6 +169,7 @@ class KartenRegelwerkTest {
         assertEquals(8, spieler.rohstoffe[Rohstoff.ZIEGEL])
         assertEquals(9, spieler.rohstoffe[Rohstoff.STAHL])
         assertEquals(EckGebaeudeTyp.BAHNHOF, danach.karte?.belegung?.ecken?.single()?.typ)
+        assertEquals(4, danach.karte?.belegung?.ecken?.single()?.gebautInRunde)
     }
 
     @Test

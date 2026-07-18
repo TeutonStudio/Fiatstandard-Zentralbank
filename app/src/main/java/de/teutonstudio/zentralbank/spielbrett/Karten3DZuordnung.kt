@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.spielbrett
 import androidx.compose.ui.graphics.Color
 import de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
@@ -15,6 +16,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 
@@ -78,10 +80,11 @@ fun Spielkarte.zu3DModell(
         },
         eckObjekte = belegung.ecken.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
+            val name = eintrag.typ.anzeigeName()
             EckObjektAuflage(
                 position = eintrag.position,
                 typ = SpielObjektTyp(
-                    name = eintrag.typ.anzeigeName(),
+                    name = name,
                     farbe = when (zustand) {
                         ObjektDarstellungsZustand.ZERSTOERT -> ZerstoertFarbe
                         ObjektDarstellungsZustand.BELAGERT ->
@@ -91,6 +94,14 @@ fun Spielkarte.zu3DModell(
                     form = eintrag.typ.zuForm(),
                     zustand = zustand,
                     istVerwaltungsstandort = zustand != ObjektDarstellungsZustand.ZERSTOERT,
+                    infos = bauwerkInfos(
+                        spieler = eintrag.besitzer?.wert ?: "neutral",
+                        gebaeude = name,
+                        bauteil = eintrag.typ.zuBauteilTyp(),
+                        gebautInRunde = eintrag.gebautInRunde,
+                        zustand = zustand,
+                    ),
+                    spieler = setOfNotNull(eintrag.besitzer?.wert),
                 ),
             )
         } + (hervorhebung as? KartenOrt.Ecke)?.let { markierung ->
@@ -107,6 +118,8 @@ fun Spielkarte.zu3DModell(
         kantenObjekte = belegung.kanten.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
             val gewalthaber = KartenAuswertung.gewalthaber(this, eintrag.position)
+            val verbundeneSpieler = KartenAuswertung.verbundeneSpieler(this, eintrag.position)
+                .mapTo(mutableSetOf(), SpielerId::wert)
             KantenObjektAuflage(
                 position = eintrag.position,
                 typ = SpielObjektTyp(
@@ -118,6 +131,20 @@ fun Spielkarte.zu3DModell(
                     },
                     form = SpielObjektForm.SCHIENE,
                     zustand = zustand,
+                    infos = bauwerkInfos(
+                        spieler = gewalthaber?.wert ?: "neutral",
+                        gebaeude = "Handelslinie",
+                        bauteil = BauteilTyp.EISENBAHNLINIE,
+                        gebautInRunde = eintrag.gebautInRunde,
+                        zustand = zustand,
+                        weitere = listOf(
+                            SpielObjektInfoEintrag(
+                                "Verbunden",
+                                verbundeneSpieler.anzeigeTextOderNeutral(),
+                            ),
+                        ),
+                    ),
+                    spieler = verbundeneSpieler,
                 ),
             )
         } + belegung.seewege.map { seeweg ->
@@ -142,15 +169,32 @@ fun Spielkarte.zu3DModell(
         }.let(::listOfNotNull),
         feldObjekte = belegung.felder.map { eintrag ->
             val effektiv = KartenAuswertung.effektiverZustand(this, eintrag)
+            val angeschlosseneSpieler = KartenAuswertung.anschlussStaerke(this, eintrag.position)
+                .keys
+                .mapTo(mutableSetOf(), SpielerId::wert)
+            val zustand = when (effektiv) {
+                AnlagenZustand.AKTIV -> ObjektDarstellungsZustand.INTAKT
+                AnlagenZustand.VERLASSEN -> ObjektDarstellungsZustand.VERLASSEN
+                AnlagenZustand.ZERSTOERT -> ObjektDarstellungsZustand.ZERSTOERT
+            }
+            val name = when (val anlage = eintrag.anlage) {
+                FeldAnlage.Geschaeftsbank -> "Geschäftsbank"
+                is FeldAnlage.Abbaueinheit -> "Abbaueinheit ${anlage.rohstoff.anzeigeName()}"
+                is FeldAnlage.Wirtschaftsregion ->
+                    anlage.bauteil.text.replaceFirstChar(Char::uppercase)
+            }
+            val bauteil = when (val anlage = eintrag.anlage) {
+                FeldAnlage.Geschaeftsbank -> BauteilTyp.GESCHAEFTSBANK
+                is FeldAnlage.Abbaueinheit -> null
+                is FeldAnlage.Wirtschaftsregion -> anlage.bauteil
+            }
+            val abbauErtrag = (eintrag.anlage as? FeldAnlage.Abbaueinheit)
+                ?.let { anlage -> mapOf(anlage.rohstoff to 1) }
+                .orEmpty()
             FeldObjektAuflage(
                 position = eintrag.position.zu3DPosition(),
                 typ = SpielObjektTyp(
-                    name = when (val anlage = eintrag.anlage) {
-                        FeldAnlage.Geschaeftsbank -> "Geschäftsbank"
-                        is FeldAnlage.Abbaueinheit -> "Abbaueinheit ${anlage.rohstoff.name}"
-                        is FeldAnlage.Wirtschaftsregion ->
-                            anlage.bauteil.text.replaceFirstChar(Char::uppercase)
-                    },
+                    name = name,
                     farbe = when (effektiv) {
                         AnlagenZustand.AKTIV,
                         AnlagenZustand.VERLASSEN -> NeutralFarbe
@@ -161,11 +205,16 @@ fun Spielkarte.zu3DModell(
                         is FeldAnlage.Abbaueinheit -> SpielObjektForm.ABBAUEINHEIT
                         is FeldAnlage.Wirtschaftsregion -> SpielObjektForm.ABBAUEINHEIT
                     },
-                    zustand = when (effektiv) {
-                        AnlagenZustand.AKTIV -> ObjektDarstellungsZustand.INTAKT
-                        AnlagenZustand.VERLASSEN -> ObjektDarstellungsZustand.VERLASSEN
-                        AnlagenZustand.ZERSTOERT -> ObjektDarstellungsZustand.ZERSTOERT
-                    },
+                    zustand = zustand,
+                    infos = bauwerkInfos(
+                        spieler = angeschlosseneSpieler.anzeigeTextOderNeutral(),
+                        gebaeude = name,
+                        bauteil = bauteil,
+                        ertrag = bauteil?.ertrag ?: abbauErtrag,
+                        gebautInRunde = eintrag.gebautInRunde,
+                        zustand = zustand,
+                    ),
+                    spieler = angeschlosseneSpieler,
                 ),
             )
         } + belegung.kriegseinheiten.mapNotNull { einheit ->
@@ -257,10 +306,68 @@ private fun EckGebaeudeTyp.zuForm(): SpielObjektForm = when (this) {
     EckGebaeudeTyp.GROSSHAFEN -> SpielObjektForm.GROSSHAFEN
 }
 
+private fun EckGebaeudeTyp.zuBauteilTyp(): BauteilTyp = when (this) {
+    EckGebaeudeTyp.HAUPTBAHNHOF -> BauteilTyp.HAUPTBAHNHOF
+    EckGebaeudeTyp.BAHNHOF -> BauteilTyp.BAHNHOF
+    EckGebaeudeTyp.GROSSBAHNHOF -> BauteilTyp.GROSSBAHNHOF
+    EckGebaeudeTyp.HAFEN -> BauteilTyp.HAFEN
+    EckGebaeudeTyp.GROSSHAFEN -> BauteilTyp.GROSSHAFEN
+}
+
+private fun bauwerkInfos(
+    spieler: String,
+    gebaeude: String,
+    bauteil: BauteilTyp?,
+    ertrag: Map<Rohstoff, Int> = bauteil?.ertrag.orEmpty(),
+    gebautInRunde: Int?,
+    zustand: ObjektDarstellungsZustand,
+    weitere: List<SpielObjektInfoEintrag> = emptyList(),
+): List<SpielObjektInfoEintrag> = listOf(
+    SpielObjektInfoEintrag("Spieler", spieler),
+    SpielObjektInfoEintrag("Gebäude", gebaeude),
+    SpielObjektInfoEintrag("Kosten", bauteil?.kosten.alsRohstoffText()),
+    SpielObjektInfoEintrag("Erträge", ertrag.alsRohstoffText()),
+    SpielObjektInfoEintrag("Verbrauch", bauteil?.verbrauch.alsRohstoffText()),
+    SpielObjektInfoEintrag("Gebaut in Runde", gebautInRunde?.toString() ?: "nicht erfasst"),
+    SpielObjektInfoEintrag("Zustand", zustand.anzeigeName()),
+) + weitere
+
+private fun Map<Rohstoff, Int>?.alsRohstoffText(): String = this
+    ?.filterValues { menge -> menge != 0 }
+    ?.entries
+    ?.sortedBy { (rohstoff, _) -> rohstoff.ordinal }
+    ?.joinToString { (rohstoff, menge) -> "$menge × ${rohstoff.anzeigeName()}" }
+    .orEmpty()
+    .ifBlank { "–" }
+
+private fun Set<String>.anzeigeTextOderNeutral(): String =
+    sorted().joinToString().ifBlank { "neutral" }
+
+private fun Rohstoff.anzeigeName(): String = when (this) {
+    Rohstoff.NAHRUNG -> "Nahrung"
+    Rohstoff.LEHM -> "Lehm"
+    Rohstoff.ZIEGEL -> "Ziegel"
+    Rohstoff.HOLZ -> "Holz"
+    Rohstoff.ROHOEL -> "Rohöl"
+    Rohstoff.SCHWEROEL -> "Schweröl"
+    Rohstoff.DIESEL -> "Diesel"
+    Rohstoff.KOHLE -> "Kohle"
+    Rohstoff.STAHL -> "Stahl"
+    Rohstoff.EISEN -> "Eisen"
+}
+
 private fun BauwerkZustand.zuDarstellungsZustand(): ObjektDarstellungsZustand = when (this) {
     BauwerkZustand.INTAKT -> ObjektDarstellungsZustand.INTAKT
     BauwerkZustand.BELAGERT -> ObjektDarstellungsZustand.BELAGERT
     BauwerkZustand.ZERSTOERT -> ObjektDarstellungsZustand.ZERSTOERT
+}
+
+private fun ObjektDarstellungsZustand.anzeigeName(): String = when (this) {
+    ObjektDarstellungsZustand.INTAKT -> "intakt"
+    ObjektDarstellungsZustand.BELAGERT -> "belagert"
+    ObjektDarstellungsZustand.ZERSTOERT -> "zerstört"
+    ObjektDarstellungsZustand.VERLASSEN -> "verlassen"
+    ObjektDarstellungsZustand.AUSGEWAEHLT -> "ausgewählt"
 }
 
 private fun Color.alsBelagert(): Color = Color(

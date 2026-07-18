@@ -3,7 +3,18 @@ package de.teutonstudio.zentralbank.spielbrett
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -18,11 +29,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.google.android.filament.MaterialInstance
@@ -49,6 +68,7 @@ import io.github.sceneview.rememberFillLightNode
 import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.utils.screenToRay
+import io.github.sceneview.utils.worldToScreen
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -56,6 +76,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import kotlin.math.sin
 
@@ -145,6 +166,15 @@ fun Spielbrett3D(
     val rasterGeometrie = remember(geometrie, rasterMitte) {
         rasterMitte?.let { geometrie.rasterAusschnittUm(it) } ?: geometrie
     }
+    val bauwerkHoverZiele = remember(modell, geometrie) {
+        erstelleBauwerkHoverZiele(modell, geometrie)
+    }
+    var bauwerkUnterZeiger by remember(modell, geometrie) {
+        mutableStateOf<BauwerkHoverZiel?>(null)
+    }
+    var angehefteteBauwerke by remember(modell, geometrie) {
+        mutableStateOf<List<BauwerkHoverZiel>>(emptyList())
+    }
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
     val environmentLoader = rememberEnvironmentLoader(engine)
@@ -189,9 +219,21 @@ fun Spielbrett3D(
         cameraNode,
         geometrie,
         modell.unbegrenztesBearbeitungsRaster,
+        bauwerkHoverZiele,
     ) {
         BetrachtungsGesten(betrachtungsStatus, kameraInteraktionsModus) { x, y ->
             val strahl = cameraNode.view?.screenToRay(x, y) ?: return@BetrachtungsGesten
+            val angeklicktesBauwerk = bauwerkHoverZiele.findeTreffer(
+                ursprungX = strahl.origin.x,
+                ursprungY = strahl.origin.y,
+                ursprungZ = strahl.origin.z,
+                richtungX = strahl.direction.x,
+                richtungY = strahl.direction.y,
+                richtungZ = strahl.direction.z,
+            )
+            angehefteteBauwerke = angeklicktesBauwerk
+                ?.let { ziel -> bauwerkHoverZiele.angehefteteZieleFuer(ziel) }
+                .orEmpty()
             if (abs(strahl.direction.y) < 0.0001f) return@BetrachtungsGesten
             val faktor = -strahl.origin.y / strahl.direction.y
             if (faktor < 0f) return@BetrachtungsGesten
@@ -398,239 +440,392 @@ fun Spielbrett3D(
         y = fokusPosition.y + lichtVektor.y * himmelsRadius * 0.88f,
         z = fokusPosition.z + lichtVektor.z * himmelsRadius * 0.88f,
     )
+    val sichtbareBauwerkInfos = angehefteteBauwerke.ifEmpty {
+        listOfNotNull(bauwerkUnterZeiger)
+    }
+    var bauwerkInfoPositionen by remember {
+        mutableStateOf<Map<String, Offset>>(emptyMap())
+    }
 
     SideEffect {
         cameraNode.position = kameraPosition
         cameraNode.lookAt(targetWorldPosition = fokusPosition, smooth = false)
     }
 
-    SceneView(
-        modifier = modifier
-            .fillMaxSize()
-            .onSizeChanged { groesse -> ansichtsGroesse = groesse }
-            .semantics {
-                contentDescription =
-                    "Hexagonales 3D-Spielbrett mit ${modell.hexagon.anzahlFelder} " +
-                        "Dreiecken und ${modell.auflagen.size} Auflagen"
+    Box(modifier = modifier.fillMaxSize()) {
+        SceneView(
+            modifier = Modifier
+                .matchParentSize()
+                .onSizeChanged { groesse -> ansichtsGroesse = groesse }
+                .pointerInput(bauwerkHoverZiele, cameraNode) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val ereignis = awaitPointerEvent(PointerEventPass.Initial)
+                            val aenderung = ereignis.changes.firstOrNull()
+                            when (ereignis.type) {
+                                PointerEventType.Exit -> bauwerkUnterZeiger = null
+                                PointerEventType.Enter,
+                                PointerEventType.Move -> if (
+                                    aenderung?.type == PointerType.Mouse ||
+                                    aenderung?.type == PointerType.Stylus
+                                ) {
+                                    val strahl = cameraNode.view?.screenToRay(
+                                        aenderung.position.x,
+                                        aenderung.position.y,
+                                    )
+                                    bauwerkUnterZeiger = strahl?.let { aktuellerStrahl ->
+                                        bauwerkHoverZiele.findeTreffer(
+                                            ursprungX = aktuellerStrahl.origin.x,
+                                            ursprungY = aktuellerStrahl.origin.y,
+                                            ursprungZ = aktuellerStrahl.origin.z,
+                                            richtungX = aktuellerStrahl.direction.x,
+                                            richtungY = aktuellerStrahl.direction.y,
+                                            richtungZ = aktuellerStrahl.direction.z,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .semantics {
+                    contentDescription =
+                        "Hexagonales 3D-Spielbrett mit ${modell.hexagon.anzahlFelder} " +
+                            "Dreiecken und ${modell.auflagen.size} Auflagen"
+                },
+            engine = engine,
+            materialLoader = materialLoader,
+            environmentLoader = environmentLoader,
+            environment = environment,
+            mainLightNode = mainLightNode,
+            fillLightNode = fillLightNode,
+            cameraNode = cameraNode,
+            cameraManipulator = null,
+            onGestureListener = null,
+            onTouchEvent = { ereignis, _ ->
+                if (eingabeAktiv) {
+                    aktuelleGesten.value.verarbeite(
+                        ereignis = ereignis,
+                        ansichtsGroesse = ansichtsGroesse,
+                        szenengroesse = szenengroesse,
+                    )
+                } else {
+                    true
+                }
             },
-        engine = engine,
-        materialLoader = materialLoader,
-        environmentLoader = environmentLoader,
-        environment = environment,
-        mainLightNode = mainLightNode,
-        fillLightNode = fillLightNode,
-        cameraNode = cameraNode,
-        cameraManipulator = null,
-        onGestureListener = null,
-        onTouchEvent = { ereignis, _ ->
-            if (eingabeAktiv) {
-                aktuelleGesten.value.verarbeite(
-                    ereignis = ereignis,
-                    ansichtsGroesse = ansichtsGroesse,
-                    szenengroesse = szenengroesse,
+            onFrame = {
+                val neuePositionen = cameraNode.view?.let { ansicht ->
+                    sichtbareBauwerkInfos.mapNotNull { ziel ->
+                        ansicht.worldToScreen(ziel.infoPosition)?.let { position ->
+                            ziel.schluessel to Offset(position.x, position.y)
+                        }
+                    }.toMap()
+                }.orEmpty()
+                if (bauwerkInfoPositionen != neuePositionen) {
+                    bauwerkInfoPositionen = neuePositionen
+                }
+            },
+            autoCenterContent = false,
+        ) {
+            SternenhimmelNode(
+                meshDaten = sternenMesh,
+                materialInstance = sternenMaterial,
+                position = Position(x = fokusPosition.x, z = fokusPosition.z),
+            )
+            if (himmel.sonnenSichtbarkeit > 0.01f) {
+                SphereNode(
+                    radius = himmelsRadius * 0.022f,
+                    stacks = 10,
+                    slices = 14,
+                    materialInstance = sonnenMaterial,
+                    position = himmelskoerperPosition,
                 )
-            } else {
-                true
             }
-        },
-        autoCenterContent = false,
-    ) {
-        SternenhimmelNode(
-            meshDaten = sternenMesh,
-            materialInstance = sternenMaterial,
-            position = Position(x = fokusPosition.x, z = fokusPosition.z),
-        )
-        if (himmel.sonnenSichtbarkeit > 0.01f) {
-            SphereNode(
-                radius = himmelsRadius * 0.022f,
-                stacks = 10,
-                slices = 14,
-                materialInstance = sonnenMaterial,
-                position = himmelskoerperPosition,
-            )
-        }
-        if (himmel.mondSichtbarkeit > 0.01f) {
-            SphereNode(
-                radius = himmelsRadius * 0.018f,
-                stacks = 10,
-                slices = 14,
-                materialInstance = mondMaterial,
-                position = himmelskoerperPosition,
-            )
-        }
+            if (himmel.mondSichtbarkeit > 0.01f) {
+                SphereNode(
+                    radius = himmelsRadius * 0.018f,
+                    stacks = 10,
+                    slices = 14,
+                    materialInstance = mondMaterial,
+                    position = himmelskoerperPosition,
+                )
+            }
 
-        if (modell.zeigeWasserFlaeche) {
-            ShapeNode(
-                polygonPath = wasserGrundPfad,
-                polygonHoles = listOf(4),
-                normal = Direction(z = 1f),
-                materialInstance = wasserMaterial,
-                position = Position(y = WASSER_GRUND_NIVEAU),
-                rotation = Rotation(x = -90f),
-            )
-            wasserMesh?.let { meshDaten ->
-                key("abgeschraegtes-wasser") {
+            if (modell.zeigeWasserFlaeche) {
+                ShapeNode(
+                    polygonPath = wasserGrundPfad,
+                    polygonHoles = listOf(4),
+                    normal = Direction(z = 1f),
+                    materialInstance = wasserMaterial,
+                    position = Position(y = WASSER_GRUND_NIVEAU),
+                    rotation = Rotation(x = -90f),
+                )
+                wasserMesh?.let { meshDaten ->
+                    key("abgeschraegtes-wasser") {
+                        AbgeschraegtesGelaendeNode(
+                            meshDaten = meshDaten,
+                            materialInstance = wasserMaterial,
+                        )
+                    }
+                }
+                richtungsPositionen.forEach { (richtung, position) ->
+                    key("himmelsrichtung", richtung) {
+                        ImageNode(
+                            bitmap = richtungsBitmaps.getValue(richtung),
+                            size = Size(x = richtungsGroesse, z = richtungsGroesse),
+                            normal = Direction(y = 1f),
+                            position = position.copy(
+                                y = WASSER_GRUND_NIVEAU + HIMMELSRICHTUNG_ABSTAND_ZUM_WASSER,
+                            ),
+                            rotation = Rotation(y = transformation.azimutGrad),
+                        )
+                    }
+                }
+            }
+
+            if (modell.zeigeBearbeitungsRaster) {
+                rasterGeometrie.dreiecke.forEachIndexed { index, dreieck ->
+                    key(dreieck.position) {
+                        ShapeNode(
+                            polygonPath = dreieck.ecken.map { punkt ->
+                                // ShapeNode liegt lokal in XY. -90 Grad um X bildet -Y auf Welt-Z ab.
+                                Position2(x = punkt.x, y = -punkt.z)
+                            },
+                            normal = Direction(z = 1f),
+                            materialInstance = grundMaterialien[index % grundMaterialien.size],
+                            position = Position(y = OBERFLAECHEN_ABSTAND),
+                            rotation = Rotation(x = -90f),
+                        )
+                    }
+                }
+            }
+
+            gelaendeMeshes.forEach { (typ, meshDaten) ->
+                key("abgeschraegtes-gelaende", typ) {
                     AbgeschraegtesGelaendeNode(
                         meshDaten = meshDaten,
-                        materialInstance = wasserMaterial,
+                        materialInstance = auflagenMaterialien.getValue(typ),
                     )
                 }
             }
-            richtungsPositionen.forEach { (richtung, position) ->
-                key("himmelsrichtung", richtung) {
-                    ImageNode(
-                        bitmap = richtungsBitmaps.getValue(richtung),
-                        size = Size(x = richtungsGroesse, z = richtungsGroesse),
-                        normal = Direction(y = 1f),
-                        position = position.copy(
-                            y = WASSER_GRUND_NIVEAU + HIMMELSRICHTUNG_ABSTAND_ZUM_WASSER,
-                        ),
+
+            if (gebirgsPyramidenMesh != null && gebirgsTyp != null) {
+                key("gebirgs-pyramiden") {
+                    AbgeschraegtesGelaendeNode(
+                        meshDaten = gebirgsPyramidenMesh,
+                        materialInstance = auflagenMaterialien.getValue(gebirgsTyp),
                     )
                 }
             }
-        }
 
-        if (modell.zeigeBearbeitungsRaster) {
-            rasterGeometrie.dreiecke.forEachIndexed { index, dreieck ->
-                key(dreieck.position) {
-                    ShapeNode(
-                        polygonPath = dreieck.ecken.map { punkt ->
-                            // ShapeNode liegt lokal in XY. -90 Grad um X bildet -Y auf Welt-Z ab.
-                            Position2(x = punkt.x, y = -punkt.z)
-                        },
-                        normal = Direction(z = 1f),
-                        materialInstance = grundMaterialien[index % grundMaterialien.size],
-                        position = Position(y = OBERFLAECHEN_ABSTAND),
-                        rotation = Rotation(x = -90f),
-                    )
-                }
-            }
-        }
-
-        gelaendeMeshes.forEach { (typ, meshDaten) ->
-            key("abgeschraegtes-gelaende", typ) {
-                AbgeschraegtesGelaendeNode(
-                    meshDaten = meshDaten,
-                    materialInstance = auflagenMaterialien.getValue(typ),
-                )
-            }
-        }
-
-        if (gebirgsPyramidenMesh != null && gebirgsTyp != null) {
-            key("gebirgs-pyramiden") {
-                AbgeschraegtesGelaendeNode(
-                    meshDaten = gebirgsPyramidenMesh,
-                    materialInstance = auflagenMaterialien.getValue(gebirgsTyp),
-                )
-            }
-        }
-
-        modell.auflagen.filter { it.ebene == AuflagenEbene.SPEZIAL }.forEach { auflage ->
-            key(auflage.position, auflage.ebene) {
-                val grundDreieck = geometrie.dreieck(auflage.position)
-                CylinderNode(
-                    radius = AUFLAGEN_RADIUS,
-                    height = SPEZIAL_AUFLAGEN_HOEHE,
-                    sideCount = 3,
-                    materialInstance = auflagenMaterialien.getValue(auflage.typ),
-                    position = Position(
-                        x = grundDreieck.mittelpunkt.x,
-                        y = OBERFLAECHEN_ABSTAND + AUFLAGEN_HOEHE +
-                            SPEZIAL_AUFLAGEN_HOEHE / 2f,
-                        z = grundDreieck.mittelpunkt.z,
-                    ),
-                    rotation = Rotation(
-                        y = when (auflage.position.ausrichtung) {
-                            DreieckAusrichtung.OBEN -> 90f
-                            DreieckAusrichtung.UNTEN -> -90f
-                        },
-                    ),
-                )
-            }
-        }
-
-        modell.kantenObjekte.forEach { objekt ->
-            val anfang = geometrie.punkt(objekt.position.anfang)
-            val ende = geometrie.punkt(objekt.position.ende)
-            if (anfang != null && ende != null) {
-                key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
-                    val deltaX = ende.x - anfang.x
-                    val deltaZ = ende.z - anfang.z
-                    val laenge = hypot(deltaX, deltaZ)
-                    val markierung = objekt.typ.form == SpielObjektForm.MARKIERUNG
-                    val seeweg = objekt.typ.form == SpielObjektForm.FRACHTSCHIFF
-                    CubeNode(
-                        size = Size(
-                            x = laenge,
-                            y = if (markierung || seeweg) 0.10f else 0.16f,
-                            z = if (markierung) 0.16f else if (seeweg) 0.08f else 0.12f,
-                        ),
-                        materialInstance = objektMaterialien.getValue(objekt.typ),
+            modell.auflagen.filter { it.ebene == AuflagenEbene.SPEZIAL }.forEach { auflage ->
+                key(auflage.position, auflage.ebene) {
+                    val grundDreieck = geometrie.dreieck(auflage.position)
+                    CylinderNode(
+                        radius = AUFLAGEN_RADIUS,
+                        height = SPEZIAL_AUFLAGEN_HOEHE,
+                        sideCount = 3,
+                        materialInstance = auflagenMaterialien.getValue(auflage.typ),
                         position = Position(
-                            x = (anfang.x + ende.x) / 2f,
-                            y = OBJEKT_BASIS_HOEHE + if (markierung) 0.08f else 0.12f,
-                            z = (anfang.z + ende.z) / 2f,
+                            x = grundDreieck.mittelpunkt.x,
+                            y = OBERFLAECHEN_ABSTAND + AUFLAGEN_HOEHE +
+                                SPEZIAL_AUFLAGEN_HOEHE / 2f,
+                            z = grundDreieck.mittelpunkt.z,
                         ),
                         rotation = Rotation(
-                            y = -Math.toDegrees(atan2(deltaZ, deltaX).toDouble()).toFloat(),
+                            y = when (auflage.position.ausrichtung) {
+                                DreieckAusrichtung.OBEN -> 90f
+                                DreieckAusrichtung.UNTEN -> -90f
+                            },
                         ),
                     )
                 }
             }
-        }
 
-        modell.feldObjekte.forEach { objekt ->
-            key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
-                val mitte = geometrie.dreieck(objekt.position).mittelpunkt
-                val (radius, hoehe, seiten) = objekt.typ.feldAbmessungen()
-                CylinderNode(
-                    radius = radius,
-                    height = hoehe,
-                    sideCount = seiten,
-                    materialInstance = objektMaterialien.getValue(objekt.typ),
-                    position = Position(
-                        x = mitte.x,
-                        y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
-                        z = mitte.z,
-                    ),
-                )
+            modell.kantenObjekte.forEach { objekt ->
+                val anfang = geometrie.punkt(objekt.position.anfang)
+                val ende = geometrie.punkt(objekt.position.ende)
+                if (anfang != null && ende != null) {
+                    key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
+                        val deltaX = ende.x - anfang.x
+                        val deltaZ = ende.z - anfang.z
+                        val laenge = hypot(deltaX, deltaZ)
+                        val markierung = objekt.typ.form == SpielObjektForm.MARKIERUNG
+                        val seeweg = objekt.typ.form == SpielObjektForm.FRACHTSCHIFF
+                        CubeNode(
+                            size = Size(
+                                x = laenge,
+                                y = if (markierung || seeweg) 0.10f else 0.16f,
+                                z = if (markierung) 0.16f else if (seeweg) 0.08f else 0.12f,
+                            ),
+                            materialInstance = objektMaterialien.getValue(objekt.typ),
+                            position = Position(
+                                x = (anfang.x + ende.x) / 2f,
+                                y = OBJEKT_BASIS_HOEHE + if (markierung) 0.08f else 0.12f,
+                                z = (anfang.z + ende.z) / 2f,
+                            ),
+                            rotation = Rotation(
+                                y = -Math.toDegrees(atan2(deltaZ, deltaX).toDouble()).toFloat(),
+                            ),
+                        )
+                    }
+                }
             }
-        }
 
-        modell.eckObjekte.forEach { objekt ->
-            val punkt = geometrie.punkt(objekt.position)
-            if (punkt != null) {
+            modell.feldObjekte.forEach { objekt ->
                 key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
-                    val (radius, hoehe, seiten) = objekt.typ.eckAbmessungen()
-                    val leuchtet =
-                        objekt.typ.istVerwaltungsstandort && himmel.nachtAnteil > 0.04f
+                    val mitte = geometrie.dreieck(objekt.position).mittelpunkt
+                    val (radius, hoehe, seiten) = objekt.typ.feldAbmessungen()
                     CylinderNode(
                         radius = radius,
                         height = hoehe,
                         sideCount = seiten,
-                        materialInstance = if (leuchtet) {
-                            verwaltungsKernMaterialien.getValue(objekt.typ)
-                        } else {
-                            objektMaterialien.getValue(objekt.typ)
-                        },
+                        materialInstance = objektMaterialien.getValue(objekt.typ),
                         position = Position(
-                            x = punkt.x,
+                            x = mitte.x,
                             y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
-                            z = punkt.z,
+                            z = mitte.z,
                         ),
                     )
-                    if (objekt.typ.istVerwaltungsstandort) {
+                }
+            }
+
+            modell.eckObjekte.forEach { objekt ->
+                val punkt = geometrie.punkt(objekt.position)
+                if (punkt != null) {
+                    key(objekt.position, objekt.typ.name, objekt.typ.zustand) {
+                        val (radius, hoehe, seiten) = objekt.typ.eckAbmessungen()
+                        val leuchtet =
+                            objekt.typ.istVerwaltungsstandort && himmel.nachtAnteil > 0.04f
                         CylinderNode(
-                            radius = radius * 1.34f,
-                            height = hoehe * 1.08f,
-                            sideCount = 16,
-                            materialInstance = verwaltungsHaloMaterialien.getValue(objekt.typ),
+                            radius = radius,
+                            height = hoehe,
+                            sideCount = seiten,
+                            materialInstance = if (leuchtet) {
+                                verwaltungsKernMaterialien.getValue(objekt.typ)
+                            } else {
+                                objektMaterialien.getValue(objekt.typ)
+                            },
                             position = Position(
                                 x = punkt.x,
                                 y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
                                 z = punkt.z,
                             ),
                         )
+                        if (objekt.typ.istVerwaltungsstandort) {
+                            CylinderNode(
+                                radius = radius * 1.34f,
+                                height = hoehe * 1.08f,
+                                sideCount = 16,
+                                materialInstance = verwaltungsHaloMaterialien.getValue(objekt.typ),
+                                position = Position(
+                                    x = punkt.x,
+                                    y = OBJEKT_BASIS_HOEHE + hoehe / 2f,
+                                    z = punkt.z,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        BauwerkInfoEbene(
+            ziele = sichtbareBauwerkInfos,
+            positionen = bauwerkInfoPositionen,
+            ansichtsGroesse = ansichtsGroesse,
+            modifier = Modifier.matchParentSize(),
+        )
+    }
+}
+
+@Composable
+private fun BauwerkInfoEbene(
+    ziele: List<BauwerkHoverZiel>,
+    positionen: Map<String, Offset>,
+    ansichtsGroesse: IntSize,
+    modifier: Modifier = Modifier,
+) {
+    val dichte = LocalDensity.current
+    val randPixel = with(dichte) { 8.dp.toPx() }
+    val kartenBreitePixel = min(
+        with(dichte) { 320.dp.toPx() },
+        (ansichtsGroesse.width - randPixel * 2f).coerceAtLeast(0f),
+    )
+    var kartenGroessen by remember {
+        mutableStateOf<Map<String, IntSize>>(emptyMap())
+    }
+    if (kartenBreitePixel <= 0f) return
+    val kartenBreite = with(dichte) { kartenBreitePixel.toDp() }
+
+    Box(modifier = modifier) {
+        ziele.forEach { ziel ->
+            val position = positionen[ziel.schluessel] ?: return@forEach
+            key("bauwerk-info-karte", ziel.schluessel) {
+                val kartenGroesse = kartenGroessen[ziel.schluessel] ?: IntSize.Zero
+                Surface(
+                    modifier = Modifier
+                        .width(kartenBreite)
+                        .onSizeChanged { neueGroesse ->
+                            if (kartenGroessen[ziel.schluessel] != neueGroesse) {
+                                kartenGroessen = kartenGroessen +
+                                    (ziel.schluessel to neueGroesse)
+                            }
+                        }
+                        .offset {
+                            val maximaleXPosition =
+                                (ansichtsGroesse.width - kartenGroesse.width - randPixel)
+                                    .coerceAtLeast(randPixel)
+                            val maximaleYPosition =
+                                (ansichtsGroesse.height - kartenGroesse.height - randPixel)
+                                    .coerceAtLeast(randPixel)
+                            IntOffset(
+                                x = (position.x - kartenGroesse.width / 2f)
+                                    .coerceIn(randPixel, maximaleXPosition)
+                                    .roundToInt(),
+                                y = (position.y - kartenGroesse.height - randPixel)
+                                    .coerceIn(randPixel, maximaleYPosition)
+                                    .roundToInt(),
+                            )
+                        },
+                    shape = MaterialTheme.shapes.medium,
+                    color = ziel.typ.farbe.copy(alpha = 0.96f),
+                    contentColor = if (ziel.typ.farbe.luminance() > 0.48f) {
+                        Color.Black
+                    } else {
+                        Color.White
+                    },
+                    shadowElevation = 10.dp,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        Text(
+                            text = "Bauwerksdetails",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        val infos = ziel.typ.infos.ifEmpty {
+                            listOf(SpielObjektInfoEintrag("Gebäude", ziel.typ.name))
+                        }
+                        infos.forEach { info ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    text = info.bezeichnung,
+                                    modifier = Modifier.width(116.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = info.wert,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -775,6 +970,260 @@ private data class ObjektAbmessungen(
     val hoehe: Float,
     val seiten: Int,
 )
+
+internal data class BauwerkHoverZiel(
+    val schluessel: String,
+    val typ: SpielObjektTyp,
+    val trefferAnfang: Position,
+    val trefferEnde: Position,
+    val trefferRadius: Float,
+    val prioritaet: Int,
+    val infoPosition: Position,
+) {
+    fun trefferWertung(
+        ursprungX: Float,
+        ursprungY: Float,
+        ursprungZ: Float,
+        richtungX: Float,
+        richtungY: Float,
+        richtungZ: Float,
+    ): Float? {
+        val abstandQuadrat = quadratischerAbstandZwischenStrahlUndStrecke(
+            ursprungX = ursprungX,
+            ursprungY = ursprungY,
+            ursprungZ = ursprungZ,
+            richtungX = richtungX,
+            richtungY = richtungY,
+            richtungZ = richtungZ,
+            anfang = trefferAnfang,
+            ende = trefferEnde,
+        )
+        val radiusQuadrat = trefferRadius * trefferRadius
+        return if (abstandQuadrat <= radiusQuadrat) {
+            abstandQuadrat / radiusQuadrat
+        } else {
+            null
+        }
+    }
+}
+
+private fun erstelleBauwerkHoverZiele(
+    modell: Spielbrett3DModell,
+    geometrie: SpielbrettGeometrie,
+): List<BauwerkHoverZiel> = buildList {
+    modell.kantenObjekte
+        .filter { objekt -> objekt.typ.istBauwerk }
+        .forEach { objekt ->
+            val anfang = geometrie.punkt(objekt.position.anfang) ?: return@forEach
+            val ende = geometrie.punkt(objekt.position.ende) ?: return@forEach
+            val mitteX = (anfang.x + ende.x) / 2f
+            val mitteZ = (anfang.z + ende.z) / 2f
+            add(
+                BauwerkHoverZiel(
+                    schluessel = "kante:${objekt.position}:${objekt.typ.name}",
+                    typ = objekt.typ,
+                    trefferAnfang = Position(
+                        x = anfang.x,
+                        y = OBJEKT_BASIS_HOEHE + 0.12f,
+                        z = anfang.z,
+                    ),
+                    trefferEnde = Position(
+                        x = ende.x,
+                        y = OBJEKT_BASIS_HOEHE + 0.12f,
+                        z = ende.z,
+                    ),
+                    trefferRadius = 0.30f,
+                    prioritaet = 2,
+                    infoPosition = Position(
+                        x = mitteX,
+                        y = OBJEKT_BASIS_HOEHE + 0.78f,
+                        z = mitteZ,
+                    ),
+                ),
+            )
+        }
+
+    modell.feldObjekte
+        .filter { objekt -> objekt.typ.istBauwerk }
+        .forEach { objekt ->
+            val mitte = geometrie.dreieck(objekt.position).mittelpunkt
+            val abmessungen = objekt.typ.feldAbmessungen()
+            add(
+                BauwerkHoverZiel(
+                    schluessel = "feld:${objekt.position}:${objekt.typ.name}",
+                    typ = objekt.typ,
+                    trefferAnfang = Position(
+                        x = mitte.x,
+                        y = OBJEKT_BASIS_HOEHE,
+                        z = mitte.z,
+                    ),
+                    trefferEnde = Position(
+                        x = mitte.x,
+                        y = OBJEKT_BASIS_HOEHE + abmessungen.hoehe,
+                        z = mitte.z,
+                    ),
+                    trefferRadius = max(abmessungen.radius * 1.35f, 0.44f),
+                    prioritaet = 1,
+                    infoPosition = Position(
+                        x = mitte.x,
+                        y = OBJEKT_BASIS_HOEHE + abmessungen.hoehe + 0.42f,
+                        z = mitte.z,
+                    ),
+                ),
+            )
+        }
+
+    modell.eckObjekte
+        .filter { objekt -> objekt.typ.istBauwerk }
+        .forEach { objekt ->
+            val punkt = geometrie.punkt(objekt.position) ?: return@forEach
+            val abmessungen = objekt.typ.eckAbmessungen()
+            add(
+                BauwerkHoverZiel(
+                    schluessel = "ecke:${objekt.position}:${objekt.typ.name}",
+                    typ = objekt.typ,
+                    trefferAnfang = Position(
+                        x = punkt.x,
+                        y = OBJEKT_BASIS_HOEHE,
+                        z = punkt.z,
+                    ),
+                    trefferEnde = Position(
+                        x = punkt.x,
+                        y = OBJEKT_BASIS_HOEHE + abmessungen.hoehe,
+                        z = punkt.z,
+                    ),
+                    trefferRadius = max(abmessungen.radius * 1.55f, 0.48f),
+                    prioritaet = 0,
+                    infoPosition = Position(
+                        x = punkt.x,
+                        y = OBJEKT_BASIS_HOEHE + abmessungen.hoehe + 0.42f,
+                        z = punkt.z,
+                    ),
+                ),
+            )
+        }
+}
+
+private val SpielObjektTyp.istBauwerk: Boolean
+    get() = when (form) {
+        SpielObjektForm.FRACHTSCHIFF,
+        SpielObjektForm.PANZER,
+        SpielObjektForm.KRIEGSSCHIFF,
+        SpielObjektForm.MARKIERUNG -> false
+        else -> true
+    }
+
+internal fun List<BauwerkHoverZiel>.findeTreffer(
+    ursprungX: Float,
+    ursprungY: Float,
+    ursprungZ: Float,
+    richtungX: Float,
+    richtungY: Float,
+    richtungZ: Float,
+): BauwerkHoverZiel? = mapNotNull { ziel ->
+    ziel.trefferWertung(
+        ursprungX = ursprungX,
+        ursprungY = ursprungY,
+        ursprungZ = ursprungZ,
+        richtungX = richtungX,
+        richtungY = richtungY,
+        richtungZ = richtungZ,
+    )?.let { wertung -> ziel to wertung }
+}.minWithOrNull(
+    compareBy<Pair<BauwerkHoverZiel, Float>> { (ziel, _) -> ziel.prioritaet }
+        .thenBy { (_, wertung) -> wertung },
+)?.first
+
+internal fun List<BauwerkHoverZiel>.angehefteteZieleFuer(
+    ziel: BauwerkHoverZiel,
+): List<BauwerkHoverZiel> {
+    if (ziel.typ.form != SpielObjektForm.HAUPTBAHNHOF) return listOf(ziel)
+    val spieler = ziel.typ.spieler.singleOrNull() ?: return listOf(ziel)
+    return filter { kandidat -> spieler in kandidat.typ.spieler }
+        .distinctBy(BauwerkHoverZiel::schluessel)
+}
+
+private fun quadratischerAbstandZwischenStrahlUndStrecke(
+    ursprungX: Float,
+    ursprungY: Float,
+    ursprungZ: Float,
+    richtungX: Float,
+    richtungY: Float,
+    richtungZ: Float,
+    anfang: Position,
+    ende: Position,
+): Float {
+    val segmentX = ende.x - anfang.x
+    val segmentY = ende.y - anfang.y
+    val segmentZ = ende.z - anfang.z
+    val strahlLaengeQuadrat =
+        richtungX * richtungX + richtungY * richtungY + richtungZ * richtungZ
+    val segmentLaengeQuadrat =
+        segmentX * segmentX + segmentY * segmentY + segmentZ * segmentZ
+    if (strahlLaengeQuadrat <= 0.000001f) return Float.POSITIVE_INFINITY
+
+    fun abstandQuadrat(strahlAnteil: Float, segmentAnteil: Float): Float {
+        val strahlX = ursprungX + richtungX * strahlAnteil
+        val strahlY = ursprungY + richtungY * strahlAnteil
+        val strahlZ = ursprungZ + richtungZ * strahlAnteil
+        val segmentPunktX = anfang.x + segmentX * segmentAnteil
+        val segmentPunktY = anfang.y + segmentY * segmentAnteil
+        val segmentPunktZ = anfang.z + segmentZ * segmentAnteil
+        val deltaX = strahlX - segmentPunktX
+        val deltaY = strahlY - segmentPunktY
+        val deltaZ = strahlZ - segmentPunktZ
+        return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ
+    }
+
+    fun strahlAnteilZu(punkt: Position): Float = (
+        ((punkt.x - ursprungX) * richtungX +
+            (punkt.y - ursprungY) * richtungY +
+            (punkt.z - ursprungZ) * richtungZ) /
+            strahlLaengeQuadrat
+        ).coerceAtLeast(0f)
+
+    var minimum = abstandQuadrat(strahlAnteilZu(anfang), 0f)
+    minimum = min(minimum, abstandQuadrat(strahlAnteilZu(ende), 1f))
+    if (segmentLaengeQuadrat <= 0.000001f) return minimum
+
+    val segmentAnteilAmUrsprung = (
+        ((ursprungX - anfang.x) * segmentX +
+            (ursprungY - anfang.y) * segmentY +
+            (ursprungZ - anfang.z) * segmentZ) /
+            segmentLaengeQuadrat
+        ).coerceIn(0f, 1f)
+    minimum = min(minimum, abstandQuadrat(0f, segmentAnteilAmUrsprung))
+
+    val ursprungZuAnfangX = ursprungX - anfang.x
+    val ursprungZuAnfangY = ursprungY - anfang.y
+    val ursprungZuAnfangZ = ursprungZ - anfang.z
+    val richtungMalSegment =
+        richtungX * segmentX + richtungY * segmentY + richtungZ * segmentZ
+    val richtungMalUrsprung =
+        richtungX * ursprungZuAnfangX +
+            richtungY * ursprungZuAnfangY +
+            richtungZ * ursprungZuAnfangZ
+    val segmentMalUrsprung =
+        segmentX * ursprungZuAnfangX +
+            segmentY * ursprungZuAnfangY +
+            segmentZ * ursprungZuAnfangZ
+    val nenner = strahlLaengeQuadrat * segmentLaengeQuadrat -
+        richtungMalSegment * richtungMalSegment
+    if (abs(nenner) > 0.000001f) {
+        val strahlAnteil = (
+            richtungMalSegment * segmentMalUrsprung -
+                segmentLaengeQuadrat * richtungMalUrsprung
+            ) / nenner
+        val segmentAnteil = (
+            strahlLaengeQuadrat * segmentMalUrsprung -
+                richtungMalSegment * richtungMalUrsprung
+            ) / nenner
+        if (strahlAnteil >= 0f && segmentAnteil in 0f..1f) {
+            minimum = min(minimum, abstandQuadrat(strahlAnteil, segmentAnteil))
+        }
+    }
+    return minimum
+}
 
 private fun SpielObjektTyp.eckAbmessungen(): ObjektAbmessungen = when (form) {
     SpielObjektForm.HAUPTBAHNHOF -> ObjektAbmessungen(0.34f, 0.92f, 6)

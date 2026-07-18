@@ -66,6 +66,7 @@ internal object KartenRegelwerk {
             position = ereignis.ecke,
             typ = EckGebaeudeTyp.HAUPTBAHNHOF,
             besitzer = ereignis.spieler,
+            gebautInRunde = zustand.rundenzähler,
         )
         val neueKarte = karte.copy(
             belegung = karte.belegung.copy(ecken = neueEcken.eckenSortiert()),
@@ -136,6 +137,7 @@ internal object KartenRegelwerk {
                         position = ereignis.ecke,
                         typ = ereignis.typ,
                         besitzer = ereignis.spieler,
+                        gebautInRunde = zustand.rundenzähler,
                     )).eckenSortiert(),
                 ),
             ),
@@ -164,8 +166,14 @@ internal object KartenRegelwerk {
             karte = aktuelleKarte.copy(
                 belegung = aktuelleKarte.belegung.copy(
                     ecken = aktuelleKarte.belegung.ecken.map { belegung ->
-                        if (belegung.position == ereignis.ecke) belegung.copy(typ = ereignis.zu)
-                        else belegung
+                        if (belegung.position == ereignis.ecke) {
+                            belegung.copy(
+                                typ = ereignis.zu,
+                                gebautInRunde = zustand.rundenzähler,
+                            )
+                        } else {
+                            belegung
+                        }
                     }.eckenSortiert(),
                 ),
             ),
@@ -205,7 +213,10 @@ internal object KartenRegelwerk {
             karte = aktuelleKarte.copy(
                 belegung = aktuelleKarte.belegung.copy(
                     kanten = (aktuelleKarte.belegung.kanten +
-                        KantenBelegung(position = ereignis.kante)).kantenSortiert(),
+                        KantenBelegung(
+                            position = ereignis.kante,
+                            gebautInRunde = zustand.rundenzähler,
+                        )).kantenSortiert(),
                 ),
             ),
         )
@@ -232,6 +243,7 @@ internal object KartenRegelwerk {
                     felder = (aktuelleKarte.belegung.felder + FeldBelegung(
                         position = ereignis.feld,
                         anlage = ereignis.anlage,
+                        gebautInRunde = zustand.rundenzähler,
                     )).felderSortiert(),
                 ),
             ),
@@ -534,6 +546,7 @@ internal object KartenRegelwerk {
                         position = ereignis.ecke,
                         typ = ereignis.typ,
                         besitzer = ereignis.spieler,
+                        gebautInRunde = zustand.rundenzähler,
                     )).eckenSortiert(),
                 ),
             ),
@@ -556,7 +569,10 @@ internal object KartenRegelwerk {
         }
         val neueKarte = karte.copy(
             belegung = karte.belegung.copy(
-                kanten = (karte.belegung.kanten + KantenBelegung(ereignis.kante)).kantenSortiert(),
+                kanten = (karte.belegung.kanten + KantenBelegung(
+                    position = ereignis.kante,
+                    gebautInRunde = zustand.rundenzähler,
+                )).kantenSortiert(),
             ),
         )
         pruefeSchienenRichtungen(neueKarte)
@@ -598,6 +614,7 @@ internal object KartenRegelwerk {
                     felder = (karte.belegung.felder + FeldBelegung(
                         position = ereignis.feld,
                         anlage = ereignis.anlage,
+                        gebautInRunde = zustand.rundenzähler,
                     )).felderSortiert(),
                 ),
             ),

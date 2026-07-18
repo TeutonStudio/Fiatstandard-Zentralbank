@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
@@ -16,6 +17,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class Karten3DZuordnungTest {
@@ -55,12 +57,27 @@ class Karten3DZuordnungTest {
         val nurAnna = grundkarte.zu3DModell(spielerReihenfolge = listOf(anna, bert))
         val annasFarbe = nurAnna.eckObjekte.single().typ.farbe
         assertEquals(true, nurAnna.eckObjekte.single().typ.istVerwaltungsstandort)
+        assertTrue(
+            nurAnna.eckObjekte.single().typ.infos.contains(
+                SpielObjektInfoEintrag("Spieler", "anna"),
+            ),
+        )
+        assertTrue(
+            nurAnna.eckObjekte.single().typ.infos.contains(
+                SpielObjektInfoEintrag("Zustand", "intakt"),
+            ),
+        )
 
         val neutraleFarbe = nurAnna.kantenObjekte
             .first { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
             .typ.farbe
         assertNotEquals(annasFarbe, neutraleFarbe)
         assertEquals(neutraleFarbe, nurAnna.feldObjekte.single().typ.farbe)
+        assertTrue(
+            nurAnna.feldObjekte.single().typ.infos.contains(
+                SpielObjektInfoEintrag("Zustand", "intakt"),
+            ),
+        )
 
         val vonAnnaKontrolliert = grundkarte.copy(
             belegung = grundkarte.belegung.copy(
@@ -73,6 +90,28 @@ class Karten3DZuordnungTest {
             .map { objekt -> objekt.typ.farbe }
             .toSet()
         assertEquals(setOf(annasFarbe), annasLinienfarben)
+        val bahnhofInfos = vonAnnaKontrolliert.eckObjekte
+            .single { objekt -> objekt.typ.form == SpielObjektForm.BAHNHOF }
+            .typ.infos.associate { info -> info.bezeichnung to info.wert }
+        assertEquals("2 × Ziegel, 2 × Holz, 1 × Stahl", bahnhofInfos["Kosten"])
+        assertEquals("1 × Nahrung, 1 × Kohle", bahnhofInfos["Verbrauch"])
+
+        val produktion = grundkarte.copy(
+            belegung = grundkarte.belegung.copy(
+                felder = listOf(
+                    FeldBelegung(
+                        position = grundkarte.belegung.felder.single().position,
+                        anlage = FeldAnlage.Wirtschaftsregion(BauteilTyp.RAFFINERIE),
+                        gebautInRunde = 3,
+                    ),
+                ),
+            ),
+        ).zu3DModell(spielerReihenfolge = listOf(anna, bert))
+        val produktionsInfos = produktion.feldObjekte.single()
+            .typ.infos.associate { info -> info.bezeichnung to info.wert }
+        assertEquals("1 × Schweröl, 2 × Diesel", produktionsInfos["Erträge"])
+        assertEquals("2 × Rohöl", produktionsInfos["Verbrauch"])
+        assertEquals("3", produktionsInfos["Gebaut in Runde"])
 
         val gemeinsam = grundkarte.copy(
             belegung = grundkarte.belegung.copy(
