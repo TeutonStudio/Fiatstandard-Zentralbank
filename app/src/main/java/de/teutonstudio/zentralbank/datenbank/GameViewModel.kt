@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import de.teutonstudio.zentralbank.daten.RaumSpielAblage
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpiel
 import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
+import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoffe
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.daten.zuordnung.zuGeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -21,6 +22,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
@@ -45,6 +47,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
 
+private const val STANDARD_AUSLANDS_IMPORTFAKTOR = 4f / 3f
 
 
 class GameViewModel(application: Application): AndroidViewModel(application) {
@@ -113,6 +116,72 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             .onFailure { throwable ->
                 _spielFehler.tryEmit(throwable.message ?: "Spielereignis wurde abgelehnt.")
             }
+    }
+
+    fun meldeSpielFehler(meldung: String) {
+        _spielFehler.tryEmit(meldung)
+    }
+
+    fun baueMitAuslandseinkauf(
+        bauEreignis: SpielEreignis,
+        fehlendeRohstoffe: Map<Rohstoff, Int>,
+    ): Boolean {
+        val ausgangszustand = spielAblauf?.zustand ?: run {
+            _spielFehler.tryEmit("Kein Spiel geladen.")
+            return false
+        }
+        val aktiverSpielerId = ausgangszustand.aktiverSpieler ?: run {
+            _spielFehler.tryEmit("Es ist kein Spieler aktiv.")
+            return false
+        }
+        val aktiverSpieler = aktuellesSpiel.spielerListe.firstOrNull { spieler ->
+            spieler.name == aktiverSpielerId.wert
+        } ?: run {
+            _spielFehler.tryEmit("Der aktive Spieler konnte nicht zugeordnet werden.")
+            return false
+        }
+        val handelsvorgaenge = fehlendeRohstoffe
+            .filterValues { menge -> menge > 0 }
+            .map { (rohstoff, menge) ->
+                val legacyRohstoff = rohstoff.zuRohstoffe()
+                val marktpreis = aktuellesSpiel.aktuelleMarktpreise[legacyRohstoff]
+                    ?: Zahlungsmittel()
+                val gesamtpreis = marktpreis * STANDARD_AUSLANDS_IMPORTFAKTOR * menge
+                if (gesamtpreis <= Zahlungsmittel()) {
+                    _spielFehler.tryEmit(
+                        "Für ${legacyRohstoff.str} ist kein positiver Auslandspreis vorhanden."
+                    )
+                    return false
+                }
+                RohstoffHandel(
+                    besitzer = Ausland,
+                    erwerber = aktiverSpieler,
+                    betrag = gesamtpreis,
+                    anzahl = menge,
+                    rohstoff = legacyRohstoff,
+                )
+            }
+
+        val fachEreignisse = runCatching {
+            handelsvorgaenge.map { handel -> handel.zuFachEreignis() } + bauEreignis
+        }.getOrElse { fehler ->
+            _spielFehler.tryEmit(fehler.message ?: "Auslandseinkauf konnte nicht vorbereitet werden.")
+            return false
+        }
+        var pruefzustand = ausgangszustand
+        fachEreignisse.forEach { ereignis ->
+            pruefzustand = SpielRegelwerk.wendeAn(pruefzustand, ereignis).getOrElse { fehler ->
+                _spielFehler.tryEmit(
+                    fehler.message ?: "Bau und Auslandseinkauf wurden fachlich abgelehnt."
+                )
+                return false
+            }
+        }
+
+        handelsvorgaenge.forEach { handel ->
+            if (!erfasseRohstoffhandel(handel)) return false
+        }
+        return uebernehmeFachEreignis(bauEreignis)
     }
 
     fun ereignisRueckgaengig() {
@@ -236,7 +305,6 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             return null
         }
         aktualisiereSpielZustand(synchronisiert)
-        starteProzugFallsNoetig()
 
         if (spielDaten.spielID == (-1).toLong()) return synchronisiert
 
@@ -257,6 +325,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
 
     private fun starteProzugFallsNoetig() {
+        if (_rundenwechselAnzeige.value != null) return
         val ablauf = spielAblauf ?: return
         val zug = ablauf.zustand.zugStatus ?: return
         if (ablauf.zustand.spielabschnitt != de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt.REGULAER ||
@@ -273,7 +342,9 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     }
 
     fun rundenwechselAngezeigt() {
+        val animationWarAktiv = _rundenwechselAnzeige.value != null
         _rundenwechselAnzeige.value = null
+        if (animationWarAktiv) starteProzugFallsNoetig()
     }
 
     fun aktualisiereWarenkorb(neuerWarenkorb: Map<Rohstoffe, Int>) {

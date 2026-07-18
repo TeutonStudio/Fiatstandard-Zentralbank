@@ -245,6 +245,13 @@ fun Spielbrett3D(
     val gelaendeMeshes = remember(geometrie, modell.auflagen) {
         erstelleAbgeschraegteGelaendeMeshes(geometrie, modell.auflagen)
     }
+    val wasserMesh = remember(geometrie, modell.auflagen, modell.zeigeWasserFlaeche) {
+        if (modell.zeigeWasserFlaeche) {
+            erstelleAbgeschraegtesWasserMesh(geometrie, modell.auflagen)
+        } else {
+            null
+        }
+    }
     val verwendeteObjektTypen = (
         modell.eckObjekte.map(EckObjektAuflage::typ) +
             modell.kantenObjekte.map(KantenObjektAuflage::typ) +
@@ -395,6 +402,14 @@ fun Spielbrett3D(
                     z = transformation.fokusZ,
                 ),
             )
+            wasserMesh?.let { meshDaten ->
+                key("abgeschraegtes-wasser") {
+                    AbgeschraegtesGelaendeNode(
+                        meshDaten = meshDaten,
+                        materialInstance = wasserMaterial,
+                    )
+                }
+            }
         }
 
         if (modell.zeigeBearbeitungsRaster) {

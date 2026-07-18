@@ -38,6 +38,19 @@ fun Rohstoffe.zuRohstoff(): Rohstoff = when (this) {
     Rohstoffe.EISEN -> Rohstoff.EISEN
 }
 
+fun Rohstoff.zuRohstoffe(): Rohstoffe = when (this) {
+    Rohstoff.NAHRUNG -> Rohstoffe.NAHRUNG
+    Rohstoff.LEHM -> Rohstoffe.LEHM
+    Rohstoff.ZIEGEL -> Rohstoffe.ZIEGEL
+    Rohstoff.HOLZ -> Rohstoffe.HOLZ
+    Rohstoff.ROHOEL -> Rohstoffe.ROHÖL
+    Rohstoff.SCHWEROEL -> Rohstoffe.SCHWERÖL
+    Rohstoff.DIESEL -> Rohstoffe.DIESEL
+    Rohstoff.KOHLE -> Rohstoffe.KOHLE
+    Rohstoff.STAHL -> Rohstoffe.STAHL
+    Rohstoff.EISEN -> Rohstoffe.EISEN
+}
+
 fun Bauteil.zuBauteilTyp(): BauteilTyp = when (this) {
     Handelslinie.LAND -> BauteilTyp.EISENBAHNLINIE
     Handelslinie.SEE -> BauteilTyp.FRACHTSCHIFF

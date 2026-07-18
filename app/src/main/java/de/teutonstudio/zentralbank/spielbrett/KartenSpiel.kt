@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +37,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
+import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -52,6 +55,7 @@ private enum class SpielKartenWerkzeug(
     GROSSBAHNHOF("Großbahnhof", KartenZielModus.ECKE, BauteilTyp.GROSSBAHNHOF),
     HAFEN("Hafen", KartenZielModus.ECKE, BauteilTyp.HAFEN),
     GROSSHAFEN("Großhafen", KartenZielModus.ECKE, BauteilTyp.GROSSHAFEN),
+    FRACHTSCHIFF("Frachtschiff", KartenZielModus.ECKE, BauteilTyp.FRACHTSCHIFF),
     AUFWERTEN("Aufwerten", KartenZielModus.ECKE),
     ECKE_BELAGERN("Belagern", KartenZielModus.ECKE),
     ECKE_ZERSTOEREN("Zerstören", KartenZielModus.ECKE),
@@ -95,6 +99,10 @@ fun KartenSpielBildschirm(
     beiRueckgaengig: () -> Unit,
     beiWiederholen: () -> Unit,
     modifier: Modifier = Modifier,
+    kompakteZentrale: Boolean = false,
+    vorgewaehltesBauteil: BauteilTyp? = null,
+    beiBauauftragBeendet: () -> Unit = {},
+    beiBauAusFinanzmitteln: ((SpielEreignis, Map<Rohstoff, Int>) -> Boolean)? = null,
 ) {
     val karte = zustand.karte
     if (karte == null) {
@@ -145,36 +153,51 @@ fun KartenSpielBildschirm(
     var rohstoff by remember { mutableStateOf(Rohstoff.NAHRUNG) }
     var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var ausgewaehltesZiel by remember { mutableStateOf<KartenOrt?>(null) }
+    var seewegStart by remember { mutableStateOf<KartenOrt.Ecke?>(null) }
+
+    LaunchedEffect(vorgewaehltesBauteil) {
+        vorgewaehltesBauteil?.let { bauteil ->
+            SpielKartenWerkzeug.entries.firstOrNull { eintrag ->
+                eintrag.startBauteil == bauteil
+            }?.let { externesWerkzeug ->
+                werkzeug = externesWerkzeug
+                ausgewaehltesZiel = null
+                seewegStart = null
+            }
+        }
+    }
 
     Column(
-        modifier = modifier.fillMaxSize().padding(8.dp),
+        modifier = modifier.fillMaxSize().padding(if (kompakteZentrale) 0.dp else 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text("Spielkarte", style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
-                        "Runde 0 · ${aktiverSpieler.wert} platziert Startbauwerke " +
-                            "(${rundeNullRestbestand.values.sum()} verbleibend)"
-                    } else {
-                        "Aktiver Spieler: ${aktiverSpieler.wert}"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(
-                    selected = false,
-                    enabled = false,
-                    onClick = {},
-                    label = { Text("Bauen") },
-                )
-                FilterChip(selected = true, onClick = {}, label = { Text("Spielen") })
+        if (!kompakteZentrale) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Spielkarte", style = MaterialTheme.typography.headlineSmall)
+                    Text(
+                        if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+                            "Runde 0 · ${aktiverSpieler.wert} platziert Startbauwerke " +
+                                "(${rundeNullRestbestand.values.sum()} verbleibend)"
+                        } else {
+                            "Aktiver Spieler: ${aktiverSpieler.wert}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = false,
+                        enabled = false,
+                        onClick = {},
+                        label = { Text("Bauen") },
+                    )
+                    FilterChip(selected = true, onClick = {}, label = { Text("Spielen") })
+                }
             }
         }
 
@@ -187,6 +210,7 @@ fun KartenSpielBildschirm(
                     beiWerkzeug = { neu ->
                         werkzeug = neu
                         ausgewaehltesZiel = null
+                        seewegStart = null
                     },
                     rohstoff = rohstoff,
                     beiRohstoff = { rohstoff = it },
@@ -204,32 +228,82 @@ fun KartenSpielBildschirm(
                     Spielbrett3D(
                         modell = karte.zu3DModell(
                             spielerReihenfolge = zustand.spieler.map { it.id },
-                            hervorhebung = ausgewaehltesZiel,
+                            hervorhebung = ausgewaehltesZiel ?: seewegStart,
                         ),
                         modifier = Modifier.fillMaxSize(),
                         betrachtungsStatus = betrachtungsStatus,
                         kameraInteraktionsModus = kameraModus,
                         himmel = himmel,
                         onDreieckBeruehrt = { treffer ->
-                            ausgewaehltesZiel = treffer.zuKartenOrt(werkzeug.ziel)
+                            if (!kompakteZentrale || vorgewaehltesBauteil != null) {
+                                val ziel = treffer.zuKartenOrt(werkzeug.ziel)
+                                if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
+                                    val hafen = ziel as KartenOrt.Ecke
+                                    if (seewegStart == null) {
+                                        seewegStart = hafen
+                                    } else {
+                                        ausgewaehltesZiel = hafen
+                                    }
+                                } else {
+                                    ausgewaehltesZiel = ziel
+                                }
+                            }
                         },
                     )
                     SpielbrettKompass(
                         himmel = himmel,
                         kameraAzimutGrad = betrachtungsStatus.azimutGrad,
                         zeitfenster = zeitfenster,
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        modifier = if (kompakteZentrale) {
+                            Modifier.align(Alignment.BottomEnd).padding(12.dp)
+                        } else {
+                            Modifier.align(Alignment.TopEnd).padding(8.dp)
+                        },
                     )
-                    Text(
-                        "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +
-                            "Ziehen: ${if (kameraModus == KameraInteraktionsModus.DREHEN) "drehen" else "verschieben"} · " +
-                            "Zwei Finger: verschieben/zoomen",
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
+                    if (!kompakteZentrale || vorgewaehltesBauteil != null) {
+                        Surface(
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                        ) {
+                            if (vorgewaehltesBauteil != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
+                                            "Frachtschiff: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
+                                        } else {
+                                            "${werkzeug.beschriftung}: ${werkzeug.ziel.name.lowercase()} auf der Karte wählen"
+                                        },
+                                        modifier = Modifier.padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    TextButton(onClick = {
+                                        ausgewaehltesZiel = null
+                                        seewegStart = null
+                                        beiBauauftragBeendet()
+                                    }) {
+                                        Text("Auftrag abbrechen")
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +
+                                        "Ziehen: ${if (kameraModus == KameraInteraktionsModus.DREHEN) "drehen" else "verschieben"} · " +
+                                        "Zwei Finger: verschieben/zoomen",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            if (breiteAnsicht) {
+            if (kompakteZentrale) {
+                brett(Modifier.fillMaxSize())
+            } else if (breiteAnsicht) {
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -255,14 +329,32 @@ fun KartenSpielBildschirm(
                 zustand = zustand,
                 ziel = ziel,
                 rohstoff = rohstoff,
+                seewegStart = seewegStart,
             )
         }
         val pruefung = ereignisErgebnis.mapCatching { ereignis ->
             SpielRegelwerk.wendeAn(zustand, ereignis).getOrThrow()
             ereignis
         }
+        val bauteil = werkzeug.startBauteil
+            ?.takeIf { zustand.spielabschnitt == Spielabschnitt.REGULAER }
+        val fehlendeRohstoffe = bauteil?.let { typ ->
+            fehlendeBauRohstoffe(zustand, typ)
+        }.orEmpty()
+        val finanziertePruefung = if (bauteil == null) {
+            null
+        } else {
+            ereignisErgebnis.mapCatching { ereignis ->
+                val aufgefuellt = zustand.mitZusaetzlichenRohstoffen(fehlendeRohstoffe)
+                SpielRegelwerk.wendeAn(aufgefuellt, ereignis).getOrThrow()
+                ereignis
+            }
+        }
         AlertDialog(
-            onDismissRequest = { ausgewaehltesZiel = null },
+            onDismissRequest = {
+                ausgewaehltesZiel = null
+                seewegStart = null
+            },
             title = { Text(werkzeug.beschriftung) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -282,23 +374,113 @@ fun KartenSpielBildschirm(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
+                    if (bauteil != null) {
+                        Text(
+                            text = if (bauteil.kosten.isEmpty()) {
+                                "Für dieses Bauteil sind keine Rohstoffe hinterlegt."
+                            } else {
+                                "Baukosten: " + bauteil.kosten.entries.joinToString { (rohstoff, menge) ->
+                                    "$menge × ${rohstoff.anzeigeName()}"
+                                }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (fehlendeRohstoffe.isNotEmpty()) {
+                            Text(
+                                text = "Fehlt im Lager: " + fehlendeRohstoffe.entries.joinToString { (rohstoff, menge) ->
+                                    "$menge × ${rohstoff.anzeigeName()}"
+                                } + ". Der Finanzmittel-Bau kauft genau diese Mengen im Ausland.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { ausgewaehltesZiel = null }) { Text("Abbrechen") }
+                TextButton(onClick = {
+                    ausgewaehltesZiel = null
+                    seewegStart = null
+                }) { Text("Abbrechen") }
             },
             confirmButton = {
-                TextButton(
-                    enabled = pruefung.isSuccess,
-                    onClick = {
-                        pruefung.getOrNull()?.let(beiEreignis)
-                        ausgewaehltesZiel = null
-                    },
-                ) { Text("Bestätigen") }
+                if (bauteil == null) {
+                    TextButton(
+                        enabled = pruefung.isSuccess,
+                        onClick = {
+                            pruefung.getOrNull()?.let(beiEreignis)
+                            ausgewaehltesZiel = null
+                            seewegStart = null
+                        },
+                    ) { Text("Bestätigen") }
+                } else {
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        OutlinedButton(
+                            enabled = pruefung.isSuccess,
+                            onClick = {
+                                pruefung.getOrNull()?.let(beiEreignis)
+                                ausgewaehltesZiel = null
+                                seewegStart = null
+                                beiBauauftragBeendet()
+                            },
+                        ) { Text("Aus dem Lager bauen") }
+                        Button(
+                            enabled = finanziertePruefung?.isSuccess == true &&
+                                beiBauAusFinanzmitteln != null,
+                            onClick = {
+                                val gebaut = finanziertePruefung?.getOrNull()?.let { ereignis ->
+                                    beiBauAusFinanzmitteln?.invoke(ereignis, fehlendeRohstoffe)
+                                } == true
+                                if (gebaut) {
+                                    ausgewaehltesZiel = null
+                                    seewegStart = null
+                                    beiBauauftragBeendet()
+                                }
+                            },
+                        ) { Text("Aus Finanzmitteln bauen") }
+                    }
+                }
             },
         )
     }
 }
+
+internal fun fehlendeBauRohstoffe(
+    zustand: SpielZustand,
+    bauteil: BauteilTyp,
+): Map<Rohstoff, Int> {
+    val aktiverSpieler = zustand.spieler.firstOrNull { spieler ->
+        spieler.id == zustand.aktiverSpieler
+    } ?: return bauteil.kosten
+    return bauteil.kosten.mapNotNull { (rohstoff, kosten) ->
+        val fehlen = kosten - aktiverSpieler.rohstoffe.getOrDefault(rohstoff, 0)
+        if (fehlen > 0) rohstoff to fehlen else null
+    }.toMap()
+}
+
+private fun SpielZustand.mitZusaetzlichenRohstoffen(
+    mengen: Map<Rohstoff, Int>,
+): SpielZustand {
+    val aktiver = aktiverSpieler ?: return this
+    return copy(
+        spieler = spieler.map { bestand ->
+            if (bestand.id != aktiver) {
+                bestand
+            } else {
+                bestand.copy(
+                    rohstoffe = (bestand.rohstoffe.keys + mengen.keys).associateWith { rohstoff ->
+                        bestand.rohstoffe.getOrDefault(rohstoff, 0) + mengen.getOrDefault(rohstoff, 0)
+                    }.filterValues { menge -> menge > 0 },
+                )
+            }
+        },
+    )
+}
+
+private fun Rohstoff.anzeigeName(): String = name.lowercase().replace('_', ' ')
+    .replaceFirstChar(Char::uppercase)
 
 @Composable
 private fun SpielWerkzeugleiste(
@@ -414,6 +596,7 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
     zustand: SpielZustand,
     ziel: KartenOrt,
     rohstoff: Rohstoff,
+    seewegStart: KartenOrt.Ecke?,
 ): SpielEreignis {
     val spieler = requireNotNull(zustand.aktiverSpieler) { "Es ist kein Spieler aktiv." }
     return when (this) {
@@ -426,6 +609,23 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
             eckGebaeude(spieler, ziel, EckGebaeudeTyp.GROSSBAHNHOF)
         SpielKartenWerkzeug.HAFEN -> eckGebaeude(spieler, ziel, EckGebaeudeTyp.HAFEN)
         SpielKartenWerkzeug.GROSSHAFEN -> eckGebaeude(spieler, ziel, EckGebaeudeTyp.GROSSHAFEN)
+        SpielKartenWerkzeug.FRACHTSCHIFF -> {
+            val hafenA = requireNotNull(seewegStart) { "Bitte zuerst den ersten Hafen wählen." }
+            val hafenB = ziel as KartenOrt.Ecke
+            val vorhandeneIds = zustand.karte?.belegung?.seewege.orEmpty().mapTo(mutableSetOf()) {
+                it.id
+            }
+            val id = generateSequence(1) { nummer -> nummer + 1 }
+                .map { nummer -> "frachtschiff-${spieler.wert}-$nummer" }
+                .first { kandidat -> kandidat !in vorhandeneIds }
+            SpielEreignis.SeewegEingerichtet(
+                id = id,
+                spieler = spieler,
+                hafenA = hafenA.position,
+                hafenB = hafenB.position,
+                richtung = FrachtRichtung.A_NACH_B,
+            )
+        }
         SpielKartenWerkzeug.AUFWERTEN -> {
             val ecke = (ziel as KartenOrt.Ecke).position
             val bisher = requireNotNull(zustand.karte?.belegung?.eckenNachPosition?.get(ecke)) {

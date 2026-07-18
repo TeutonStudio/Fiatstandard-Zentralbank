@@ -1085,6 +1085,7 @@ fun AnleihenRegister(
     runden: List<Runde>,
     onDelete: (AnleiheAnzeige) -> Unit = {},
     onNew: (Anleihe) -> Unit = {},
+    beiEmission: () -> Unit = {},
 ) {
     var eingabeSpieler by remember(spiel.spielerStringListe) { mutableStateOf(GLOBAL_PLAYER) }
     var eingabeRunde by remember(spiel.aktuelleRunde) {
@@ -1169,18 +1170,18 @@ fun AnleihenRegister(
                         eingabeSpieler == GLOBAL_PLAYER || anleihe.schuldiger.name == eingabeSpieler
                     }
 
-                if (filteredDebt.isEmpty()) {
-                    EmptyInfoCard("Keine Anleihen für diese Auswahl.")
-                } else {
-                    VerticalGrid(columns = SimpleGridCells.Adaptive(270.dp)) {
-                        filteredDebt.forEach { eintrag -> AnleiheCard(
-                            modifier = ModiPad5.height(270.dp),
-                            eintrag = eintrag,
-                            status = spiel.erhalteAnleiheStatus(eintrag, currentRound),
-                            onShowAblauf = { geoeffneteAnleihe = eintrag },
-                            onDelete = onDelete,
-                        ) }
-                    }
+                VerticalGrid(columns = SimpleGridCells.Adaptive(270.dp)) {
+                    AnleiheEmissionKarte(
+                        modifier = ModiPad5.height(270.dp),
+                        beiKlick = beiEmission,
+                    )
+                    filteredDebt.forEach { eintrag -> AnleiheCard(
+                        modifier = ModiPad5.height(270.dp),
+                        eintrag = eintrag,
+                        status = spiel.erhalteAnleiheStatus(eintrag, currentRound),
+                        onShowAblauf = { geoeffneteAnleihe = eintrag },
+                        onDelete = onDelete,
+                    ) }
                 }
             }
         }
@@ -1196,6 +1197,45 @@ fun AnleihenRegister(
                 spiel = spiel,
                 aktuelleRunde = eingabeRunde,
                 eintrag = eintrag,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnleiheEmissionKarte(
+    modifier: Modifier,
+    beiKlick: () -> Unit,
+) {
+    Card(
+        modifier = modifier,
+        onClick = beiKlick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "+",
+                style = MaterialTheme.typography.displayMedium,
+                fontWeight = FontWeight.Light,
+            )
+            Text(
+                text = "Neue Anleihe emittieren",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = "Der aktive Spieler übernimmt die Rolle des Emittenten.",
+                modifier = Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
             )
         }
     }

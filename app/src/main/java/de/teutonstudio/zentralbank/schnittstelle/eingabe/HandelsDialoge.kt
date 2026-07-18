@@ -35,6 +35,7 @@ import de.teutonstudio.zentralbank.datenbank.JuristischePerson
 import de.teutonstudio.zentralbank.datenbank.RohstoffHandel
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Spiel
+import de.teutonstudio.zentralbank.datenbank.Zahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.toZahlungsmittel
 import de.teutonstudio.zentralbank.datenbank.zuMark
 import java.util.Locale
@@ -120,6 +121,10 @@ fun HandelDialog(
     onDismiss: () -> Unit,
     onCreateRohstoff: (RohstoffHandel) -> Unit,
     onCreateAnleihe: (Anleihenhandel) -> Unit,
+    initialerRohstoff: Rohstoffe? = null,
+    initialerBesitzer: JuristischePerson? = null,
+    initialerErwerber: JuristischePerson? = null,
+    initialerGesamtpreis: Zahlungsmittel? = null,
 ) {
     val rohstoffPersonen = remember(spiel.spielerListe) {
         spiel.spielerListe.map { it as JuristischePerson } + Ausland
@@ -127,15 +132,30 @@ fun HandelDialog(
     val anleihePersonen = remember(spiel.spielerListe) {
         spiel.spielerListe.map { it as JuristischePerson } + Geschäftsbank
     }
-    var besitzer by remember(rohstoffPersonen) { mutableStateOf(rohstoffPersonen.firstOrNull()) }
-    var erwerber by remember(rohstoffPersonen) {
-        mutableStateOf(rohstoffPersonen.getOrNull(1) ?: rohstoffPersonen.firstOrNull())
+    var besitzer by remember(rohstoffPersonen, initialerBesitzer) {
+        mutableStateOf(
+            initialerBesitzer?.takeIf { person -> person in rohstoffPersonen }
+                ?: rohstoffPersonen.firstOrNull()
+        )
     }
-    var handelsgut by remember {
-        mutableStateOf<HandelsgutAuswahl>(HandelsgutAuswahl.Rohstoff(Rohstoffe.entries.first()))
+    var erwerber by remember(rohstoffPersonen, initialerErwerber) {
+        mutableStateOf(
+            initialerErwerber?.takeIf { person -> person in rohstoffPersonen }
+                ?: rohstoffPersonen.firstOrNull { person -> person != besitzer }
+                ?: rohstoffPersonen.firstOrNull()
+        )
+    }
+    var handelsgut by remember(initialerRohstoff) {
+        mutableStateOf<HandelsgutAuswahl>(
+            HandelsgutAuswahl.Rohstoff(initialerRohstoff ?: Rohstoffe.entries.first())
+        )
     }
     var menge by remember { mutableStateOf("1") }
-    var gesamtpreis by remember { mutableStateOf("") }
+    var gesamtpreis by remember(initialerGesamtpreis) {
+        mutableStateOf(
+            initialerGesamtpreis?.toIntOderNull()?.takeIf { preis -> preis > 0 }?.toString().orEmpty()
+        )
+    }
     val personen = when (handelsgut) {
         is HandelsgutAuswahl.Rohstoff -> rohstoffPersonen
         is HandelsgutAuswahl.AnleiheWert -> anleihePersonen

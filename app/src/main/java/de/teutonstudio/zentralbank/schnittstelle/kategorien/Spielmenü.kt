@@ -1,162 +1,216 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalGridApi
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import de.teutonstudio.zentralbank.R
-import de.teutonstudio.zentralbank.datenbank.Spiel
-import de.teutonstudio.zentralbank.datenbank.TestSpiel
-import de.teutonstudio.zentralbank.schnittstelle.GridByOrientation
-import de.teutonstudio.zentralbank.schnittstelle.eingabe.ImageCard
-import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
-import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
+import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoffe
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 
-@OptIn(ExperimentalGridApi::class)
-@Composable
-fun Spielmenü(
-    beiVermogenSaldo: () -> Unit,
-    beiSchuldenSaldo: () -> Unit,
-    beiMarktSaldo: () -> Unit,
-    beiAuslandSaldo: () -> Unit,
-    beiHandel: () -> Unit,
-    beiAnleihe: () -> Unit,
-    beiKarte: () -> Unit,
-    beiNaechstemZugabschnitt: () -> Unit,
-    spiel: Spiel,
-    aktiverSpielerName: String?,
-    zugText: String = "Kein Zug aktiv",
-    zugZeitText: String? = null,
+enum class SpielmenueBereich(
+    val beschriftung: String,
+    val icon: Int,
 ) {
-    Titel(anleitung = remember { mutableStateOf(true) }) {
-        GridByOrientation() { idx: Int, modifier -> when(idx) {
-            0 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.saldo, beiKlick = beiVermogenSaldo)
-            1 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.debt, beiKlick = beiSchuldenSaldo)
-            2 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.market, beiKlick = beiMarktSaldo)
-            3 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.foreign, beiKlick = beiAuslandSaldo)
-            4 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.handel, beiKlick = beiHandel)
-            5 -> ImageCard(modifier = modifier(Modifier), bild_index = R.drawable.anleihe, beiKlick = beiAnleihe)
-            6 -> ZugStatusKarte(
-                spiel = spiel,
-                aktiverSpielerName = aktiverSpielerName,
-                zugText = zugText,
-                zugZeitText = zugZeitText,
-                modifier = modifier(null),
-                beiKlick = beiNaechstemZugabschnitt,
-                beiKarte = beiKarte,
-            )
-        } }
-    }
+    SALDO("Saldo", R.drawable.saldo),
+    SCHULDEN("Schulden", R.drawable.debt),
+    MARKTPLATZ("Marktplatz", R.drawable.market),
+    AUSSENHANDEL("Außenhandel", R.drawable.foreign),
 }
 
 @Composable
-private fun ZugStatusKarte(
-    spiel: Spiel,
-    aktiverSpielerName: String?,
+fun Spielmenü(
+    zustand: SpielZustand,
     zugText: String,
     zugZeitText: String?,
-    modifier: Modifier,
-    beiKlick: () -> Unit,
-    beiKarte: () -> Unit,
+    beiBereich: (SpielmenueBereich) -> Unit,
+    beiZugBeenden: () -> Unit,
+    modifier: Modifier = Modifier,
+    kartenInhalt: @Composable BoxScope.() -> Unit,
 ) {
-    val spielerFarben = erhalteSpielerFarben(spiel.spielerListe)
-    val aktiverIndex = spiel.spielerListe.indexOfFirst { spieler ->
-        spieler.name == aktiverSpielerName
-    }
-    val verbleibendeZuege = if (aktiverIndex >= 0) {
-        spiel.spielerListe.size - aktiverIndex
-    } else {
-        spiel.spielerListe.size
+    val aktiverSpieler = zustand.spieler.firstOrNull { spieler ->
+        spieler.id == zustand.aktiverSpieler
     }
 
-    Card(
-        modifier = modifier,
-        onClick = beiKlick,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+    Box(modifier = modifier.fillMaxSize().padding(12.dp)) {
+        kartenInhalt()
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(start = 132.dp, end = 8.dp, top = 8.dp),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 5.dp,
+            shadowElevation = 4.dp,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
         ) {
-            Text(
-                text = zugText,
-                modifier = Modifier.fillMaxWidth(),
-                fontSize = 22.sp,
-                textAlign = TextAlign.Center,
-            )
-            zugZeitText?.let { zeit ->
-                Text(
-                    text = "Spieltag $zeit Uhr",
-                    modifier = Modifier.padding(top = 3.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-            if (spiel.spielerListe.isNotEmpty()) {
-                Text(
-                    text = "$verbleibendeZuege Züge bis zu den neu berechneten Marktpreisen",
-                    modifier = Modifier.padding(top = 5.dp),
-                    fontSize = 11.sp,
-                )
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    spiel.spielerListe.forEachIndexed { index, spieler ->
-                        val istAktiv = index == aktiverIndex
-                        val hintergrund = if (istAktiv) {
-                            spielerFarben.getValue(spieler)
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        }
-                        Card(
-                            modifier = Modifier.weight(1f).padding(horizontal = 2.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = hintergrund,
-                                contentColor = if (istAktiv) {
-                                    hintergrund.lesbareSchriftfarbe()
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            ),
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.widthIn(min = 120.dp)) {
+                    Text(
+                        text = aktiverSpieler?.name ?: "Kein Spieler",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = aktiverSpieler?.geldkonto?.zuMarkString() ?: "–",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+                Rohstoff.entries.forEach { rohstoff ->
+                    val darstellung = rohstoff.zuRohstoffe()
+                    val farbe = darstellung.farbe
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = farbe,
+                        contentColor = farbe.lesbareSchriftfarbe(),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(
-                                text = spieler.name,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                                fontSize = if (istAktiv) 11.sp else 9.sp,
-                                textAlign = TextAlign.Center,
+                            zeigeRohstoff(
+                                rohstoff = darstellung,
+                                iconSize = 28.dp,
+                                text = false,
                             )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = darstellung.str.replaceFirstChar(Char::uppercase),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                                Text(
+                                    text = aktiverSpieler?.rohstoffe?.getOrDefault(rohstoff, 0)
+                                        ?.toString() ?: "0",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
                         }
                     }
                 }
             }
-            OutlinedButton(
-                onClick = beiKarte,
-                modifier = Modifier.padding(top = 6.dp),
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 8.dp, top = 70.dp, bottom = 8.dp),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 5.dp,
+            shadowElevation = 4.dp,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+        ) {
+            Column(
+                modifier = Modifier.padding(7.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
-                Text("Spielkarte öffnen")
+                SpielmenueBereich.entries.forEach { bereich ->
+                    OutlinedButton(
+                        onClick = { beiBereich(bereich) },
+                        modifier = Modifier.widthIn(min = 110.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(bereich.icon),
+                            contentDescription = bereich.beschriftung,
+                            modifier = Modifier.size(26.dp),
+                            contentScale = ContentScale.Fit,
+                        )
+                        Text(bereich.beschriftung)
+                    }
+                }
+                Button(
+                    onClick = beiZugBeenden,
+                    enabled = zustand.zugStatus?.phase == ZugPhase.Epizug,
+                    modifier = Modifier.widthIn(min = 110.dp),
+                ) {
+                    Text("Zug beenden")
+                }
+                Text(
+                    text = zugText,
+                    modifier = Modifier.widthIn(max = 110.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                zugZeitText?.let { zeit ->
+                    Text(
+                        text = "$zeit Uhr",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
             }
         }
     }
 }
 
-@Preview(
-
-)
 @Composable
-private fun SpielmenüPreview() {
-    Column() {
-        Spielmenü({},{},{},{},{},{},{},{}, TestSpiel, TestSpiel.spielerListe.first().name)
+fun SpielmenueDialog(
+    titel: String,
+    beiSchliessen: () -> Unit,
+    inhalt: @Composable () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = beiSchliessen,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.9f),
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp,
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(titel, style = MaterialTheme.typography.headlineSmall)
+                    TextButton(onClick = beiSchliessen) { Text("Schließen") }
+                }
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(10.dp)) {
+                    inhalt()
+                }
+            }
+        }
     }
 }

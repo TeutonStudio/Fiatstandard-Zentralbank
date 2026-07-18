@@ -111,6 +111,31 @@ class SpielbrettGelaendeMeshTest {
     }
 
     @Test
+    fun `Wasserdreiecke werden ohne Landfelder in einem Mesh gebuendelt`() {
+        val landPosition = geometrie.dreiecke.first().position
+        val mesh = requireNotNull(
+            erstelleAbgeschraegtesWasserMesh(
+                geometrie = geometrie,
+                auflagen = listOf(DreieckAuflage(landPosition, typ)),
+            ),
+        )
+        val wasserAnzahl = geometrie.dreiecke.size - 1
+
+        assertEquals(wasserAnzahl * 27, mesh.ecken.size)
+        assertEquals(wasserAnzahl * 39, mesh.indizes.size)
+        assertEquals(WASSER_DREIECK_HOEHE, mesh.ecken.first().position.y, 0.0001f)
+    }
+
+    @Test
+    fun `vollstaendig belegte Karte benoetigt kein Wasser-Bevel-Mesh`() {
+        val auflagen = geometrie.dreiecke.map { dreieck ->
+            DreieckAuflage(dreieck.position, typ)
+        }
+
+        assertEquals(null, erstelleAbgeschraegtesWasserMesh(geometrie, auflagen))
+    }
+
+    @Test
     fun `Spezialauflagen werden nicht abgeschraegt`() {
         val meshes = erstelleAbgeschraegteGelaendeMeshes(
             geometrie = geometrie,

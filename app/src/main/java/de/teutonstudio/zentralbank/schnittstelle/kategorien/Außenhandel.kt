@@ -83,13 +83,16 @@ private val hafenTarife = listOf(
 )
 
 @Composable
-fun zeigeAussenhandel(spiel: Spiel) {
+fun zeigeAussenhandel(
+    spiel: Spiel,
+    beiRohstoffKlick: (Rohstoffe, Zahlungsmittel) -> Unit = { _, _ -> },
+) {
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         AussenhandelsbilanzDiagramm(spiel)
-        HafenPreisKarte(spiel.aktuelleMarktpreise)
+        HafenPreisKarte(spiel.aktuelleMarktpreise, beiRohstoffKlick)
     }
 }
 
@@ -269,7 +272,10 @@ private fun AussenhandelsbilanzDiagramm(spiel: Spiel) {
 }
 
 @Composable
-private fun HafenPreisKarte(marktpreise: Map<Rohstoffe, Zahlungsmittel>) {
+private fun HafenPreisKarte(
+    marktpreise: Map<Rohstoffe, Zahlungsmittel>,
+    beiRohstoffKlick: (Rohstoffe, Zahlungsmittel) -> Unit,
+) {
     var ausgewählterTarif by remember { mutableStateOf(hafenTarife.first()) }
     var tarifAuswahlOffen by remember { mutableStateOf(false) }
 
@@ -318,7 +324,9 @@ private fun HafenPreisKarte(marktpreise: Map<Rohstoffe, Zahlungsmittel>) {
                 val exportPreis = marktpreis / ausgewählterTarif.preisfaktor
 
                 Card(
-                    modifier = ModiPad5.fillMaxWidth(),
+                    modifier = ModiPad5.fillMaxWidth().clickable {
+                        beiRohstoffKlick(rohstoff, importPreis)
+                    },
                     colors = CardDefaults.cardColors(
                         containerColor = rohstoff.farbe,
                         contentColor = rohstoff.farbe.lesbareSchriftfarbe(),

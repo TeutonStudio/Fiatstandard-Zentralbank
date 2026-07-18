@@ -5,6 +5,9 @@ import kotlin.math.sqrt
 
 internal const val GELAENDE_BEVEL_BREITE = 0.12f
 internal const val GELAENDE_BEVEL_HOEHE = 0.08f
+internal const val WASSER_DREIECK_HOEHE = 0.045f
+internal const val WASSER_BEVEL_BREITE = 0.12f
+internal const val WASSER_BEVEL_HOEHE = 0.032f
 
 internal data class GelaendeMeshVektor(
     val x: Float,
@@ -29,8 +32,8 @@ internal data class GelaendeMeshDaten(
 }
 
 /**
- * Erzeugt je Gelaendetyp ein gemeinsames Mesh. Nur Landauflagen werden aufgenommen; Wasser ist
- * keine Auflage und Spezialauflagen behalten ihre bisherige, nicht abgeschraegte Darstellung.
+ * Erzeugt je Gelaendetyp ein gemeinsames Mesh. Nur Landauflagen werden aufgenommen;
+ * Spezialauflagen behalten ihre bisherige, nicht abgeschraegte Darstellung.
  */
 internal fun erstelleAbgeschraegteGelaendeMeshes(
     geometrie: SpielbrettGeometrie,
@@ -40,14 +43,49 @@ internal fun erstelleAbgeschraegteGelaendeMeshes(
     .filter { it.ebene == AuflagenEbene.LAND }
     .groupBy(DreieckAuflage::typ)
     .mapValues { (_, landauflagen) ->
-        GelaendeMeshErsteller().apply {
+        GelaendeMeshErsteller(
+            basisY = OBERFLAECHEN_ABSTAND,
+            obenY = OBERFLAECHEN_ABSTAND + AUFLAGEN_HOEHE,
+            bevelBreite = GELAENDE_BEVEL_BREITE,
+            bevelHoehe = GELAENDE_BEVEL_HOEHE,
+        ).apply {
             landauflagen.forEach { auflage ->
                 fuegeDreieckHinzu(geometrie.dreieck(auflage.position))
             }
         }.baue()
     }
 
-private class GelaendeMeshErsteller {
+/** Bündelt alle nicht mit Land belegten Kartendreiecke zu einer abgeschrägten Wasseroberfläche. */
+internal fun erstelleAbgeschraegtesWasserMesh(
+    geometrie: SpielbrettGeometrie,
+    auflagen: List<DreieckAuflage>,
+): GelaendeMeshDaten? {
+    val landPositionen = auflagen
+        .asSequence()
+        .filter { auflage -> auflage.ebene == AuflagenEbene.LAND }
+        .map(DreieckAuflage::position)
+        .toSet()
+    val wasserDreiecke = geometrie.dreiecke.filter { dreieck ->
+        dreieck.position !in landPositionen
+    }
+    if (wasserDreiecke.isEmpty()) return null
+
+    return GelaendeMeshErsteller(
+        basisY = 0f,
+        obenY = WASSER_DREIECK_HOEHE,
+        bevelBreite = WASSER_BEVEL_BREITE,
+        bevelHoehe = WASSER_BEVEL_HOEHE,
+    ).apply {
+        wasserDreiecke.forEach(::fuegeDreieckHinzu)
+    }.baue()
+}
+
+private class GelaendeMeshErsteller(
+    private val basisY: Float,
+    private val obenY: Float,
+    private val bevelBreite: Float,
+    private val bevelHoehe: Float,
+) {
     private val ecken = mutableListOf<GelaendeMeshEcke>()
     private val indizes = mutableListOf<Int>()
 
@@ -55,16 +93,14 @@ private class GelaendeMeshErsteller {
         val aussen = dreieck.ecken
         val mittelpunkt = dreieck.mittelpunkt
         val innenRadius = abstandZuGerade(mittelpunkt, aussen[0], aussen[1])
-        val innenFaktor = (1f - GELAENDE_BEVEL_BREITE / innenRadius).coerceIn(0.5f, 0.95f)
+        val innenFaktor = (1f - bevelBreite / innenRadius).coerceIn(0.5f, 0.95f)
         val innen = aussen.map { ecke ->
             BrettPunkt(
                 x = mittelpunkt.x + (ecke.x - mittelpunkt.x) * innenFaktor,
                 z = mittelpunkt.z + (ecke.z - mittelpunkt.z) * innenFaktor,
             )
         }
-        val basisY = OBERFLAECHEN_ABSTAND
-        val obenY = basisY + AUFLAGEN_HOEHE
-        val bevelBeginnY = obenY - GELAENDE_BEVEL_HOEHE
+        val bevelBeginnY = obenY - bevelHoehe
 
         fuegeDreiecksflaecheHinzu(
             punkte = innen.map { punkt -> GelaendeMeshVektor(punkt.x, obenY, punkt.z) },
@@ -99,9 +135,9 @@ private class GelaendeMeshErsteller {
                     GelaendeMeshVektor(innenA.x, obenY, innenA.z),
                 ),
                 normale = normalisiere(
-                    x = aussenNormale.x * GELAENDE_BEVEL_HOEHE,
-                    y = GELAENDE_BEVEL_BREITE,
-                    z = aussenNormale.z * GELAENDE_BEVEL_HOEHE,
+                    x = aussenNormale.x * bevelHoehe,
+                    y = bevelBreite,
+                    z = aussenNormale.z * bevelHoehe,
                 ),
             )
         }

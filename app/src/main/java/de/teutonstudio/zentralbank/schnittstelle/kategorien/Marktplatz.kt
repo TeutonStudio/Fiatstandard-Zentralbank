@@ -167,6 +167,7 @@ fun zeigeMarktplatz(
     spiel: Spiel,
     onTrade: (HandelsDaten) -> Unit = {},
     onWarenkorbAendern: (Map<Rohstoffe, Int>) -> Unit = {},
+    beiBauteilKlick: (Bauteil) -> Unit = {},
 ) {
     var marktpreisKategorie by remember { mutableStateOf(MarktpreisKategorie.HANDELSGUETER) }
     var handelsdifferenzEinheit by remember {
@@ -515,7 +516,7 @@ fun zeigeMarktplatz(
                         marktpreise = spiel.aktuelleBauwerkBewertungspreise,
                         nicht_null_preise = false,
                         nicht_null_zeilen = false,
-                        beiKlick = {},
+                        beiKlick = beiBauteilKlick,
                     )
                 }
             }
