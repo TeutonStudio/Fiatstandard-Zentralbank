@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -26,6 +27,8 @@ import de.teutonstudio.zentralbank.datenbank.Rohstoffe
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
+
+internal const val ROHSTOFF_ICON_SKALIERUNG = 2.5f
 
 
 fun Rohstoffe.zuPfad(): Int = when (this) {
@@ -106,7 +109,9 @@ fun zeigeRohstoff(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .scale(ROHSTOFF_ICON_SKALIERUNG),
                         painter = rohstoff.zuPainter(),
                         contentDescription = rohstoff.str.uppercase(),
                         contentScale = ContentScale.Fit

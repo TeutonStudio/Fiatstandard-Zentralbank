@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +39,7 @@ import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoffe
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.schnittstelle.ausgabe.ROHSTOFF_ICON_SKALIERUNG
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarbe
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
@@ -78,25 +81,25 @@ fun Spielmenü(
     Box(modifier = modifier.fillMaxSize().padding(12.dp)) {
         kartenInhalt()
 
-        Surface(
+        Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(start = 132.dp, end = 8.dp, top = 8.dp),
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 5.dp,
-            shadowElevation = 4.dp,
-            color = leistenFarbe,
-            contentColor = leistenInhaltFarbe,
+                .padding(start = 132.dp, end = 8.dp, top = 8.dp)
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                modifier = Modifier.widthIn(min = 120.dp),
+                shape = MaterialTheme.shapes.large,
+                tonalElevation = 5.dp,
+                shadowElevation = 4.dp,
+                color = leistenFarbe,
+                contentColor = leistenInhaltFarbe,
             ) {
-                Column(modifier = Modifier.widthIn(min = 120.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Text(
                         text = aktiverSpieler?.name ?: "Kein Spieler",
                         style = MaterialTheme.typography.titleSmall,
@@ -109,37 +112,40 @@ fun Spielmenü(
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
-                Rohstoff.entries.forEach { rohstoff ->
-                    val darstellung = rohstoff.zuRohstoffe()
-                    val farbe = darstellung.farbe
-                    Surface(
-                        shape = MaterialTheme.shapes.medium,
-                        color = farbe,
-                        contentColor = farbe.lesbareSchriftfarbe(),
+            }
+            Spacer(modifier = Modifier.width(5.dp))
+            Rohstoff.entries.forEach { rohstoff ->
+                val darstellung = rohstoff.zuRohstoffe()
+                val farbe = darstellung.farbe
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = farbe,
+                    contentColor = farbe.lesbareSchriftfarbe(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        Box(
+                            modifier = Modifier.size(28.dp * ROHSTOFF_ICON_SKALIERUNG),
+                            contentAlignment = Alignment.Center,
                         ) {
                             zeigeRohstoff(
                                 rohstoff = darstellung,
                                 iconSize = 28.dp,
                                 text = false,
                             )
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = darstellung.str.replaceFirstChar(Char::uppercase),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                                Text(
-                                    text = aktiverSpieler?.rohstoffe?.getOrDefault(rohstoff, 0)
-                                        ?.toString() ?: "0",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
                         }
+                        Text(
+                            text = darstellung.str.replaceFirstChar(Char::uppercase),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            text = aktiverSpieler?.rohstoffe?.getOrDefault(rohstoff, 0)
+                                ?.toString() ?: "0",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }
