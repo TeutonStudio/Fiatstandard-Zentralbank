@@ -44,4 +44,22 @@ class KartenTopologieTest {
         assertEquals(2, kantenAbstand(start, zwei, maximal = 2))
         assertNotEquals(start, zwei)
     }
+
+    @Test
+    fun kuerzesterSeewegNutztAusschliesslichWasserWasserKanten() {
+        val karte = Spielkarte(
+            id = "wasserwege",
+            name = "Wasserwege",
+            hexagon = KartenHexagon(radius = 3),
+            gelaendefelder = emptyList(),
+        )
+        val direkteKante = karte.wasserKanten().first()
+
+        val weg = requireNotNull(
+            karte.kuerzesterWasserweg(direkteKante.anfang, direkteKante.ende),
+        )
+
+        assertEquals(listOf(direkteKante), weg)
+        assertTrue(weg.all { kante -> kante in karte.wasserKanten() })
+    }
 }

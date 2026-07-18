@@ -2,6 +2,12 @@ package de.teutonstudio.zentralbank.spielbrett
 
 import android.annotation.SuppressLint
 import android.view.MotionEvent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +26,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +85,7 @@ import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.utils.screenToRay
 import io.github.sceneview.utils.worldToScreen
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -151,6 +159,11 @@ fun Spielbrett3D(
     himmel: HimmelsDarstellung = HimmelsDarstellung.fuerUhrzeit(12f),
     eingabeAktiv: Boolean = true,
     bauwerkInfoFreiraum: PaddingValues = PaddingValues(),
+    aufwertbareEcken: Set<KartenEcke> = emptySet(),
+    aenderbareSeewege: Set<String> = emptySet(),
+    beiEckgebaeudeAufwerten: ((KartenEcke) -> Unit)? = null,
+    beiSeewegRouteAendern: ((String) -> Unit)? = null,
+    beiAktivemSeeweg: ((String?) -> Unit)? = null,
 ) {
     if (LocalInspectionMode.current || statischeVorschau) {
         SpielbrettVorschau(
@@ -222,6 +235,7 @@ fun Spielbrett3D(
     }
     var ansichtsGroesse by remember { mutableStateOf(IntSize.Zero) }
     val aktuellerBeruehrungsEmpfaenger = rememberUpdatedState(onDreieckBeruehrt)
+    val aktuellerSeewegEmpfaenger = rememberUpdatedState(beiAktivemSeeweg)
     val betrachtungsGesten = remember(
         betrachtungsStatus,
         kameraInteraktionsModus,
@@ -243,6 +257,7 @@ fun Spielbrett3D(
             angehefteteBauwerke = angeklicktesBauwerk
                 ?.let { ziel -> bauwerkHoverZiele.angehefteteZieleFuer(ziel) }
                 .orEmpty()
+            aktuellerSeewegEmpfaenger.value?.invoke(angeklicktesBauwerk?.objektId)
             if (abs(strahl.direction.y) < 0.0001f) return@BetrachtungsGesten
             val faktor = -strahl.origin.y / strahl.direction.y
             if (faktor < 0f) return@BetrachtungsGesten
@@ -483,7 +498,12 @@ fun Spielbrett3D(
                             val ereignis = awaitPointerEvent(PointerEventPass.Initial)
                             val aenderung = ereignis.changes.firstOrNull()
                             when (ereignis.type) {
-                                PointerEventType.Exit -> bauwerkUnterZeiger = null
+                                PointerEventType.Exit -> {
+                                    bauwerkUnterZeiger = null
+                                    if (angehefteteBauwerke.isEmpty()) {
+                                        aktuellerSeewegEmpfaenger.value?.invoke(null)
+                                    }
+                                }
                                 PointerEventType.Enter,
                                 PointerEventType.Move -> if (
                                     aenderung?.type == PointerType.Mouse ||
@@ -502,6 +522,10 @@ fun Spielbrett3D(
                                             richtungY = aktuellerStrahl.direction.y,
                                             richtungZ = aktuellerStrahl.direction.z,
                                         )
+                                    }
+                                    if (angehefteteBauwerke.isEmpty()) {
+                                        aktuellerSeewegEmpfaenger.value
+                                            ?.invoke(bauwerkUnterZeiger?.objektId)
                                     }
                                 }
                             }
@@ -680,22 +704,30 @@ fun Spielbrett3D(
                         val laenge = hypot(deltaX, deltaZ)
                         val markierung = objekt.typ.form == SpielObjektForm.MARKIERUNG
                         val seeweg = objekt.typ.form == SpielObjektForm.FRACHTSCHIFF
-                        CubeNode(
-                            size = Size(
-                                x = laenge,
-                                y = if (markierung || seeweg) 0.10f else 0.16f,
-                                z = if (markierung) 0.16f else if (seeweg) 0.08f else 0.12f,
-                            ),
-                            materialInstance = objektMaterialien.getValue(objekt.typ),
-                            position = Position(
-                                x = (anfang.x + ende.x) / 2f,
-                                y = OBJEKT_BASIS_HOEHE + if (markierung) 0.08f else 0.12f,
-                                z = (anfang.z + ende.z) / 2f,
-                            ),
-                            rotation = Rotation(
-                                y = -Math.toDegrees(atan2(deltaZ, deltaX).toDouble()).toFloat(),
-                            ),
-                        )
+                        if (seeweg && objekt.bewegungsRoute.isNotEmpty()) {
+                            BewegtesFrachtschiffNode(
+                                objekt = objekt,
+                                geometrie = geometrie,
+                                materialInstance = objektMaterialien.getValue(objekt.typ),
+                            )
+                        } else {
+                            CubeNode(
+                                size = Size(
+                                    x = laenge,
+                                    y = if (markierung) 0.10f else 0.16f,
+                                    z = if (markierung) 0.16f else 0.12f,
+                                ),
+                                materialInstance = objektMaterialien.getValue(objekt.typ),
+                                position = Position(
+                                    x = (anfang.x + ende.x) / 2f,
+                                    y = OBJEKT_BASIS_HOEHE + if (markierung) 0.08f else 0.12f,
+                                    z = (anfang.z + ende.z) / 2f,
+                                ),
+                                rotation = Rotation(
+                                    y = -Math.toDegrees(atan2(deltaZ, deltaX).toDouble()).toFloat(),
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -762,6 +794,10 @@ fun Spielbrett3D(
             positionen = bauwerkInfoPositionen,
             ansichtsGroesse = ansichtsGroesse,
             freiraum = bauwerkInfoFreiraum,
+            aufwertbareEcken = aufwertbareEcken,
+            aenderbareSeewege = aenderbareSeewege,
+            beiEckgebaeudeAufwerten = beiEckgebaeudeAufwerten,
+            beiSeewegRouteAendern = beiSeewegRouteAendern,
             modifier = Modifier.matchParentSize(),
         )
     }
@@ -773,6 +809,10 @@ private fun BauwerkInfoEbene(
     positionen: Map<String, Offset>,
     ansichtsGroesse: IntSize,
     freiraum: PaddingValues,
+    aufwertbareEcken: Set<KartenEcke>,
+    aenderbareSeewege: Set<String>,
+    beiEckgebaeudeAufwerten: ((KartenEcke) -> Unit)?,
+    beiSeewegRouteAendern: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val dichte = LocalDensity.current
@@ -866,7 +906,7 @@ private fun BauwerkInfoEbene(
                         verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
                         Text(
-                            text = "Bauwerksdetails",
+                            text = "Objektdetails",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                         )
@@ -889,6 +929,24 @@ private fun BauwerkInfoEbene(
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
+                            }
+                        }
+                        ziel.ecke?.takeIf { ecke -> ecke in aufwertbareEcken }?.let { ecke ->
+                            Button(
+                                onClick = { beiEckgebaeudeAufwerten?.invoke(ecke) },
+                                enabled = beiEckgebaeudeAufwerten != null,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Aufwerten")
+                            }
+                        }
+                        ziel.objektId?.takeIf { id -> id in aenderbareSeewege }?.let { id ->
+                            Button(
+                                onClick = { beiSeewegRouteAendern?.invoke(id) },
+                                enabled = beiSeewegRouteAendern != null,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Route ändern")
                             }
                         }
                     }
@@ -1073,6 +1131,8 @@ internal data class BauwerkHoverZiel(
     val trefferRadius: Float,
     val prioritaet: Int,
     val infoPosition: Position,
+    val ecke: KartenEcke? = null,
+    val objektId: String? = null,
 ) {
     fun trefferWertung(
         ursprungX: Float,
@@ -1101,6 +1161,67 @@ internal data class BauwerkHoverZiel(
     }
 }
 
+@Composable
+private fun SceneScope.BewegtesFrachtschiffNode(
+    objekt: KantenObjektAuflage,
+    geometrie: SpielbrettGeometrie,
+    materialInstance: MaterialInstance,
+) {
+    val routenPunkte = remember(objekt.bewegungsRoute, objekt.routenStart, geometrie) {
+        objekt.ermittleRoutenPunkte(geometrie)
+    }
+    if (routenPunkte.size < 2) return
+    val uebergang = rememberInfiniteTransition(label = "Frachtschiff ${objekt.objektId}")
+    val fortschritt by uebergang.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = (objekt.bewegungsRoute.size * 1_200).coerceIn(1_200, 12_000),
+                easing = LinearEasing,
+            ),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "Pendelweg",
+    )
+    val skalierterFortschritt = fortschritt * (routenPunkte.size - 1)
+    val segmentIndex = min(skalierterFortschritt.toInt(), routenPunkte.size - 2)
+    val segmentFortschritt = skalierterFortschritt - segmentIndex
+    val anfang = routenPunkte[segmentIndex]
+    val ende = routenPunkte[segmentIndex + 1]
+    val deltaX = ende.x - anfang.x
+    val deltaZ = ende.z - anfang.z
+    CubeNode(
+        size = Size(x = 0.34f, y = 0.12f, z = 0.16f),
+        materialInstance = materialInstance,
+        position = Position(
+            x = anfang.x + deltaX * segmentFortschritt,
+            y = OBJEKT_BASIS_HOEHE + 0.16f,
+            z = anfang.z + deltaZ * segmentFortschritt,
+        ),
+        rotation = Rotation(
+            y = -Math.toDegrees(atan2(deltaZ, deltaX).toDouble()).toFloat(),
+        ),
+    )
+}
+
+private fun KantenObjektAuflage.ermittleRoutenPunkte(
+    geometrie: SpielbrettGeometrie,
+): List<BrettPunkt> {
+    var aktuelleEcke = routenStart ?: return emptyList()
+    val ersterPunkt = geometrie.punkt(aktuelleEcke) ?: return emptyList()
+    val punkte = mutableListOf(ersterPunkt)
+    bewegungsRoute.forEach { kante ->
+        aktuelleEcke = when (aktuelleEcke) {
+            kante.anfang -> kante.ende
+            kante.ende -> kante.anfang
+            else -> return emptyList()
+        }
+        punkte += geometrie.punkt(aktuelleEcke) ?: return emptyList()
+    }
+    return punkte
+}
+
 private fun erstelleBauwerkHoverZiele(
     modell: Spielbrett3DModell,
     geometrie: SpielbrettGeometrie,
@@ -1108,33 +1229,37 @@ private fun erstelleBauwerkHoverZiele(
     modell.kantenObjekte
         .filter { objekt -> objekt.typ.istBauwerk }
         .forEach { objekt ->
-            val anfang = geometrie.punkt(objekt.position.anfang) ?: return@forEach
-            val ende = geometrie.punkt(objekt.position.ende) ?: return@forEach
-            val mitteX = (anfang.x + ende.x) / 2f
-            val mitteZ = (anfang.z + ende.z) / 2f
-            add(
-                BauwerkHoverZiel(
-                    schluessel = "kante:${objekt.position}:${objekt.typ.name}",
-                    typ = objekt.typ,
-                    trefferAnfang = Position(
-                        x = anfang.x,
-                        y = OBJEKT_BASIS_HOEHE + 0.12f,
-                        z = anfang.z,
+            val hoverKanten = objekt.bewegungsRoute.ifEmpty { listOf(objekt.position) }
+            hoverKanten.forEach route@ { kante ->
+                val anfang = geometrie.punkt(kante.anfang) ?: return@route
+                val ende = geometrie.punkt(kante.ende) ?: return@route
+                val mitteX = (anfang.x + ende.x) / 2f
+                val mitteZ = (anfang.z + ende.z) / 2f
+                add(
+                    BauwerkHoverZiel(
+                        schluessel = "kante:$kante:${objekt.typ.name}",
+                        typ = objekt.typ,
+                        trefferAnfang = Position(
+                            x = anfang.x,
+                            y = OBJEKT_BASIS_HOEHE + 0.12f,
+                            z = anfang.z,
+                        ),
+                        trefferEnde = Position(
+                            x = ende.x,
+                            y = OBJEKT_BASIS_HOEHE + 0.12f,
+                            z = ende.z,
+                        ),
+                        trefferRadius = 0.30f,
+                        prioritaet = 2,
+                        infoPosition = Position(
+                            x = mitteX,
+                            y = OBJEKT_BASIS_HOEHE + 0.78f,
+                            z = mitteZ,
+                        ),
+                        objektId = objekt.objektId,
                     ),
-                    trefferEnde = Position(
-                        x = ende.x,
-                        y = OBJEKT_BASIS_HOEHE + 0.12f,
-                        z = ende.z,
-                    ),
-                    trefferRadius = 0.30f,
-                    prioritaet = 2,
-                    infoPosition = Position(
-                        x = mitteX,
-                        y = OBJEKT_BASIS_HOEHE + 0.78f,
-                        z = mitteZ,
-                    ),
-                ),
-            )
+                )
+            }
         }
 
     modell.feldObjekte
@@ -1181,6 +1306,7 @@ private fun erstelleBauwerkHoverZiele(
                         y = OBJEKT_BASIS_HOEHE,
                         z = punkt.z,
                     ),
+                    ecke = objekt.position,
                     trefferEnde = Position(
                         x = punkt.x,
                         y = OBJEKT_BASIS_HOEHE + abmessungen.hoehe,
@@ -1201,7 +1327,6 @@ private fun erstelleBauwerkHoverZiele(
 private val SpielObjektTyp.istBauwerk: Boolean
     get() = when (form) {
         SpielObjektForm.TEICH,
-        SpielObjektForm.FRACHTSCHIFF,
         SpielObjektForm.PANZER,
         SpielObjektForm.KRIEGSSCHIFF,
         SpielObjektForm.MARKIERUNG -> false
@@ -1234,7 +1359,9 @@ internal fun List<BauwerkHoverZiel>.angehefteteZieleFuer(
 ): List<BauwerkHoverZiel> {
     if (ziel.typ.form != SpielObjektForm.HAUPTBAHNHOF) return listOf(ziel)
     val spieler = ziel.typ.spieler.singleOrNull() ?: return listOf(ziel)
-    return filter { kandidat -> spieler in kandidat.typ.spieler }
+    return filter { kandidat ->
+        spieler in kandidat.typ.spieler && kandidat.typ.form != SpielObjektForm.FRACHTSCHIFF
+    }
         .distinctBy(BauwerkHoverZiel::schluessel)
 }
 

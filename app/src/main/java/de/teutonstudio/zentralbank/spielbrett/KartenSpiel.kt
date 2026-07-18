@@ -45,11 +45,14 @@ import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 
 private enum class SpielKartenWerkzeug(
@@ -60,9 +63,7 @@ private enum class SpielKartenWerkzeug(
 ) {
     HAUPTBAHNHOF("Hauptbahnhof", KartenZielModus.ECKE, BauteilTyp.HAUPTBAHNHOF),
     BAHNHOF("Bahnhof", KartenZielModus.ECKE, BauteilTyp.BAHNHOF),
-    GROSSBAHNHOF("Großbahnhof", KartenZielModus.ECKE, BauteilTyp.GROSSBAHNHOF),
     HAFEN("Hafen", KartenZielModus.ECKE, BauteilTyp.HAFEN),
-    GROSSHAFEN("Großhafen", KartenZielModus.ECKE, BauteilTyp.GROSSHAFEN),
     FRACHTSCHIFF("Frachtschiff", KartenZielModus.ECKE, BauteilTyp.FRACHTSCHIFF),
     AUFWERTEN("Aufwerten", KartenZielModus.ECKE),
     ECKE_BELAGERN("Belagern", KartenZielModus.ECKE),
@@ -182,7 +183,10 @@ fun KartenSpielBildschirm(
     var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var ausgewaehltesZiel by remember { mutableStateOf<KartenOrt?>(null) }
     var seewegStart by remember { mutableStateOf<KartenOrt.Ecke?>(null) }
+    var seewegBearbeitungId by remember { mutableStateOf<String?>(null) }
+    var aktiverSeewegId by remember { mutableStateOf<String?>(null) }
     var truppenStart by remember { mutableStateOf<KartenOrt.Kante?>(null) }
+    var werkzeugVorHoverAufwertung by remember { mutableStateOf<SpielKartenWerkzeug?>(null) }
     var planungsmodus by remember(zustand.spielabschnitt, aktiverSpieler) {
         mutableStateOf(false)
     }
@@ -217,6 +221,7 @@ fun KartenSpielBildschirm(
         planungsmodus = aktiv && zustand.spielabschnitt == Spielabschnitt.REGULAER
         ausgewaehltesZiel = null
         seewegStart = null
+        seewegBearbeitungId = null
         truppenStart = null
         planungsFehler = null
         if (!planungsmodus) {
@@ -238,6 +243,7 @@ fun KartenSpielBildschirm(
                 ziel = ziel,
                 rohstoff = rohstoff,
                 seewegStart = seewegStart,
+                seewegBearbeitungId = seewegBearbeitungId,
                 truppenStart = truppenStart,
             )
         }.getOrElse { fehler ->
@@ -262,6 +268,7 @@ fun KartenSpielBildschirm(
             },
         )
         seewegStart = null
+        seewegBearbeitungId = null
         truppenStart = null
     }
 
@@ -272,11 +279,53 @@ fun KartenSpielBildschirm(
                 eintrag.startBauteil == bauteil
             }?.let { externesWerkzeug ->
                 werkzeug = externesWerkzeug
+                werkzeugVorHoverAufwertung = null
                 ausgewaehltesZiel = null
                 seewegStart = null
+                seewegBearbeitungId = null
                 truppenStart = null
             }
         }
+    }
+
+    val aufwertungAusHover: (KartenEcke) -> Unit = aufwerten@ { ecke ->
+        val basisZustand = if (planungsmodus) planungsZustand else zustand
+        val bisher = basisZustand.karte?.belegung?.eckenNachPosition?.get(ecke)
+            ?: return@aufwerten
+        val (zu, bauteil) = when (bisher.typ) {
+            EckGebaeudeTyp.BAHNHOF ->
+                EckGebaeudeTyp.GROSSBAHNHOF to BauteilTyp.GROSSBAHNHOF
+            EckGebaeudeTyp.HAFEN -> EckGebaeudeTyp.GROSSHAFEN to BauteilTyp.GROSSHAFEN
+            else -> return@aufwerten
+        }
+        val ereignis = SpielEreignis.EckGebaeudeAufgewertet(aktiverSpieler, ecke, zu)
+        if (!planungsmodus) {
+            werkzeugVorHoverAufwertung = werkzeug
+            werkzeug = SpielKartenWerkzeug.AUFWERTEN
+            ausgewaehltesZiel = KartenOrt.Ecke(ecke)
+            return@aufwerten
+        }
+        val pruefzustand = basisZustand.mitZusaetzlichenRohstoffen(
+            fehlendeBauRohstoffe(basisZustand, bauteil),
+        )
+        SpielRegelwerk.wendeAn(pruefzustand, ereignis).fold(
+            onSuccess = {
+                geplanteBauten = geplanteBauten + GeplanterBauauftrag(
+                    werkzeug = SpielKartenWerkzeug.AUFWERTEN,
+                    bauteil = bauteil,
+                    ziel = KartenOrt.Ecke(ecke),
+                    ereignis = ereignis,
+                )
+                planungsFehler = null
+            },
+            onFailure = { fehler ->
+                planungsFehler = fehler.message ?: "Das Gebäude kann nicht aufgewertet werden."
+            },
+        )
+    }
+    val beendeHoverAufwertung: () -> Unit = {
+        werkzeugVorHoverAufwertung?.let { vorher -> werkzeug = vorher }
+        werkzeugVorHoverAufwertung = null
     }
 
     Column(
@@ -331,6 +380,7 @@ fun KartenSpielBildschirm(
                         werkzeug = neu
                         ausgewaehltesZiel = null
                         seewegStart = null
+                        seewegBearbeitungId = null
                         truppenStart = null
                     },
                     rohstoff = rohstoff,
@@ -353,6 +403,7 @@ fun KartenSpielBildschirm(
                         werkzeug = neu
                         ausgewaehltesZiel = null
                         seewegStart = null
+                        seewegBearbeitungId = null
                         truppenStart = null
                         planungsFehler = null
                     },
@@ -374,6 +425,7 @@ fun KartenSpielBildschirm(
                                 geplanteBauten = gekuerzt
                                 planungsFehler = null
                                 seewegStart = null
+                                seewegBearbeitungId = null
                             },
                             onFailure = { fehler ->
                                 planungsFehler = fehler.message
@@ -405,11 +457,45 @@ fun KartenSpielBildschirm(
                 } else {
                     karte
                 }
+                val hervorgehobeneRoute = aktiverSeewegId
+                    ?.let { id ->
+                        angezeigteKarte.belegung.seewege.firstOrNull { seeweg -> seeweg.id == id }
+                    }
+                    ?.let { seeweg ->
+                        angezeigteKarte.kuerzesterWasserweg(seeweg.hafenA, seeweg.hafenB)
+                    }
+                    .orEmpty()
+                    .toSet()
+                val epizugAktiv = zustand.zugStatus?.phase == ZugPhase.Epizug
+                val aufwertbareEcken = if (planungsmodus || epizugAktiv) {
+                    angezeigteKarte.belegung.ecken
+                        .asSequence()
+                        .filter { belegung ->
+                            belegung.besitzer == aktiverSpieler &&
+                                belegung.zustand == BauwerkZustand.INTAKT &&
+                                belegung.typ in setOf(
+                                    EckGebaeudeTyp.BAHNHOF,
+                                    EckGebaeudeTyp.HAFEN,
+                                )
+                        }
+                        .map { belegung -> belegung.position }
+                        .toSet()
+                } else {
+                    emptySet()
+                }
+                val aenderbareSeewege = if (!planungsmodus && epizugAktiv) {
+                    angezeigteKarte.belegung.seewege
+                        .filter { seeweg -> seeweg.besitzer == aktiverSpieler }
+                        .mapTo(mutableSetOf()) { seeweg -> seeweg.id }
+                } else {
+                    emptySet()
+                }
                 Box(modifier = brettModifier) {
                     Spielbrett3D(
                         modell = angezeigteKarte.zu3DModell(
                             spielerReihenfolge = zustand.spieler.map { it.id },
                             hervorhebung = ausgewaehltesZiel ?: seewegStart ?: truppenStart,
+                            routenHervorhebung = hervorgehobeneRoute,
                         ),
                         modifier = Modifier.fillMaxSize(),
                         betrachtungsStatus = betrachtungsStatus,
@@ -429,8 +515,22 @@ fun KartenSpielBildschirm(
                         } else {
                             PaddingValues(bottom = 56.dp)
                         },
+                        aufwertbareEcken = aufwertbareEcken,
+                        aenderbareSeewege = aenderbareSeewege,
+                        beiEckgebaeudeAufwerten = aufwertungAusHover,
+                        beiSeewegRouteAendern = { id ->
+                            werkzeug = SpielKartenWerkzeug.FRACHTSCHIFF
+                            seewegBearbeitungId = id
+                            seewegStart = null
+                            ausgewaehltesZiel = null
+                            planungsFehler = null
+                        },
+                        beiAktivemSeeweg = { id -> aktiverSeewegId = id },
                         onDreieckBeruehrt = beruehrung@ { treffer ->
-                            if (planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null) {
+                            if (
+                                planungsmodus || !kompakteZentrale ||
+                                vorgewaehltesBauteil != null || seewegBearbeitungId != null
+                            ) {
                                 val ziel = treffer.zuKartenOrt(werkzeug.ziel)
                                     ?: return@beruehrung
                                 if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
@@ -438,7 +538,7 @@ fun KartenSpielBildschirm(
                                     if (seewegStart == null) {
                                         seewegStart = hafen
                                         planungsFehler = null
-                                    } else if (planungsmodus) {
+                                    } else if (planungsmodus && seewegBearbeitungId == null) {
                                         bauwerkPlanen(hafen)
                                     } else {
                                         ausgewaehltesZiel = hafen
@@ -458,7 +558,10 @@ fun KartenSpielBildschirm(
                             }
                         },
                     )
-                    if (planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null) {
+                    if (
+                        planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null ||
+                        seewegBearbeitungId != null
+                    ) {
                         Surface(
                             modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                             shape = MaterialTheme.shapes.medium,
@@ -466,7 +569,9 @@ fun KartenSpielBildschirm(
                         ) {
                             if (planungsmodus) {
                                 Text(
-                                    if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
+                                    if (seewegBearbeitungId != null) {
+                                        "Route ändern: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
+                                    } else if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
                                         "Planen: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
                                     } else {
                                         "Planen: ${werkzeug.beschriftung} auf der Karte wählen"
@@ -494,6 +599,24 @@ fun KartenSpielBildschirm(
                                         beiBauauftragBeendet()
                                     }) {
                                         Text("Auftrag abbrechen")
+                                    }
+                                }
+                            } else if (seewegBearbeitungId != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(
+                                        "Route ändern: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen",
+                                        modifier = Modifier.padding(start = 10.dp, top = 6.dp, bottom = 6.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    TextButton(onClick = {
+                                        ausgewaehltesZiel = null
+                                        seewegStart = null
+                                        seewegBearbeitungId = null
+                                    }) {
+                                        Text("Abbrechen")
                                     }
                                 }
                             } else {
@@ -550,7 +673,7 @@ fun KartenSpielBildschirm(
                     Modifier
                         .align(Alignment.CenterEnd)
                         .padding(
-                            top = if (kompakteZentrale) 76.dp else 8.dp,
+                            top = if (kompakteZentrale) 146.dp else 8.dp,
                             end = 8.dp,
                             bottom = if (kompakteZentrale) 56.dp else 8.dp,
                         )
@@ -569,6 +692,7 @@ fun KartenSpielBildschirm(
                 ziel = ziel,
                 rohstoff = rohstoff,
                 seewegStart = seewegStart,
+                seewegBearbeitungId = seewegBearbeitungId,
                 truppenStart = truppenStart,
             )
         }
@@ -576,8 +700,15 @@ fun KartenSpielBildschirm(
             SpielRegelwerk.wendeAn(zustand, ereignis).getOrThrow()
             ereignis
         }
-        val bauteil = werkzeug.startBauteil
-            ?.takeIf { zustand.spielabschnitt == Spielabschnitt.REGULAER }
+        val bauteil = when (val ereignis = ereignisErgebnis.getOrNull()) {
+            is SpielEreignis.SeewegRouteGeaendert -> null
+            is SpielEreignis.EckGebaeudeAufgewertet -> when (ereignis.zu) {
+                EckGebaeudeTyp.GROSSBAHNHOF -> BauteilTyp.GROSSBAHNHOF
+                EckGebaeudeTyp.GROSSHAFEN -> BauteilTyp.GROSSHAFEN
+                else -> null
+            }
+            else -> werkzeug.startBauteil
+        }?.takeIf { zustand.spielabschnitt == Spielabschnitt.REGULAER }
         val fehlendeRohstoffe = bauteil?.let { typ ->
             fehlendeBauRohstoffe(zustand, typ)
         }.orEmpty()
@@ -594,7 +725,9 @@ fun KartenSpielBildschirm(
             onDismissRequest = {
                 ausgewaehltesZiel = null
                 seewegStart = null
+                seewegBearbeitungId = null
                 truppenStart = null
+                beendeHoverAufwertung()
             },
             title = { Text(werkzeug.beschriftung) },
             text = {
@@ -655,7 +788,9 @@ fun KartenSpielBildschirm(
                 TextButton(onClick = {
                     ausgewaehltesZiel = null
                     seewegStart = null
+                    seewegBearbeitungId = null
                     truppenStart = null
+                    beendeHoverAufwertung()
                 }) { Text("Abbrechen") }
             },
             confirmButton = {
@@ -666,7 +801,9 @@ fun KartenSpielBildschirm(
                             pruefung.getOrNull()?.let(beiEreignis)
                             ausgewaehltesZiel = null
                             seewegStart = null
+                            seewegBearbeitungId = null
                             truppenStart = null
+                            beendeHoverAufwertung()
                         },
                     ) { Text("Bestätigen") }
                 } else {
@@ -680,7 +817,9 @@ fun KartenSpielBildschirm(
                                 pruefung.getOrNull()?.let(beiEreignis)
                                 ausgewaehltesZiel = null
                                 seewegStart = null
+                                seewegBearbeitungId = null
                                 truppenStart = null
+                                beendeHoverAufwertung()
                                 beiBauauftragBeendet()
                             },
                         ) { Text("Aus dem Lager bauen") }
@@ -694,7 +833,9 @@ fun KartenSpielBildschirm(
                                 if (gebaut) {
                                     ausgewaehltesZiel = null
                                     seewegStart = null
+                                    seewegBearbeitungId = null
                                     truppenStart = null
+                                    beendeHoverAufwertung()
                                     beiBauauftragBeendet()
                                 }
                             },
@@ -1038,7 +1179,10 @@ private fun SpielWerkzeugleiste(
             Text("Ecke", style = MaterialTheme.typography.titleSmall)
             WerkzeugChips(
                 werkzeuge = SpielKartenWerkzeug.entries.filter { it.ziel == KartenZielModus.ECKE }
-                    .filterNot { it == SpielKartenWerkzeug.HAUPTBAHNHOF || it.nurRundeNull },
+                    .filterNot {
+                        it == SpielKartenWerkzeug.HAUPTBAHNHOF ||
+                            it == SpielKartenWerkzeug.AUFWERTEN || it.nurRundeNull
+                    },
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
             )
@@ -1106,6 +1250,7 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
     ziel: KartenOrt,
     rohstoff: Rohstoff,
     seewegStart: KartenOrt.Ecke?,
+    seewegBearbeitungId: String?,
     truppenStart: KartenOrt.Kante?,
 ): SpielEreignis {
     val spieler = requireNotNull(zustand.aktiverSpieler) { "Es ist kein Spieler aktiv." }
@@ -1115,13 +1260,18 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
             (ziel as KartenOrt.Ecke).position,
         )
         SpielKartenWerkzeug.BAHNHOF -> eckGebaeude(spieler, ziel, EckGebaeudeTyp.BAHNHOF)
-        SpielKartenWerkzeug.GROSSBAHNHOF ->
-            eckGebaeude(spieler, ziel, EckGebaeudeTyp.GROSSBAHNHOF)
         SpielKartenWerkzeug.HAFEN -> eckGebaeude(spieler, ziel, EckGebaeudeTyp.HAFEN)
-        SpielKartenWerkzeug.GROSSHAFEN -> eckGebaeude(spieler, ziel, EckGebaeudeTyp.GROSSHAFEN)
         SpielKartenWerkzeug.FRACHTSCHIFF -> {
             val hafenA = requireNotNull(seewegStart) { "Bitte zuerst den ersten Hafen wählen." }
             val hafenB = ziel as KartenOrt.Ecke
+            if (seewegBearbeitungId != null) {
+                return SpielEreignis.SeewegRouteGeaendert(
+                    spieler = spieler,
+                    id = seewegBearbeitungId,
+                    hafenA = hafenA.position,
+                    hafenB = hafenB.position,
+                )
+            }
             val vorhandeneIds = zustand.karte?.belegung?.seewege.orEmpty().mapTo(mutableSetOf()) {
                 it.id
             }

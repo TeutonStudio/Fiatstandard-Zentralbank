@@ -209,6 +209,14 @@ sealed interface SpielEreignis {
     ) : SpielEreignis
 
     @Serializable
+    data class SeewegRouteGeaendert(
+        val spieler: SpielerId,
+        val id: String,
+        val hafenA: KartenEcke,
+        val hafenB: KartenEcke,
+    ) : SpielEreignis
+
+    @Serializable
     data class KriegsEinheitEingesetzt(
         val id: String,
         val spieler: SpielerId,

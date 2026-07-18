@@ -24,6 +24,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
@@ -39,6 +40,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.felder
 import de.teutonstudio.zentralbank.fachlogik.modell.gesperrteKanten
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
+import de.teutonstudio.zentralbank.fachlogik.modell.wasserKanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -539,10 +541,22 @@ class KartenRegelwerkTest {
                     ),
                 )
 
-                val danach = SpielRegelwerk.wendeAn(
+                val mitHafen = SpielRegelwerk.wendeAn(
                     start,
-                    SpielEreignis.EckGebaeudeGebaut(anna, ecke, typ),
+                    SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.HAFEN),
                 ).getOrThrow()
+                val danach = if (typ == EckGebaeudeTyp.GROSSHAFEN) {
+                    SpielRegelwerk.wendeAn(
+                        mitHafen,
+                        SpielEreignis.EckGebaeudeAufgewertet(
+                            spieler = anna,
+                            ecke = ecke,
+                            zu = EckGebaeudeTyp.GROSSHAFEN,
+                        ),
+                    ).getOrThrow()
+                } else {
+                    mitHafen
+                }
 
                 assertEquals(typ, danach.karte?.belegung?.ecken?.single()?.typ)
             }
@@ -610,10 +624,62 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun grossbahnhofKannNurDurchAufwertungEntstehen() {
+        val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val start = zustand().mitHandelslinieZu(ecke)
+
+        val direktbau = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.GROSSBAHNHOF),
+        )
+
+        assertTrue(direktbau.isFailure)
+        assertTrue(direktbau.exceptionOrNull()?.message.orEmpty().contains("Aufwertung"))
+    }
+
+    @Test
+    fun bahnhofWirdZuGrossbahnhofAufgewertet() {
+        val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val basis = zustand()
+        val start = basis.copy(
+            spieler = basis.spieler.map { spieler ->
+                if (spieler.id == anna) {
+                    spieler.copy(bauteile = mapOf(BauteilTyp.BAHNHOF to 1))
+                } else {
+                    spieler
+                }
+            },
+            karte = basis.karte?.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(EckBelegung(ecke, EckGebaeudeTyp.BAHNHOF, anna)),
+                ),
+            ),
+        )
+
+        val danach = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.EckGebaeudeAufgewertet(
+                spieler = anna,
+                ecke = ecke,
+                zu = EckGebaeudeTyp.GROSSBAHNHOF,
+            ),
+        ).getOrThrow()
+
+        assertEquals(
+            EckGebaeudeTyp.GROSSBAHNHOF,
+            danach.karte?.belegung?.eckenNachPosition?.get(ecke)?.typ,
+        )
+        val bauteile = danach.spieler.first { it.id == anna }.bauteile
+        assertEquals(null, bauteile[BauteilTyp.BAHNHOF])
+        assertEquals(1, bauteile[BauteilTyp.GROSSBAHNHOF])
+    }
+
+    @Test
     fun frachtschiffVerbindetEigeneHaefenUndBeachtetKapazitaet() {
         val start = zustand()
-        val hafenA = KartenFeld(1, 1, DreieckHaelfte.UNTEN).ecken().first()
-        val hafenB = KartenFeld(4, 4, DreieckHaelfte.OBEN).ecken().last()
+        val wasserKante = requireNotNull(start.karte).wasserKanten().first()
+        val hafenA = wasserKante.anfang
+        val hafenB = wasserKante.ende
         val mitHaefen = start.copy(
             karte = start.karte?.copy(
                 belegung = KartenBelegung(
@@ -652,7 +718,61 @@ class KartenRegelwerkTest {
     }
 
     @Test
-    fun kriegseinheitenExistierenNurWaehrendKonflikt() {
+    fun frachtschiffRouteKannZwischenEigenenHaefenGeaendertWerden() {
+        val start = zustand()
+        val karte = requireNotNull(start.karte)
+        val ersteKante = karte.wasserKanten().first()
+        val zweiteKante = karte.wasserKanten().first { kandidat ->
+            kandidat != ersteKante &&
+                setOf(kandidat.anfang, kandidat.ende)
+                    .intersect(setOf(ersteKante.anfang, ersteKante.ende)).size == 1
+        }
+        val mitte = setOf(ersteKante.anfang, ersteKante.ende)
+            .intersect(setOf(zweiteKante.anfang, zweiteKante.ende)).single()
+        val hafenA = if (ersteKante.anfang == mitte) ersteKante.ende else ersteKante.anfang
+        val hafenB = mitte
+        val hafenC = if (zweiteKante.anfang == mitte) zweiteKante.ende else zweiteKante.anfang
+        val mitHaefen = start.copy(
+            karte = karte.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(hafenA, hafenB, hafenC).map { ecke ->
+                        EckBelegung(ecke, EckGebaeudeTyp.HAFEN, anna)
+                    },
+                ),
+            ),
+        )
+        val eingerichtet = SpielRegelwerk.wendeAn(
+            mitHaefen,
+            SpielEreignis.SeewegEingerichtet(
+                id = "schiff-1",
+                spieler = anna,
+                hafenA = hafenA,
+                hafenB = hafenB,
+                richtung = FrachtRichtung.A_NACH_B,
+            ),
+        ).getOrThrow()
+
+        val danach = SpielRegelwerk.wendeAn(
+            eingerichtet,
+            SpielEreignis.SeewegRouteGeaendert(
+                spieler = anna,
+                id = "schiff-1",
+                hafenA = hafenB,
+                hafenB = hafenC,
+            ),
+        ).getOrThrow()
+
+        val route = danach.karte?.belegung?.seewege?.single()
+        assertEquals(hafenB, route?.hafenA)
+        assertEquals(hafenC, route?.hafenB)
+        assertEquals(
+            eingerichtet.spieler.first { it.id == anna }.rohstoffe,
+            danach.spieler.first { it.id == anna }.rohstoffe,
+        )
+    }
+
+    @Test
+    fun ueberlegeneKriegseinheitUeberlebtDasKriegsende() {
         val feld = KartenFeld(2, 2, DreieckHaelfte.UNTEN)
         val imKrieg = zustand().copy(konflikte = setOf(Konflikt(anna, bert)))
         val mitPanzer = SpielRegelwerk.wendeAn(
@@ -672,7 +792,50 @@ class KartenRegelwerkTest {
         ).getOrThrow()
 
         assertEquals(1, mitPanzer.karte?.belegung?.kriegseinheiten?.size)
-        assertTrue(nachFrieden.karte?.belegung?.kriegseinheiten.orEmpty().isEmpty())
+        assertEquals(1, nachFrieden.karte?.belegung?.kriegseinheiten?.size)
+    }
+
+    @Test
+    fun kriegsendeWertetPanzerUndKriegsschiffeGetrenntAus() {
+        val start = zustand()
+        val karte = requireNotNull(start.karte)
+        val panzerKanten = karte.gelaendefelder
+            .flatMap { feld -> feld.position.kanten() }
+            .distinct()
+            .take(8)
+        val schiffsKanten = karte.wasserKanten().take(6)
+        val panzer = panzerKanten.mapIndexed { index, kante ->
+            KriegsEinheitBelegung(
+                id = "panzer-$index",
+                typ = KriegsEinheitTyp.PANZER,
+                besitzer = if (index < 5) anna else bert,
+                ort = KartenOrt.Kante(kante),
+            )
+        }
+        val schiffe = schiffsKanten.mapIndexed { index, kante ->
+            KriegsEinheitBelegung(
+                id = "kriegsschiff-$index",
+                typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+                besitzer = if (index < 3) anna else bert,
+                ort = KartenOrt.Kante(kante),
+            )
+        }
+        val imKrieg = start.copy(
+            konflikte = setOf(Konflikt(anna, bert)),
+            karte = karte.copy(
+                belegung = KartenBelegung(kriegseinheiten = panzer + schiffe),
+            ),
+        )
+
+        val danach = SpielRegelwerk.wendeAn(
+            imKrieg,
+            SpielEreignis.KriegBeendet(anna, bert),
+        ).getOrThrow()
+
+        val ueberlebende = danach.karte?.belegung?.kriegseinheiten.orEmpty()
+        assertEquals(3, ueberlebende.count { it.typ == KriegsEinheitTyp.PANZER })
+        assertTrue(ueberlebende.all { it.besitzer == anna })
+        assertEquals(0, ueberlebende.count { it.typ == KriegsEinheitTyp.KRIEGSSCHIFF })
     }
 
     @Test

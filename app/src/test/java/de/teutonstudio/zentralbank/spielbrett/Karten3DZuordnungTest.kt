@@ -5,6 +5,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
@@ -15,11 +16,14 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.SeewegBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
+import de.teutonstudio.zentralbank.fachlogik.modell.wasserKanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -186,5 +190,55 @@ class Karten3DZuordnungTest {
             panzer.typ.infos.contains(SpielObjektInfoEintrag("Bewegung", "1 Diesel je Kante")),
         )
         assertTrue(modell.feldObjekte.isEmpty())
+    }
+
+    @Test
+    fun frachtschiffStehtAufSeinerWasserrouteUndDieRouteKannMarkiertWerden() {
+        val grundkarte = Spielkarte(
+            id = "frachtschiff",
+            name = "Frachtschiff",
+            hexagon = KartenHexagon(radius = 3),
+            gelaendefelder = emptyList(),
+        )
+        val direkteRoute = grundkarte.wasserKanten().first()
+        val karte = grundkarte.copy(
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(direkteRoute.anfang, EckGebaeudeTyp.HAFEN, anna),
+                    EckBelegung(direkteRoute.ende, EckGebaeudeTyp.HAFEN, anna),
+                ),
+                seewege = listOf(
+                    SeewegBelegung(
+                        id = "schiff-1",
+                        hafenA = direkteRoute.anfang,
+                        hafenB = direkteRoute.ende,
+                        besitzer = anna,
+                        richtung = FrachtRichtung.A_NACH_B,
+                    ),
+                ),
+            ),
+        )
+        val route = requireNotNull(
+            karte.kuerzesterWasserweg(direkteRoute.anfang, direkteRoute.ende),
+        )
+
+        val modell = karte.zu3DModell(
+            spielerReihenfolge = listOf(anna, bert),
+            routenHervorhebung = route.toSet(),
+        )
+
+        val schiff = modell.kantenObjekte.single { objekt ->
+            objekt.typ.form == SpielObjektForm.FRACHTSCHIFF
+        }
+        assertEquals(direkteRoute, schiff.position)
+        assertEquals("schiff-1", schiff.objektId)
+        assertEquals(route, schiff.bewegungsRoute)
+        assertEquals(direkteRoute.anfang, schiff.routenStart)
+        assertEquals(
+            route.toSet(),
+            modell.kantenObjekte
+                .filter { objekt -> objekt.typ.form == SpielObjektForm.MARKIERUNG }
+                .mapTo(mutableSetOf()) { objekt -> objekt.position },
+        )
     }
 }

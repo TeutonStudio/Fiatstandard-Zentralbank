@@ -247,6 +247,9 @@ data class KartenBelegung(
             ) {
                 "Ein Frachtschiff verbindet zwei eigene, intakte Häfen."
             }
+            require(karte.kuerzesterWasserweg(seeweg.hafenA, seeweg.hafenB) != null) {
+                "Zwischen den Häfen existiert keine Route aus Wasser-Wasser-Kanten."
+            }
         }
         ecken.filter { it.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN) }
             .forEach { hafen ->

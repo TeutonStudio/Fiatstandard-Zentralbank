@@ -19,6 +19,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
+import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 
 private val GelaendeDarstellung = mapOf(
     GelaendeTyp.EBENE to DreieckTyp("Ebene", Color(0xFF8DBB61), rauheit = 0.92f),
@@ -48,6 +49,7 @@ private val NeutralFarbe = Color(0xFF37474F)
 private val ZerstoertFarbe = Color(0xFF616161)
 private val AuswahlFarbe = Color(0xFFFFD600)
 private val TeichFarbe = Color(0xFF1565A8)
+private val RoutenFarbe = Color(0xFF00E5FF)
 
 fun KartenVorlage.zu3DModell(
     zeigeBearbeitungsRaster: Boolean = false,
@@ -59,6 +61,7 @@ fun Spielkarte.zu3DModell(
     zeigeBearbeitungsRaster: Boolean = false,
     spielerReihenfolge: List<SpielerId> = emptyList(),
     hervorhebung: KartenOrt? = null,
+    routenHervorhebung: Set<KartenKante> = emptySet(),
 ): Spielbrett3DModell {
     val farben = spielerReihenfolge.mapIndexed { index, spieler ->
         spieler to SpielerPalette.getOrElse(index) { Color(0xFF707070) }
@@ -157,14 +160,35 @@ fun Spielkarte.zu3DModell(
                     spieler = verbundeneSpieler,
                 ),
             )
-        } + belegung.seewege.map { seeweg ->
+        } + belegung.seewege.mapNotNull { seeweg ->
+            val route = kuerzesterWasserweg(seeweg.hafenA, seeweg.hafenB)
+                ?: return@mapNotNull null
+            val gerichteteRoute = when (seeweg.richtung) {
+                de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung.A_NACH_B -> route
+                de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung.B_NACH_A ->
+                    route.asReversed()
+            }
             KantenObjektAuflage(
-                position = KartenKante.zwischen(seeweg.hafenA, seeweg.hafenB),
+                position = gerichteteRoute.first(),
                 typ = SpielObjektTyp(
                     name = "Frachtschiff ${seeweg.id}",
                     farbe = NeutralFarbe,
                     form = SpielObjektForm.FRACHTSCHIFF,
+                    infos = listOf(
+                        SpielObjektInfoEintrag("Spieler", seeweg.besitzer.wert),
+                        SpielObjektInfoEintrag("Route", "${route.size} Kanten"),
+                        SpielObjektInfoEintrag("Betrieb", "pendelt zwischen seinen Häfen"),
+                    ),
+                    spieler = setOf(seeweg.besitzer.wert),
                 ),
+                objektId = seeweg.id,
+                bewegungsRoute = gerichteteRoute,
+                routenStart = when (seeweg.richtung) {
+                    de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung.A_NACH_B ->
+                        seeweg.hafenA
+                    de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung.B_NACH_A ->
+                        seeweg.hafenB
+                },
             )
         } + belegung.kriegseinheiten.map { einheit ->
             KantenObjektAuflage(
@@ -196,7 +220,17 @@ fun Spielkarte.zu3DModell(
                     ObjektDarstellungsZustand.AUSGEWAEHLT,
                 ),
             )
-        }.let(::listOfNotNull),
+        }.let(::listOfNotNull) + routenHervorhebung.map { kante ->
+            KantenObjektAuflage(
+                position = kante,
+                typ = SpielObjektTyp(
+                    name = "Frachtschiffroute",
+                    farbe = RoutenFarbe,
+                    form = SpielObjektForm.MARKIERUNG,
+                    zustand = ObjektDarstellungsZustand.AUSGEWAEHLT,
+                ),
+            )
+        },
         feldObjekte = belegung.felder.map { eintrag ->
             val effektiv = KartenAuswertung.effektiverZustand(this, eintrag)
             val angeschlosseneSpieler = KartenAuswertung.anschlussStaerke(this, eintrag.position)

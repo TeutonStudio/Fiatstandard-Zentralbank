@@ -236,6 +236,11 @@ fun Navigation(viewModel: GameViewModel) {
                                         BauteilTyp.HAUPTBAHNHOF -> viewModel.meldeSpielFehler(
                                             "Der Hauptbahnhof kann nur in Runde 0 platziert werden."
                                         )
+                                        BauteilTyp.GROSSBAHNHOF,
+                                        BauteilTyp.GROSSHAFEN -> viewModel.meldeSpielFehler(
+                                            "Großbahnhof und Großhafen werden über Aufwerten " +
+                                                "im Hoverfenster des bestehenden Gebäudes gebaut."
+                                        )
                                         else -> {
                                             bauauftrag = typ
                                             geoeffneterBereich = null

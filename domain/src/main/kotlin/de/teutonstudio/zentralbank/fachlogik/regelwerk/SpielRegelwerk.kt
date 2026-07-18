@@ -64,6 +64,8 @@ object SpielRegelwerk {
                 KartenRegelwerk.seewegEinrichten(zustand, ereignis)
             is SpielEreignis.SeewegEntfernt ->
                 KartenRegelwerk.seewegEntfernen(zustand, ereignis)
+            is SpielEreignis.SeewegRouteGeaendert ->
+                KartenRegelwerk.seewegRouteAendern(zustand, ereignis)
             is SpielEreignis.KriegsEinheitEingesetzt ->
                 KartenRegelwerk.kriegsEinheitEinsetzen(zustand, ereignis)
             is SpielEreignis.KriegsEinheitGebaut ->

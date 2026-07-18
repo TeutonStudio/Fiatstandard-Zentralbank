@@ -123,6 +123,12 @@ internal object KartenRegelwerk {
         require(ereignis.typ != EckGebaeudeTyp.HAUPTBAHNHOF) {
             "Ein Hauptbahnhof braucht die Runde-0-Platzierung."
         }
+        require(
+            ereignis.typ != EckGebaeudeTyp.GROSSBAHNHOF &&
+                ereignis.typ != EckGebaeudeTyp.GROSSHAFEN,
+        ) {
+            "Großbahnhof und Großhafen entstehen ausschließlich durch Aufwertung."
+        }
         if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
             return startEckGebaeudePlatzieren(zustand, ereignis)
         }
@@ -483,6 +489,29 @@ internal object KartenRegelwerk {
             kostenBuchen = false,
         ).mitBelegung { belegung ->
             belegung.copy(seewege = belegung.seewege.filterNot { it.id == ereignis.id })
+        }
+    }
+
+    fun seewegRouteAendern(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.SeewegRouteGeaendert,
+    ): SpielZustand {
+        val karte = regulaereKarte(zustand)
+        val bisher = karte.belegung.seewege.firstOrNull { seeweg -> seeweg.id == ereignis.id }
+            ?: error("Der Seeweg wurde nicht gefunden.")
+        require(bisher.besitzer == ereignis.spieler) {
+            "Nur der Besitzer darf die Frachtschiffroute ändern."
+        }
+        return zustand.mitBelegung { belegung ->
+            belegung.copy(
+                seewege = belegung.seewege.map { seeweg ->
+                    if (seeweg.id == ereignis.id) {
+                        seeweg.copy(hafenA = ereignis.hafenA, hafenB = ereignis.hafenB)
+                    } else {
+                        seeweg
+                    }
+                },
+            )
         }
     }
 

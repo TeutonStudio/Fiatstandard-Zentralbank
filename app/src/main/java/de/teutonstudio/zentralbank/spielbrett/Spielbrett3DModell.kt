@@ -139,6 +139,9 @@ data class EckObjektAuflage(
 data class KantenObjektAuflage(
     val position: KartenKante,
     val typ: SpielObjektTyp,
+    val objektId: String? = null,
+    val bewegungsRoute: List<KartenKante> = emptyList(),
+    val routenStart: KartenEcke? = null,
 )
 
 @Immutable

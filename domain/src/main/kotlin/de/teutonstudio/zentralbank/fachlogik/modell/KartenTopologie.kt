@@ -114,6 +114,64 @@ fun Spielkarte.istBefahrbar(
 fun sindBenachbarteKanten(a: KartenKante, b: KartenKante): Boolean =
     a != b && setOf(a.anfang, a.ende).intersect(setOf(b.anfang, b.ende)).size == 1
 
+/** Kanten, die auf beiden Seiten an ein Wasserfeld innerhalb der Karte grenzen. */
+fun Spielkarte.wasserKanten(): Set<KartenKante> = hexagon.felder()
+    .asSequence()
+    .flatMap { feld -> feld.kanten().asSequence() }
+    .distinct()
+    .filter { kante ->
+        val nachbarn = angrenzendeFelder(kante).filter(::enthaeltFeld)
+        nachbarn.size == 2 && nachbarn.all { feld -> feld !in landNachPosition }
+    }
+    .toSet()
+
+/** Kürzester stabiler Kantenweg zwischen zwei Häfen ausschließlich über Wasser-Wasser-Kanten. */
+fun Spielkarte.kuerzesterWasserweg(
+    start: KartenEcke,
+    ziel: KartenEcke,
+): List<KartenKante>? {
+    if (start == ziel) return emptyList()
+    val erlaubteKanten = wasserKanten()
+    val kantenNachEcke = erlaubteKanten
+        .flatMap { kante -> listOf(kante.anfang to kante, kante.ende to kante) }
+        .groupBy(keySelector = { (ecke, _) -> ecke }, valueTransform = { (_, kante) -> kante })
+    val besucht = mutableSetOf(start)
+    val offen = ArrayDeque<KartenEcke>()
+    val vorgaenger = mutableMapOf<KartenEcke, Pair<KartenEcke, KartenKante>>()
+    offen.add(start)
+    while (offen.isNotEmpty()) {
+        val aktuell = offen.removeFirst()
+        kantenNachEcke[aktuell]
+            .orEmpty()
+            .sortedWith(kartenKantenVergleich)
+            .forEach { kante ->
+                val nachbar = if (kante.anfang == aktuell) kante.ende else kante.anfang
+                if (besucht.add(nachbar)) {
+                    vorgaenger[nachbar] = aktuell to kante
+                    if (nachbar == ziel) {
+                        return buildList {
+                            var rueckweg = ziel
+                            while (rueckweg != start) {
+                                val (vorher, schritt) = requireNotNull(vorgaenger[rueckweg])
+                                add(schritt)
+                                rueckweg = vorher
+                            }
+                        }.asReversed()
+                    }
+                    offen.add(nachbar)
+                }
+            }
+    }
+    return null
+}
+
+private val kartenKantenVergleich = compareBy<KartenKante>(
+    { kante -> kante.anfang.y },
+    { kante -> kante.anfang.x },
+    { kante -> kante.ende.y },
+    { kante -> kante.ende.x },
+)
+
 /** Die sechs vom Mittelpunkt zu den äußeren Ecken eines Spezialfelds laufenden Kanten. */
 fun Spezialfeld.gesperrteKanten(): Set<KartenKante> = positionen
     .asSequence()

@@ -94,7 +94,8 @@ internal object ZugRegelwerk {
             is SpielEreignis.KartenBauwerkZustandGeaendert,
             is SpielEreignis.FeldAnlagenZustandGeaendert,
             is SpielEreignis.SeewegEingerichtet,
-            is SpielEreignis.SeewegEntfernt -> {
+            is SpielEreignis.SeewegEntfernt,
+            is SpielEreignis.SeewegRouteGeaendert -> {
                 pruefeEpizug(zug)
                 require(ereignis.primaererSpieler() == zug.spieler) {
                     "Nur der aktive Spieler darf bauen oder die Karte ändern."
@@ -211,6 +212,7 @@ internal object ZugRegelwerk {
         is SpielEreignis.FeldAnlagenZustandGeaendert -> spieler
         is SpielEreignis.SeewegEingerichtet -> spieler
         is SpielEreignis.SeewegEntfernt -> spieler
+        is SpielEreignis.SeewegRouteGeaendert -> spieler
         is SpielEreignis.KriegsEinheitEingesetzt -> spieler
         is SpielEreignis.KriegsEinheitGebaut -> spieler
         is SpielEreignis.KriegsEinheitBewegt -> spieler
