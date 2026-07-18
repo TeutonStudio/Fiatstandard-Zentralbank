@@ -253,8 +253,8 @@ fun Spielbrett3D(
             null
         }
     }
-    val gebirgsPrismaMesh = remember(geometrie, modell.auflagen) {
-        erstelleGebirgsPrismaMesh(geometrie, modell.auflagen)
+    val gebirgsPyramidenMesh = remember(geometrie, modell.auflagen) {
+        erstelleGebirgsPyramidenMesh(geometrie, modell.auflagen)
     }
     val gebirgsTyp = remember(modell.auflagen) {
         modell.auflagen.firstOrNull { auflage ->
@@ -448,10 +448,10 @@ fun Spielbrett3D(
             }
         }
 
-        if (gebirgsPrismaMesh != null && gebirgsTyp != null) {
-            key("gebirgs-prismen") {
+        if (gebirgsPyramidenMesh != null && gebirgsTyp != null) {
+            key("gebirgs-pyramiden") {
                 AbgeschraegtesGelaendeNode(
-                    meshDaten = gebirgsPrismaMesh,
+                    meshDaten = gebirgsPyramidenMesh,
                     materialInstance = auflagenMaterialien.getValue(gebirgsTyp),
                 )
             }

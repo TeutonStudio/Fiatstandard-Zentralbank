@@ -3,8 +3,7 @@ package de.teutonstudio.zentralbank.spielbrett
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-internal const val GEBIRGS_PRISMA_HOEHE = 0.34f
-internal const val GEBIRGS_PRISMA_HALBBREITE = 0.19f
+internal const val GEBIRGS_PYRAMIDEN_HOEHE = 0.46f
 
 private data class PunktSchluessel(val x: Int, val z: Int) : Comparable<PunktSchluessel> {
     override fun compareTo(other: PunktSchluessel): Int =
@@ -23,10 +22,11 @@ private data class GebirgsKante(
 )
 
 /**
- * Erzeugt niedrige Dreiecksprismen als Gebirgsgrate. Benachbarte Gebirgsfelder teilen sich ein
- * einziges Prisma auf ihrer Verbindungskante; nur isolierte Felder erhalten einen eigenen Grat.
+ * Erzeugt über jedem Gebirgsdreieck eine Pyramide mit der Spitze über dem Feldmittelpunkt.
+ * Benachbarte Gebirgsfelder besitzen an ihrer gemeinsamen Kante keine inneren Trennwände:
+ * Stattdessen verbinden zwei gefüllte Dreiecke beide Pyramidenspitzen mit den Kantenendpunkten.
  */
-internal fun erstelleGebirgsPrismaMesh(
+internal fun erstelleGebirgsPyramidenMesh(
     geometrie: SpielbrettGeometrie,
     auflagen: List<DreieckAuflage>,
 ): GelaendeMeshDaten? {
@@ -41,86 +41,69 @@ internal fun erstelleGebirgsPrismaMesh(
     if (gebirgsPositionen.isEmpty()) return null
 
     val gebirgsDreiecke = gebirgsPositionen.associateWith(geometrie::dreieck)
+    val basisY = OBERFLAECHEN_ABSTAND + AUFLAGEN_HOEHE
+    val spitzen = gebirgsDreiecke.mapValues { (_, dreieck) ->
+        GelaendeMeshVektor(
+            x = dreieck.mittelpunkt.x,
+            y = basisY + GEBIRGS_PYRAMIDEN_HOEHE,
+            z = dreieck.mittelpunkt.z,
+        )
+    }
     val kanten = mutableMapOf<KantenSchluessel, GebirgsKante>()
     gebirgsDreiecke.forEach { (position, dreieck) ->
         dreieck.ecken.indices.forEach { index ->
             val anfang = dreieck.ecken[index]
             val ende = dreieck.ecken[(index + 1) % dreieck.ecken.size]
             val schluessel = kantenSchluessel(anfang, ende)
-            val kante = kanten.getOrPut(schluessel) { GebirgsKante(anfang, ende) }
-            kante.felder += position
+            kanten.getOrPut(schluessel) { GebirgsKante(anfang, ende) }.felder += position
         }
     }
 
-    val gemeinsameKanten = kanten.values.filter { kante -> kante.felder.size >= 2 }
-    val verbundeneFelder = gemeinsameKanten.flatMapTo(mutableSetOf()) { kante -> kante.felder }
-    return GebirgsPrismaErsteller().apply {
-        gemeinsameKanten.forEach { kante ->
-            val (anfang, ende) = kante.anfang.und(kante.ende, randAnteil = 0.08f)
-            fuegePrismaHinzu(anfang, ende)
-        }
-        gebirgsDreiecke
-            .filterKeys { position -> position !in verbundeneFelder }
-            .values
-            .forEach { dreieck ->
-                val kantenMitte = dreieck.ecken[0].mittelpunkt(dreieck.ecken[1])
-                val anfang = dreieck.mittelpunkt.inRichtung(kantenMitte, anteil = 0.62f)
-                val ende = dreieck.mittelpunkt.inRichtung(dreieck.ecken[2], anteil = 0.62f)
-                fuegePrismaHinzu(anfang, ende)
+    return GebirgsPyramidenErsteller().apply {
+        kanten.values.forEach { kante ->
+            val anfang = kante.anfang.alsMeshVektor(basisY)
+            val ende = kante.ende.alsMeshVektor(basisY)
+            val felder = kante.felder.toList()
+            if (felder.size == 1) {
+                fuegeSichtbaresDreieckHinzu(
+                    anfang,
+                    ende,
+                    spitzen.getValue(felder.single()),
+                )
+            } else {
+                val ersteSpitze = spitzen.getValue(felder[0])
+                val zweiteSpitze = spitzen.getValue(felder[1])
+                fuegeSichtbaresDreieckHinzu(anfang, ersteSpitze, zweiteSpitze)
+                fuegeSichtbaresDreieckHinzu(ende, zweiteSpitze, ersteSpitze)
             }
+        }
     }.baueOderNull()
 }
 
-private class GebirgsPrismaErsteller {
+private class GebirgsPyramidenErsteller {
     private val ecken = mutableListOf<GelaendeMeshEcke>()
     private val indizes = mutableListOf<Int>()
 
-    fun fuegePrismaHinzu(anfang: BrettPunkt, ende: BrettPunkt) {
-        val deltaX = ende.x - anfang.x
-        val deltaZ = ende.z - anfang.z
-        val laenge = sqrt(deltaX * deltaX + deltaZ * deltaZ)
-        require(laenge > 0.001f) { "Ein Gebirgsprisma benötigt eine erkennbare Länge." }
-        val seiteX = -deltaZ / laenge * GEBIRGS_PRISMA_HALBBREITE
-        val seiteZ = deltaX / laenge * GEBIRGS_PRISMA_HALBBREITE
-        val basisY = OBERFLAECHEN_ABSTAND + AUFLAGEN_HOEHE
-
-        val aLinks = GelaendeMeshVektor(anfang.x - seiteX, basisY, anfang.z - seiteZ)
-        val aRechts = GelaendeMeshVektor(anfang.x + seiteX, basisY, anfang.z + seiteZ)
-        val aGrat = GelaendeMeshVektor(anfang.x, basisY + GEBIRGS_PRISMA_HOEHE, anfang.z)
-        val bLinks = GelaendeMeshVektor(ende.x - seiteX, basisY, ende.z - seiteZ)
-        val bRechts = GelaendeMeshVektor(ende.x + seiteX, basisY, ende.z + seiteZ)
-        val bGrat = GelaendeMeshVektor(ende.x, basisY + GEBIRGS_PRISMA_HOEHE, ende.z)
-        val prismaMitte = listOf(aLinks, aRechts, aGrat, bLinks, bRechts, bGrat).mittelpunkt()
-
-        fuegeKonvexeFlaecheHinzu(listOf(aLinks, aRechts, aGrat), prismaMitte)
-        fuegeKonvexeFlaecheHinzu(listOf(bLinks, bGrat, bRechts), prismaMitte)
-        fuegeKonvexeFlaecheHinzu(listOf(aLinks, aGrat, bGrat, bLinks), prismaMitte)
-        fuegeKonvexeFlaecheHinzu(listOf(aGrat, aRechts, bRechts, bGrat), prismaMitte)
+    fun fuegeSichtbaresDreieckHinzu(
+        a: GelaendeMeshVektor,
+        b: GelaendeMeshVektor,
+        c: GelaendeMeshVektor,
+    ) {
+        var punkte = listOf(a, b, c)
+        var normale = punkte.flaechenNormale()
+        if (normale.y < 0f) {
+            punkte = listOf(a, c, b)
+            normale = punkte.flaechenNormale()
+        }
+        val ersterIndex = ecken.size
+        punkte.forEach { punkt -> ecken += GelaendeMeshEcke(punkt, normale) }
+        indizes += listOf(ersterIndex, ersterIndex + 1, ersterIndex + 2)
     }
 
     fun baueOderNull(): GelaendeMeshDaten? = if (ecken.isEmpty()) {
         null
     } else {
         GelaendeMeshDaten(ecken.toList(), indizes.toList())
-    }
-
-    private fun fuegeKonvexeFlaecheHinzu(
-        punkte: List<GelaendeMeshVektor>,
-        prismaMitte: GelaendeMeshVektor,
-    ) {
-        require(punkte.size >= 3)
-        val flaechenMitte = punkte.mittelpunkt()
-        var sortiertePunkte = punkte
-        var normale = sortiertePunkte.flaechenNormale()
-        if (normale.skalarprodukt(flaechenMitte - prismaMitte) < 0f) {
-            sortiertePunkte = listOf(punkte.first()) + punkte.drop(1).reversed()
-            normale = sortiertePunkte.flaechenNormale()
-        }
-        val ersterIndex = ecken.size
-        sortiertePunkte.forEach { punkt -> ecken += GelaendeMeshEcke(punkt, normale) }
-        for (index in 1 until sortiertePunkte.lastIndex) {
-            indizes += listOf(ersterIndex, ersterIndex + index, ersterIndex + index + 1)
-        }
     }
 }
 
@@ -139,21 +122,7 @@ private fun BrettPunkt.schluessel() = PunktSchluessel(
     z = (z * 10_000f).roundToInt(),
 )
 
-private fun BrettPunkt.und(anderer: BrettPunkt, randAnteil: Float): Pair<BrettPunkt, BrettPunkt> =
-    inRichtung(anderer, randAnteil) to anderer.inRichtung(this, randAnteil)
-
-private fun BrettPunkt.inRichtung(ziel: BrettPunkt, anteil: Float) = BrettPunkt(
-    x = x + (ziel.x - x) * anteil,
-    z = z + (ziel.z - z) * anteil,
-)
-
-private fun BrettPunkt.mittelpunkt(anderer: BrettPunkt) = inRichtung(anderer, 0.5f)
-
-private fun List<GelaendeMeshVektor>.mittelpunkt() = GelaendeMeshVektor(
-    x = sumOf { punkt -> punkt.x.toDouble() }.toFloat() / size,
-    y = sumOf { punkt -> punkt.y.toDouble() }.toFloat() / size,
-    z = sumOf { punkt -> punkt.z.toDouble() }.toFloat() / size,
-)
+private fun BrettPunkt.alsMeshVektor(y: Float) = GelaendeMeshVektor(x, y, z)
 
 private fun List<GelaendeMeshVektor>.flaechenNormale(): GelaendeMeshVektor {
     val kreuzprodukt = (this[1] - this[0]).kreuz(this[2] - this[0])
@@ -162,7 +131,7 @@ private fun List<GelaendeMeshVektor>.flaechenNormale(): GelaendeMeshVektor {
             kreuzprodukt.y * kreuzprodukt.y +
             kreuzprodukt.z * kreuzprodukt.z,
     )
-    require(laenge > 0.0001f)
+    require(laenge > 0.0001f) { "Eine Gebirgsfläche darf nicht entartet sein." }
     return GelaendeMeshVektor(
         kreuzprodukt.x / laenge,
         kreuzprodukt.y / laenge,
@@ -178,6 +147,3 @@ private fun GelaendeMeshVektor.kreuz(anderer: GelaendeMeshVektor) = GelaendeMesh
     y = z * anderer.x - x * anderer.z,
     z = x * anderer.y - y * anderer.x,
 )
-
-private fun GelaendeMeshVektor.skalarprodukt(anderer: GelaendeMeshVektor): Float =
-    x * anderer.x + y * anderer.y + z * anderer.z
