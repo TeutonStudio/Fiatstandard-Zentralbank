@@ -106,13 +106,16 @@ fun Spielkarte.zu3DModell(
         }.let(::listOfNotNull),
         kantenObjekte = belegung.kanten.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
+            val gewalthaber = KartenAuswertung.gewalthaber(this, eintrag.position)
             KantenObjektAuflage(
                 position = eintrag.position,
                 typ = SpielObjektTyp(
                     name = "Handelslinie",
                     farbe = if (zustand == ObjektDarstellungsZustand.ZERSTOERT) {
                         ZerstoertFarbe
-                    } else NeutralFarbe,
+                    } else {
+                        gewalthaber?.let(::spielerFarbe) ?: NeutralFarbe
+                    },
                     form = SpielObjektForm.SCHIENE,
                     zustand = zustand,
                 ),

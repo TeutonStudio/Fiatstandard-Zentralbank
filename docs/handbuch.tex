@@ -190,13 +190,26 @@ Abgesehen vom Hauptbahnhof darf ein Eckgebaeude nur an einer Ecke mit einer dort
 endenden, intakten Handelslinie errichtet werden. Zwischen allen bebauten Ecken
 muss der kuerzeste Kantenweg mindestens drei Kanten lang sein.
 
+Ein Hauptbahnhof darf nur auf einer Ecke stehen, an der sechs Gelaendefelder
+zusammentreffen. Ein Hauptbahnhof kann Schienen in alle sechs Richtungen fuehren,
+ein Grossbahnhof in bis zu vier Richtungen und ein Bahnhof in bis zu drei
+Richtungen. An einer Ecke ohne Bahnhof sind hoechstens zwei Schienenrichtungen
+als durchgehende Strecke erlaubt; Schienenkreuzungen ohne Bahnhof sind unzulaessig.
+Auch Haefen und Grosshaefen erlauben deshalb hoechstens zwei Schienenrichtungen.
+
 \section{Hafenstandorte}
-Ein Hafen oder Grosshafen darf auf einer Ecke gebaut werden, wenn an dieser Ecke mindestens zwei Wasserfelder und mindestens zwei Gelaendefelder angrenzen.
+Ein Hafen oder Grosshafen darf auf einer Ecke gebaut werden, wenn an dieser Ecke
+mindestens zwei Wasserfelder und mindestens zwei Gelaendefelder angrenzen. Bei
+sechs angrenzenden Feldern sind damit genau die Verteilungen 2:4, 3:3 und 4:2
+zwischen Gelaende und Wasser zulaessig.
 
 \section{Runde 0: Platzierung der Hauptbahnhoefe}
 Vor der ersten normalen Spielrunde findet Runde 0 statt. In dieser Runde platzieren die Spieler ihre Hauptbahnhoefe.
 
-Jede bebaute Ecke muss mindestens drei Kanten Abstand zur naechsten bebauten Ecke haben. Fuer die Startplatzierung bedeutet das: Kein Hauptbahnhof darf zu nah an einem anderen Hauptbahnhof stehen.
+Jede bebaute Ecke muss mindestens drei Kanten Abstand zur naechsten bebauten Ecke
+haben. Fuer die Startplatzierung bedeutet das: Kein Hauptbahnhof darf zu nah an
+einem anderen Hauptbahnhof stehen und jeder Hauptbahnhof braucht sechs
+angrenzende Gelaendefelder.
 
 \section{Rohstoffzuordnung der Gelaendefelder}
 Die Rohstoffzuordnung der Gelaendefelder ist noch offen. Fest steht bisher nur: Gelaendefelder bilden die Grundlage fuer Abbaueinheiten und Geschaeftsbanken.
@@ -268,6 +281,19 @@ Panzer & Krieg & Kriegseinheit gegen Landziele. Befindet sich nur waehrend eines
 Kriegsschiff & Krieg & Kriegseinheit gegen Haefen und Seewege. Befindet sich nur waehrend eines Krieges auf dem Spielfeld. \\
 \bottomrule
 \end{longtable}
+
+\section{Schienenrouten, Kontrolle und Abriss}
+Eine Schienenroute verlaeuft zwischen zwei Bauwerk-Endpunkten. Ecken ohne
+Bauwerk und mit genau zwei Schienen setzen dieselbe Route fort. Endet eine Route an zwei
+Bauwerken desselben Spielers, kontrolliert dieser Spieler die Route: Die Schienen
+erscheinen in seiner Farbe und nur er darf sie abbauen oder ihren Zustand
+aendern.
+
+Endet die Route an Bauwerken verschiedener Spieler, ist sie neutral dargestellt
+und beide Spieler duerfen sie abbauen oder ihren Zustand aendern. Eine Route, die
+von nur einem Bauwerk ausgeht und noch kein Zielbauwerk erreicht, bleibt ebenfalls
+neutral. In diesem Fall darf ausschliesslich der Besitzer des Ausgangsbauwerks
+die Route abbauen oder veraendern.
 
 \section{Bauen}
 Ein Spieler darf ausschliesslich im Epizug und ohne Aktionspunktgrenze bauen, solange er alle Baukosten decken kann.
@@ -580,7 +606,8 @@ Der Belagerungsfortschritt wird angehalten, wenn der Verteidiger genuegend Trupp
 \section{Folgen erfolgreicher Belagerung}
 Nach erfolgreicher Belagerung werden Bahnhof, Grossbahnhof, Hafen oder Grosshafen zu einer zerstoerten neutralen Variante.
 
-Danach werden alle Schienenlinien abgerissen, die keine Verbindung ueber einen unzerstoerten Bahnhof zum Hauptbahnhof haben.
+Danach werden alle Schienenlinien abgerissen, die an keinem Ende mehr mit einem
+unzerstoerten Bauwerk verbunden sind.
 
 \section{Friedensvertrag}
 Ein Krieg endet durch Friedensvertrag oder durch Ausscheiden einer Kriegspartei. Waehrend des Krieges ausgesetzte Schuldenstriche werden nach dem Frieden nicht nachgeholt.

@@ -57,6 +57,9 @@ internal object KartenRegelwerk {
         }) {
             "${ereignis.spieler.wert} hat bereits einen Hauptbahnhof."
         }
+        require(angrenzendeFelder(ereignis.ecke).all { feld -> feld in karte.landNachPosition }) {
+            "Ein Hauptbahnhof kann nur an einer Ecke mit sechs Geländefeldern stehen."
+        }
         pruefeEckMindestabstand(karte, ereignis.ecke)
 
         val neueEcken = karte.belegung.ecken + EckBelegung(
@@ -189,8 +192,12 @@ internal object KartenRegelwerk {
                 kanten = karte.belegung.kanten + KantenBelegung(ereignis.kante),
             ),
         )
-        require(ereignis.spieler in KartenAuswertung.verbundeneSpieler(probeKarte, ereignis.kante)) {
-            "Eine Handelslinie muss mit dem eigenen Hauptbahnhof oder Liniennetz verbunden sein."
+        pruefeSchienenRichtungen(probeKarte)
+        require(
+            ereignis.spieler in
+                KartenAuswertung.abrissberechtigteSpieler(probeKarte, ereignis.kante),
+        ) {
+            "Eine Handelslinie muss von einem eigenen Bauwerk oder Schienenweg ausgehen."
         }
         val nachKosten = bucheKosten(zustand, ereignis.spieler, BauteilTyp.EISENBAHNLINIE)
         val aktuelleKarte = requireNotNull(nachKosten.karte)
@@ -241,6 +248,10 @@ internal object KartenRegelwerk {
                 val bisher = karte.belegung.eckenNachPosition[ort.position]
                     ?: error("Die gewählte Ecke ist nicht belegt.")
                 pruefeEntfernung(ereignis.spieler, bisher.besitzer, ereignis.grund)
+                require(karte.schienenAn(ort.position).size <= 2) {
+                    "Ein Bahnhof mit mehr als zwei Schienenrichtungen muss vor dem Abbau " +
+                        "zurückgebaut werden."
+                }
                 var nachBestand = bisher.besitzer?.let { besitzer ->
                     bisher.typ.bauteilTyp()?.let { typ ->
                         bucheBauteil(zustand, besitzer, typ, -1, kostenBuchen = false)
@@ -272,10 +283,10 @@ internal object KartenRegelwerk {
                     ?: error("Die gewählte Kante ist nicht belegt.")
                 if (ereignis.grund == KartenAenderungsGrund.SPIELERAKTION) {
                     require(
-                        KartenAuswertung.gewalthaberBeiIntakterLinie(karte, ort.position) ==
-                            ereignis.spieler,
+                        ereignis.spieler in
+                            KartenAuswertung.abrissberechtigteSpieler(karte, ort.position),
                     ) {
-                        "Nur der alleinige Gewalthaber darf diese Handelslinie abbauen."
+                        "Nur ein Besitzer an einem Ende der Handelslinie darf sie abbauen."
                     }
                 }
                 zustand.mitBelegung { belegung ->
@@ -366,11 +377,11 @@ internal object KartenRegelwerk {
                     ?: error("Die gewählte Kante ist nicht belegt.")
                 if (ereignis.grund == KartenAenderungsGrund.SPIELERAKTION) {
                     require(
-                        KartenAuswertung.gewalthaberBeiIntakterLinie(
+                        ereignis.spieler in KartenAuswertung.abrissberechtigteSpieler(
                             requireNotNull(zustand.karte),
                             ort.position,
-                        ) == ereignis.spieler,
-                    ) { "Nur der alleinige Gewalthaber darf diese Handelslinie verändern." }
+                        ),
+                    ) { "Nur ein Besitzer an einem Routenende darf die Handelslinie verändern." }
                 }
                 require(ereignis.zustand != BauwerkZustand.BELAGERT) {
                     "Eine Handelslinie kann nicht belagert sein."
@@ -548,8 +559,12 @@ internal object KartenRegelwerk {
                 kanten = (karte.belegung.kanten + KantenBelegung(ereignis.kante)).kantenSortiert(),
             ),
         )
-        require(ereignis.spieler in KartenAuswertung.verbundeneSpieler(neueKarte, ereignis.kante)) {
-            "Eine Handelslinie muss mit dem eigenen Hauptbahnhof oder Liniennetz verbunden sein."
+        pruefeSchienenRichtungen(neueKarte)
+        require(
+            ereignis.spieler in
+                KartenAuswertung.abrissberechtigteSpieler(neueKarte, ereignis.kante),
+        ) {
+            "Eine Handelslinie muss von einem eigenen Bauwerk oder Schienenweg ausgehen."
         }
         return schliesseRundeNullPlatzierungAb(
             zustand.copy(karte = neueKarte),
@@ -714,6 +729,37 @@ internal object KartenRegelwerk {
             "Eine Ecke kann nur bebaut werden, wenn eine intakte Handelslinie dorthin führt."
         }
     }
+
+    private fun pruefeSchienenRichtungen(karte: Spielkarte) {
+        val ecken = karte.belegung.kanten
+            .flatMap { schiene -> listOf(schiene.position.anfang, schiene.position.ende) }
+            .distinct()
+        ecken.forEach { ecke ->
+            val anzahl = karte.schienenAn(ecke).size
+            val bauwerk = karte.belegung.eckenNachPosition[ecke]
+            val maximal = when (bauwerk?.typ) {
+                EckGebaeudeTyp.HAUPTBAHNHOF -> 6
+                EckGebaeudeTyp.GROSSBAHNHOF -> 4
+                EckGebaeudeTyp.BAHNHOF -> 3
+                EckGebaeudeTyp.HAFEN,
+                EckGebaeudeTyp.GROSSHAFEN -> 2
+                null -> 2
+            }
+            require(anzahl <= maximal) {
+                if (bauwerk == null) {
+                    "Eine Schienenkreuzung mit mehr als zwei Richtungen braucht einen Bahnhof."
+                } else {
+                    "${bauwerk.typ.name.lowercase().replaceFirstChar(Char::uppercase)} erlaubt " +
+                        "höchstens $maximal Schienenrichtungen."
+                }
+            }
+        }
+    }
+
+    private fun Spielkarte.schienenAn(ecke: KartenEcke): List<KantenBelegung> =
+        belegung.kanten.filter { schiene ->
+            schiene.position.anfang == ecke || schiene.position.ende == ecke
+        }
 
     private fun bucheKosten(
         zustand: SpielZustand,

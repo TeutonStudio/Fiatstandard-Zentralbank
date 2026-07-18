@@ -141,6 +141,19 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun hauptbahnhofBrauchtSechsAngrenzendeGelaendefelder() {
+        val eckeMitWasser = KartenFeld(0, 0, DreieckHaelfte.UNTEN).ecken().first()
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            zustand(rundeNull = true),
+            SpielEreignis.HauptbahnhofPlatziert(anna, eckeMitWasser),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("sechs Geländefeldern"))
+    }
+
+    @Test
     fun bahnhofBuchtKostenUndOrtAtomar() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val start = zustand().mitHandelslinieZu(ecke)
@@ -286,7 +299,82 @@ class KartenRegelwerkTest {
     }
 
     @Test
-    fun gebauteHandelslinieBleibtBesitzerlosAberUnterAnnasGewalt() {
+    fun eckBauwerkeBegrenzenSchienenrichtungen() {
+        val ecke = KartenEcke(8, 4)
+        listOf(
+            EckGebaeudeTyp.BAHNHOF to 3,
+            EckGebaeudeTyp.GROSSBAHNHOF to 4,
+            EckGebaeudeTyp.HAFEN to 2,
+            EckGebaeudeTyp.GROSSHAFEN to 2,
+        ).forEach { (typ, maximal) ->
+            val start = zustand().mitEckBauwerk(ecke, typ, anna)
+            val richtungen = start.schienenrichtungen(ecke)
+            val mitMaximalerBelegung = richtungen.take(maximal).fold(start) { aktuell, kante ->
+                SpielRegelwerk.wendeAn(
+                    aktuell,
+                    SpielEreignis.SchieneGebaut(anna, kante),
+                ).getOrThrow()
+            }
+
+            val zuViel = SpielRegelwerk.wendeAn(
+                mitMaximalerBelegung,
+                SpielEreignis.SchieneGebaut(anna, richtungen[maximal]),
+            )
+
+            assertEquals(maximal, mitMaximalerBelegung.karte?.belegung?.kanten?.size)
+            assertTrue(zuViel.isFailure)
+            assertTrue(zuViel.exceptionOrNull()?.message.orEmpty().contains("höchstens $maximal"))
+        }
+    }
+
+    @Test
+    fun hauptbahnhofErlaubtAlleSechsSchienenrichtungen() {
+        val ecke = KartenEcke(8, 4)
+        val start = zustand().mitEckBauwerk(ecke, EckGebaeudeTyp.HAUPTBAHNHOF, anna)
+
+        val danach = start.schienenrichtungen(ecke).fold(start) { aktuell, kante ->
+            SpielRegelwerk.wendeAn(
+                aktuell,
+                SpielEreignis.SchieneGebaut(anna, kante),
+            ).getOrThrow()
+        }
+
+        assertEquals(6, danach.karte?.belegung?.kanten?.size)
+    }
+
+    @Test
+    fun schienenkreuzungOhneBahnhofWirdAbgelehnt() {
+        val bahnhof = KartenEcke(6, 4)
+        val kreuzung = KartenEcke(8, 4)
+        val start = zustand().mitEckBauwerk(bahnhof, EckGebaeudeTyp.BAHNHOF, anna)
+        val zumKnoten = KartenKante.zwischen(bahnhof, kreuzung)
+        val vorbereitet = start.copy(
+            karte = start.karte?.copy(
+                belegung = start.karte.belegung.copy(
+                    kanten = listOf(KantenBelegung(zumKnoten)),
+                ),
+            ),
+        )
+        val abzweige = vorbereitet.schienenrichtungen(kreuzung)
+            .filterNot { kante -> kante == zumKnoten }
+        val mitFortsetzung = SpielRegelwerk.wendeAn(
+            vorbereitet,
+            SpielEreignis.SchieneGebaut(anna, abzweige.first()),
+        ).getOrThrow()
+
+        val kreuzungErgebnis = SpielRegelwerk.wendeAn(
+            mitFortsetzung,
+            SpielEreignis.SchieneGebaut(anna, abzweige[1]),
+        )
+
+        assertTrue(kreuzungErgebnis.isFailure)
+        assertTrue(
+            kreuzungErgebnis.exceptionOrNull()?.message.orEmpty().contains("Schienenkreuzung"),
+        )
+    }
+
+    @Test
+    fun offeneHandelslinieBleibtNeutralAberNurAnnaDarfSieAbbauen() {
         val start = zustand()
         val karte = requireNotNull(start.karte)
         val kante = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten().first()
@@ -305,14 +393,18 @@ class KartenRegelwerkTest {
             SpielEreignis.SchieneGebaut(anna, kante),
         ).getOrThrow()
 
-        assertEquals(anna, KartenAuswertung.gewalthaber(requireNotNull(danach.karte), kante))
+        assertNull(KartenAuswertung.gewalthaber(requireNotNull(danach.karte), kante))
+        assertEquals(
+            setOf(anna),
+            KartenAuswertung.abrissberechtigteSpieler(requireNotNull(danach.karte), kante),
+        )
         assertNull(danach.spieler.first { it.id == anna }.bauteile[BauteilTyp.EISENBAHNLINIE])
         assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.HOLZ])
         assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.STAHL])
     }
 
     @Test
-    fun gemeinsamVerbundenesHandelsnetzDarfKeinerDerSpielerAbbauen() {
+    fun neutraleHandelslinieZwischenVerschiedenenSpielernDuerfenBeideAbbauen() {
         val start = zustand()
         val karte = requireNotNull(start.karte)
         val ecken = listOf(
@@ -334,41 +426,120 @@ class KartenRegelwerkTest {
             ),
         )
 
+        val durchAnna = SpielRegelwerk.wendeAn(
+            gemeinsam,
+            SpielEreignis.KartenBelegungEntfernt(
+                spieler = anna,
+                ort = KartenOrt.Kante(linien.first()),
+            ),
+        ).getOrThrow()
+        val durchBert = SpielRegelwerk.wendeAn(
+            gemeinsam.copy(aktiverSpieler = bert, zugStatus = epizug(bert)),
+            SpielEreignis.KartenBelegungEntfernt(
+                spieler = bert,
+                ort = KartenOrt.Kante(linien.last()),
+            ),
+        ).getOrThrow()
+
+        assertEquals(linien.size - 1, durchAnna.karte?.belegung?.kanten?.size)
+        assertEquals(linien.size - 1, durchBert.karte?.belegung?.kanten?.size)
+    }
+
+    @Test
+    fun kontrollierteHandelslinieZwischenEigenenBauwerkenDarfNurBesitzerAbbauen() {
+        val start = zustand()
+        val karte = requireNotNull(start.karte)
+        val ecken = listOf(KartenEcke(6, 4), KartenEcke(8, 4), KartenEcke(10, 4))
+        val linien = ecken.zipWithNext(KartenKante::zwischen)
+        val annasRoute = start.copy(
+            karte = karte.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(ecken.first(), EckGebaeudeTyp.BAHNHOF, anna),
+                        EckBelegung(ecken.last(), EckGebaeudeTyp.BAHNHOF, anna),
+                    ),
+                    kanten = linien.map(::KantenBelegung),
+                ),
+            ),
+        )
         val abbauen = SpielEreignis.KartenBelegungEntfernt(
             spieler = anna,
             ort = KartenOrt.Kante(linien.first()),
         )
-        val ergebnis = SpielRegelwerk.wendeAn(gemeinsam, abbauen)
+        val durchAnna = SpielRegelwerk.wendeAn(annasRoute, abbauen)
+        val durchBert = SpielRegelwerk.wendeAn(
+            annasRoute.copy(aktiverSpieler = bert, zugStatus = epizug(bert)),
+            abbauen.copy(spieler = bert),
+        )
 
-        assertTrue(ergebnis.isFailure)
-        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("Gewalthaber"))
+        assertTrue(durchAnna.isSuccess)
+        assertTrue(durchBert.isFailure)
+        assertTrue(durchBert.exceptionOrNull()?.message.orEmpty().contains("Besitzer"))
     }
 
     @Test
-    fun hafenBrauchtZweiWasserUndZweiGelaendefelder() {
+    fun hafenUndGrosshafenErlaubenZweiZuVierBisVierZuZwei() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val hafenKante = benachbarteEcken(ecke)
             .map { nachbar -> KartenKante.zwischen(ecke, nachbar) }
             .first()
-        val kuestenLand = angrenzendeFelder(hafenKante).map { feld ->
-            GelaendeFeld(feld, GelaendeTyp.EBENE)
+        val alleNachbarn = angrenzendeFelder(ecke)
+        val linienNachbarn = angrenzendeFelder(hafenKante)
+        listOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN).forEach { typ ->
+            (2..4).forEach { landAnzahl ->
+                val kuestenLand = (linienNachbarn + alleNachbarn)
+                    .distinct()
+                    .take(landAnzahl)
+                    .map { feld -> GelaendeFeld(feld, GelaendeTyp.EBENE) }
+                val start = zustand().copy(
+                    karte = Spielkarte(
+                        id = "kueste-$typ-$landAnzahl",
+                        name = "Küste",
+                        hexagon = KartenHexagon(radius = 12),
+                        gelaendefelder = kuestenLand,
+                        belegung = KartenBelegung(
+                            kanten = listOf(KantenBelegung(hafenKante)),
+                        ),
+                    ),
+                )
+
+                val danach = SpielRegelwerk.wendeAn(
+                    start,
+                    SpielEreignis.EckGebaeudeGebaut(anna, ecke, typ),
+                ).getOrThrow()
+
+                assertEquals(typ, danach.karte?.belegung?.ecken?.single()?.typ)
+            }
         }
+    }
+
+    @Test
+    fun hafenBrauchtMindestensZweiWasserfelder() {
+        val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val hafenKante = benachbarteEcken(ecke)
+            .map { nachbar -> KartenKante.zwischen(ecke, nachbar) }
+            .first()
+        val fuenfLandfelder = (angrenzendeFelder(hafenKante) + angrenzendeFelder(ecke))
+            .distinct()
+            .take(5)
+            .map { feld -> GelaendeFeld(feld, GelaendeTyp.EBENE) }
         val start = zustand().copy(
             karte = Spielkarte(
-                id = "kueste",
-                name = "Küste",
+                id = "fast-nur-land",
+                name = "Fast nur Land",
                 hexagon = KartenHexagon(radius = 12),
-                gelaendefelder = kuestenLand,
+                gelaendefelder = fuenfLandfelder,
                 belegung = KartenBelegung(kanten = listOf(KantenBelegung(hafenKante))),
             ),
         )
 
-        val danach = SpielRegelwerk.wendeAn(
+        val ergebnis = SpielRegelwerk.wendeAn(
             start,
             SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.HAFEN),
-        ).getOrThrow()
+        )
 
-        assertEquals(EckGebaeudeTyp.HAFEN, danach.karte?.belegung?.ecken?.single()?.typ)
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("zwei Wasser"))
     }
 
     @Test
@@ -609,5 +780,30 @@ class KartenRegelwerkTest {
                 ),
             ),
         )
+    }
+
+    private fun SpielZustand.mitEckBauwerk(
+        ecke: KartenEcke,
+        typ: EckGebaeudeTyp,
+        spieler: SpielerId,
+    ): SpielZustand {
+        val karte = requireNotNull(karte)
+        return copy(
+            karte = karte.copy(
+                belegung = karte.belegung.copy(
+                    ecken = karte.belegung.ecken + EckBelegung(ecke, typ, spieler),
+                ),
+            ),
+        )
+    }
+
+    private fun SpielZustand.schienenrichtungen(ecke: KartenEcke): List<KartenKante> {
+        val karte = requireNotNull(karte)
+        return benachbarteEcken(ecke)
+            .map { nachbar -> KartenKante.zwischen(ecke, nachbar) }
+            .filter { kante ->
+                val nachbarn = angrenzendeFelder(kante)
+                nachbarn.size == 2 && nachbarn.all { feld -> feld in karte.landNachPosition }
+            }
     }
 }

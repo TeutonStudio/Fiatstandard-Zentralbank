@@ -23,7 +23,7 @@ class Karten3DZuordnungTest {
     private val bert = SpielerId("bert")
 
     @Test
-    fun eckBauwerkeNutzenSpielerfarbenUndKantenSowieFelderDieselbeNeutraleFarbe() {
+    fun schienenNutzenJeNachEndpunktenSpielerfarbeOderNeutraleFarbe() {
         val ecken = listOf(
             KartenEcke(6, 4),
             KartenEcke(8, 4),
@@ -61,6 +61,18 @@ class Karten3DZuordnungTest {
             .typ.farbe
         assertNotEquals(annasFarbe, neutraleFarbe)
         assertEquals(neutraleFarbe, nurAnna.feldObjekte.single().typ.farbe)
+
+        val vonAnnaKontrolliert = grundkarte.copy(
+            belegung = grundkarte.belegung.copy(
+                ecken = grundkarte.belegung.ecken +
+                    EckBelegung(ecken.last(), EckGebaeudeTyp.BAHNHOF, anna),
+            ),
+        ).zu3DModell(spielerReihenfolge = listOf(anna, bert))
+        val annasLinienfarben = vonAnnaKontrolliert.kantenObjekte
+            .filter { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
+            .map { objekt -> objekt.typ.farbe }
+            .toSet()
+        assertEquals(setOf(annasFarbe), annasLinienfarben)
 
         val gemeinsam = grundkarte.copy(
             belegung = grundkarte.belegung.copy(

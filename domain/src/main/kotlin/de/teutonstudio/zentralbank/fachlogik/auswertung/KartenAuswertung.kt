@@ -17,7 +17,6 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ProduktionsArt
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
-import java.util.ArrayDeque
 
 data class VerarbeitungsStandort(
     val feld: KartenFeld,
@@ -191,83 +190,78 @@ object KartenAuswertung {
         .filter { spieler in verbundeneSpieler(karte, it.position) }
         .mapTo(mutableSetOf(), KantenBelegung::position)
 
-    /**
-     * Spieler, deren intakter Hauptbahnhof über die zusammenhängende Handelslinie erreichbar ist.
-     * Die Linie bleibt fachlich neutral; diese Menge beschreibt Nutzung und aktuelle Gewalt.
-     */
+    /** Spieler an den beiden Bauwerk-Endpunkten der Route, auf der [kante] liegt. */
     fun verbundeneSpieler(
         karte: Spielkarte,
         kante: KartenKante,
-    ): Set<SpielerId> {
-        val komponente = schienenKomponente(karte, kante)
-        if (komponente.isEmpty()) return emptySet()
-        val ecken = komponente.flatMapTo(mutableSetOf()) { listOf(it.anfang, it.ende) }
-        return karte.belegung.ecken
-            .asSequence()
-            .filter {
-                it.typ == EckGebaeudeTyp.HAUPTBAHNHOF &&
-                    it.zustand == BauwerkZustand.INTAKT &&
-                    it.position in ecken
-            }
-            .mapNotNullTo(mutableSetOf()) { it.besitzer }
-    }
+    ): Set<SpielerId> = routenEndpunkte(karte, kante)
+        .let { endpunkte -> setOfNotNull(endpunkte.anfang, endpunkte.ende) }
 
-    /** Nur eine ausschließlich mit einem Spieler verbundene Linie steht unter dessen Gewalt. */
+    /** Nur eine zwischen zwei Bauwerken desselben Spielers verlaufende Route wird kontrolliert. */
     fun gewalthaber(
         karte: Spielkarte,
         kante: KartenKante,
-    ): SpielerId? = verbundeneSpieler(karte, kante).singleOrNull()
+    ): SpielerId? = routenEndpunkte(karte, kante).let { endpunkte ->
+        endpunkte.anfang?.takeIf { spieler -> spieler == endpunkte.ende }
+    }
 
-    /** Bestimmt die Gewalt auch für eine zerstörte Linie anhand ihres Netzes im intakten Zustand. */
-    fun gewalthaberBeiIntakterLinie(
+    /**
+     * Beide Besitzer einer verbindenden Route dürfen sie abbauen. Bei einer offenen Route ist
+     * ausschließlich der Besitzer des einzigen Bauwerk-Endpunkts abrissberechtigt.
+     */
+    fun abrissberechtigteSpieler(
         karte: Spielkarte,
         kante: KartenKante,
-    ): SpielerId? {
-        val eintrag = karte.belegung.kantenNachPosition[kante] ?: return null
-        val pruefKarte = if (eintrag.zustand == BauwerkZustand.INTAKT) {
-            karte
-        } else {
-            karte.copy(
-                belegung = karte.belegung.copy(
-                    kanten = karte.belegung.kanten.map {
-                        if (it.position == kante) it.copy(zustand = BauwerkZustand.INTAKT) else it
-                    },
-                ),
-            )
-        }
-        return gewalthaber(pruefKarte, kante)
-    }
+    ): Set<SpielerId> = verbundeneSpieler(karte, kante)
 
-    private fun schienenKomponente(
+    private fun routenEndpunkte(
         karte: Spielkarte,
         start: KartenKante,
-    ): Set<KartenKante> {
-        val schienen = karte.belegung.kanten.filter { it.zustand == BauwerkZustand.INTAKT }
-        if (schienen.none { it.position == start }) return emptySet()
-        val anEcke = buildMap<KartenEcke, MutableList<KantenBelegung>> {
-            schienen.forEach { schiene ->
-                getOrPut(schiene.position.anfang) { mutableListOf() }.add(schiene)
-                getOrPut(schiene.position.ende) { mutableListOf() }.add(schiene)
+    ): RoutenEndpunkte {
+        if (start !in karte.belegung.kantenNachPosition) return RoutenEndpunkte(null, null)
+        val anEcke = buildMap<KartenEcke, MutableList<KartenKante>> {
+            karte.belegung.kanten.forEach { schiene ->
+                getOrPut(schiene.position.anfang) { mutableListOf() }.add(schiene.position)
+                getOrPut(schiene.position.ende) { mutableListOf() }.add(schiene.position)
             }
         }
-        val besuchteEcken = mutableSetOf(start.anfang, start.ende)
-        val verbundeneSchienen = mutableSetOf(start)
-        val offen = ArrayDeque<KartenEcke>().apply {
-            add(start.anfang)
-            add(start.ende)
-        }
-        while (offen.isNotEmpty()) {
-            val ecke = offen.removeFirst()
-            anEcke[ecke].orEmpty().forEach { schiene ->
-                verbundeneSchienen += schiene.position
-                val andere = if (schiene.position.anfang == ecke) {
-                    schiene.position.ende
-                } else {
-                    schiene.position.anfang
-                }
-                if (besuchteEcken.add(andere)) offen.add(andere)
-            }
-        }
-        return verbundeneSchienen
+        return RoutenEndpunkte(
+            anfang = routenEndpunktBesitzer(karte, start, start.anfang, anEcke),
+            ende = routenEndpunktBesitzer(karte, start, start.ende, anEcke),
+        )
     }
+
+    private fun routenEndpunktBesitzer(
+        karte: Spielkarte,
+        start: KartenKante,
+        ersteEcke: KartenEcke,
+        anEcke: Map<KartenEcke, List<KartenKante>>,
+    ): SpielerId? {
+        var aktuelleEcke = ersteEcke
+        var vorherigeKante = start
+        val besuchteKanten = mutableSetOf(start)
+        while (true) {
+            karte.belegung.eckenNachPosition[aktuelleEcke]
+                ?.takeIf { bauwerk -> bauwerk.zustand != BauwerkZustand.ZERSTOERT }
+                ?.besitzer
+                ?.let { return it }
+            val fortsetzungen = anEcke[aktuelleEcke]
+                .orEmpty()
+                .filterNot { kante -> kante == vorherigeKante }
+            if (fortsetzungen.size != 1) return null
+            val naechsteKante = fortsetzungen.single()
+            if (!besuchteKanten.add(naechsteKante)) return null
+            aktuelleEcke = if (naechsteKante.anfang == aktuelleEcke) {
+                naechsteKante.ende
+            } else {
+                naechsteKante.anfang
+            }
+            vorherigeKante = naechsteKante
+        }
+    }
+
+    private data class RoutenEndpunkte(
+        val anfang: SpielerId?,
+        val ende: SpielerId?,
+    )
 }

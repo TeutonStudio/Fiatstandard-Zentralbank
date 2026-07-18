@@ -83,7 +83,7 @@ class KartenAuswertungTest {
     }
 
     @Test
-    fun handelslinieHatNurBeiGenauEinemVerbundenenSpielerEinenGewalthaber() {
+    fun routenEndpunkteBestimmenKontrolleUndAbrissberechtigung() {
         val ecken = listOf(
             KartenEcke(6, 4),
             KartenEcke(8, 4),
@@ -117,7 +117,28 @@ class KartenAuswertungTest {
             belegung = netz.belegung.copy(ecken = netz.belegung.ecken.take(1)),
         )
         linien.forEach { linie ->
-            assertEquals(anna, KartenAuswertung.gewalthaber(nurAnna, linie))
+            assertEquals(setOf(anna), KartenAuswertung.verbundeneSpieler(nurAnna, linie))
+            assertEquals(setOf(anna), KartenAuswertung.abrissberechtigteSpieler(nurAnna, linie))
+            assertNull(KartenAuswertung.gewalthaber(nurAnna, linie))
+        }
+
+        val zwischenAnnasBauwerken = netz.copy(
+            belegung = netz.belegung.copy(
+                ecken = listOf(
+                    netz.belegung.ecken.first(),
+                    netz.belegung.ecken.last().copy(
+                        typ = EckGebaeudeTyp.BAHNHOF,
+                        besitzer = anna,
+                    ),
+                ),
+            ),
+        )
+        linien.forEach { linie ->
+            assertEquals(anna, KartenAuswertung.gewalthaber(zwischenAnnasBauwerken, linie))
+            assertEquals(
+                setOf(anna),
+                KartenAuswertung.abrissberechtigteSpieler(zwischenAnnasBauwerken, linie),
+            )
         }
     }
 

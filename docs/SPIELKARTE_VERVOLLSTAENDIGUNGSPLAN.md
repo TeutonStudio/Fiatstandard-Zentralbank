@@ -50,15 +50,27 @@ Aus der Anleitung ergeben sich folgende feste Anforderungen:
 - Auf **Ecken** stehen Hauptbahnhof, Bahnhof, Großbahnhof, Hafen oder Großhafen.
 - Auf **Kanten** stehen Schienen. Eine Schiene ist nur zwischen zwei
   Geländefeldern zulässig.
+- Ein Hauptbahnhof steht nur an einer Ecke mit sechs Geländefeldern. Er erlaubt
+  sechs Schienenrichtungen, ein Großbahnhof vier und ein Bahnhof drei. Ohne
+  Bahnhof sind höchstens zwei Richtungen erlaubt; Schienenkreuzungen ohne
+  Bahnhof sind unzulässig.
 - Auf einem **Geländefeld** steht entweder eine Abbaueinheit oder eine
   Geschäftsbank. Beide sind neutral und haben keinen dauerhaften Spielerbesitzer.
 - Ein Hafen oder Großhafen ist nur an einer Ecke mit mindestens zwei angrenzenden
-  Wasserfeldern und zwei angrenzenden Geländefeldern zulässig.
+  Wasserfeldern und zwei angrenzenden Geländefeldern zulässig; bei sechs Feldern
+  also mit Gelände-Wasser-Verteilung 2:4, 3:3 oder 4:2. Beide sind
+  Bauwerk-Endpunkte von Schienenrouten und erlauben als Ecken ohne Bahnhof
+  höchstens zwei Schienenrichtungen.
 - Bebaute Ecken halten auf dem kürzesten Kantenweg mindestens drei Kanten
   Abstand zueinander. Abgesehen vom Hauptbahnhof braucht jedes neue Eckgebäude
   eine intakte Handelslinie an seiner Zielecke.
 - Eine eigene Schiene, ein eigener Bahnhof oder ein eigener Großbahnhof neben
   einer Abbaueinheit bilden unterschiedlich starke Anschlüsse.
+- Schienen zwischen zwei Bauwerken desselben Spielers stehen unter seiner
+  Kontrolle und erscheinen in seiner Farbe. Zwischen Bauwerken verschiedener
+  Spieler sind sie neutral und durch beide Endpunktbesitzer abreißbar. Offene
+  Routen sind neutral und nur durch den Besitzer ihres einzigen Bauwerk-Endpunkts
+  abreißbar.
 - Frachtschiffe verbinden zwei Häfen und liegen deshalb nicht auf einer normalen
   Dreieckskante. Panzer und Kriegsschiffe sind nur während eines Krieges auf dem
   Brett.
@@ -171,7 +183,7 @@ Eine Ortsart akzeptiert nur die dafür erlaubten Inhalte:
 | Ort | Inhalt | Besitzer/Zustand |
 | --- | --- | --- |
 | Ecke | Hauptbahnhof, Bahnhof, Großbahnhof, Hafen, Großhafen | Spieler; zusätzlich intakt, belagert oder zerstört |
-| Kante | Schiene | Spieler; zusätzlich intakt oder zerstört |
+| Kante | Schiene | Kontrolle aus den Bauwerk-Endpunkten abgeleitet; neutral oder Spielerfarbe, zusätzlich intakt oder zerstört |
 | Geländefeld | Abbaueinheit mit Rohstoff oder Geschäftsbank | neutral; aktiv, verlassen oder zerstört nur soweit fachlich nötig |
 | Seeweg | Frachtschiff zwischen zwei Hafen-Ecken | Spieler sowie Import-/Exportrichtung |
 | Krieg | Panzer oder Kriegsschiff | Spieler, Konflikt und nur temporär während des Krieges |
@@ -239,10 +251,11 @@ Die Zielgruppe bestimmt die Trefferzone. Dadurch wird ein Tipp nahe einer Ecke
 nicht zugleich als Feldänderung interpretiert. Kamera drehen, verschieben und
 zoomen bleiben unabhängig vom Kartenmodus verfügbar.
 
-Im Spielmodus werden Spielergebäude und Schienen in der jeweiligen Spielerfarbe,
-neutrale Anlagen in der Zentralbankfarbe und zerstörte Belegungen eindeutig
-abweichend dargestellt. Auswahl und mögliche Ziele erhalten eine kurzlebige
-Hervorhebung, die nicht gespeichert wird.
+Im Spielmodus werden Spielergebäude und durch einen Spieler kontrollierte
+Schienen in der jeweiligen Spielerfarbe dargestellt. Gemeinsame oder offene
+Schienenrouten und neutrale Anlagen verwenden die Zentralbankfarbe; zerstörte
+Belegungen werden eindeutig abweichend dargestellt. Auswahl und mögliche Ziele
+erhalten eine kurzlebige Hervorhebung, die nicht gespeichert wird.
 
 ## Fachereignisse und Regeln
 
@@ -274,6 +287,10 @@ Mindestens folgende Regeln werden automatisiert:
 - Ein Feld kann nur belegt werden, wenn es Gelände ist.
 - Pro Ecke, Kante oder Feld gibt es höchstens eine zulässige Belegung.
 - Eine Schiene liegt nur an einer Kante zwischen zwei Geländefeldern.
+- Ein Hauptbahnhof liegt nur an sechs Geländefeldern. Hauptbahnhof, Großbahnhof
+  und Bahnhof erlauben höchstens sechs, vier beziehungsweise drei
+  Schienenrichtungen; ohne Bahnhof sind Kreuzungen mit mehr als zwei Richtungen
+  verboten. Das gilt auch für Hafen und Großhafen.
 - Ein Hafen liegt nur an einer Ecke mit mindestens zwei Wasser- und zwei
   Geländefeldern.
 - Eckgebäude und Schienen haben einen gültigen Spieler aus dem Spielstand.
@@ -435,6 +452,10 @@ maßgebliche Quelle und benötigen keine manuell parallel gepflegten Bauteilmeng
 - Nachbarschaften an Innenpunkten und Kartenrändern.
 - Schiene nur zwischen zwei Geländefeldern.
 - Hafen nur bei mindestens zwei Wasser- und zwei Geländefeldern.
+- Richtungsgrenzen für Hauptbahnhof, Großbahnhof, Bahnhof und Häfen sowie das
+  Verbot einer Schienenkreuzung ohne Bahnhof.
+- Routenkontrolle, neutrale Routen und Abrissrechte für gleiche, verschiedene
+  und nur einen Bauwerk-Endpunkt.
 - Ausschluss doppelter oder ortsfremder Belegung.
 - Runde-0-Abstand der Hauptbahnhöfe.
 - erlaubte und verbotene Aufwertungen.
