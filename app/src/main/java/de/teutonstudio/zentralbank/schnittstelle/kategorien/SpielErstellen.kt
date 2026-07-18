@@ -1,7 +1,5 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -97,15 +94,12 @@ fun SpielErstellen(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag(STARTBAUWERKE_LAZY_ROW),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     itemsIndexed(spielerNamen) { idx, spielerName ->
-                        Box(modifier = Modifier.fillParentMaxSize()) {
-                            definiereBauteile(
-                                fürWenn = "für $spielerName",
-                                inhalt = bauteileProSpieler[idx],
-                            )
-                        }
+                        definiereBauteile(
+                            fürWenn = "für $spielerName",
+                            inhalt = bauteileProSpieler[idx],
+                        )
                     }
                 }
             }
