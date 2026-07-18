@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -87,19 +89,27 @@ fun Spielmenü(
                 .fillMaxWidth()
                 .padding(start = 132.dp, end = 8.dp, top = 8.dp)
                 .horizontalScroll(rememberScrollState())
-                .padding(vertical = 7.dp),
+                .padding(vertical = 7.dp)
+                .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
-                modifier = Modifier.widthIn(min = 120.dp),
+                modifier = Modifier
+                    .widthIn(min = 120.dp)
+                    .fillMaxHeight(),
                 shape = MaterialTheme.shapes.large,
                 tonalElevation = 5.dp,
                 shadowElevation = 4.dp,
                 color = leistenFarbe,
                 contentColor = leistenInhaltFarbe,
             ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
                     Text(
                         text = aktiverSpieler?.name ?: "Kein Spieler",
                         style = MaterialTheme.typography.titleSmall,
@@ -111,6 +121,12 @@ fun Spielmenü(
                         text = aktiverSpieler?.geldkonto?.zuMarkString() ?: "–",
                         style = MaterialTheme.typography.labelMedium,
                     )
+                    zugZeitText?.let { zeit ->
+                        Text(
+                            text = "$zeit Uhr",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.width(5.dp))
@@ -203,12 +219,6 @@ fun Spielmenü(
                     modifier = Modifier.widthIn(max = 110.dp),
                     style = MaterialTheme.typography.labelMedium,
                 )
-                zugZeitText?.let { zeit ->
-                    Text(
-                        text = "$zeit Uhr",
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
                 Text(
                     text = "Änderungen werden laufend gespeichert.",
                     modifier = Modifier.widthIn(max = 110.dp),

@@ -230,7 +230,6 @@ fun KartenEditorDialog(
                             )
                             SpielbrettKompass(
                                 himmel = bauHimmel,
-                                kameraAzimutGrad = 0f,
                                 modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                             )
                             Text(

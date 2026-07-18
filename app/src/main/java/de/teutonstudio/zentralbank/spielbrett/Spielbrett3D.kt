@@ -40,6 +40,7 @@ import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Size
 import io.github.sceneview.math.colorOf
 import io.github.sceneview.node.GeometryNode
+import io.github.sceneview.node.TextNode as SceneTextNode
 import io.github.sceneview.rememberCameraNode
 import io.github.sceneview.rememberEngine
 import io.github.sceneview.rememberEnvironment
@@ -59,7 +60,8 @@ import kotlin.math.sqrt
 import kotlin.math.sin
 
 private const val BRETT_DICKE = 0.12f
-private const val WASSER_GRUND_NIVEAU = -0.012f
+private const val WASSER_GRUND_NIVEAU = -0.04f
+private const val HIMMELSRICHTUNG_ABSTAND_ZUM_WASSER = 0.065f
 internal const val OBERFLAECHEN_ABSTAND = 0.004f
 private const val WASSER_MINDEST_SICHTWEITE = 10_000f
 private const val BRETT_RAND = 0.35f
@@ -312,11 +314,70 @@ fun Spielbrett3D(
         max(geometrie.breite, geometrie.tiefe),
         if (modell.unbegrenztesBearbeitungsRaster) 24f else 0f,
     )
+    val richtungsGroesse = (szenengroesse * 0.08f).coerceIn(0.75f, 1.25f)
+    val richtungsAbstand = richtungsGroesse * 0.65f + WASSER_BEVEL_BREITE
+    val brettMinX = geometrie.dreiecke.minOf { dreieck ->
+        dreieck.ecken.minOf(BrettPunkt::x)
+    }
+    val brettMaxX = geometrie.dreiecke.maxOf { dreieck ->
+        dreieck.ecken.maxOf(BrettPunkt::x)
+    }
+    val brettMinZ = geometrie.dreiecke.minOf { dreieck ->
+        dreieck.ecken.minOf(BrettPunkt::z)
+    }
+    val brettMaxZ = geometrie.dreiecke.maxOf { dreieck ->
+        dreieck.ecken.maxOf(BrettPunkt::z)
+    }
+    val brettMitteX = (brettMinX + brettMaxX) / 2f
+    val brettMitteZ = (brettMinZ + brettMaxZ) / 2f
+    val richtungsPositionen = remember(
+        brettMinX,
+        brettMaxX,
+        brettMinZ,
+        brettMaxZ,
+        richtungsAbstand,
+    ) {
+        listOf(
+            "N" to Position(x = brettMitteX, z = brettMinZ - richtungsAbstand),
+            "O" to Position(x = brettMaxX + richtungsAbstand, z = brettMitteZ),
+            "S" to Position(x = brettMitteX, z = brettMaxZ + richtungsAbstand),
+            "W" to Position(x = brettMinX - richtungsAbstand, z = brettMitteZ),
+        )
+    }
+    val richtungsBitmaps = remember {
+        listOf("N", "O", "S", "W").associateWith { richtung ->
+            SceneTextNode.renderTextBitmap(
+                text = richtung,
+                fontSize = 176f,
+                textColor = if (richtung == "N") {
+                    0xFFD32F2F.toInt()
+                } else {
+                    android.graphics.Color.WHITE
+                },
+                backgroundColor = android.graphics.Color.TRANSPARENT,
+                bitmapWidth = 256,
+                bitmapHeight = 256,
+            )
+        }
+    }
     val himmelsRadius = max(szenengroesse * 3.2f, 32f)
     val sternenMesh = remember(himmelsRadius) {
         erstelleSternenhimmelMesh(himmelsRadius)
     }
     val wasserAusdehnung = max(szenengroesse * 64f, WASSER_MINDEST_SICHTWEITE)
+    val wasserGrundPfad = remember(geometrie, wasserAusdehnung) {
+        val halbeAusdehnung = wasserAusdehnung / 2f
+        val aussenKontur = listOf(
+            Position2(x = -halbeAusdehnung, y = halbeAusdehnung),
+            Position2(x = halbeAusdehnung, y = halbeAusdehnung),
+            Position2(x = halbeAusdehnung, y = -halbeAusdehnung),
+            Position2(x = -halbeAusdehnung, y = -halbeAusdehnung),
+        )
+        val brettAussparung = geometrie.aussenKontur().map { punkt ->
+            Position2(x = punkt.x, y = -punkt.z)
+        }
+        aussenKontur + brettAussparung
+    }
     val kameraAbstand = szenengroesse * 1.15f + AUFLAGEN_HOEHE * 2f
     val kameraDistanz = kameraAbstand / transformation.zoom
     val azimut = Math.toRadians(transformation.azimutGrad.toDouble())
@@ -399,24 +460,31 @@ fun Spielbrett3D(
         }
 
         if (modell.zeigeWasserFlaeche) {
-            CubeNode(
-                size = Size(
-                    x = wasserAusdehnung,
-                    y = BRETT_DICKE,
-                    z = wasserAusdehnung,
-                ),
+            ShapeNode(
+                polygonPath = wasserGrundPfad,
+                polygonHoles = listOf(4),
+                normal = Direction(z = 1f),
                 materialInstance = wasserMaterial,
-                position = Position(
-                    x = transformation.fokusX,
-                    y = WASSER_GRUND_NIVEAU - BRETT_DICKE / 2f,
-                    z = transformation.fokusZ,
-                ),
+                position = Position(y = WASSER_GRUND_NIVEAU),
+                rotation = Rotation(x = -90f),
             )
             wasserMesh?.let { meshDaten ->
                 key("abgeschraegtes-wasser") {
                     AbgeschraegtesGelaendeNode(
                         meshDaten = meshDaten,
                         materialInstance = wasserMaterial,
+                    )
+                }
+            }
+            richtungsPositionen.forEach { (richtung, position) ->
+                key("himmelsrichtung", richtung) {
+                    ImageNode(
+                        bitmap = richtungsBitmaps.getValue(richtung),
+                        size = Size(x = richtungsGroesse, z = richtungsGroesse),
+                        normal = Direction(y = 1f),
+                        position = position.copy(
+                            y = WASSER_GRUND_NIVEAU + HIMMELSRICHTUNG_ABSTAND_ZUM_WASSER,
+                        ),
                     )
                 }
             }

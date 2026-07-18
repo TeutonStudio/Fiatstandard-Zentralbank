@@ -423,16 +423,6 @@ fun KartenSpielBildschirm(
                             }
                         },
                     )
-                    SpielbrettKompass(
-                        himmel = himmel,
-                        kameraAzimutGrad = betrachtungsStatus.azimutGrad,
-                        zeitfenster = zeitfenster,
-                        modifier = if (kompakteZentrale) {
-                            Modifier.align(Alignment.BottomEnd).padding(12.dp)
-                        } else {
-                            Modifier.align(Alignment.TopEnd).padding(8.dp)
-                        },
-                    )
                     if (planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null) {
                         Surface(
                             modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),

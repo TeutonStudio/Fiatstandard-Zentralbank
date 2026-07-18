@@ -23,6 +23,16 @@ class SpielbrettGeometrieTest {
     }
 
     @Test
+    fun `Aussenkontur reduziert das Brett auf sechs Hexagonecken`() {
+        val geometrie = berechneSpielbrettGeometrie(KartenHexagon(radius = 3))
+
+        val kontur = geometrie.aussenKontur()
+
+        assertEquals(6, kontur.size)
+        assertEquals(6, kontur.distinct().size)
+    }
+
+    @Test
     fun `Grunddreiecke sind gleichseitig und haben Hoehe zwei`() {
         val dreieck = berechneSpielbrettGeometrie(KartenHexagon()).dreieck(
             DreieckPosition(0, 0, DreieckAusrichtung.UNTEN),

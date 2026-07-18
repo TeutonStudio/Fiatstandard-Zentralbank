@@ -120,6 +120,31 @@ internal data class SpielbrettGeometrie(
     }
 }
 
+/** Liefert die konvexe Außenkontur des Bretts ohne Zwischenpunkte auf geraden Kanten. */
+internal fun SpielbrettGeometrie.aussenKontur(): List<BrettPunkt> {
+    val punkte = dreiecke
+        .flatMap(GrundDreieck::ecken)
+        .distinct()
+        .sortedWith(compareBy(BrettPunkt::x).thenBy(BrettPunkt::z))
+    if (punkte.size <= 2) return punkte
+
+    fun kreuz(o: BrettPunkt, a: BrettPunkt, b: BrettPunkt): Float =
+        (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x)
+
+    fun halbeKontur(reihenfolge: Iterable<BrettPunkt>): List<BrettPunkt> = buildList {
+        reihenfolge.forEach { punkt ->
+            while (size >= 2 && kreuz(this[size - 2], last(), punkt) <= 0f) {
+                removeAt(lastIndex)
+            }
+            add(punkt)
+        }
+    }
+
+    val unten = halbeKontur(punkte)
+    val oben = halbeKontur(punkte.asReversed())
+    return unten.dropLast(1) + oben.dropLast(1)
+}
+
 private fun quadratischerAbstandZuStrecke(
     punkt: BrettPunkt,
     a: BrettPunkt,

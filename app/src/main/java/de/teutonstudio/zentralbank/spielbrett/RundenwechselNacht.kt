@@ -100,7 +100,6 @@ fun RundenwechselNacht(
             }
             SpielbrettKompass(
                 himmel = himmel,
-                kameraAzimutGrad = betrachtungsStatus.azimutGrad,
                 modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             )
             LinearProgressIndicator(
