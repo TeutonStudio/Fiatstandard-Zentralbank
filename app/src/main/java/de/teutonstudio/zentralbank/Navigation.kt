@@ -120,7 +120,7 @@ fun Navigation(viewModel: GameViewModel) {
 
             composable(route = Screen.NewGame.route) {
                 SpielErstellen(
-                    Screen.StartScreen.navigiere(navController),
+                    { navController.popBackStack() },
                     viewModel::erstelleSpiel,
                     Screen.GameMap.navigiere(navController),
                 )

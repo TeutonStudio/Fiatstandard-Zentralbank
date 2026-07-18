@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -30,6 +31,28 @@ class SpielErstellenTest {
         composeTestRule
             .onNodeWithText("Spieler Anzahl: ")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun zurueckAufErsterSeiteBrichtDirektAbOhneLeereSeite() {
+        val seite = mutableIntStateOf(1)
+        var abbruchAufrufe = 0
+
+        composeTestRule.setContent {
+            SpielErstellen(
+                nachAbbruch = { abbruchAufrufe += 1 },
+                erstelleSpiel = { _, _ -> },
+                nachAbschluß = {},
+                seite = seite,
+            )
+        }
+
+        composeTestRule.onNodeWithText("Zurück").performClick()
+
+        composeTestRule.runOnIdle {
+            assertEquals(1, abbruchAufrufe)
+            assertEquals(1, seite.intValue)
+        }
     }
 
     @Test

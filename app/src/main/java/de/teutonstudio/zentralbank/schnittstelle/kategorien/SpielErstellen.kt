@@ -54,7 +54,13 @@ fun SpielErstellen(
     val spielerNamen = spieler.keys.toList()
     val abschlussSeite = 5 + spielerNamen.size
     Titel(
-        beiZurück = { seite.intValue -= 1 },
+        beiZurück = {
+            if (seite.intValue > 1) {
+                seite.intValue -= 1
+            } else {
+                nachAbbruch()
+            }
+        },
         beiWeiter = if (seite.intValue < abschlussSeite) {
             {
                 val darfWeiter = spielerGültig.value &&
@@ -67,7 +73,6 @@ fun SpielErstellen(
         anleitung = remember { mutableStateOf(false) }
     ) {
         when (seite.intValue) {
-            0 -> { nachAbbruch() }
             1 -> { definiereSpieler(spielerGültig,spieler) }
             2 -> { definiereWarenkorb(warenkorb) }
             3 -> { definiereLeitzinsatzZiele(zentralbankZiele) }
