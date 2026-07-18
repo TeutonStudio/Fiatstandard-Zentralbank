@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -48,6 +50,7 @@ import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.UmschaltbareDiagrammLegende
 import de.teutonstudio.zentralbank.schnittstelle.bilanzDiagrammYBereich
+import de.teutonstudio.zentralbank.schnittstelle.ausgabe.ROHSTOFF_ICON_SKALIERUNG
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeRohstoff
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.leererDiagrammEintrag
@@ -75,6 +78,10 @@ private enum class BilanzEinheit(val bezeichnung: String) {
 }
 
 private val aussenhandelGesamtFarbe = Color(0xFF29434E)
+private val hafenpreisRohstoffIconGroesse = 28.dp
+private val hafenpreisRohstoffIconFlaeche =
+    hafenpreisRohstoffIconGroesse * ROHSTOFF_ICON_SKALIERUNG
+private val hafenpreisZeilenMindesthoehe = hafenpreisRohstoffIconFlaeche + 12.dp
 
 private val hafenTarife = listOf(
     HafenTarif("3 : 1 Hafen", 1f + 1f / 3f),
@@ -346,15 +353,31 @@ private fun HafenPreisKarte(
                     ),
                 ) {
                     Row(
-                        modifier = ModiPad5.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = hafenpreisZeilenMindesthoehe)
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Box(modifier = Modifier.weight(1.4f)) {
-                            zeigeRohstoff(
-                                rohstoff = rohstoff,
-                                fontsize = 14.sp,
-                                iconSize = 28.dp,
+                        Row(
+                            modifier = Modifier.weight(1.4f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier.size(hafenpreisRohstoffIconFlaeche),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                zeigeRohstoff(
+                                    rohstoff = rohstoff,
+                                    iconSize = hafenpreisRohstoffIconGroesse,
+                                    text = false,
+                                )
+                            }
+                            Text(
+                                text = rohstoff.str.uppercase(),
+                                fontSize = 14.sp,
                             )
                         }
                         Text(text = importPreis.zuMark(), modifier = Modifier.weight(1f))

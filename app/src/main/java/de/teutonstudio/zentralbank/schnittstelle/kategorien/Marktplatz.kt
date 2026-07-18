@@ -563,7 +563,7 @@ fun zeigeMarktplatz(
         }
 
         if (spiel.marktpreise.isNotEmpty()) {
-            val spaltenBreite = 7 * 45.dp
+            val spaltenBreite = 360.dp
             VerticalGrid(
                 columns = SimpleGridCells.Adaptive(spaltenBreite),
                 horizontalArrangement = Arrangement.Center,

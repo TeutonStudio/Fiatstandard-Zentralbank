@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
@@ -36,6 +37,11 @@ import de.teutonstudio.zentralbank.schnittstelle.RightText
 import de.teutonstudio.zentralbank.schnittstelle.lesbareSchriftfarbe
 import java.util.EnumMap
 
+private val marktpreisRasterSpaltenbreite = 44.dp
+private val marktpreisRohstoffIconGroesse = 36.dp
+private val marktpreisRohstoffZeilenhoehe =
+    marktpreisRohstoffIconGroesse * ROHSTOFF_ICON_SKALIERUNG + 6.dp
+private val marktpreisTitelZeilenhoehe = 48.dp
 
 @Composable
 fun zeigeBauteil(
@@ -89,6 +95,7 @@ fun zeigeBauteilPreis(
     nicht_null_zeilen: Boolean = false,
     beiKlick: (Bauteil) -> Unit
 ) {
+    require(hAnzahl >= 6) { "Eine Marktpreiszeile benötigt mindestens sechs Rasterspalten." }
     Card(
         modifier = modifier,
         onClick = { beiKlick(bauteil) },
@@ -99,25 +106,58 @@ fun zeigeBauteilPreis(
     ) {
         val inhalt = bauteil.kosten.filter { if (nicht_null_zeilen) true else it.value != 0 }.map { it.key to (it.value to marktpreise[it.key]!!.zuMark()) }.toMap()
         Grid({
-            repeat(hAnzahl) { column(40.dp) }
-            repeat(inhalt.size+1) { row(40.dp) }
+            repeat(hAnzahl) { column(marktpreisRasterSpaltenbreite) }
+            repeat(inhalt.size) { row(marktpreisRohstoffZeilenhoehe) }
+            row(marktpreisTitelZeilenhoehe)
             gap(5.dp)
         }, ModiPad5) {
             inhalt.forEach { (rohstoff,z) ->
                 val (anzahl,preis) = z
                 if (nicht_null_zeilen || anzahl != 0) {
-                    RightText(text = anzahl.toString(), fontSize = 20.sp, modifier = ModiPad5.fillMaxSize())
-                    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) { zeigeRohstoff(
-                        rohstoff = rohstoff, iconSize = 36.dp, fontsize = 25.sp, text = false,
-                    ) }
+                    RightText(
+                        text = anzahl.toString(),
+                        fontSize = 20.sp,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(5.dp)
+                            .wrapContentSize(Alignment.CenterEnd),
+                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize().gridItem(columnSpan = 2),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        zeigeRohstoff(
+                            rohstoff = rohstoff,
+                            iconSize = marktpreisRohstoffIconGroesse,
+                            fontsize = 25.sp,
+                            text = false,
+                        )
+                    }
                     if ((nicht_null_preise && anzahl != 0) || !nicht_null_preise) {
-                        Text(text = " zu je ",fontSize = 20.sp, modifier = ModiPad5.gridItem(columnSpan = 2))
-                        RightText(text = preis, fontSize = 20.sp, modifier = ModiPad5.fillMaxSize(.9f).gridItem(columnSpan = hAnzahl-4))
+                        Box(
+                            modifier = Modifier.fillMaxSize().gridItem(columnSpan = 2),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(text = "zu je", fontSize = 20.sp)
+                        }
+                        RightText(
+                            text = preis,
+                            fontSize = 20.sp,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(5.dp)
+                                .wrapContentSize(Alignment.CenterEnd)
+                                .gridItem(columnSpan = hAnzahl - 5),
+                        )
                     } else { Box(modifier = Modifier) }
                 }
             }
             Text(
-                modifier = Modifier.padding(5.dp,0.dp).fillMaxSize().gridItem(columnSpan = hAnzahl),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 5.dp)
+                    .wrapContentSize(Alignment.Center)
+                    .gridItem(columnSpan = hAnzahl),
                 text = "${bauteil.str.replaceFirstChar{ it.uppercase() }}: ${bauteil.kosten.zuPreis(marktpreise).zuMark()}",
                 textAlign = TextAlign.Center,
                 fontSize = 25.sp,
