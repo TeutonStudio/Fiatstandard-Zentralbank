@@ -54,8 +54,9 @@ Aus der Anleitung ergeben sich folgende feste Anforderungen:
   Geschäftsbank. Beide sind neutral und haben keinen dauerhaften Spielerbesitzer.
 - Ein Hafen oder Großhafen ist nur an einer Ecke mit mindestens zwei angrenzenden
   Wasserfeldern und zwei angrenzenden Geländefeldern zulässig.
-- In Runde 0 werden Hauptbahnhöfe mit mindestens drei Kanten Abstand zueinander
-  platziert.
+- Bebaute Ecken halten auf dem kürzesten Kantenweg mindestens drei Kanten
+  Abstand zueinander. Abgesehen vom Hauptbahnhof braucht jedes neue Eckgebäude
+  eine intakte Handelslinie an seiner Zielecke.
 - Eine eigene Schiene, ein eigener Bahnhof oder ein eigener Großbahnhof neben
   einer Abbaueinheit bilden unterschiedlich starke Anschlüsse.
 - Frachtschiffe verbinden zwei Häfen und liegen deshalb nicht auf einer normalen
@@ -69,7 +70,6 @@ Code eingehen. Das betrifft vor allem:
 
 - die Zuordnung von Geländetypen zu Rohstoffen,
 - die endgültigen Bau- und Fixkosten,
-- den Drei-Kanten-Abstand nach Runde 0,
 - Mehrfachanschluss beziehungsweise Kontrolle neutraler Anlagen,
 - die Platzierung der Startschienen und Start-Abbaueinheiten,
 - genaue Kriegsbewegungen und Belagerungswerte.
@@ -278,8 +278,9 @@ Mindestens folgende Regeln werden automatisiert:
   Geländefeldern.
 - Eckgebäude und Schienen haben einen gültigen Spieler aus dem Spielstand.
 - Neutrale Feldanlagen besitzen keinen Spieler.
-- Hauptbahnhöfe werden nur in Runde 0 gesetzt und halten mindestens drei Kanten
-  Abstand zu anderen belegten Runde-0-Ecken.
+- Hauptbahnhöfe werden nur in Runde 0 gesetzt. Alle belegten Ecken halten
+  mindestens drei Kanten Abstand; neue Eckgebäude benötigen eine intakte
+  Handelslinie an ihrer Zielecke.
 - Nur erlaubte Aufwertungen sind möglich, beispielsweise Bahnhof zu Großbahnhof
   und Hafen zu Großhafen.
 - Kostenprüfung, Abbuchung und Platzierung sind eine atomare Zustandsänderung.

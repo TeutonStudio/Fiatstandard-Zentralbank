@@ -14,6 +14,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
@@ -141,8 +142,8 @@ class KartenRegelwerkTest {
 
     @Test
     fun bahnhofBuchtKostenUndOrtAtomar() {
-        val start = zustand()
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val start = zustand().mitHandelslinieZu(ecke)
 
         val danach = SpielRegelwerk.wendeAn(
             start,
@@ -159,13 +160,13 @@ class KartenRegelwerkTest {
 
     @Test
     fun fehlendeRohstoffeLassenAuchKarteUnveraendert() {
+        val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val start = zustand().copy(
             spieler = listOf(
                 Spieler(id = anna, name = "Anna"),
                 Spieler(id = bert, name = "Bert"),
             ),
-        )
-        val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        ).mitHandelslinieZu(ecke)
 
         val ergebnis = SpielRegelwerk.wendeAn(
             start,
@@ -175,6 +176,91 @@ class KartenRegelwerkTest {
         assertTrue(ergebnis.isFailure)
         assertTrue(start.karte?.belegung?.ecken.orEmpty().isEmpty())
         assertTrue(start.spieler.first().bauteile.isEmpty())
+    }
+
+    @Test
+    fun eckgebaeudeBrauchtEineIntakteHandelslinieAnDerZielecke() {
+        val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val ohneLinie = SpielRegelwerk.wendeAn(
+            zustand(),
+            SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.BAHNHOF),
+        )
+        val mitZerstoerterLinie = SpielRegelwerk.wendeAn(
+            zustand().mitHandelslinieZu(ecke, BauwerkZustand.ZERSTOERT),
+            SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.BAHNHOF),
+        )
+
+        assertTrue(ohneLinie.isFailure)
+        assertTrue(ohneLinie.exceptionOrNull()?.message.orEmpty().contains("Handelslinie"))
+        assertTrue(mitZerstoerterLinie.isFailure)
+        assertTrue(
+            mitZerstoerterLinie.exceptionOrNull()?.message.orEmpty().contains("intakte Handelslinie"),
+        )
+    }
+
+    @Test
+    fun eckgebaeudeHaeltAufKuerzestemKantenwegMindestensDreiKantenAbstand() {
+        val bestehend = KartenEcke(6, 4)
+        val zuNah = KartenEcke(10, 4)
+        val linien = listOf(
+            KartenKante.zwischen(KartenEcke(6, 4), KartenEcke(8, 4)),
+            KartenKante.zwischen(KartenEcke(8, 4), KartenEcke(10, 4)),
+        )
+        val karte = requireNotNull(zustand().karte)
+        val start = zustand().copy(
+            karte = karte.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(bestehend, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                    ),
+                    kanten = linien.map(::KantenBelegung),
+                ),
+            ),
+        )
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.EckGebaeudeGebaut(anna, zuNah, EckGebaeudeTyp.BAHNHOF),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("mindestens drei Kanten"))
+    }
+
+    @Test
+    fun geplanteHandelslinieErmoeglichtEckgebaeudeBeiGenauDreiKantenAbstand() {
+        val bestehend = KartenEcke(6, 4)
+        val ziel = KartenEcke(12, 4)
+        val bestehendeLinien = listOf(
+            KartenKante.zwischen(KartenEcke(6, 4), KartenEcke(8, 4)),
+            KartenKante.zwischen(KartenEcke(8, 4), KartenEcke(10, 4)),
+        )
+        val geplanteLinie = KartenKante.zwischen(KartenEcke(10, 4), KartenEcke(12, 4))
+        val karte = requireNotNull(zustand().karte)
+        val start = zustand().copy(
+            karte = karte.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(bestehend, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                    ),
+                    kanten = bestehendeLinien.map(::KantenBelegung),
+                ),
+            ),
+        )
+
+        val nachHandelslinie = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.SchieneGebaut(anna, geplanteLinie),
+        ).getOrThrow()
+        val danach = SpielRegelwerk.wendeAn(
+            nachHandelslinie,
+            SpielEreignis.EckGebaeudeGebaut(anna, ziel, EckGebaeudeTyp.BAHNHOF),
+        ).getOrThrow()
+
+        assertEquals(
+            EckGebaeudeTyp.BAHNHOF,
+            danach.karte?.belegung?.eckenNachPosition?.get(ziel)?.typ,
+        )
     }
 
     @Test
@@ -261,7 +347,10 @@ class KartenRegelwerkTest {
     @Test
     fun hafenBrauchtZweiWasserUndZweiGelaendefelder() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
-        val kuestenLand = angrenzendeFelder(ecke).take(2).map { feld ->
+        val hafenKante = benachbarteEcken(ecke)
+            .map { nachbar -> KartenKante.zwischen(ecke, nachbar) }
+            .first()
+        val kuestenLand = angrenzendeFelder(hafenKante).map { feld ->
             GelaendeFeld(feld, GelaendeTyp.EBENE)
         }
         val start = zustand().copy(
@@ -270,6 +359,7 @@ class KartenRegelwerkTest {
                 name = "Küste",
                 hexagon = KartenHexagon(radius = 12),
                 gelaendefelder = kuestenLand,
+                belegung = KartenBelegung(kanten = listOf(KantenBelegung(hafenKante))),
             ),
         )
 
@@ -298,8 +388,8 @@ class KartenRegelwerkTest {
 
     @Test
     fun kartenereignisIstRueckgaengigUndWiederholbar() {
-        val start = zustand()
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val start = zustand().mitHandelslinieZu(ecke)
         val ablauf = SpielAblauf(start)
         ablauf.ereignisAnwenden(
             SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.BAHNHOF),
@@ -499,4 +589,25 @@ class KartenRegelwerkTest {
         phase = ZugPhase.Epizug,
         prozug = ProzugStatus(begonnen = true, erfolgreichAbgeschlossen = true),
     )
+
+    private fun SpielZustand.mitHandelslinieZu(
+        ecke: KartenEcke,
+        linienZustand: BauwerkZustand = BauwerkZustand.INTAKT,
+    ): SpielZustand {
+        val karte = requireNotNull(karte)
+        val kante = benachbarteEcken(ecke)
+            .asSequence()
+            .map { nachbar -> KartenKante.zwischen(ecke, nachbar) }
+            .first { kandidat ->
+                val nachbarn = angrenzendeFelder(kandidat)
+                nachbarn.size == 2 && nachbarn.all { feld -> feld in karte.landNachPosition }
+            }
+        return copy(
+            karte = karte.copy(
+                belegung = karte.belegung.copy(
+                    kanten = karte.belegung.kanten + KantenBelegung(kante, linienZustand),
+                ),
+            ),
+        )
+    }
 }

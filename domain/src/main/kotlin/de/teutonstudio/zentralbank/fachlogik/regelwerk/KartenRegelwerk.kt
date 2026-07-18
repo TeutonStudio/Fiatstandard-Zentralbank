@@ -12,10 +12,12 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.SeewegBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
@@ -55,14 +57,7 @@ internal object KartenRegelwerk {
         }) {
             "${ereignis.spieler.wert} hat bereits einen Hauptbahnhof."
         }
-        karte.belegung.ecken
-            .filter { it.typ == EckGebaeudeTyp.HAUPTBAHNHOF }
-            .forEach { bestehend ->
-                val abstand = kantenAbstand(ereignis.ecke, bestehend.position, maximal = 2)
-                require(abstand == null || abstand >= 3) {
-                    "Hauptbahnhöfe müssen mindestens drei Kanten Abstand halten."
-                }
-            }
+        pruefeEckMindestabstand(karte, ereignis.ecke)
 
         val neueEcken = karte.belegung.ecken + EckBelegung(
             position = ereignis.ecke,
@@ -122,6 +117,8 @@ internal object KartenRegelwerk {
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
             "Die gewählte Ecke ist bereits belegt."
         }
+        pruefeEckMindestabstand(karte, ereignis.ecke)
+        pruefeHandelslinienAnschluss(karte, ereignis.ecke)
         if (ereignis.typ == EckGebaeudeTyp.HAFEN || ereignis.typ == EckGebaeudeTyp.GROSSHAFEN) {
             require(KartenAuswertung.istHafenstandort(karte, ereignis.ecke)) {
                 "Ein Hafen braucht mindestens zwei Wasser- und zwei angrenzende Geländefelder."
@@ -512,6 +509,8 @@ internal object KartenRegelwerk {
         require(karte.belegung.ecken.none { it.position == ereignis.ecke }) {
             "Die gewählte Ecke ist bereits belegt."
         }
+        pruefeEckMindestabstand(karte, ereignis.ecke)
+        pruefeHandelslinienAnschluss(karte, ereignis.ecke)
         if (ereignis.typ == EckGebaeudeTyp.HAFEN || ereignis.typ == EckGebaeudeTyp.GROSSHAFEN) {
             require(KartenAuswertung.istHafenstandort(karte, ereignis.ecke)) {
                 "Ein Hafen braucht mindestens zwei Wasser- und zwei angrenzende Geländefelder."
@@ -689,6 +688,30 @@ internal object KartenRegelwerk {
             val bauteile = bestand.bauteile.toMutableMap()
             if (neu == 0) bauteile.remove(bauteil) else bauteile[bauteil] = neu
             bestand.copy(bauteile = bauteile.toMap())
+        }
+    }
+
+    private fun pruefeEckMindestabstand(
+        karte: Spielkarte,
+        ecke: KartenEcke,
+    ) {
+        karte.belegung.ecken.forEach { bestehend ->
+            require(kantenAbstand(ecke, bestehend.position, maximal = 2) == null) {
+                "Bebaute Ecken müssen auf dem kürzesten Kantenweg mindestens drei Kanten " +
+                    "Abstand halten."
+            }
+        }
+    }
+
+    private fun pruefeHandelslinienAnschluss(
+        karte: Spielkarte,
+        ecke: KartenEcke,
+    ) {
+        require(karte.belegung.kanten.any { handelslinie ->
+            handelslinie.zustand == BauwerkZustand.INTAKT &&
+                (handelslinie.position.anfang == ecke || handelslinie.position.ende == ecke)
+        }) {
+            "Eine Ecke kann nur bebaut werden, wenn eine intakte Handelslinie dorthin führt."
         }
     }
 
