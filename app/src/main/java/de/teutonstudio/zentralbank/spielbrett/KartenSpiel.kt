@@ -6,16 +6,20 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -29,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
@@ -38,6 +43,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
+import de.teutonstudio.zentralbank.fachlogik.modell.Geld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -92,6 +98,20 @@ private enum class SpielKartenWerkzeug(
     FELD_ENTFERNEN("Entfernen", KartenZielModus.FELD),
 }
 
+private val planbareWerkzeuge: List<SpielKartenWerkzeug> =
+    SpielKartenWerkzeug.entries.filter { eintrag ->
+        eintrag.startBauteil != null &&
+            eintrag != SpielKartenWerkzeug.HAUPTBAHNHOF &&
+            !eintrag.nurRundeNull
+    }
+
+private data class GeplanterBauauftrag(
+    val werkzeug: SpielKartenWerkzeug,
+    val bauteil: BauteilTyp,
+    val ziel: KartenOrt,
+    val ereignis: SpielEreignis,
+)
+
 @Composable
 fun KartenSpielBildschirm(
     zustand: SpielZustand,
@@ -103,6 +123,8 @@ fun KartenSpielBildschirm(
     vorgewaehltesBauteil: BauteilTyp? = null,
     beiBauauftragBeendet: () -> Unit = {},
     beiBauAusFinanzmitteln: ((SpielEreignis, Map<Rohstoff, Int>) -> Boolean)? = null,
+    beiBauplanAusLager: ((List<SpielEreignis>) -> Boolean)? = null,
+    beiBauplanAusFinanzmitteln: ((List<SpielEreignis>, Map<Rohstoff, Int>) -> Boolean)? = null,
 ) {
     val karte = zustand.karte
     if (karte == null) {
@@ -154,9 +176,88 @@ fun KartenSpielBildschirm(
     var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var ausgewaehltesZiel by remember { mutableStateOf<KartenOrt?>(null) }
     var seewegStart by remember { mutableStateOf<KartenOrt.Ecke?>(null) }
+    var planungsmodus by remember(zustand.spielabschnitt, aktiverSpieler) {
+        mutableStateOf(false)
+    }
+    var geplanteBauten by remember(zustand.spielabschnitt, aktiverSpieler) {
+        mutableStateOf(emptyList<GeplanterBauauftrag>())
+    }
+    var planungsFehler by remember(zustand.spielabschnitt, aktiverSpieler) {
+        mutableStateOf<String?>(null)
+    }
+
+    val planungsErgebnis = remember(zustand, geplanteBauten) {
+        projiziereBauplan(zustand, geplanteBauten)
+    }
+    val planungsZustand = planungsErgebnis.getOrElse { zustand }
+    val geplanteRohstoffkosten = remember(geplanteBauten) {
+        bauRohstoffKosten(geplanteBauten.map { auftrag -> auftrag.bauteil })
+    }
+    val fehlendePlanRohstoffe = remember(zustand, geplanteRohstoffkosten) {
+        fehlendeBauRohstoffe(zustand, geplanteRohstoffkosten)
+    }
+    val lagerPruefung = remember(zustand, geplanteBauten) {
+        pruefeBauereignisse(zustand, geplanteBauten.map { auftrag -> auftrag.ereignis })
+    }
+    val finanziertePruefung = remember(zustand, geplanteBauten, fehlendePlanRohstoffe) {
+        pruefeBauereignisse(
+            zustand.mitZusaetzlichenRohstoffen(fehlendePlanRohstoffe),
+            geplanteBauten.map { auftrag -> auftrag.ereignis },
+        )
+    }
+
+    val setzePlanungsmodus: (Boolean) -> Unit = { aktiv ->
+        planungsmodus = aktiv && zustand.spielabschnitt == Spielabschnitt.REGULAER
+        ausgewaehltesZiel = null
+        seewegStart = null
+        planungsFehler = null
+        if (!planungsmodus) {
+            geplanteBauten = emptyList()
+        } else if (werkzeug !in planbareWerkzeuge) {
+            werkzeug = SpielKartenWerkzeug.BAHNHOF
+        }
+    }
+
+    val bauwerkPlanen: (KartenOrt) -> Unit = planen@ { ziel ->
+        val bauteil = werkzeug.startBauteil
+        if (werkzeug !in planbareWerkzeuge || bauteil == null) {
+            planungsFehler = "Im Planungsmodus können nur neue Bauwerke gewählt werden."
+            return@planen
+        }
+        val ereignis = runCatching {
+            werkzeug.erstelleEreignis(
+                zustand = planungsZustand,
+                ziel = ziel,
+                rohstoff = rohstoff,
+                seewegStart = seewegStart,
+            )
+        }.getOrElse { fehler ->
+            planungsFehler = fehler.message ?: "Der Bauauftrag konnte nicht erstellt werden."
+            return@planen
+        }
+        val pruefzustand = planungsZustand.mitZusaetzlichenRohstoffen(
+            fehlendeBauRohstoffe(planungsZustand, bauteil),
+        )
+        SpielRegelwerk.wendeAn(pruefzustand, ereignis).fold(
+            onSuccess = {
+                geplanteBauten = geplanteBauten + GeplanterBauauftrag(
+                    werkzeug = werkzeug,
+                    bauteil = bauteil,
+                    ziel = ziel,
+                    ereignis = ereignis,
+                )
+                planungsFehler = null
+            },
+            onFailure = { fehler ->
+                planungsFehler = fehler.message ?: "Das Bauwerk kann dort nicht geplant werden."
+            },
+        )
+        seewegStart = null
+    }
 
     LaunchedEffect(vorgewaehltesBauteil) {
         vorgewaehltesBauteil?.let { bauteil ->
+            setzePlanungsmodus(false)
             SpielKartenWerkzeug.entries.firstOrNull { eintrag ->
                 eintrag.startBauteil == bauteil
             }?.let { externesWerkzeug ->
@@ -191,18 +292,25 @@ fun KartenSpielBildschirm(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(
-                        selected = false,
-                        enabled = false,
-                        onClick = {},
-                        label = { Text("Bauen") },
+                        selected = planungsmodus,
+                        enabled = zustand.spielabschnitt == Spielabschnitt.REGULAER &&
+                            vorgewaehltesBauteil == null,
+                        onClick = { setzePlanungsmodus(true) },
+                        label = { Text("Planen") },
                     )
-                    FilterChip(selected = true, onClick = {}, label = { Text("Spielen") })
+                    FilterChip(
+                        selected = !planungsmodus,
+                        onClick = { setzePlanungsmodus(false) },
+                        label = { Text("Spielen") },
+                    )
                 }
             }
         }
 
         BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
             val breiteAnsicht = maxWidth >= 840.dp
+            val warenkorbEingebettet = !kompakteZentrale &&
+                planungsmodus && maxWidth >= 1180.dp
             val werkzeugleiste: @Composable (Modifier) -> Unit = { leistenModifier ->
                 SpielWerkzeugleiste(
                     modifier = leistenModifier,
@@ -221,12 +329,71 @@ fun KartenSpielBildschirm(
                     rundeNull = zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL,
                     rundeNullWerkzeuge = rundeNullWerkzeuge,
                     rundeNullRestbestand = rundeNullRestbestand,
+                    planungsmodus = planungsmodus,
+                )
+            }
+            val warenkorb: @Composable (Modifier) -> Unit = { warenkorbModifier ->
+                BauwerkWarenkorb(
+                    modifier = warenkorbModifier,
+                    werkzeug = werkzeug,
+                    beiWerkzeug = { neu ->
+                        werkzeug = neu
+                        ausgewaehltesZiel = null
+                        seewegStart = null
+                        planungsFehler = null
+                    },
+                    geplanteBauten = geplanteBauten,
+                    marktpreise = zustand.marktpreise,
+                    rohstoffkosten = geplanteRohstoffkosten,
+                    fehlendeRohstoffe = fehlendePlanRohstoffe,
+                    fehlermeldung = planungsFehler
+                        ?: planungsErgebnis.exceptionOrNull()?.message,
+                    lagerBauMoeglich = geplanteBauten.isNotEmpty() && lagerPruefung.isSuccess,
+                    finanzierterBauMoeglich = geplanteBauten.isNotEmpty() &&
+                        finanziertePruefung.isSuccess,
+                    beiEntfernen = { index ->
+                        val gekuerzt = geplanteBauten.filterIndexed { aktuellerIndex, _ ->
+                            aktuellerIndex != index
+                        }
+                        projiziereBauplan(zustand, gekuerzt).fold(
+                            onSuccess = {
+                                geplanteBauten = gekuerzt
+                                planungsFehler = null
+                                seewegStart = null
+                            },
+                            onFailure = { fehler ->
+                                planungsFehler = fehler.message
+                                    ?: "Der Bauauftrag wird von späteren Planungen benötigt."
+                            },
+                        )
+                    },
+                    beiAusLagerBauen = {
+                        val gebaut = beiBauplanAusLager?.invoke(
+                            geplanteBauten.map { auftrag -> auftrag.ereignis },
+                        ) == true
+                        if (gebaut) setzePlanungsmodus(false)
+                    },
+                    beiAusFinanzmittelnBauen = {
+                        val gebaut = beiBauplanAusFinanzmitteln?.invoke(
+                            geplanteBauten.map { auftrag -> auftrag.ereignis },
+                            fehlendePlanRohstoffe,
+                        ) == true
+                        if (gebaut) setzePlanungsmodus(false)
+                    },
+                    lagerAktionVorhanden = beiBauplanAusLager != null,
+                    finanzAktionVorhanden = beiBauplanAusFinanzmitteln != null,
+                    beiSchliessen = { setzePlanungsmodus(false) },
                 )
             }
             val brett: @Composable (Modifier) -> Unit = { brettModifier ->
+                val angezeigteKarte = if (planungsmodus) {
+                    planungsZustand.karte ?: karte
+                } else {
+                    karte
+                }
                 Box(modifier = brettModifier) {
                     Spielbrett3D(
-                        modell = karte.zu3DModell(
+                        modell = angezeigteKarte.zu3DModell(
                             spielerReihenfolge = zustand.spieler.map { it.id },
                             hervorhebung = ausgewaehltesZiel ?: seewegStart,
                         ),
@@ -234,16 +401,22 @@ fun KartenSpielBildschirm(
                         betrachtungsStatus = betrachtungsStatus,
                         kameraInteraktionsModus = kameraModus,
                         himmel = himmel,
-                        onDreieckBeruehrt = { treffer ->
-                            if (!kompakteZentrale || vorgewaehltesBauteil != null) {
+                        onDreieckBeruehrt = beruehrung@ { treffer ->
+                            if (planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null) {
                                 val ziel = treffer.zuKartenOrt(werkzeug.ziel)
+                                    ?: return@beruehrung
                                 if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
                                     val hafen = ziel as KartenOrt.Ecke
                                     if (seewegStart == null) {
                                         seewegStart = hafen
+                                        planungsFehler = null
+                                    } else if (planungsmodus) {
+                                        bauwerkPlanen(hafen)
                                     } else {
                                         ausgewaehltesZiel = hafen
                                     }
+                                } else if (planungsmodus) {
+                                    bauwerkPlanen(ziel)
                                 } else {
                                     ausgewaehltesZiel = ziel
                                 }
@@ -260,13 +433,23 @@ fun KartenSpielBildschirm(
                             Modifier.align(Alignment.TopEnd).padding(8.dp)
                         },
                     )
-                    if (!kompakteZentrale || vorgewaehltesBauteil != null) {
+                    if (planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null) {
                         Surface(
                             modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
                             shape = MaterialTheme.shapes.medium,
                             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
                         ) {
-                            if (vorgewaehltesBauteil != null) {
+                            if (planungsmodus) {
+                                Text(
+                                    if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
+                                        "Planen: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
+                                    } else {
+                                        "Planen: ${werkzeug.beschriftung} auf der Karte wählen"
+                                    },
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            } else if (vorgewaehltesBauteil != null) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -310,6 +493,9 @@ fun KartenSpielBildschirm(
                 ) {
                     werkzeugleiste(Modifier.widthIn(max = 360.dp).fillMaxSize())
                     brett(Modifier.weight(1f).fillMaxSize())
+                    if (warenkorbEingebettet) {
+                        warenkorb(Modifier.widthIn(min = 280.dp, max = 340.dp).fillMaxHeight())
+                    }
                 }
             } else {
                 Column(
@@ -319,6 +505,30 @@ fun KartenSpielBildschirm(
                     werkzeugleiste(Modifier.fillMaxWidth().heightIn(max = 300.dp))
                     brett(Modifier.weight(1f).fillMaxWidth())
                 }
+            }
+            if (zustand.spielabschnitt == Spielabschnitt.REGULAER &&
+                vorgewaehltesBauteil == null && !planungsmodus && kompakteZentrale
+            ) {
+                OutlinedButton(
+                    onClick = { setzePlanungsmodus(true) },
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                ) {
+                    Text("Planen")
+                }
+            }
+            if (planungsmodus && !warenkorbEingebettet) {
+                warenkorb(
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(
+                            top = if (kompakteZentrale) 76.dp else 8.dp,
+                            end = 8.dp,
+                            bottom = if (kompakteZentrale) 56.dp else 8.dp,
+                        )
+                        .fillMaxHeight()
+                        .widthIn(max = 340.dp)
+                        .fillMaxWidth(),
+                )
             }
         }
     }
@@ -450,14 +660,57 @@ fun KartenSpielBildschirm(
 internal fun fehlendeBauRohstoffe(
     zustand: SpielZustand,
     bauteil: BauteilTyp,
+): Map<Rohstoff, Int> = fehlendeBauRohstoffe(zustand, bauteil.kosten)
+
+internal fun fehlendeBauRohstoffe(
+    zustand: SpielZustand,
+    kosten: Map<Rohstoff, Int>,
 ): Map<Rohstoff, Int> {
     val aktiverSpieler = zustand.spieler.firstOrNull { spieler ->
         spieler.id == zustand.aktiverSpieler
-    } ?: return bauteil.kosten
-    return bauteil.kosten.mapNotNull { (rohstoff, kosten) ->
-        val fehlen = kosten - aktiverSpieler.rohstoffe.getOrDefault(rohstoff, 0)
+    } ?: return kosten
+    return kosten.mapNotNull { (rohstoff, menge) ->
+        val fehlen = menge - aktiverSpieler.rohstoffe.getOrDefault(rohstoff, 0)
         if (fehlen > 0) rohstoff to fehlen else null
     }.toMap()
+}
+
+internal fun bauRohstoffKosten(bauteile: Iterable<BauteilTyp>): Map<Rohstoff, Int> =
+    bauteile
+        .flatMap { bauteil -> bauteil.kosten.entries }
+        .groupingBy { eintrag -> eintrag.key }
+        .fold(0) { summe, eintrag -> summe + eintrag.value }
+        .toSortedMap(compareBy(Rohstoff::ordinal))
+
+internal fun marktpreisSumme(
+    kosten: Map<Rohstoff, Int>,
+    marktpreise: Map<Rohstoff, Geld>,
+): Geld? {
+    if (kosten.any { (rohstoff, menge) -> menge > 0 && rohstoff !in marktpreise }) return null
+    return kosten.entries.fold(Geld.NULL) { summe, (rohstoff, menge) ->
+        summe + (marktpreise[rohstoff] ?: Geld.NULL) * menge
+    }
+}
+
+private fun pruefeBauereignisse(
+    ausgangszustand: SpielZustand,
+    ereignisse: List<SpielEreignis>,
+): Result<SpielZustand> = runCatching {
+    ereignisse.fold(ausgangszustand) { aktuellerZustand, ereignis ->
+        SpielRegelwerk.wendeAn(aktuellerZustand, ereignis).getOrThrow()
+    }
+}
+
+private fun projiziereBauplan(
+    ausgangszustand: SpielZustand,
+    auftraege: List<GeplanterBauauftrag>,
+): Result<SpielZustand> = runCatching {
+    auftraege.fold(ausgangszustand) { aktuellerZustand, auftrag ->
+        val pruefzustand = aktuellerZustand.mitZusaetzlichenRohstoffen(
+            fehlendeBauRohstoffe(aktuellerZustand, auftrag.bauteil),
+        )
+        SpielRegelwerk.wendeAn(pruefzustand, auftrag.ereignis).getOrThrow()
+    }
 }
 
 private fun SpielZustand.mitZusaetzlichenRohstoffen(
@@ -483,6 +736,205 @@ private fun Rohstoff.anzeigeName(): String = name.lowercase().replace('_', ' ')
     .replaceFirstChar(Char::uppercase)
 
 @Composable
+private fun BauwerkWarenkorb(
+    modifier: Modifier,
+    werkzeug: SpielKartenWerkzeug,
+    beiWerkzeug: (SpielKartenWerkzeug) -> Unit,
+    geplanteBauten: List<GeplanterBauauftrag>,
+    marktpreise: Map<Rohstoff, Geld>,
+    rohstoffkosten: Map<Rohstoff, Int>,
+    fehlendeRohstoffe: Map<Rohstoff, Int>,
+    fehlermeldung: String?,
+    lagerBauMoeglich: Boolean,
+    finanzierterBauMoeglich: Boolean,
+    beiEntfernen: (Int) -> Unit,
+    beiAusLagerBauen: () -> Unit,
+    beiAusFinanzmittelnBauen: () -> Unit,
+    lagerAktionVorhanden: Boolean,
+    finanzAktionVorhanden: Boolean,
+    beiSchliessen: () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("Bauwerk-Warenkorb", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (geplanteBauten.size == 1) {
+                            "1 Bauwerk geplant"
+                        } else {
+                            "${geplanteBauten.size} Bauwerke geplant"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+                TextButton(onClick = beiSchliessen) { Text("Verwerfen") }
+            }
+
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Bauwerk wählen", style = MaterialTheme.typography.labelLarge)
+                        WerkzeugChips(
+                            werkzeuge = planbareWerkzeuge,
+                            ausgewaehlt = werkzeug,
+                            beiWerkzeug = beiWerkzeug,
+                        )
+                        Text(
+                            "Danach den Bauort auf der Karte antippen.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+
+                if (geplanteBauten.isEmpty()) {
+                    item {
+                        Text(
+                            "Noch keine Bauwerke im Warenkorb.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+
+                itemsIndexed(geplanteBauten) { index, auftrag ->
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        tonalElevation = 2.dp,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "${index + 1}. ${auftrag.werkzeug.beschriftung}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                TextButton(onClick = { beiEntfernen(index) }) {
+                                    Text("Entfernen")
+                                }
+                            }
+                            Text(
+                                auftrag.ziel.anzeigeText(),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                "Rohstoffkosten: ${auftrag.bauteil.kosten.alsKostenText()}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                "Marktpreis: " + marktpreisSumme(
+                                    auftrag.bauteil.kosten,
+                                    marktpreise,
+                                ).alsPreisText(),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        HorizontalDivider()
+                        Text("Rohstoffkosten gesamt", style = MaterialTheme.typography.titleSmall)
+                        if (rohstoffkosten.isEmpty()) {
+                            Text("Keine", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            rohstoffkosten.forEach { (rohstoff, menge) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        "$menge × ${rohstoff.anzeigeName()}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                    Text(
+                                        marktpreisSumme(
+                                            mapOf(rohstoff to menge),
+                                            marktpreise,
+                                        ).alsPreisText(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text("Marktpreis (Summe)", fontWeight = FontWeight.Bold)
+                            Text(
+                                marktpreisSumme(rohstoffkosten, marktpreise).alsPreisText(),
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        if (fehlendeRohstoffe.isNotEmpty()) {
+                            Text(
+                                "Fehlt im Lager: ${fehlendeRohstoffe.alsKostenText()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        fehlermeldung?.let { meldung ->
+                            Text(
+                                meldung,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+            }
+
+            OutlinedButton(
+                onClick = beiAusLagerBauen,
+                enabled = lagerBauMoeglich && lagerAktionVorhanden,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Plan aus Lager errichten")
+            }
+            Button(
+                onClick = beiAusFinanzmittelnBauen,
+                enabled = finanzierterBauMoeglich && finanzAktionVorhanden,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Plan mit Finanzmitteln errichten")
+            }
+        }
+    }
+}
+
+private fun Map<Rohstoff, Int>.alsKostenText(): String = if (isEmpty()) {
+    "keine"
+} else {
+    entries.joinToString { (rohstoff, menge) -> "$menge × ${rohstoff.anzeigeName()}" }
+}
+
+private fun Geld?.alsPreisText(): String = this?.zuMarkString() ?: "nicht verfügbar"
+
+@Composable
 private fun SpielWerkzeugleiste(
     modifier: Modifier,
     werkzeug: SpielKartenWerkzeug,
@@ -496,6 +948,7 @@ private fun SpielWerkzeugleiste(
     rundeNull: Boolean,
     rundeNullWerkzeuge: List<SpielKartenWerkzeug>,
     rundeNullRestbestand: Map<BauteilTyp, Int>,
+    planungsmodus: Boolean,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
@@ -524,6 +977,13 @@ private fun SpielWerkzeugleiste(
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
                 mengen = rundeNullRestbestand,
+            )
+        } else if (planungsmodus) {
+            Text("Planbare Bauwerke", style = MaterialTheme.typography.titleSmall)
+            WerkzeugChips(
+                werkzeuge = planbareWerkzeuge,
+                ausgewaehlt = werkzeug,
+                beiWerkzeug = beiWerkzeug,
             )
         } else {
             Text("Ecke", style = MaterialTheme.typography.titleSmall)

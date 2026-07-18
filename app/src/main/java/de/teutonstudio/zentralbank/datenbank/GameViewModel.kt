@@ -148,7 +148,16 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
     fun baueMitAuslandseinkauf(
         bauEreignis: SpielEreignis,
         fehlendeRohstoffe: Map<Rohstoff, Int>,
+    ): Boolean = baueBauplanMitAuslandseinkauf(listOf(bauEreignis), fehlendeRohstoffe)
+
+    fun baueBauplanMitAuslandseinkauf(
+        bauEreignisse: List<SpielEreignis>,
+        fehlendeRohstoffe: Map<Rohstoff, Int>,
     ): Boolean {
+        if (bauEreignisse.isEmpty()) {
+            _spielFehler.tryEmit("Der Bauplan enthält keine Bauwerke.")
+            return false
+        }
         val ausgangszustand = spielAblauf?.zustand ?: run {
             _spielFehler.tryEmit("Kein Spiel geladen.")
             return false
@@ -186,7 +195,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
             }
 
         val fachEreignisse = runCatching {
-            handelsvorgaenge.map { handel -> handel.zuFachEreignis() } + bauEreignis
+            handelsvorgaenge.map { handel -> handel.zuFachEreignis() } + bauEreignisse
         }.getOrElse { fehler ->
             _spielFehler.tryEmit(fehler.message ?: "Auslandseinkauf konnte nicht vorbereitet werden.")
             return false
@@ -204,7 +213,40 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         handelsvorgaenge.forEach { handel ->
             if (!erfasseRohstoffhandel(handel)) return false
         }
-        return uebernehmeFachEreignis(bauEreignis)
+        return bauplanAnwenden(bauEreignisse)
+    }
+
+    fun bauplanAnwenden(bauEreignisse: List<SpielEreignis>): Boolean {
+        if (bauEreignisse.isEmpty()) {
+            _spielFehler.tryEmit("Der Bauplan enthält keine Bauwerke.")
+            return false
+        }
+        val ablauf = spielAblauf ?: run {
+            _spielFehler.tryEmit("Kein Spiel geladen.")
+            return false
+        }
+        val vorher = ablauf.zustand
+        val pruefung = bauEreignisse.fold(Result.success(vorher)) { bisher, ereignis ->
+            bisher.mapCatching { zustand ->
+                SpielRegelwerk.wendeAn(zustand, ereignis).getOrThrow()
+            }
+        }
+        pruefung.exceptionOrNull()?.let { fehler ->
+            _spielFehler.tryEmit(fehler.message ?: "Der Bauplan wurde fachlich abgelehnt.")
+            return false
+        }
+
+        for (ereignis in bauEreignisse) {
+            val ergebnis = ablauf.ereignisAnwenden(ereignis)
+            if (ergebnis.isFailure) {
+                _spielFehler.tryEmit(
+                    ergebnis.exceptionOrNull()?.message ?: "Der Bauplan konnte nicht übernommen werden."
+                )
+                return false
+            }
+        }
+        uebernehmeEreignisErgebnis(vorher, ablauf.zustand)
+        return true
     }
 
     fun ereignisRueckgaengig() {

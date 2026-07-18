@@ -188,6 +188,8 @@ fun Navigation(viewModel: GameViewModel) {
                             vorgewaehltesBauteil = bauauftrag,
                             beiBauauftragBeendet = { bauauftrag = null },
                             beiBauAusFinanzmitteln = viewModel::baueMitAuslandseinkauf,
+                            beiBauplanAusLager = viewModel::bauplanAnwenden,
+                            beiBauplanAusFinanzmitteln = viewModel::baueBauplanMitAuslandseinkauf,
                         )
                     }
                 }
@@ -334,6 +336,8 @@ fun Navigation(viewModel: GameViewModel) {
                             beiRueckgaengig = viewModel::ereignisRueckgaengig,
                             beiWiederholen = viewModel::ereignisWiederholen,
                             modifier = Modifier.fillMaxSize(),
+                            beiBauplanAusLager = viewModel::bauplanAnwenden,
+                            beiBauplanAusFinanzmitteln = viewModel::baueBauplanMitAuslandseinkauf,
                         )
                     }
                 }
