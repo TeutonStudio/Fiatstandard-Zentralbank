@@ -1,41 +1,5 @@
 package de.teutonstudio.zentralbank.datenbank
 
-import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
-import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
-import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
-import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
-
-private val testSpielKarte = Spielkarte(
-    id = "testspiel-inselreich",
-    name = "Testspiel – Inselreich",
-    hexagon = KartenHexagon(radius = 3),
-    gelaendefelder = listOf(
-        GelaendeFeld(KartenFeld(-2, 0, DreieckHaelfte.OBEN), GelaendeTyp.WALD),
-        GelaendeFeld(KartenFeld(-2, 1, DreieckHaelfte.OBEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(-2, 1, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(-1, -1, DreieckHaelfte.OBEN), GelaendeTyp.WALD),
-        GelaendeFeld(KartenFeld(-1, 0, DreieckHaelfte.OBEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(-1, 0, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(-1, 1, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(-1, 1, DreieckHaelfte.OBEN), GelaendeTyp.GEBIRGE),
-        GelaendeFeld(KartenFeld(-1, 2, DreieckHaelfte.UNTEN), GelaendeTyp.GEBIRGE),
-        GelaendeFeld(KartenFeld(0, -1, DreieckHaelfte.UNTEN), GelaendeTyp.WALD),
-        GelaendeFeld(KartenFeld(0, -1, DreieckHaelfte.OBEN), GelaendeTyp.SUMPF),
-        GelaendeFeld(KartenFeld(0, 0, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(0, 0, DreieckHaelfte.OBEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(0, 1, DreieckHaelfte.UNTEN), GelaendeTyp.WUESTE),
-        GelaendeFeld(KartenFeld(0, 1, DreieckHaelfte.OBEN), GelaendeTyp.WUESTE),
-        GelaendeFeld(KartenFeld(1, -2, DreieckHaelfte.OBEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(1, -1, DreieckHaelfte.OBEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(1, -1, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(2, -2, DreieckHaelfte.OBEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(2, -2, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-        GelaendeFeld(KartenFeld(2, -1, DreieckHaelfte.UNTEN), GelaendeTyp.EBENE),
-    ),
-)
-
 object TestSpiel : Spiel(
     leitzinssatz = 2.0f,
     spieler = testSpieler.associateWith { 100.toZahlungsmittel() },

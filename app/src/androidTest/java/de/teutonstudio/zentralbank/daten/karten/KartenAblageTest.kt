@@ -2,16 +2,89 @@ package de.teutonstudio.zentralbank.daten.karten
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import de.teutonstudio.zentralbank.datenbank.TestSpiel
+import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import java.io.File
+import java.util.ArrayDeque
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class KartenAblageTest {
+    @Test
+    fun EuropaVorlagenWerdenInFuenfSkalierungenGeladen() = runBlocking {
+        val kontext = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        val europaVorlagen = KartenAblage(kontext).alleKartenLaden()
+            .filter { eintrag ->
+                eintrag.quelle == KartenQuelle.VORLAGE &&
+                    eintrag.vorlage.id.startsWith("vorlage-europa-")
+            }
+            .map(KartenEintrag::vorlage)
+            .sortedBy { vorlage -> vorlage.hexagon.radius }
+
+        assertEquals(
+            listOf(
+                "vorlage-europa-1-kompakt",
+                "vorlage-europa-2-klein",
+                "vorlage-europa-3-mittel",
+                "vorlage-europa-4-gross",
+                "vorlage-europa-5-kontinental",
+            ),
+            europaVorlagen.map(KartenVorlage::id),
+        )
+        assertEquals(listOf(11, 13, 15, 17, 19), europaVorlagen.map { it.hexagon.radius })
+        assertEquals(
+            listOf(420, 594, 796, 1019, 1281),
+            europaVorlagen.map { vorlage -> vorlage.gelaendefelder.size },
+        )
+        assertTrue(
+            europaVorlagen.zipWithNext().all { (kleiner, groesser) ->
+                kleiner.gelaendefelder.size < groesser.gelaendefelder.size
+            },
+        )
+
+        val testspielKarte = requireNotNull(TestSpiel.karte)
+        val groessteVorlage = europaVorlagen.last()
+        assertEquals("testspiel-europa-5-kontinental", testspielKarte.id)
+        assertEquals(groessteVorlage.hexagon, testspielKarte.hexagon)
+        assertEquals(groessteVorlage.gelaendefelder, testspielKarte.gelaendefelder)
+    }
+
+    @Test
+    fun KompakteEuropaTopologieTrenntBritischeInselnUndErschliesstDenOsten() = runBlocking {
+        val kontext = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val kompakt = KartenAblage(kontext).alleKartenLaden()
+            .single { eintrag -> eintrag.vorlage.id == "vorlage-europa-1-kompakt" }
+            .vorlage
+        val land = kompakt.gelaendefelder.mapTo(mutableSetOf()) { feld -> feld.position }
+        val irland = KartenFeld(-1, -9, DreieckHaelfte.OBEN)
+        val grossbritannien = KartenFeld(-1, -7, DreieckHaelfte.UNTEN)
+        val festland = KartenFeld(1, -5, DreieckHaelfte.OBEN)
+        val russland = KartenFeld(-3, 9, DreieckHaelfte.UNTEN)
+        val kaukasus = KartenFeld(6, 2, DreieckHaelfte.UNTEN)
+        val anatolien = KartenFeld(7, -1, DreieckHaelfte.UNTEN)
+
+        assertTrue(
+            listOf(irland, grossbritannien, festland, russland, kaukasus, anatolien)
+                .all { position -> position in land },
+        )
+        assertFalse(grossbritannien in erreichbareLandfelder(irland, land))
+        assertFalse(festland in erreichbareLandfelder(grossbritannien, land))
+
+        val festlandKomponente = erreichbareLandfelder(festland, land)
+        assertTrue(russland in festlandKomponente)
+        assertTrue(kaukasus in festlandKomponente)
+        assertTrue(anatolien in festlandKomponente)
+    }
+
     @Test
     fun VorlageWirdGeladenUndEigeneKarteBleibtErhalten() = runBlocking {
         val kontext = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -107,5 +180,30 @@ class KartenAblageTest {
             ablage.eigeneKarteLoeschen(gespeichert.id)
             quellbild.delete()
         }
+    }
+
+    private fun erreichbareLandfelder(
+        start: KartenFeld,
+        land: Set<KartenFeld>,
+    ): Set<KartenFeld> {
+        require(start in land)
+        val felderNachKante = buildMap {
+            land.forEach { feld ->
+                feld.kanten().forEach { kante ->
+                    getOrPut(kante) { mutableListOf() }.add(feld)
+                }
+            }
+        }
+        val besucht = mutableSetOf(start)
+        val offen = ArrayDeque<KartenFeld>().apply { add(start) }
+        while (offen.isNotEmpty()) {
+            val aktuell = offen.removeFirst()
+            aktuell.kanten().forEach { kante ->
+                felderNachKante[kante].orEmpty().forEach { nachbar ->
+                    if (besucht.add(nachbar)) offen.add(nachbar)
+                }
+            }
+        }
+        return besucht
     }
 }

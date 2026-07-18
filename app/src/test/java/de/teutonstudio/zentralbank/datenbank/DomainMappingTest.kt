@@ -33,8 +33,9 @@ class DomainMappingTest {
         assertEquals(TestSpiel.aktuelleRunde - 1, state.rundenzähler)
         assertEquals(TestSpiel.spielerStringListe, state.spieler.map { it.name })
         assertEquals(Basispunkte((TestSpiel.aktuellerLeitzinssatz * 100).toInt()), state.leitzins)
-        assertEquals("testspiel-inselreich", state.karte?.id)
-        assertEquals(21, state.karte?.gelaendefelder?.size)
+        assertEquals("testspiel-europa-5-kontinental", state.karte?.id)
+        assertEquals(19, state.karte?.hexagon?.radius)
+        assertEquals(1281, state.karte?.gelaendefelder?.size)
         assertTrue(state.marktpreise.keys.containsAll(Rohstoff.entries))
         assertEquals(
             setOf(
