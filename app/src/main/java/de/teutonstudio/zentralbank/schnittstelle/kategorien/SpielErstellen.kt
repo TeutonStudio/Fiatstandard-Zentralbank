@@ -1,6 +1,8 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -59,7 +61,7 @@ fun SpielErstellen(
         }
     }
     val spielerNamen = spieler.keys.toList()
-    val abschlussSeite = 6
+    val abschlussSeite = 5
     Titel(
         beiZurück = {
             if (seite.intValue > 1) {
@@ -71,7 +73,7 @@ fun SpielErstellen(
         beiWeiter = if (seite.intValue < abschlussSeite) {
             {
                 val darfWeiter = spielerGültig.value &&
-                    (seite.intValue != 4 || ausgewaehlteKarte.value != null)
+                    (seite.intValue != 3 || ausgewaehlteKarte.value != null)
                 if (darfWeiter) seite.intValue += 1
             }
         } else {
@@ -81,15 +83,23 @@ fun SpielErstellen(
     ) {
         when (seite.intValue) {
             1 -> { definiereSpieler(spielerGültig,spieler) }
-            2 -> { definiereWarenkorb(warenkorb) }
-            3 -> { definiereLeitzinsatzZiele(zentralbankZiele) }
-            4 -> {
+            2 -> {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        definiereWarenkorb(warenkorb)
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        definiereLeitzinsatzZiele(zentralbankZiele)
+                    }
+                }
+            }
+            3 -> {
                 KartenAuswahl(
                     ausgewaehlteKarte = ausgewaehlteKarte.value,
                     beiAuswahl = { karte -> ausgewaehlteKarte.value = karte },
                 )
             }
-            5 -> {
+            4 -> {
                 LazyRow(
                     modifier = Modifier
                         .fillMaxSize()
@@ -136,7 +146,7 @@ fun SpielErstellen(
 @Preview(showBackground = true)
 @Composable
 private fun SpielErstellenPreview() {
-    val seite = remember { mutableIntStateOf(4) }
+    val seite = remember { mutableIntStateOf(3) }
     Column() {
         SpielErstellen({}, { _, _ -> }, {}, seite)
     }

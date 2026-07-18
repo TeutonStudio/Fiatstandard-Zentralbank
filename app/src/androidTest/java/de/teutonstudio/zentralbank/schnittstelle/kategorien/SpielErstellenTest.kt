@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -64,7 +65,7 @@ class SpielErstellenTest {
                 nachAbbruch = {},
                 erstelleSpiel = { _, _ -> },
                 nachAbschluß = {},
-                seite = remember { mutableIntStateOf(4) },
+                seite = remember { mutableIntStateOf(3) },
             )
         }
 
@@ -77,13 +78,36 @@ class SpielErstellenTest {
     }
 
     @Test
+    fun warenkorbUndZentralbankStehenGemeinsamLinksUndRechts() {
+        composeTestRule.setContent {
+            SpielErstellen(
+                nachAbbruch = {},
+                erstelleSpiel = { _, _ -> },
+                nachAbschluß = {},
+                seite = remember { mutableIntStateOf(2) },
+            )
+        }
+
+        val warenkorb = composeTestRule
+            .onNodeWithText("Warenkorb")
+            .assertIsDisplayed()
+            .fetchSemanticsNode()
+        val zentralbank = composeTestRule
+            .onNodeWithText("Zentralbank")
+            .assertIsDisplayed()
+            .fetchSemanticsNode()
+
+        assertTrue(warenkorb.boundsInRoot.center.x < zentralbank.boundsInRoot.center.x)
+    }
+
+    @Test
     fun startbauwerkeAllerSpielerStehenAufEinerHorizontalenSeite() {
         composeTestRule.setContent {
             SpielErstellen(
                 nachAbbruch = {},
                 erstelleSpiel = { _, _ -> },
                 nachAbschluß = {},
-                seite = remember { mutableIntStateOf(5) },
+                seite = remember { mutableIntStateOf(4) },
             )
         }
 
@@ -114,7 +138,7 @@ class SpielErstellenTest {
                     nachErstellen = nachErfolg
                 },
                 nachAbschluß = { navigationsAufrufe += 1 },
-                seite = remember { mutableIntStateOf(6) },
+                seite = remember { mutableIntStateOf(5) },
                 vorbelegteKarte = KartenVorlage(
                     id = "test-vorlage",
                     name = "Testkarte",
