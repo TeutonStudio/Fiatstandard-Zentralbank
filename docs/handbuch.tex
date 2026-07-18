@@ -134,8 +134,8 @@ Schienen & Spielerabhaengige Verbindungen auf Kanten zwischen zwei Gelaendefelde
 Geschaeftsbanken & Neutrale Gebaeude in der Farbe der Zentralbank. Sie koennen statt Abbaueinheiten auf Gelaendefelder gebaut werden. \\
 Abbaueinheiten & Neutrale Anlagen auf Gelaendefeldern. Sie erzeugen Rohstoffertrag fuer angeschlossene Spieler. \\
 Frachtschiffe & Spielerabhaengige Einheiten zur Verbindung von zwei Haefen. Jedes Frachtschiff besitzt zwei Faehnchen zur Definition von Import- und Exportrichtung. \\
-Panzer & Spielerabhaengige Kriegseinheiten. Sie erscheinen nur waehrend eines Krieges auf dem Spielfeld. \\
-Kriegsschiffe & Spielerabhaengige Kriegseinheiten. Sie erscheinen nur waehrend eines Krieges auf dem Spielfeld. \\
+Panzer & Spielerabhaengige Truppen auf Kanten an Gelaendefeldern. Eine Kantenbewegung kostet 1 Diesel. \\
+Kriegsschiffe & Spielerabhaengige Truppen auf Kanten an Wasserfeldern. Eine Kantenbewegung kostet 1 Schweroel. \\
 Ereigniskarten & Karten in den Kategorien 1 bis 6. Die Kategorie ergibt sich durch einen Wuerfelwurf. \\
 Rohstoffkarten & Karten fuer Nahrung, Lehm, Ziegel, Holz, Rohoel, Schweroel, Diesel, Kohle, Stahl und Eisen. \\
 Waehrungsscheine & Scheine der Waehrung Mark. \\
@@ -183,7 +183,7 @@ Gelaendedreiecke um eine gemeinsame Ecke zu einer Gruppe zusammenfassen, ohne
 die einzelnen Dreiecksfelder zu ersetzen. Die Zivilisation beginnt klein,
 geometrisch unbequem und mit erstaunlich viel Verwaltungsaufwand.
 
-Ein egriff{Teich} ist ein solches sechsteiliges Spezialfeld. Seine gemeinsame
+Ein \begriff{Teich} ist ein solches sechsteiliges Spezialfeld. Seine gemeinsame
 mittlere Ecke ist nicht bebaubar. Ebenso duerfen die sechs Kanten von den
 aeusseren Ecken zur Teichmitte keine Schienen tragen. Die sechs umgebenden
 Dreiecksfelder bleiben normale Gelaendefelder.
@@ -285,8 +285,8 @@ Synthetische Raffinerie & Gelaendefeld & Verarbeitung: 3 Kohle zu 2 Diesel und 1
 Stahlfabrik & Gelaendefeld & Verarbeitung: 1 Eisen und 1 Kohle zu 2 Stahl je Lauf. \\
 Geschaeftsbank & Gelaendefeld & Neutrales Bankgebaeude in Zentralbankfarbe. Kann statt einer Abbaueinheit gebaut werden und wird durch angrenzende Infrastruktur genutzt. \\
 Frachtschiff & Seeweg & Verbindet zwei Haefen. Import- und Exportrichtung werden durch zwei Faehnchen markiert. \\
-Panzer & Krieg & Kriegseinheit gegen Landziele. Befindet sich nur waehrend eines Krieges auf dem Spielfeld. \\
-Kriegsschiff & Krieg & Kriegseinheit gegen Haefen und Seewege. Befindet sich nur waehrend eines Krieges auf dem Spielfeld. \\
+Panzer & Kante & Truppe gegen Landziele; kann im Epizug gebaut werden und benoetigt 1 Diesel je Kantenbewegung. \\
+Kriegsschiff & Kante & Truppe gegen Haefen und Seewege; kann im Epizug gebaut werden und benoetigt 1 Schweroel je Kantenbewegung. \\
 \bottomrule
 \end{longtable}
 
@@ -584,23 +584,23 @@ Ereignisse duerfen tendenziell Schulden, Zinssaetze, Rohstoffpreise, Marktwerte 
 Ein Krieg beginnt durch eine Kriegserklaerung im Epizug. Im Prozug ist sie gesperrt. Dabei wird festgehalten, welche Spieler beteiligt sind, welches Ziel angegriffen wird und welche Kriegseinheiten eingesetzt werden.
 
 \section{Kriegseinheiten}
-Es gibt zwei Kriegseinheiten:
+Spieler koennen im Epizug auch ohne bestehenden Krieg Truppen bauen. Fuer den Bau selbst sind in dieser Fassung noch keine Rohstoffkosten festgelegt. Jede Kante kann hoechstens eine Truppe tragen. Es gibt zwei Truppentypen:
 \begin{description}
-  \item[Panzer] Werden zur Belagerung von Bahnhoefen, Grossbahnhoefen, Haefen und Grosshaefen eingesetzt.
-  \item[Kriegsschiffe] Werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
+  \item[Panzer] Stehen auf Kanten, die an mindestens ein Gelaendefeld grenzen, und werden zur Belagerung von Bahnhoefen, Grossbahnhoefen, Haefen und Grosshaefen eingesetzt.
+  \item[Kriegsschiffe] Stehen auf Kanten, die an mindestens ein Wasserfeld grenzen, und werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
 \end{description}
 
-Panzer und Kriegsschiffe befinden sich nur waehrend eines Krieges auf dem Spielfeld.
+Gebautes Material bleibt nach einem Friedensschluss auf dem Spielfeld und kann in spaeteren Konflikten erneut verwendet werden.
 
-\section{Treibstoffverbrauch im Krieg}
-Der Treibstoffverbrauch der Kriegseinheiten nach Bewegungsmenge ist noch nicht abschliessend einem Rohstoff zugeordnet.
+\section{Treibstoffverbrauch}
+Eine Bewegung fuehrt von der aktuellen Kante auf eine benachbarte Kante mit gemeinsamer Ecke. Fuer jeden einzelnen solchen Schritt wird Treibstoff verbraucht:
 
 \begin{itemize}
-  \item Bei Panzern bestimmt die Bewegung vom Hauptbahnhof zum Kriegspunkt den Verbrauch.
-  \item Bei Kriegsschiffen bestimmt die Bewegung vom naechsten Hafen zum Kriegspunkt den Verbrauch.
+  \item Ein Panzer verbraucht 1 Diesel je Kantenbewegung.
+  \item Ein Kriegsschiff verbraucht 1 Schweroel je Kantenbewegung.
 \end{itemize}
 
-\offen{Treibstoffart und genaue Verbrauchsformel pro Bewegungsschritt festlegen.}
+Ein mehrschrittiger Weg wird nur ausgefuehrt, wenn der gesamte benoetigte Treibstoff vorhanden ist. Andernfalls bleiben sowohl Rohstoffbestand als auch Truppenposition unveraendert.
 
 \section{Blockade und Belagerung}
 Haefen koennen durch Kriegsschiffe blockiert werden. Bahnhoefe, Grossbahnhoefe, Haefen und Grosshaefen koennen durch Panzer belagert werden.

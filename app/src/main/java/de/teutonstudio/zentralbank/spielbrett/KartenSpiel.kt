@@ -46,6 +46,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
@@ -69,6 +70,10 @@ private enum class SpielKartenWerkzeug(
     ECKE_REPARIEREN("Reparieren", KartenZielModus.ECKE),
     ECKE_ENTFERNEN("Entfernen", KartenZielModus.ECKE),
     SCHIENE("Handelslinie", KartenZielModus.KANTE, BauteilTyp.EISENBAHNLINIE),
+    PANZER_BAUEN("Panzer bauen", KartenZielModus.KANTE),
+    KRIEGSSCHIFF_BAUEN("Kriegsschiff bauen", KartenZielModus.KANTE),
+    TRUPPE_BEWEGEN("Truppe bewegen", KartenZielModus.KANTE),
+    TRUPPE_ENTFERNEN("Truppe entfernen", KartenZielModus.KANTE),
     KANTE_ZERSTOEREN("Zerstören", KartenZielModus.KANTE),
     KANTE_REPARIEREN("Reparieren", KartenZielModus.KANTE),
     KANTE_ENTFERNEN("Entfernen", KartenZielModus.KANTE),
@@ -177,6 +182,7 @@ fun KartenSpielBildschirm(
     var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var ausgewaehltesZiel by remember { mutableStateOf<KartenOrt?>(null) }
     var seewegStart by remember { mutableStateOf<KartenOrt.Ecke?>(null) }
+    var truppenStart by remember { mutableStateOf<KartenOrt.Kante?>(null) }
     var planungsmodus by remember(zustand.spielabschnitt, aktiverSpieler) {
         mutableStateOf(false)
     }
@@ -211,6 +217,7 @@ fun KartenSpielBildschirm(
         planungsmodus = aktiv && zustand.spielabschnitt == Spielabschnitt.REGULAER
         ausgewaehltesZiel = null
         seewegStart = null
+        truppenStart = null
         planungsFehler = null
         if (!planungsmodus) {
             geplanteBauten = emptyList()
@@ -231,6 +238,7 @@ fun KartenSpielBildschirm(
                 ziel = ziel,
                 rohstoff = rohstoff,
                 seewegStart = seewegStart,
+                truppenStart = truppenStart,
             )
         }.getOrElse { fehler ->
             planungsFehler = fehler.message ?: "Der Bauauftrag konnte nicht erstellt werden."
@@ -254,6 +262,7 @@ fun KartenSpielBildschirm(
             },
         )
         seewegStart = null
+        truppenStart = null
     }
 
     LaunchedEffect(vorgewaehltesBauteil) {
@@ -265,6 +274,7 @@ fun KartenSpielBildschirm(
                 werkzeug = externesWerkzeug
                 ausgewaehltesZiel = null
                 seewegStart = null
+                truppenStart = null
             }
         }
     }
@@ -321,6 +331,7 @@ fun KartenSpielBildschirm(
                         werkzeug = neu
                         ausgewaehltesZiel = null
                         seewegStart = null
+                        truppenStart = null
                     },
                     rohstoff = rohstoff,
                     beiRohstoff = { rohstoff = it },
@@ -342,6 +353,7 @@ fun KartenSpielBildschirm(
                         werkzeug = neu
                         ausgewaehltesZiel = null
                         seewegStart = null
+                        truppenStart = null
                         planungsFehler = null
                     },
                     geplanteBauten = geplanteBauten,
@@ -397,7 +409,7 @@ fun KartenSpielBildschirm(
                     Spielbrett3D(
                         modell = angezeigteKarte.zu3DModell(
                             spielerReihenfolge = zustand.spieler.map { it.id },
-                            hervorhebung = ausgewaehltesZiel ?: seewegStart,
+                            hervorhebung = ausgewaehltesZiel ?: seewegStart ?: truppenStart,
                         ),
                         modifier = Modifier.fillMaxSize(),
                         betrachtungsStatus = betrachtungsStatus,
@@ -430,6 +442,13 @@ fun KartenSpielBildschirm(
                                         bauwerkPlanen(hafen)
                                     } else {
                                         ausgewaehltesZiel = hafen
+                                    }
+                                } else if (werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN) {
+                                    val kante = ziel as KartenOrt.Kante
+                                    if (truppenStart == null) {
+                                        truppenStart = kante
+                                    } else {
+                                        ausgewaehltesZiel = kante
                                     }
                                 } else if (planungsmodus) {
                                     bauwerkPlanen(ziel)
@@ -479,9 +498,13 @@ fun KartenSpielBildschirm(
                                 }
                             } else {
                                 Text(
-                                    "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +
+                                    if (werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN) {
+                                        "Truppe bewegen: ${if (truppenStart == null) "Truppenkante" else "benachbarte Zielkante"} wählen"
+                                    } else {
+                                        "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +
                                         "Ziehen: ${if (kameraModus == KameraInteraktionsModus.DREHEN) "drehen" else "verschieben"} · " +
-                                        "Zwei Finger: verschieben/zoomen",
+                                            "Zwei Finger: verschieben/zoomen"
+                                    },
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                 )
@@ -546,6 +569,7 @@ fun KartenSpielBildschirm(
                 ziel = ziel,
                 rohstoff = rohstoff,
                 seewegStart = seewegStart,
+                truppenStart = truppenStart,
             )
         }
         val pruefung = ereignisErgebnis.mapCatching { ereignis ->
@@ -570,6 +594,7 @@ fun KartenSpielBildschirm(
             onDismissRequest = {
                 ausgewaehltesZiel = null
                 seewegStart = null
+                truppenStart = null
             },
             title = { Text(werkzeug.beschriftung) },
             text = {
@@ -577,11 +602,25 @@ fun KartenSpielBildschirm(
                     Text(ziel.anzeigeText())
                     if (pruefung.isSuccess) {
                         Text(
-                            if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
-                                "Das Startbauwerk wird ohne zusätzliche Kosten platziert."
-                            } else {
-                                "Die Aktion ist regelkonform. Hinterlegte Baukosten und Bestand " +
-                                    "werden gemeinsam mit der Kartenbelegung geändert."
+                            when (val ereignis = pruefung.getOrNull()) {
+                                is SpielEreignis.KriegsEinheitGebaut ->
+                                    "Die Truppe wird ohne zusätzliche Herstellungskosten gebaut."
+                                is SpielEreignis.KriegsEinheitBewegt -> {
+                                    val typ = zustand.karte?.belegung?.kriegseinheiten
+                                        .orEmpty()
+                                        .first { einheit -> einheit.id == ereignis.id }
+                                        .typ
+                                    "Treibstoff: ${ereignis.weg.size} × " +
+                                        typ.bewegungsRohstoff.anzeigeName()
+                                }
+                                is SpielEreignis.KriegsEinheitEntfernt ->
+                                    "Die Truppe wird von der Karte entfernt."
+                                else -> if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
+                                    "Das Startbauwerk wird ohne zusätzliche Kosten platziert."
+                                } else {
+                                    "Die Aktion ist regelkonform. Hinterlegte Baukosten und " +
+                                        "Bestand werden gemeinsam mit der Kartenbelegung geändert."
+                                }
                             },
                         )
                     } else {
@@ -616,6 +655,7 @@ fun KartenSpielBildschirm(
                 TextButton(onClick = {
                     ausgewaehltesZiel = null
                     seewegStart = null
+                    truppenStart = null
                 }) { Text("Abbrechen") }
             },
             confirmButton = {
@@ -626,6 +666,7 @@ fun KartenSpielBildschirm(
                             pruefung.getOrNull()?.let(beiEreignis)
                             ausgewaehltesZiel = null
                             seewegStart = null
+                            truppenStart = null
                         },
                     ) { Text("Bestätigen") }
                 } else {
@@ -639,6 +680,7 @@ fun KartenSpielBildschirm(
                                 pruefung.getOrNull()?.let(beiEreignis)
                                 ausgewaehltesZiel = null
                                 seewegStart = null
+                                truppenStart = null
                                 beiBauauftragBeendet()
                             },
                         ) { Text("Aus dem Lager bauen") }
@@ -652,6 +694,7 @@ fun KartenSpielBildschirm(
                                 if (gebaut) {
                                     ausgewaehltesZiel = null
                                     seewegStart = null
+                                    truppenStart = null
                                     beiBauauftragBeendet()
                                 }
                             },
@@ -1063,6 +1106,7 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
     ziel: KartenOrt,
     rohstoff: Rohstoff,
     seewegStart: KartenOrt.Ecke?,
+    truppenStart: KartenOrt.Kante?,
 ): SpielEreignis {
     val spieler = requireNotNull(zustand.aktiverSpieler) { "Es ist kein Spieler aktiv." }
     return when (this) {
@@ -1119,6 +1163,47 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
             spieler,
             (ziel as KartenOrt.Kante).position,
         )
+        SpielKartenWerkzeug.PANZER_BAUEN,
+        SpielKartenWerkzeug.KRIEGSSCHIFF_BAUEN -> {
+            val typ = if (this == SpielKartenWerkzeug.PANZER_BAUEN) {
+                KriegsEinheitTyp.PANZER
+            } else {
+                KriegsEinheitTyp.KRIEGSSCHIFF
+            }
+            val vorhandeneIds = zustand.karte?.belegung?.kriegseinheiten.orEmpty()
+                .mapTo(mutableSetOf()) { einheit -> einheit.id }
+            val namensTeil = typ.name.lowercase()
+            val id = generateSequence(1) { nummer -> nummer + 1 }
+                .map { nummer -> "$namensTeil-${spieler.wert}-$nummer" }
+                .first { kandidat -> kandidat !in vorhandeneIds }
+            SpielEreignis.KriegsEinheitGebaut(
+                id = id,
+                spieler = spieler,
+                typ = typ,
+                kante = (ziel as KartenOrt.Kante).position,
+            )
+        }
+        SpielKartenWerkzeug.TRUPPE_BEWEGEN -> {
+            val start = requireNotNull(truppenStart) { "Bitte zuerst eine Truppenkante wählen." }
+            val einheit = zustand.karte?.belegung?.kriegseinheiten
+                .orEmpty()
+                .singleOrNull { belegung -> belegung.position == start.position }
+                ?: error("Auf der gewählten Startkante steht nicht genau eine Truppe.")
+            require(einheit.besitzer == spieler) { "Nur die eigene Truppe darf bewegt werden." }
+            SpielEreignis.KriegsEinheitBewegt(
+                spieler = spieler,
+                id = einheit.id,
+                weg = listOf((ziel as KartenOrt.Kante).position),
+            )
+        }
+        SpielKartenWerkzeug.TRUPPE_ENTFERNEN -> {
+            val kante = (ziel as KartenOrt.Kante).position
+            val einheit = zustand.karte?.belegung?.kriegseinheiten
+                .orEmpty()
+                .singleOrNull { belegung -> belegung.position == kante }
+                ?: error("Auf der gewählten Kante steht nicht genau eine Truppe.")
+            SpielEreignis.KriegsEinheitEntfernt(spieler = spieler, id = einheit.id)
+        }
         SpielKartenWerkzeug.ABBAUEINHEIT -> SpielEreignis.NeutraleAnlageErrichtet(
             spieler,
             (ziel as KartenOrt.Feld).position,

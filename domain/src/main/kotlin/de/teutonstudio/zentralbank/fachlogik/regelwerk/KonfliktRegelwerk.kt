@@ -41,7 +41,9 @@ internal object KonfliktRegelwerk {
                 karte.copy(
                     belegung = karte.belegung.copy(
                         kriegseinheiten = karte.belegung.kriegseinheiten.filterNot { einheit ->
-                            konflikt.betrifft(einheit.besitzer, einheit.gegner)
+                            einheit.gegner?.let { gegner ->
+                                konflikt.betrifft(einheit.besitzer, gegner)
+                            } == true
                         },
                     ),
                 )

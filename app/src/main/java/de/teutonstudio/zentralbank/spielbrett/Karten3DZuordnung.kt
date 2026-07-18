@@ -166,6 +166,26 @@ fun Spielkarte.zu3DModell(
                     form = SpielObjektForm.FRACHTSCHIFF,
                 ),
             )
+        } + belegung.kriegseinheiten.map { einheit ->
+            KantenObjektAuflage(
+                position = einheit.position,
+                typ = SpielObjektTyp(
+                    name = "${einheit.typ.anzeigeName()} ${einheit.id}",
+                    farbe = spielerFarbe(einheit.besitzer),
+                    form = when (einheit.typ) {
+                        KriegsEinheitTyp.PANZER -> SpielObjektForm.PANZER
+                        KriegsEinheitTyp.KRIEGSSCHIFF -> SpielObjektForm.KRIEGSSCHIFF
+                    },
+                    infos = listOf(
+                        SpielObjektInfoEintrag("Spieler", einheit.besitzer.wert),
+                        SpielObjektInfoEintrag(
+                            "Bewegung",
+                            "1 ${einheit.typ.bewegungsRohstoff.anzeigeName()} je Kante",
+                        ),
+                    ),
+                    spieler = setOf(einheit.besitzer.wert),
+                ),
+            )
         } + (hervorhebung as? KartenOrt.Kante)?.let { markierung ->
             KantenObjektAuflage(
                 markierung.position,
@@ -225,19 +245,6 @@ fun Spielkarte.zu3DModell(
                         zustand = zustand,
                     ),
                     spieler = angeschlosseneSpieler,
-                ),
-            )
-        } + belegung.kriegseinheiten.mapNotNull { einheit ->
-            val ort = einheit.ort as? KartenOrt.Feld ?: return@mapNotNull null
-            FeldObjektAuflage(
-                position = ort.position.zu3DPosition(),
-                typ = SpielObjektTyp(
-                    name = "${einheit.typ.name.lowercase()} ${einheit.id}",
-                    farbe = spielerFarbe(einheit.besitzer),
-                    form = when (einheit.typ) {
-                        KriegsEinheitTyp.PANZER -> SpielObjektForm.PANZER
-                        KriegsEinheitTyp.KRIEGSSCHIFF -> SpielObjektForm.KRIEGSSCHIFF
-                    },
                 ),
             )
         } + (hervorhebung as? KartenOrt.Feld)?.let { markierung ->
@@ -306,6 +313,11 @@ private fun EckGebaeudeTyp.anzeigeName(): String = when (this) {
     EckGebaeudeTyp.GROSSBAHNHOF -> "Großbahnhof"
     EckGebaeudeTyp.HAFEN -> "Hafen"
     EckGebaeudeTyp.GROSSHAFEN -> "Großhafen"
+}
+
+private fun KriegsEinheitTyp.anzeigeName(): String = when (this) {
+    KriegsEinheitTyp.PANZER -> "Panzer"
+    KriegsEinheitTyp.KRIEGSSCHIFF -> "Kriegsschiff"
 }
 
 private fun EckGebaeudeTyp.zuForm(): SpielObjektForm = when (this) {

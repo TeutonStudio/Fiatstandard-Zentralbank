@@ -66,6 +66,10 @@ object SpielRegelwerk {
                 KartenRegelwerk.seewegEntfernen(zustand, ereignis)
             is SpielEreignis.KriegsEinheitEingesetzt ->
                 KartenRegelwerk.kriegsEinheitEinsetzen(zustand, ereignis)
+            is SpielEreignis.KriegsEinheitGebaut ->
+                KartenRegelwerk.kriegsEinheitBauen(zustand, ereignis)
+            is SpielEreignis.KriegsEinheitBewegt ->
+                KartenRegelwerk.kriegsEinheitBewegen(zustand, ereignis)
             is SpielEreignis.KriegsEinheitEntfernt ->
                 KartenRegelwerk.kriegsEinheitEntfernen(zustand, ereignis)
             is SpielEreignis.KriegErklaert ->

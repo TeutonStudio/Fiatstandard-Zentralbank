@@ -13,6 +13,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
@@ -25,9 +26,12 @@ import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.istBefahrbar
 import de.teutonstudio.zentralbank.fachlogik.modell.istSpezialfeldInnenkante
 import de.teutonstudio.zentralbank.fachlogik.modell.istSpezialfeldMittelpunkt
 import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
+import de.teutonstudio.zentralbank.fachlogik.modell.sindBenachbarteKanten
 
 internal object KartenRegelwerk {
     fun hauptbahnhofPlatzieren(
@@ -493,16 +497,17 @@ internal object KartenRegelwerk {
         require(karte.belegung.kriegseinheiten.none { it.id == ereignis.id }) {
             "Die Kriegseinheiten-ID ist bereits vergeben."
         }
-        val feld = (ereignis.ort as? KartenOrt.Feld)?.position
-            ?: error("Kriegseinheiten werden auf einem Dreiecksfeld eingesetzt.")
-        when (ereignis.typ) {
-            KriegsEinheitTyp.PANZER -> require(feld in karte.landNachPosition) {
-                "Ein Panzer muss auf einem Geländefeld stehen."
-            }
-            KriegsEinheitTyp.KRIEGSSCHIFF -> require(
-                karte.enthaeltFeld(feld) && feld !in karte.landNachPosition,
-            ) { "Ein Kriegsschiff muss auf einem Wasserfeld stehen." }
+        val kante = when (val alterOrt = ereignis.ort) {
+            is KartenOrt.Kante -> alterOrt.position
+            is KartenOrt.Feld -> alterOrt.position.kanten().firstOrNull { kandidat ->
+                karte.istBefahrbar(ereignis.typ, kandidat) &&
+                    karte.belegung.kriegseinheiten.none { einheit ->
+                        einheit.position == kandidat
+                    }
+            } ?: error("Der alte Feldort kann keiner befahrbaren Kartenkante zugeordnet werden.")
+            is KartenOrt.Ecke -> error("Kriegseinheiten werden auf einer Kartenkante eingesetzt.")
         }
+        pruefeFreieBefahrbareKante(karte, ereignis.typ, kante)
         return zustand.mitBelegung { belegung ->
             belegung.copy(
                 kriegseinheiten = (belegung.kriegseinheiten + KriegsEinheitBelegung(
@@ -510,8 +515,78 @@ internal object KartenRegelwerk {
                     typ = ereignis.typ,
                     besitzer = ereignis.spieler,
                     gegner = ereignis.gegner,
-                    ort = ereignis.ort,
+                    ort = KartenOrt.Kante(kante),
                 )).sortedBy(KriegsEinheitBelegung::id),
+            )
+        }
+    }
+
+    fun kriegsEinheitBauen(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.KriegsEinheitGebaut,
+    ): SpielZustand {
+        val karte = regulaereKarte(zustand)
+        require(ereignis.id.isNotBlank()) { "Eine Kriegseinheiten-ID darf nicht leer sein." }
+        require(zustand.spieler.any { spieler -> spieler.id == ereignis.spieler }) {
+            "Unbekannter Spieler: ${ereignis.spieler.wert}."
+        }
+        require(karte.belegung.kriegseinheiten.none { einheit -> einheit.id == ereignis.id }) {
+            "Die Kriegseinheiten-ID ist bereits vergeben."
+        }
+        pruefeFreieBefahrbareKante(karte, ereignis.typ, ereignis.kante)
+        return zustand.mitBelegung { belegung ->
+            belegung.copy(
+                kriegseinheiten = (belegung.kriegseinheiten + KriegsEinheitBelegung(
+                    id = ereignis.id,
+                    typ = ereignis.typ,
+                    besitzer = ereignis.spieler,
+                    ort = KartenOrt.Kante(ereignis.kante),
+                )).sortedBy(KriegsEinheitBelegung::id),
+            )
+        }
+    }
+
+    fun kriegsEinheitBewegen(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.KriegsEinheitBewegt,
+    ): SpielZustand {
+        val karte = regulaereKarte(zustand)
+        val einheit = karte.belegung.kriegseinheiten.firstOrNull { it.id == ereignis.id }
+            ?: error("Die Kriegseinheit wurde nicht gefunden.")
+        require(einheit.besitzer == ereignis.spieler) {
+            "Nur der Besitzer darf die Kriegseinheit bewegen."
+        }
+        require(ereignis.weg.isNotEmpty()) { "Der Bewegungsweg darf nicht leer sein." }
+        val besetzteKanten = karte.belegung.kriegseinheiten
+            .asSequence()
+            .filterNot { andere -> andere.id == einheit.id }
+            .map(KriegsEinheitBelegung::position)
+            .toSet()
+        var vorher = einheit.position
+        ereignis.weg.forEach { ziel ->
+            require(sindBenachbarteKanten(vorher, ziel)) {
+                "Eine Kriegseinheit kann nur auf eine benachbarte Kante ziehen."
+            }
+            require(ziel !in besetzteKanten) { "Die Zielkante ist bereits durch eine Truppe belegt." }
+            pruefeBefahrbareKante(karte, einheit.typ, ziel)
+            vorher = ziel
+        }
+        val nachTreibstoff = RohstoffRegelwerk.rohstoffeBuchen(
+            zustand = zustand,
+            spieler = ereignis.spieler,
+            mengen = mapOf(einheit.typ.bewegungsRohstoff to ereignis.weg.size),
+            faktor = -1,
+        )
+        val ziel = ereignis.weg.last()
+        return nachTreibstoff.mitBelegung { belegung ->
+            belegung.copy(
+                kriegseinheiten = belegung.kriegseinheiten.map { bisher ->
+                    if (bisher.id == einheit.id) {
+                        bisher.copy(ort = KartenOrt.Kante(ziel))
+                    } else {
+                        bisher
+                    }
+                },
             )
         }
     }
@@ -530,6 +605,32 @@ internal object KartenRegelwerk {
             belegung.copy(
                 kriegseinheiten = belegung.kriegseinheiten.filterNot { it.id == ereignis.id },
             )
+        }
+    }
+
+    private fun pruefeFreieBefahrbareKante(
+        karte: Spielkarte,
+        typ: KriegsEinheitTyp,
+        kante: KartenKante,
+    ) {
+        require(karte.belegung.kriegseinheiten.none { einheit -> einheit.position == kante }) {
+            "Auf der gewählten Kante steht bereits eine Truppe."
+        }
+        pruefeBefahrbareKante(karte, typ, kante)
+    }
+
+    private fun pruefeBefahrbareKante(
+        karte: Spielkarte,
+        typ: KriegsEinheitTyp,
+        kante: KartenKante,
+    ) {
+        require(karte.istBefahrbar(typ, kante)) {
+            when (typ) {
+                KriegsEinheitTyp.PANZER ->
+                    "Ein Panzer muss auf einer an Gelände grenzenden Kartenkante stehen."
+                KriegsEinheitTyp.KRIEGSSCHIFF ->
+                    "Ein Kriegsschiff muss auf einer an Wasser grenzenden Kartenkante stehen."
+            }
         }
     }
 

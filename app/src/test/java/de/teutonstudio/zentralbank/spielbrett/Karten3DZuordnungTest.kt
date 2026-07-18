@@ -12,6 +12,9 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
@@ -152,5 +155,36 @@ class Karten3DZuordnungTest {
         assertEquals(1, gemeinsameLinienfarben.size)
         assertEquals(neutraleFarbe, gemeinsameLinienfarben.single())
         assertNotEquals(bertsFarbe, gemeinsameLinienfarben.single())
+    }
+
+    @Test
+    fun panzerWirdAlsKantenobjektMitDieselverbrauchDargestellt() {
+        val kante = KartenKante.zwischen(KartenEcke(2, 0), KartenEcke(3, 2))
+        val modell = Spielkarte(
+            id = "panzer",
+            name = "Panzer",
+            hexagon = KartenHexagon(radius = 3),
+            gelaendefelder = angrenzendeFelder(kante).map { feld ->
+                GelaendeFeld(feld, GelaendeTyp.EBENE)
+            },
+            belegung = KartenBelegung(
+                kriegseinheiten = listOf(
+                    KriegsEinheitBelegung(
+                        id = "panzer-anna-1",
+                        typ = KriegsEinheitTyp.PANZER,
+                        besitzer = anna,
+                        ort = KartenOrt.Kante(kante),
+                    ),
+                ),
+            ),
+        ).zu3DModell(spielerReihenfolge = listOf(anna, bert))
+
+        val panzer = modell.kantenObjekte.single()
+        assertEquals(kante, panzer.position)
+        assertEquals(SpielObjektForm.PANZER, panzer.typ.form)
+        assertTrue(
+            panzer.typ.infos.contains(SpielObjektInfoEintrag("Bewegung", "1 Diesel je Kante")),
+        )
+        assertTrue(modell.feldObjekte.isEmpty())
     }
 }

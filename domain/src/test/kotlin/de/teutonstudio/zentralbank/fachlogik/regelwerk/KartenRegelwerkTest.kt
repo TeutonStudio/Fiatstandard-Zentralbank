@@ -36,6 +36,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.benachbarteEcken
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.felder
 import de.teutonstudio.zentralbank.fachlogik.modell.gesperrteKanten
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import org.junit.Assert.assertEquals
@@ -661,6 +662,7 @@ class KartenRegelwerkTest {
                 spieler = anna,
                 gegner = bert,
                 typ = KriegsEinheitTyp.PANZER,
+                // Kompatibilitätsereignisse mit altem Feldort werden auf eine Kante überführt.
                 ort = KartenOrt.Feld(feld),
             ),
         ).getOrThrow()
@@ -671,6 +673,136 @@ class KartenRegelwerkTest {
 
         assertEquals(1, mitPanzer.karte?.belegung?.kriegseinheiten?.size)
         assertTrue(nachFrieden.karte?.belegung?.kriegseinheiten.orEmpty().isEmpty())
+    }
+
+    @Test
+    fun spielerBautPanzerOhneKonfliktAufGelaendekante() {
+        val kante = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten().first()
+
+        val danach = SpielRegelwerk.wendeAn(
+            zustand(),
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "panzer-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.PANZER,
+                kante = kante,
+            ),
+        ).getOrThrow()
+
+        val panzer = danach.karte?.belegung?.kriegseinheiten?.single()
+        assertEquals(kante, panzer?.position)
+        assertEquals(null, panzer?.gegner)
+    }
+
+    @Test
+    fun panzerBewegtSichKantenweiseUndVerbrauchtJeSchrittDiesel() {
+        val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
+        val mitPanzer = SpielRegelwerk.wendeAn(
+            zustand(),
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "panzer-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.PANZER,
+                kante = kanten[0],
+            ),
+        ).getOrThrow()
+
+        val danach = SpielRegelwerk.wendeAn(
+            mitPanzer,
+            SpielEreignis.KriegsEinheitBewegt(
+                spieler = anna,
+                id = "panzer-anna-1",
+                weg = listOf(kanten[1], kanten[2]),
+            ),
+        ).getOrThrow()
+
+        assertEquals(kanten[2], danach.karte?.belegung?.kriegseinheiten?.single()?.position)
+        assertEquals(8, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
+    }
+
+    @Test
+    fun bewegungOhneGenugTreibstoffAendertWederBestandNochPosition() {
+        val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
+        val start = zustand().copy(
+            spieler = zustand().spieler.map { spieler ->
+                if (spieler.id == anna) {
+                    spieler.copy(rohstoffe = spieler.rohstoffe + (Rohstoff.DIESEL to 1))
+                } else {
+                    spieler
+                }
+            },
+        )
+        val mitPanzer = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "panzer-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.PANZER,
+                kante = kanten[0],
+            ),
+        ).getOrThrow()
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            mitPanzer,
+            SpielEreignis.KriegsEinheitBewegt(
+                spieler = anna,
+                id = "panzer-anna-1",
+                weg = listOf(kanten[1], kanten[2]),
+            ),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertEquals(kanten[0], mitPanzer.karte?.belegung?.kriegseinheiten?.single()?.position)
+        assertEquals(1, mitPanzer.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
+    }
+
+    @Test
+    fun kriegsschiffBefaehrtWasserkantenMitSchweroel() {
+        val start = zustand()
+        val karte = requireNotNull(start.karte)
+        val wasserfeld = karte.hexagon.felder().first { feld ->
+            feld !in karte.landNachPosition
+        }
+        val kanten = wasserfeld.kanten()
+        val mitSchiff = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "kriegsschiff-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+                kante = kanten[0],
+            ),
+        ).getOrThrow()
+
+        val danach = SpielRegelwerk.wendeAn(
+            mitSchiff,
+            SpielEreignis.KriegsEinheitBewegt(
+                spieler = anna,
+                id = "kriegsschiff-anna-1",
+                weg = listOf(kanten[1]),
+            ),
+        ).getOrThrow()
+
+        assertEquals(kanten[1], danach.karte?.belegung?.kriegseinheiten?.single()?.position)
+        assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.SCHWEROEL])
+    }
+
+    @Test
+    fun truppentypMussZumAngrenzendenGelaendePassen() {
+        val reineLandkante = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten().first()
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            zustand(),
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "kriegsschiff-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+                kante = reineLandkante,
+            ),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("Wasser"))
     }
 
     @Test

@@ -160,9 +160,11 @@ data class SeewegBelegung(
 }
 
 @Serializable
-enum class KriegsEinheitTyp {
-    PANZER,
-    KRIEGSSCHIFF,
+enum class KriegsEinheitTyp(
+    val bewegungsRohstoff: Rohstoff,
+) {
+    PANZER(Rohstoff.DIESEL),
+    KRIEGSSCHIFF(Rohstoff.SCHWEROEL),
 }
 
 @Serializable
@@ -170,13 +172,17 @@ data class KriegsEinheitBelegung(
     val id: String,
     val typ: KriegsEinheitTyp,
     val besitzer: SpielerId,
-    val gegner: SpielerId,
+    /** Nur bei alten, unmittelbar für einen Konflikt eingesetzten Einheiten gesetzt. */
+    val gegner: SpielerId? = null,
     val ort: KartenOrt,
 ) {
     init {
         require(id.isNotBlank()) { "Eine Kriegseinheiten-ID darf nicht leer sein." }
-        require(besitzer != gegner) { "Eine Kriegseinheit braucht eine gegnerische Kriegspartei." }
+        require(besitzer != gegner) { "Besitzer und Gegner einer Kriegseinheit müssen verschieden sein." }
+        require(ort is KartenOrt.Kante) { "Eine Kriegseinheit muss auf einer Kartenkante stehen." }
     }
+
+    val position: KartenKante get() = (ort as KartenOrt.Kante).position
 }
 
 @Serializable
@@ -209,6 +215,11 @@ data class KartenBelegung(
         }
         require(kriegseinheiten.size == kriegseinheiten.map(KriegsEinheitBelegung::id).toSet().size) {
             "Kriegseinheiten-IDs müssen eindeutig sein."
+        }
+        require(
+            kriegseinheiten.size == kriegseinheiten.map(KriegsEinheitBelegung::position).toSet().size,
+        ) {
+            "Auf jeder Kante darf höchstens eine Kriegseinheit stehen."
         }
         val hauptbahnhoefeNachSpieler = ecken
             .asSequence()
@@ -246,17 +257,13 @@ data class KartenBelegung(
                 }
             }
         kriegseinheiten.forEach { einheit ->
-            when (val ort = einheit.ort) {
-                is KartenOrt.Feld -> require(karte.enthaeltFeld(ort.position)) {
-                    "Kriegseinheit liegt außerhalb der Karte: ${ort.position}."
+            require(karte.istBefahrbar(einheit.typ, einheit.position)) {
+                when (einheit.typ) {
+                    KriegsEinheitTyp.PANZER ->
+                        "Ein Panzer muss auf einer an Gelände grenzenden Kartenkante stehen."
+                    KriegsEinheitTyp.KRIEGSSCHIFF ->
+                        "Ein Kriegsschiff muss auf einer an Wasser grenzenden Kartenkante stehen."
                 }
-                is KartenOrt.Ecke -> require(karte.liegtImBearbeitungsUmfeld(ort.position)) {
-                    "Kriegseinheit liegt außerhalb der Karte: ${ort.position}."
-                }
-                is KartenOrt.Kante -> require(
-                    karte.liegtImBearbeitungsUmfeld(ort.position.anfang) &&
-                        karte.liegtImBearbeitungsUmfeld(ort.position.ende),
-                ) { "Kriegseinheit liegt außerhalb der Karte: ${ort.position}." }
             }
         }
 

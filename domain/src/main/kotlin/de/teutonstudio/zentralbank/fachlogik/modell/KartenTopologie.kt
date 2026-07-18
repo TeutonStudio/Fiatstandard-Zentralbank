@@ -97,6 +97,23 @@ fun angrenzendeFelder(kante: KartenKante): List<KartenFeld> =
         .toList()
         .sortedMitKartenPosition()
 
+/** Prüft, ob eine Einheit die Kante entsprechend ihrem Gelände benutzen darf. */
+fun Spielkarte.istBefahrbar(
+    typ: KriegsEinheitTyp,
+    kante: KartenKante,
+): Boolean {
+    val nachbarnAufKarte = angrenzendeFelder(kante).filter(::enthaeltFeld)
+    return when (typ) {
+        KriegsEinheitTyp.PANZER -> nachbarnAufKarte.any { feld -> feld in landNachPosition }
+        KriegsEinheitTyp.KRIEGSSCHIFF ->
+            nachbarnAufKarte.any { feld -> feld !in landNachPosition }
+    }
+}
+
+/** Zwei Kanten sind in genau einem Bewegungsschritt erreichbar, wenn sie eine Ecke teilen. */
+fun sindBenachbarteKanten(a: KartenKante, b: KartenKante): Boolean =
+    a != b && setOf(a.anfang, a.ende).intersect(setOf(b.anfang, b.ende)).size == 1
+
 /** Die sechs vom Mittelpunkt zu den äußeren Ecken eines Spezialfelds laufenden Kanten. */
 fun Spezialfeld.gesperrteKanten(): Set<KartenKante> = positionen
     .asSequence()
