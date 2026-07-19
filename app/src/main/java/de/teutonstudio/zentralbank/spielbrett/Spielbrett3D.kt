@@ -84,8 +84,9 @@ import io.github.sceneview.rememberMainLightNode
 import io.github.sceneview.rememberMaterialLoader
 import io.github.sceneview.utils.screenToRay
 import io.github.sceneview.utils.worldToScreen
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -1644,6 +1645,18 @@ private fun SpielbrettVorschau(
     } else {
         geometrie
     }
+    val gebirgsBinnenkanten = remember(modell.auflagen) {
+        ermittleGebirgsBinnenkanten(
+            modell.auflagen
+                .asSequence()
+                .filter { auflage ->
+                    auflage.ebene == AuflagenEbene.LAND &&
+                        auflage.typ.relief == DreieckRelief.GEBIRGE
+                }
+                .map(DreieckAuflage::position)
+                .asIterable(),
+        )
+    }
 
     Canvas(
         modifier = modifier.semantics {
@@ -1835,11 +1848,17 @@ private fun SpielbrettVorschau(
                     }
                 val dachPfad = pfad(auflagenDachEcken)
                 drawPath(path = dachPfad, color = auflage.typ.farbe)
-                drawPath(
-                    path = dachPfad,
-                    color = Color.White.copy(alpha = 0.72f),
-                    style = Stroke(width = 1.5.dp.toPx()),
-                )
+                grundDreieck.position.zuKartenFeld().kanten().forEachIndexed { index, kante ->
+                    val naechsterIndex = (index + 1) % auflagenDachEcken.size
+                    drawLine(
+                        color = Color.White.copy(
+                            alpha = if (kante in gebirgsBinnenkanten) 0.35f else 0.72f,
+                        ),
+                        start = auflagenDachEcken[index].alsOffset(),
+                        end = auflagenDachEcken[naechsterIndex].alsOffset(),
+                        strokeWidth = 1.5.dp.toPx(),
+                    )
+                }
             }
 
         modell.kantenObjekte.forEach { objekt ->

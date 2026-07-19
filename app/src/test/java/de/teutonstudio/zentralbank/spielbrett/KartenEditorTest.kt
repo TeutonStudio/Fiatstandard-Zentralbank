@@ -24,6 +24,18 @@ class KartenEditorTest {
     }
 
     @Test
+    fun wuesteWerkzeugSpeichertEinWuestenfeld() {
+        val treffer = DreieckTreffer(
+            DreieckPosition(0, 1, DreieckAusrichtung.OBEN),
+            naechsteEcke = 0,
+        )
+
+        val bearbeitet = leereKarte().wendeWerkzeugAn(treffer, KartenWerkzeug.WUESTE)
+
+        assertEquals(GelaendeTyp.WUESTE, bearbeitet.gelaendefelder.single().gelaende)
+    }
+
+    @Test
     fun wasserEntferntNurDasGetroffeneGelaendefeld() {
         val trefferA = DreieckTreffer(DreieckPosition(1, 1, DreieckAusrichtung.UNTEN), 0)
         val trefferB = DreieckTreffer(DreieckPosition(1, 1, DreieckAusrichtung.OBEN), 0)

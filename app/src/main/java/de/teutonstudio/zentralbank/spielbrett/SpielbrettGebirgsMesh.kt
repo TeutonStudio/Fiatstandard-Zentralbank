@@ -1,5 +1,7 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -20,6 +22,16 @@ private data class GebirgsKante(
     val ende: BrettPunkt,
     val felder: MutableSet<DreieckPosition> = mutableSetOf(),
 )
+
+/** Liefert die Rasterkanten, an die auf beiden Seiten ein Gebirgsdreieck grenzt. */
+internal fun ermittleGebirgsBinnenkanten(
+    gebirgsPositionen: Iterable<DreieckPosition>,
+): Set<KartenKante> = gebirgsPositionen
+    .flatMap { position -> position.zuKartenFeld().kanten() }
+    .groupingBy { kante -> kante }
+    .eachCount()
+    .filterValues { anzahl -> anzahl == 2 }
+    .keys
 
 /**
  * Erzeugt über jedem Gebirgsdreieck eine Pyramide mit der Spitze über dem Feldmittelpunkt.

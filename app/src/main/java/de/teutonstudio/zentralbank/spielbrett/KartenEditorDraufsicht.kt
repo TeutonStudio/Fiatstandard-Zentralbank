@@ -30,8 +30,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -209,6 +211,13 @@ internal fun KartenEditorDraufsicht(
                     spaltenRadius = spaltenRadius,
                 )
                 val gelaendePfade = DraufsichtGelaendeFarben.keys.associateWith { Path() }
+                val gebirgsBinnenkanten = ermittleGebirgsBinnenkanten(
+                    karte.gelaendefelder
+                        .asSequence()
+                        .filter { feld -> feld.gelaende == GelaendeTyp.GEBIRGE }
+                        .map { feld -> feld.position.zu3DPosition() }
+                        .asIterable(),
+                )
                 val gelaendeUmriss = Path()
                 karte.gelaendefelder.forEach { feld ->
                     val dreieck = grundDreieck(
@@ -216,7 +225,9 @@ internal fun KartenEditorDraufsicht(
                         ursprung = geometrie.ursprung,
                     )
                     gelaendePfade.getValue(feld.gelaende).fuegeHinzu(dreieck)
-                    gelaendeUmriss.fuegeHinzu(dreieck)
+                    feld.position.kanten()
+                        .filterNot(gebirgsBinnenkanten::contains)
+                        .forEach { kante -> gelaendeUmriss.fuegeHinzu(kante, geometrie) }
                 }
                 val spezialfeldUmriss = Path()
                 val teichMittelpunkte = karte.spezialfelder.mapNotNull { spezialfeld ->
@@ -438,4 +449,14 @@ private fun Path.fuegeHinzu(dreieck: GrundDreieck) {
     lineTo(dreieck.ecken[1].x, dreieck.ecken[1].z)
     lineTo(dreieck.ecken[2].x, dreieck.ecken[2].z)
     close()
+}
+
+private fun Path.fuegeHinzu(
+    kante: KartenKante,
+    geometrie: SpielbrettGeometrie,
+) {
+    val anfang = geometrie.punkt(kante.anfang) ?: return
+    val ende = geometrie.punkt(kante.ende) ?: return
+    moveTo(anfang.x, anfang.z)
+    lineTo(ende.x, ende.z)
 }

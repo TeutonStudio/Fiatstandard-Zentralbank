@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import androidx.compose.ui.graphics.Color
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
@@ -22,6 +23,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.felder
 import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 import de.teutonstudio.zentralbank.fachlogik.modell.wasserKanten
 import org.junit.Assert.assertEquals
@@ -32,6 +34,19 @@ import org.junit.Test
 class Karten3DZuordnungTest {
     private val anna = SpielerId("anna")
     private val bert = SpielerId("bert")
+
+    @Test
+    fun wuesteWirdAlsSandfarbenesGelaendeDargestellt() {
+        val feld = KartenHexagon(radius = 1).felder().first()
+        val modell = Spielkarte(
+            id = "wueste",
+            name = "Wüste",
+            gelaendefelder = listOf(GelaendeFeld(feld, GelaendeTyp.WUESTE)),
+        ).zu3DModell()
+
+        assertEquals("Wüste", modell.auflagen.single().typ.name)
+        assertEquals(Color(0xFFD8B56A), modell.auflagen.single().typ.farbe)
+    }
 
     @Test
     fun teichWirdAlsFlachesObjektAufDerSpezialfeldmitteDargestellt() {

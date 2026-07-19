@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.spielbrett
 
 import androidx.compose.ui.graphics.Color
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -61,6 +62,24 @@ class SpielbrettGebirgsMeshTest {
         // Vier äußere Pyramidenflächen plus zwei Flächen entlang der gemeinsamen Kante.
         assertEquals(18, mesh?.indizes?.size)
         assertEquals(18, mesh?.ecken?.size)
+    }
+
+    @Test
+    fun `gemeinsame Kante zweier Gebirgsfelder wird als Binnenkante erkannt`() {
+        val erstes = geometrie.dreiecke.first()
+        val zweites = geometrie.dreiecke.first { kandidat ->
+            kandidat !== erstes && gemeinsamerEckenAnzahl(erstes, kandidat) == 2
+        }
+
+        val binnenkanten = ermittleGebirgsBinnenkanten(
+            listOf(erstes.position, zweites.position),
+        )
+
+        assertEquals(
+            erstes.position.zuKartenFeld().kanten()
+                .intersect(zweites.position.zuKartenFeld().kanten().toSet()),
+            binnenkanten,
+        )
     }
 
     @Test
