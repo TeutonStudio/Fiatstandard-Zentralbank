@@ -167,6 +167,11 @@ enum class KriegsEinheitTyp(
     KRIEGSSCHIFF(Rohstoff.SCHWEROEL),
 }
 
+fun KriegsEinheitTyp.bewegungsKosten(kanten: Int): Map<Rohstoff, Int> {
+    require(kanten >= 0) { "Die Anzahl der Bewegungskanten darf nicht negativ sein." }
+    return if (kanten == 0) emptyMap() else mapOf(bewegungsRohstoff to kanten)
+}
+
 @Serializable
 data class KriegsEinheitBelegung(
     val id: String,

@@ -866,11 +866,11 @@ class KartenRegelwerkTest {
     }
 
     @Test
-    fun spielerBautPanzerOhneKonfliktAufGelaendekante() {
+    fun spielerBautPanzerOhneKonfliktAufEigenerHandelslinie() {
         val kante = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten().first()
 
         val danach = SpielRegelwerk.wendeAn(
-            zustand(),
+            zustand().mitKontrollierterHandelslinie(kante, anna),
             SpielEreignis.KriegsEinheitGebaut(
                 id = "panzer-anna-1",
                 spieler = anna,
@@ -888,7 +888,7 @@ class KartenRegelwerkTest {
     fun panzerBewegtSichKantenweiseUndVerbrauchtJeSchrittDiesel() {
         val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
         val mitPanzer = SpielRegelwerk.wendeAn(
-            zustand(),
+            zustand().mitKontrollierterHandelslinie(kanten[0], anna),
             SpielEreignis.KriegsEinheitGebaut(
                 id = "panzer-anna-1",
                 spieler = anna,
@@ -913,7 +913,7 @@ class KartenRegelwerkTest {
     @Test
     fun bewegungOhneGenugTreibstoffAendertWederBestandNochPosition() {
         val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
-        val start = zustand().copy(
+        val start = zustand().mitKontrollierterHandelslinie(kanten[0], anna).copy(
             spieler = zustand().spieler.map { spieler ->
                 if (spieler.id == anna) {
                     spieler.copy(rohstoffe = spieler.rohstoffe + (Rohstoff.DIESEL to 1))
@@ -955,7 +955,7 @@ class KartenRegelwerkTest {
         }
         val kanten = wasserfeld.kanten()
         val mitSchiff = SpielRegelwerk.wendeAn(
-            start,
+            start.mitEigenemHafenAn(kanten[0], anna),
             SpielEreignis.KriegsEinheitGebaut(
                 id = "kriegsschiff-anna-1",
                 spieler = anna,
@@ -975,6 +975,80 @@ class KartenRegelwerkTest {
 
         assertEquals(kanten[1], danach.karte?.belegung?.kriegseinheiten?.single()?.position)
         assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.SCHWEROEL])
+    }
+
+    @Test
+    fun panzerKannNichtOhneEigeneHandelslinieGebautWerden() {
+        val kante = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten().first()
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            zustand(),
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "panzer-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.PANZER,
+                kante = kante,
+            ),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("eigenen"))
+    }
+
+    @Test
+    fun kriegsschiffKannNichtOhneEigenenHafenGebautWerden() {
+        val karte = requireNotNull(zustand().karte)
+        val wasserKante = karte.wasserKanten().first()
+
+        val ergebnis = SpielRegelwerk.wendeAn(
+            zustand(),
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "kriegsschiff-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+                kante = wasserKante,
+            ),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertTrue(ergebnis.exceptionOrNull()?.message.orEmpty().contains("Hafen"))
+    }
+
+    @Test
+    fun fremdeHandelslinieIstNurImKriegBefahrbar() {
+        val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
+        val startKante = kanten[0]
+        val fremdeKante = kanten[1]
+        val basis = zustand().mitKontrollierterHandelslinie(fremdeKante, bert)
+        val mitPanzer = basis.copy(
+            karte = basis.karte?.copy(
+                belegung = basis.karte.belegung.copy(
+                    kriegseinheiten = listOf(
+                        KriegsEinheitBelegung(
+                            id = "panzer-anna-1",
+                            typ = KriegsEinheitTyp.PANZER,
+                            besitzer = anna,
+                            ort = KartenOrt.Kante(startKante),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val bewegung = SpielEreignis.KriegsEinheitBewegt(
+            spieler = anna,
+            id = "panzer-anna-1",
+            weg = listOf(fremdeKante),
+        )
+
+        val imFrieden = SpielRegelwerk.wendeAn(mitPanzer, bewegung)
+        val imKrieg = SpielRegelwerk.wendeAn(
+            mitPanzer.copy(konflikte = setOf(Konflikt(anna, bert))),
+            bewegung,
+        ).getOrThrow()
+
+        assertTrue(imFrieden.isFailure)
+        assertTrue(imFrieden.exceptionOrNull()?.message.orEmpty().contains("während eines Krieges"))
+        assertEquals(fremdeKante, imKrieg.karte?.belegung?.kriegseinheiten?.single()?.position)
     }
 
     @Test
@@ -1154,6 +1228,39 @@ class KartenRegelwerkTest {
             karte = karte.copy(
                 belegung = karte.belegung.copy(
                     ecken = karte.belegung.ecken + EckBelegung(ecke, typ, spieler),
+                ),
+            ),
+        )
+    }
+
+    private fun SpielZustand.mitKontrollierterHandelslinie(
+        kante: KartenKante,
+        spieler: SpielerId,
+    ): SpielZustand {
+        val karte = requireNotNull(karte)
+        return copy(
+            karte = karte.copy(
+                belegung = karte.belegung.copy(
+                    ecken = karte.belegung.ecken + listOf(
+                        EckBelegung(kante.anfang, EckGebaeudeTyp.BAHNHOF, spieler),
+                        EckBelegung(kante.ende, EckGebaeudeTyp.BAHNHOF, spieler),
+                    ),
+                    kanten = karte.belegung.kanten + KantenBelegung(kante),
+                ),
+            ),
+        )
+    }
+
+    private fun SpielZustand.mitEigenemHafenAn(
+        kante: KartenKante,
+        spieler: SpielerId,
+    ): SpielZustand {
+        val karte = requireNotNull(karte)
+        return copy(
+            karte = karte.copy(
+                belegung = karte.belegung.copy(
+                    ecken = karte.belegung.ecken +
+                        EckBelegung(kante.anfang, EckGebaeudeTyp.HAFEN, spieler),
                 ),
             ),
         )

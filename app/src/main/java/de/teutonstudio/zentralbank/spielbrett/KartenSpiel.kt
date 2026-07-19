@@ -56,6 +56,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.fachlogik.modell.bewegungsKosten
 import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.bauteilIconPfadOderNull
@@ -64,6 +65,7 @@ private enum class SpielKartenWerkzeug(
     val beschriftung: String,
     val ziel: KartenZielModus,
     val startBauteil: BauteilTyp? = null,
+    val startKriegsEinheit: KriegsEinheitTyp? = null,
     val nurRundeNull: Boolean = false,
 ) {
     HAUPTBAHNHOF("Hauptbahnhof", KartenZielModus.ECKE, BauteilTyp.HAUPTBAHNHOF),
@@ -76,8 +78,16 @@ private enum class SpielKartenWerkzeug(
     ECKE_REPARIEREN("Reparieren", KartenZielModus.ECKE),
     ECKE_ENTFERNEN("Entfernen", KartenZielModus.ECKE),
     SCHIENE("Handelslinie", KartenZielModus.KANTE, BauteilTyp.EISENBAHNLINIE),
-    PANZER_BAUEN("Panzer bauen", KartenZielModus.KANTE),
-    KRIEGSSCHIFF_BAUEN("Kriegsschiff bauen", KartenZielModus.KANTE),
+    PANZER_BAUEN(
+        "Panzer bauen",
+        KartenZielModus.KANTE,
+        startKriegsEinheit = KriegsEinheitTyp.PANZER,
+    ),
+    KRIEGSSCHIFF_BAUEN(
+        "Kriegsschiff bauen",
+        KartenZielModus.KANTE,
+        startKriegsEinheit = KriegsEinheitTyp.KRIEGSSCHIFF,
+    ),
     TRUPPE_BEWEGEN("Truppe bewegen", KartenZielModus.KANTE),
     TRUPPE_ENTFERNEN("Truppe entfernen", KartenZielModus.KANTE),
     KANTE_ZERSTOEREN("Zerstören", KartenZielModus.KANTE),
@@ -112,16 +122,25 @@ private enum class SpielKartenWerkzeug(
 
 private val planbareWerkzeuge: List<SpielKartenWerkzeug> =
     SpielKartenWerkzeug.entries.filter { eintrag ->
-        eintrag.startBauteil != null &&
+        (eintrag.startBauteil != null ||
+            eintrag.startKriegsEinheit != null ||
+            eintrag == SpielKartenWerkzeug.TRUPPE_BEWEGEN) &&
             eintrag != SpielKartenWerkzeug.HAUPTBAHNHOF &&
             !eintrag.nurRundeNull
+    }
+
+private val SpielKartenWerkzeug.planungsKosten: Map<Rohstoff, Int>?
+    get() = when {
+        startBauteil != null -> startBauteil.kosten
+        startKriegsEinheit != null -> emptyMap()
+        else -> null
     }
 
 private val KompakteKopfleistenHoehe = 146.dp
 
 private data class GeplanterBauauftrag(
     val werkzeug: SpielKartenWerkzeug,
-    val bauteil: BauteilTyp,
+    val kosten: Map<Rohstoff, Int>,
     val ziel: KartenOrt,
     val ereignis: SpielEreignis,
 )
@@ -209,7 +228,7 @@ fun KartenSpielBildschirm(
     }
     val planungsZustand = planungsErgebnis.getOrElse { zustand }
     val geplanteRohstoffkosten = remember(geplanteBauten) {
-        bauRohstoffKosten(geplanteBauten.map { auftrag -> auftrag.bauteil })
+        summiereRohstoffKosten(geplanteBauten.map { auftrag -> auftrag.kosten })
     }
     val fehlendePlanRohstoffe = remember(zustand, geplanteRohstoffkosten) {
         fehlendeBauRohstoffe(zustand, geplanteRohstoffkosten)
@@ -239,9 +258,9 @@ fun KartenSpielBildschirm(
     }
 
     val bauwerkPlanen: (KartenOrt) -> Unit = planen@ { ziel ->
-        val bauteil = werkzeug.startBauteil
-        if (werkzeug !in planbareWerkzeuge || bauteil == null) {
-            planungsFehler = "Im Planungsmodus können nur neue Bauwerke gewählt werden."
+        if (werkzeug !in planbareWerkzeuge) {
+            planungsFehler =
+                "Im Planungsmodus können Bauwerke, Einheiten und Truppenbewegungen gewählt werden."
             return@planen
         }
         val ereignis = runCatching {
@@ -254,24 +273,40 @@ fun KartenSpielBildschirm(
                 truppenStart = truppenStart,
             )
         }.getOrElse { fehler ->
-            planungsFehler = fehler.message ?: "Der Bauauftrag konnte nicht erstellt werden."
+            planungsFehler = fehler.message ?: "Das Vorhaben konnte nicht erstellt werden."
             return@planen
         }
+        val kosten = when (ereignis) {
+            is SpielEreignis.KriegsEinheitBewegt -> {
+                val einheit = planungsZustand.karte?.belegung?.kriegseinheiten
+                    .orEmpty()
+                    .firstOrNull { belegung -> belegung.id == ereignis.id }
+                    ?: run {
+                        planungsFehler = "Die zu bewegende Einheit wurde nicht gefunden."
+                        return@planen
+                    }
+                einheit.typ.bewegungsKosten(ereignis.weg.size)
+            }
+            else -> werkzeug.planungsKosten ?: run {
+                planungsFehler = "Für dieses Vorhaben ist kein Rohstoffbedarf definiert."
+                return@planen
+            }
+        }
         val pruefzustand = planungsZustand.mitZusaetzlichenRohstoffen(
-            fehlendeBauRohstoffe(planungsZustand, bauteil),
+            fehlendeBauRohstoffe(planungsZustand, kosten),
         )
         SpielRegelwerk.wendeAn(pruefzustand, ereignis).fold(
             onSuccess = {
                 geplanteBauten = geplanteBauten + GeplanterBauauftrag(
                     werkzeug = werkzeug,
-                    bauteil = bauteil,
+                    kosten = kosten,
                     ziel = ziel,
                     ereignis = ereignis,
                 )
                 planungsFehler = null
             },
             onFailure = { fehler ->
-                planungsFehler = fehler.message ?: "Das Bauwerk kann dort nicht geplant werden."
+                planungsFehler = fehler.message ?: "Das Vorhaben kann dort nicht geplant werden."
             },
         )
         seewegStart = null
@@ -319,7 +354,7 @@ fun KartenSpielBildschirm(
             onSuccess = {
                 geplanteBauten = geplanteBauten + GeplanterBauauftrag(
                     werkzeug = SpielKartenWerkzeug.AUFWERTEN,
-                    bauteil = bauteil,
+                    kosten = bauteil.kosten,
                     ziel = KartenOrt.Ecke(ecke),
                     ereignis = ereignis,
                 )
@@ -554,6 +589,9 @@ fun KartenSpielBildschirm(
                                     val kante = ziel as KartenOrt.Kante
                                     if (truppenStart == null) {
                                         truppenStart = kante
+                                        planungsFehler = null
+                                    } else if (planungsmodus) {
+                                        bauwerkPlanen(kante)
                                     } else {
                                         ausgewaehltesZiel = kante
                                     }
@@ -580,6 +618,8 @@ fun KartenSpielBildschirm(
                                         "Route ändern: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
                                     } else if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
                                         "Planen: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
+                                    } else if (werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN) {
+                                        "Planen: ${if (truppenStart == null) "Truppenkante" else "benachbarte Zielkante"} wählen"
                                     } else {
                                         "Planen: ${werkzeug.beschriftung} auf der Karte wählen"
                                     },
@@ -873,8 +913,13 @@ internal fun fehlendeBauRohstoffe(
 }
 
 internal fun bauRohstoffKosten(bauteile: Iterable<BauteilTyp>): Map<Rohstoff, Int> =
-    bauteile
-        .flatMap { bauteil -> bauteil.kosten.entries }
+    summiereRohstoffKosten(bauteile.map(BauteilTyp::kosten))
+
+private fun summiereRohstoffKosten(
+    kosten: Iterable<Map<Rohstoff, Int>>,
+): Map<Rohstoff, Int> =
+    kosten
+        .flatMap(Map<Rohstoff, Int>::entries)
         .groupingBy { eintrag -> eintrag.key }
         .fold(0) { summe, eintrag -> summe + eintrag.value }
         .toSortedMap(compareBy(Rohstoff::ordinal))
@@ -904,7 +949,7 @@ private fun projiziereBauplan(
 ): Result<SpielZustand> = runCatching {
     auftraege.fold(ausgangszustand) { aktuellerZustand, auftrag ->
         val pruefzustand = aktuellerZustand.mitZusaetzlichenRohstoffen(
-            fehlendeBauRohstoffe(aktuellerZustand, auftrag.bauteil),
+            fehlendeBauRohstoffe(aktuellerZustand, auftrag.kosten),
         )
         SpielRegelwerk.wendeAn(pruefzustand, auftrag.ereignis).getOrThrow()
     }
@@ -968,12 +1013,12 @@ private fun BauwerkWarenkorb(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
-                    Text("Bauwerk-Warenkorb", style = MaterialTheme.typography.titleMedium)
+                    Text("Bau- und Einsatzplan", style = MaterialTheme.typography.titleMedium)
                     Text(
                         if (geplanteBauten.size == 1) {
-                            "1 Bauwerk geplant"
+                            "1 Vorhaben geplant"
                         } else {
-                            "${geplanteBauten.size} Bauwerke geplant"
+                            "${geplanteBauten.size} Vorhaben geplant"
                         },
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -987,14 +1032,14 @@ private fun BauwerkWarenkorb(
             ) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Bauwerk wählen", style = MaterialTheme.typography.labelLarge)
+                        Text("Vorhaben wählen", style = MaterialTheme.typography.labelLarge)
                         WerkzeugChips(
                             werkzeuge = planbareWerkzeuge,
                             ausgewaehlt = werkzeug,
                             beiWerkzeug = beiWerkzeug,
                         )
                         Text(
-                            "Danach den Bauort auf der Karte antippen.",
+                            "Danach Bauort oder Start- und Zielkante auf der Karte antippen.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -1003,7 +1048,7 @@ private fun BauwerkWarenkorb(
                 if (geplanteBauten.isEmpty()) {
                     item {
                         Text(
-                            "Noch keine Bauwerke im Warenkorb.",
+                            "Noch keine Vorhaben im Plan.",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
@@ -1037,16 +1082,22 @@ private fun BauwerkWarenkorb(
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Text(
-                                "Rohstoffkosten: ${auftrag.bauteil.kosten.alsKostenText()}",
+                                "Rohstoffbedarf: ${auftrag.kosten.alsKostenText()}",
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Text(
                                 "Marktpreis: " + marktpreisSumme(
-                                    auftrag.bauteil.kosten,
+                                    auftrag.kosten,
                                     marktpreise,
                                 ).alsPreisText(),
                                 style = MaterialTheme.typography.bodySmall,
                             )
+                            auftrag.werkzeug.startKriegsEinheit?.let { einheit ->
+                                Text(
+                                    "Bewegung: 1 × ${einheit.bewegungsRohstoff.anzeigeName()} je Kante",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                     }
                 }
@@ -1054,7 +1105,7 @@ private fun BauwerkWarenkorb(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         HorizontalDivider()
-                        Text("Rohstoffkosten gesamt", style = MaterialTheme.typography.titleSmall)
+                        Text("Rohstoffbedarf gesamt", style = MaterialTheme.typography.titleSmall)
                         if (rohstoffkosten.isEmpty()) {
                             Text("Keine", style = MaterialTheme.typography.bodySmall)
                         } else {
@@ -1110,14 +1161,14 @@ private fun BauwerkWarenkorb(
                 enabled = lagerBauMoeglich && lagerAktionVorhanden,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Plan aus Lager errichten")
+                Text("Plan aus Lager ausführen")
             }
             Button(
                 onClick = beiAusFinanzmittelnBauen,
                 enabled = finanzierterBauMoeglich && finanzAktionVorhanden,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Plan mit Finanzmitteln errichten")
+                Text("Plan mit Finanzmitteln ausführen")
             }
         }
     }
@@ -1176,7 +1227,10 @@ private fun SpielWerkzeugleiste(
                 mengen = rundeNullRestbestand,
             )
         } else if (planungsmodus) {
-            Text("Planbare Bauwerke", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Planbare Bauwerke, Einheiten und Bewegungen",
+                style = MaterialTheme.typography.titleSmall,
+            )
             WerkzeugChips(
                 werkzeuge = planbareWerkzeuge,
                 ausgewaehlt = werkzeug,

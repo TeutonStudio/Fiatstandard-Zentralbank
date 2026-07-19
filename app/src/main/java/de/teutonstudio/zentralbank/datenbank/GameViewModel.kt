@@ -155,7 +155,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
         fehlendeRohstoffe: Map<Rohstoff, Int>,
     ): Boolean {
         if (bauEreignisse.isEmpty()) {
-            _spielFehler.tryEmit("Der Bauplan enthält keine Bauwerke.")
+            _spielFehler.tryEmit("Der Plan enthält keine Vorhaben.")
             return false
         }
         val ausgangszustand = spielAblauf?.zustand ?: run {
@@ -218,7 +218,7 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     fun bauplanAnwenden(bauEreignisse: List<SpielEreignis>): Boolean {
         if (bauEreignisse.isEmpty()) {
-            _spielFehler.tryEmit("Der Bauplan enthält keine Bauwerke.")
+            _spielFehler.tryEmit("Der Plan enthält keine Vorhaben.")
             return false
         }
         val ablauf = spielAblauf ?: run {

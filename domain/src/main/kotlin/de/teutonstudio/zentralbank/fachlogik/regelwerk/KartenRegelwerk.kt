@@ -23,6 +23,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.bewegungsKosten
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
@@ -571,6 +572,28 @@ internal object KartenRegelwerk {
             "Die Kriegseinheiten-ID ist bereits vergeben."
         }
         pruefeFreieBefahrbareKante(karte, ereignis.typ, ereignis.kante)
+        when (ereignis.typ) {
+            KriegsEinheitTyp.PANZER -> require(
+                karte.belegung.kantenNachPosition[ereignis.kante]
+                    ?.takeIf { handelslinie -> handelslinie.zustand == BauwerkZustand.INTAKT }
+                    ?.let { KartenAuswertung.gewalthaber(karte, ereignis.kante) } ==
+                    ereignis.spieler,
+            ) {
+                "Ein Panzer kann nur auf einer eigenen, intakten Handelslinie gebaut werden."
+            }
+            KriegsEinheitTyp.KRIEGSSCHIFF -> require(
+                listOf(ereignis.kante.anfang, ereignis.kante.ende).any { ecke ->
+                    karte.belegung.eckenNachPosition[ecke]?.let { hafen ->
+                        hafen.besitzer == ereignis.spieler &&
+                            hafen.zustand == BauwerkZustand.INTAKT &&
+                            hafen.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN)
+                    } == true
+                },
+            ) {
+                "Ein Kriegsschiff kann nur auf einer Seekante an einem eigenen, intakten Hafen " +
+                    "gebaut werden."
+            }
+        }
         return zustand.mitBelegung { belegung ->
             belegung.copy(
                 kriegseinheiten = (belegung.kriegseinheiten + KriegsEinheitBelegung(
@@ -606,12 +629,13 @@ internal object KartenRegelwerk {
             }
             require(ziel !in besetzteKanten) { "Die Zielkante ist bereits durch eine Truppe belegt." }
             pruefeBefahrbareKante(karte, einheit.typ, ziel)
+            pruefeFremdeHandelslinie(zustand, karte, einheit.besitzer, ziel)
             vorher = ziel
         }
         val nachTreibstoff = RohstoffRegelwerk.rohstoffeBuchen(
             zustand = zustand,
             spieler = ereignis.spieler,
-            mengen = mapOf(einheit.typ.bewegungsRohstoff to ereignis.weg.size),
+            mengen = einheit.typ.bewegungsKosten(ereignis.weg.size),
             faktor = -1,
         )
         val ziel = ereignis.weg.last()
@@ -668,6 +692,22 @@ internal object KartenRegelwerk {
                 KriegsEinheitTyp.KRIEGSSCHIFF ->
                     "Ein Kriegsschiff muss auf einer an Wasser grenzenden Kartenkante stehen."
             }
+        }
+    }
+
+    private fun pruefeFremdeHandelslinie(
+        zustand: SpielZustand,
+        karte: Spielkarte,
+        spieler: SpielerId,
+        kante: KartenKante,
+    ) {
+        if (kante !in karte.belegung.kantenNachPosition) return
+        val fremderSpieler = KartenAuswertung.gewalthaber(karte, kante)
+            ?.takeIf { besitzer -> besitzer != spieler }
+            ?: return
+        require(zustand.konflikte.any { konflikt -> konflikt.betrifft(spieler, fremderSpieler) }) {
+            "Eine fremde Handelslinie darf nur während eines Krieges mit ihrem Besitzer " +
+                "befahren werden."
         }
     }
 

@@ -60,4 +60,17 @@ class BauteilKostenTest {
         assertTrue(BauteilTyp.BAHNHOF.istInRundeNullPlatzierbar)
         assertTrue(BauteilTyp.HAFEN.istInRundeNullPlatzierbar)
     }
+
+    @Test
+    fun kriegseinheitenBerechnenIhrenTreibstoffJeBewegterKante() {
+        assertEquals(
+            mapOf(Rohstoff.DIESEL to 3),
+            KriegsEinheitTyp.PANZER.bewegungsKosten(3),
+        )
+        assertEquals(
+            mapOf(Rohstoff.SCHWEROEL to 2),
+            KriegsEinheitTyp.KRIEGSSCHIFF.bewegungsKosten(2),
+        )
+        assertTrue(KriegsEinheitTyp.PANZER.bewegungsKosten(0).isEmpty())
+    }
 }

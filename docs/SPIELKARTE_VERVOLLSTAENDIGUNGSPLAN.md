@@ -72,8 +72,9 @@ Aus der Anleitung ergeben sich folgende feste Anforderungen:
   Routen sind neutral und nur durch den Besitzer ihres einzigen Bauwerk-Endpunkts
   abreißbar.
 - Frachtschiffe verbinden zwei Häfen und liegen deshalb nicht auf einer normalen
-  Dreieckskante. Panzer und Kriegsschiffe sind nur während eines Krieges auf dem
-  Brett.
+  Dreieckskante. Panzer werden auf eigenen Handelslinien und Kriegsschiffe an
+  eigenen Häfen gebaut; fremd kontrollierte Handelslinien sind für Truppen nur
+  während eines Krieges befahrbar.
 - Nach erfolgreicher Belagerung werden Eckgebäude zu einer zerstörten neutralen
   Variante.
 
@@ -186,7 +187,7 @@ Eine Ortsart akzeptiert nur die dafür erlaubten Inhalte:
 | Kante | Schiene | Kontrolle aus den Bauwerk-Endpunkten abgeleitet; neutral oder Spielerfarbe, zusätzlich intakt oder zerstört |
 | Geländefeld | Abbaueinheit mit Rohstoff oder Geschäftsbank | neutral; aktiv, verlassen oder zerstört nur soweit fachlich nötig |
 | Seeweg | Frachtschiff zwischen zwei Hafen-Ecken | Spieler sowie Import-/Exportrichtung |
-| Krieg | Panzer oder Kriegsschiff | Spieler, Konflikt und nur temporär während des Krieges |
+| Krieg | Panzer oder Kriegsschiff | Spieler; Bau im Epizug, fremde Infrastruktur nur im Krieg befahrbar |
 
 Pro Ecke, Kante und Feld ist zunächst höchstens eine Belegung zulässig. Auf
 Wasserfeldern gibt es keine Feldbelegung. Seewege und Kriegseinheiten werden als

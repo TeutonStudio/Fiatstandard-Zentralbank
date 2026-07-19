@@ -601,10 +601,10 @@ Ereignisse duerfen tendenziell Schulden, Zinssaetze, Rohstoffpreise, Marktwerte 
 Ein Krieg beginnt durch eine Kriegserklaerung im Epizug. Im Prozug ist sie gesperrt. Dabei wird festgehalten, welche Spieler beteiligt sind, welches Ziel angegriffen wird und welche Kriegseinheiten eingesetzt werden.
 
 \section{Kriegseinheiten}
-Spieler koennen im Epizug auch ohne bestehenden Krieg Truppen bauen. Fuer den Bau selbst sind in dieser Fassung noch keine Rohstoffkosten festgelegt. Jede Kante kann hoechstens eine Truppe tragen. Es gibt zwei Truppentypen:
+Spieler koennen im Epizug auch ohne bestehenden Krieg Truppen bauen und Bau sowie Bewegung bereits im Planmodus vormerken. Fuer den Bau selbst sind in dieser Fassung noch keine Rohstoffkosten festgelegt. Jede Kante kann hoechstens eine Truppe tragen. Es gibt zwei Truppentypen:
 \begin{description}
-  \item[Panzer] Stehen auf Kanten, die an mindestens ein Gelaendefeld grenzen, und werden zur Belagerung von Bahnhoefen, Grossbahnhoefen, Haefen und Grosshaefen eingesetzt.
-  \item[Kriegsschiffe] Stehen auf Kanten, die an mindestens ein Wasserfeld grenzen, und werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
+  \item[Panzer] Werden auf einer eigenen, intakten Handelslinie gebaut, stehen auf Kanten, die an mindestens ein Gelaendefeld grenzen, und werden zur Belagerung von Bahnhoefen, Grossbahnhoefen, Haefen und Grosshaefen eingesetzt.
+  \item[Kriegsschiffe] Werden auf einer Seekante an einem eigenen, intakten Hafen oder Grosshafen gebaut, stehen auf Kanten, die an mindestens ein Wasserfeld grenzen, und werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
 \end{description}
 
 \section{Treibstoffverbrauch}
@@ -616,6 +616,8 @@ Eine Bewegung fuehrt von der aktuellen Kante auf eine benachbarte Kante mit geme
 \end{itemize}
 
 Ein mehrschrittiger Weg wird nur ausgefuehrt, wenn der gesamte benoetigte Treibstoff vorhanden ist. Andernfalls bleiben sowohl Rohstoffbestand als auch Truppenposition unveraendert.
+
+Eine von einem anderen Spieler kontrollierte Handelslinie darf nur befahren werden, solange mit diesem Spieler ein Krieg besteht.
 
 \section{Kampfaufloesung}
 Beim Kriegsende werden Panzer und Kriegsschiffe jeweils getrennt nach demselben
