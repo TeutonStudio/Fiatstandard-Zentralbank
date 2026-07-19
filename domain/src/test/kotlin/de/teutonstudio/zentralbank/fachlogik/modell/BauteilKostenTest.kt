@@ -13,8 +13,10 @@ class BauteilKostenTest {
             it.art == BauteilArt.WIRTSCHAFTSREGION
         }
 
-        assertEquals(11, wirtschaftsstandorte.size)
+        assertEquals(12, wirtschaftsstandorte.size)
         assertTrue(wirtschaftsstandorte.all { it.kosten == erwarteteKosten })
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1), BauteilTyp.ANGLER.ertrag)
+        assertEquals(ProduktionsArt.ABBAU, BauteilTyp.ANGLER.produktionsArt)
     }
 
     @Test

@@ -112,7 +112,7 @@ class SpielbrettBauwerkHoverTest {
     }
 
     @Test
-    fun `Hauptbahnhof heftet alle zugeordneten Bauwerke seines Spielers an`() {
+    fun `Hauptbahnhof heftet nur Nichtschienen seines Spielers an`() {
         val hauptbahnhof = ziel(
             name = "Hauptbahnhof",
             form = SpielObjektForm.HAUPTBAHNHOF,
@@ -124,16 +124,28 @@ class SpielbrettBauwerkHoverTest {
             form = SpielObjektForm.SCHIENE,
             spieler = setOf("anna"),
         )
+        val frachtschiff = ziel(
+            name = "Frachtschiff",
+            form = SpielObjektForm.FRACHTSCHIFF,
+            spieler = setOf("anna"),
+        )
+        val panzer = ziel(
+            name = "Panzer",
+            form = SpielObjektForm.PANZER,
+            spieler = setOf("anna"),
+        )
         val fremderHafen = ziel(name = "Hafen", spieler = setOf("bert"))
 
         val angeheftet = listOf(
             hauptbahnhof,
             bahnhof,
             handelslinie,
+            frachtschiff,
+            panzer,
             fremderHafen,
         ).angehefteteZieleFuer(hauptbahnhof)
 
-        assertEquals(setOf(hauptbahnhof, bahnhof, handelslinie), angeheftet.toSet())
+        assertEquals(setOf(hauptbahnhof, bahnhof, frachtschiff, panzer), angeheftet.toSet())
     }
 
     @Test

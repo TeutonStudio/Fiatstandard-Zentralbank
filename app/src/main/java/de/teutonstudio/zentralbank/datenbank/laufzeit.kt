@@ -831,13 +831,14 @@ data object Ausland: JuristischePerson {
 class Spieler(
     override val name: String,
     public val gebaut: MutableList<Map<out Bauteil,Int>>, // index=runde, zuordnung=was gebaut/was zerstört
-    public val kontrolle: MutableList<Map<Wirtschaftsregionen,Int>> // index=runde, zuordnung kontrollverlust/kontrollgewinn
+    public val kontrolle: MutableList<Map<Wirtschaftsregionen,Int>>, // index=runde, zuordnung kontrollverlust/kontrollgewinn
+    val passwortHash: String = "",
 ): JuristischePerson {
-    constructor(name: String, runde0gebaut: Map<out Bauteil,Int>, runde0kontrolle: Map<Wirtschaftsregionen,Int>): this(
-        name,mutableListOf(runde0gebaut),mutableListOf(runde0kontrolle)
+    constructor(name: String, runde0gebaut: Map<out Bauteil,Int>, runde0kontrolle: Map<Wirtschaftsregionen,Int>, passwortHash: String = ""): this(
+        name,mutableListOf(runde0gebaut),mutableListOf(runde0kontrolle),passwortHash
     )
-    constructor(name: String, runde0gebaut: Map<out Bauteil,Int>): this(
-        name,runde0gebaut,emptyMap<Wirtschaftsregionen,Int>()
+    constructor(name: String, runde0gebaut: Map<out Bauteil,Int>, passwortHash: String = ""): this(
+        name,runde0gebaut,emptyMap<Wirtschaftsregionen,Int>(),passwortHash
     )
 
     private val cache: MutableList<Map<out Bauteil,Int>> = mutableListOf()

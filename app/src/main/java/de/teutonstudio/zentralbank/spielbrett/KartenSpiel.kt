@@ -95,6 +95,7 @@ private enum class SpielKartenWerkzeug(
     ABBAUEINHEIT("Abbaueinheit", KartenZielModus.FELD),
     GESCHAEFTSBANK("Geschäftsbank", KartenZielModus.FELD, BauteilTyp.GESCHAEFTSBANK),
     VIEHHOF("Viehhof", KartenZielModus.FELD, BauteilTyp.VIEHHOF, nurRundeNull = true),
+    ANGLER("Angler", KartenZielModus.FELD, BauteilTyp.ANGLER, nurRundeNull = true),
     ZIEGELBRENNER(
         "Ziegelbrenner",
         KartenZielModus.FELD,
@@ -122,9 +123,11 @@ private enum class SpielKartenWerkzeug(
 private val planbareWerkzeuge: List<SpielKartenWerkzeug> =
     SpielKartenWerkzeug.entries.filter { eintrag ->
         (eintrag.startBauteil != null || eintrag.startKriegsEinheit != null) &&
-            eintrag != SpielKartenWerkzeug.HAUPTBAHNHOF &&
-            !eintrag.nurRundeNull
+            eintrag != SpielKartenWerkzeug.HAUPTBAHNHOF
     }
+
+internal val planbareBauteilTypen: Set<BauteilTyp> =
+    planbareWerkzeuge.mapNotNullTo(mutableSetOf(), SpielKartenWerkzeug::startBauteil)
 
 private val SpielKartenWerkzeug.planungsKosten: Map<Rohstoff, Int>?
     get() = when {
@@ -203,7 +206,6 @@ fun KartenSpielBildschirm(
         )
     }
     var rohstoff by remember { mutableStateOf(Rohstoff.NAHRUNG) }
-    var kameraModus by remember { mutableStateOf(KameraInteraktionsModus.DREHEN) }
     var ausgewaehltesZiel by remember { mutableStateOf<KartenOrt?>(null) }
     var seewegStart by remember { mutableStateOf<KartenOrt.Ecke?>(null) }
     var seewegBearbeitungId by remember { mutableStateOf<String?>(null) }
@@ -423,8 +425,6 @@ fun KartenSpielBildschirm(
                     },
                     rohstoff = rohstoff,
                     beiRohstoff = { rohstoff = it },
-                    kameraModus = kameraModus,
-                    beiKameraModus = { kameraModus = it },
                     beiRueckgaengig = beiRueckgaengig,
                     beiWiederholen = beiWiederholen,
                     rundeNull = zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL,
@@ -548,7 +548,6 @@ fun KartenSpielBildschirm(
                         ),
                         modifier = Modifier.fillMaxSize(),
                         betrachtungsStatus = betrachtungsStatus,
-                        kameraInteraktionsModus = kameraModus,
                         himmel = himmel,
                         bauwerkInfoFreiraum = if (kompakteZentrale) {
                             PaddingValues(
@@ -708,8 +707,7 @@ fun KartenSpielBildschirm(
                                 } else {
                                     Text(
                                         "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +
-                                            "Ziehen: ${if (kameraModus == KameraInteraktionsModus.DREHEN) "drehen" else "verschieben"} · " +
-                                                "Zwei Finger: verschieben/zoomen",
+                                            "Ein Finger: verschieben · Zwei Finger: drehen/zoomen",
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.labelSmall,
                                     )
@@ -1234,8 +1232,6 @@ private fun SpielWerkzeugleiste(
     beiWerkzeug: (SpielKartenWerkzeug) -> Unit,
     rohstoff: Rohstoff,
     beiRohstoff: (Rohstoff) -> Unit,
-    kameraModus: KameraInteraktionsModus,
-    beiKameraModus: (KameraInteraktionsModus) -> Unit,
     beiRueckgaengig: () -> Unit,
     beiWiederholen: () -> Unit,
     rundeNull: Boolean,
@@ -1250,18 +1246,6 @@ private fun SpielWerkzeugleiste(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = beiRueckgaengig) { Text("Rückgängig") }
             OutlinedButton(onClick = beiWiederholen) { Text("Wiederholen") }
-        }
-        Text("Kamera", style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            KameraInteraktionsModus.entries.forEach { modus ->
-                FilterChip(
-                    selected = kameraModus == modus,
-                    onClick = { beiKameraModus(modus) },
-                    label = {
-                        Text(if (modus == KameraInteraktionsModus.DREHEN) "Drehen" else "Verschieben")
-                    },
-                )
-            }
         }
         if (rundeNull) {
             Text("Runde 0", style = MaterialTheme.typography.titleSmall)
@@ -1501,6 +1485,7 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
             FeldAnlage.Geschaeftsbank,
         )
         SpielKartenWerkzeug.VIEHHOF,
+        SpielKartenWerkzeug.ANGLER,
         SpielKartenWerkzeug.ZIEGELBRENNER,
         SpielKartenWerkzeug.LEHMINE,
         SpielKartenWerkzeug.FOERSTER,

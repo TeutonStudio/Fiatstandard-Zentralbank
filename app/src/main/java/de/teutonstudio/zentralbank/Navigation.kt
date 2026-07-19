@@ -31,6 +31,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeSpieler
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.ProzugDialog
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.SpielerPasswortDialog
 import de.teutonstudio.zentralbank.schnittstelle.domain.zuProzugAnzeigeZustand
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.AnleiheDialog
@@ -40,6 +41,7 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.Hauptmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.LebensraeumeVerwalten
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielErstellen
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielLaden
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielstaendeVerwalten
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielmenueBereich
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielmenueDialog
@@ -54,6 +56,11 @@ private fun Screen.navigiere(navController: NavHostController): () -> Unit = { n
 private data class HandelsVorauswahl(
     val rohstoff: Rohstoffe,
     val gesamtpreis: Zahlungsmittel,
+)
+
+private data class PasswortAnfrage(
+    val spielerNamen: List<String>,
+    val aktion: () -> Unit,
 )
 
 @Composable
@@ -80,6 +87,7 @@ sealed class Screen(val route: String) {
     object NewGame: Screen(route = "new_game")
     object LoadGame: Screen(route = "load_game")
     object Lebensraeume: Screen(route = "lebensraeume")
+    object Spielstaende: Screen(route = "spielstaende")
     object Game: Screen(route = "game")
     object GameMap: Screen(route = "game_map")
     object PlayerSaldo: Screen(route = "player_saldo")
@@ -118,6 +126,7 @@ fun Navigation(viewModel: GameViewModel) {
                     Screen.NewGame.navigiere(navController),
                     Screen.LoadGame.navigiere(navController),
                     Screen.Lebensraeume.navigiere(navController),
+                    Screen.Spielstaende.navigiere(navController),
                 )
             }
 
@@ -135,10 +144,17 @@ fun Navigation(viewModel: GameViewModel) {
                 )
             }
 
+            composable(route = Screen.Spielstaende.route) {
+                SpielstaendeVerwalten(
+                    beiAbbruch = { navController.popBackStack() },
+                    beiLoeschen = viewModel.vernichteSpiel,
+                    spielstaende = viewModel.spielstaende.collectAsState().value,
+                )
+            }
+
             composable(route = Screen.LoadGame.route) {
                 SpielLaden(
                     Screen.StartScreen.navigiere(navController),
-                    viewModel.vernichteSpiel,
                     viewModel.ladeSpiel,
                     Screen.Game.navigiere(navController),
                     viewModel.spielstaende.collectAsState().value
@@ -158,6 +174,15 @@ fun Navigation(viewModel: GameViewModel) {
                     mutableStateOf<HandelsVorauswahl?>(null)
                 }
                 var anleiheDialogOffen by remember(spiel) { mutableStateOf(false) }
+                var passwortAnfrage by remember(spiel) { mutableStateOf<PasswortAnfrage?>(null) }
+                fun nachPasswort(spielerNamen: Collection<String>, aktion: () -> Unit) {
+                    val geschuetzteSpieler = viewModel.passwortGeschuetzteSpieler(spielerNamen)
+                    if (geschuetzteSpieler.isEmpty()) {
+                        aktion()
+                    } else {
+                        passwortAnfrage = PasswortAnfrage(geschuetzteSpieler, aktion)
+                    }
+                }
                 val aktiverIndex = spielZustand?.let { zustand ->
                     zustand.spieler.indexOfFirst { it.id == zustand.aktiverSpieler }
                 } ?: -1
@@ -176,7 +201,11 @@ fun Navigation(viewModel: GameViewModel) {
                         zugText = spielUebersicht?.zug?.text ?: "Kein Zug aktiv",
                         zugZeitText = zugZeitText,
                         beiBereich = { bereich -> geoeffneterBereich = bereich },
-                        beiZugBeenden = viewModel::beendeZug,
+                        beiZugBeenden = {
+                            spielZustand.aktiverSpieler?.wert?.let { name ->
+                                nachPasswort(listOf(name), viewModel::beendeZug)
+                            }
+                        },
                         beiSpielBeenden = {
                             viewModel.spielstandBeenden {
                                 navController.navigate(Screen.StartScreen.route) {
@@ -291,15 +320,19 @@ fun Navigation(viewModel: GameViewModel) {
                             handelsVorauswahl = null
                         },
                         onCreateRohstoff = { handel ->
-                            if (viewModel.erfasseRohstoffhandel(handel)) {
-                                handelDialogOffen = false
-                                handelsVorauswahl = null
+                            nachPasswort(listOf(handel.besitzer.name, handel.erwerber.name)) {
+                                if (viewModel.erfasseRohstoffhandel(handel)) {
+                                    handelDialogOffen = false
+                                    handelsVorauswahl = null
+                                }
                             }
                         },
                         onCreateAnleihe = { handel ->
-                            if (viewModel.erfasseAnleihenhandel(handel)) {
-                                handelDialogOffen = false
-                                handelsVorauswahl = null
+                            nachPasswort(listOf(handel.besitzer.name, handel.erwerber.name)) {
+                                if (viewModel.erfasseAnleihenhandel(handel)) {
+                                    handelDialogOffen = false
+                                    handelsVorauswahl = null
+                                }
                             }
                         },
                         initialerRohstoff = handelsVorauswahl?.rohstoff,
@@ -315,8 +348,25 @@ fun Navigation(viewModel: GameViewModel) {
                             ?: spiel.spielerStringListe.firstOrNull().orEmpty(),
                         onDismiss = { anleiheDialogOffen = false },
                         onCreate = { handel ->
-                            if (viewModel.erfasseAnleihenhandel(handel)) {
-                                anleiheDialogOffen = false
+                            nachPasswort(listOf(handel.besitzer.name, handel.erwerber.name)) {
+                                if (viewModel.erfasseAnleihenhandel(handel)) {
+                                    anleiheDialogOffen = false
+                                }
+                            }
+                        },
+                    )
+                }
+                passwortAnfrage?.let { anfrage ->
+                    SpielerPasswortDialog(
+                        spielerNamen = anfrage.spielerNamen,
+                        beiAbbruch = { passwortAnfrage = null },
+                        beiBestaetigen = { passwoerter ->
+                            if (viewModel.pruefeSpielerPasswoerter(passwoerter)) {
+                                passwortAnfrage = null
+                                anfrage.aktion()
+                                true
+                            } else {
+                                false
                             }
                         },
                     )
@@ -412,25 +462,49 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.NewTrade.route) {
             MitAktuellemSpiel(viewModel, navController) { spiel ->
+                var passwortAnfrage by remember(spiel) { mutableStateOf<PasswortAnfrage?>(null) }
+                fun nachPasswort(spielerNamen: Collection<String>, aktion: () -> Unit) {
+                    val geschuetzteSpieler = viewModel.passwortGeschuetzteSpieler(spielerNamen)
+                    if (geschuetzteSpieler.isEmpty()) aktion()
+                    else passwortAnfrage = PasswortAnfrage(geschuetzteSpieler, aktion)
+                }
                 HandelDialog(
                     spiel = spiel,
                     onDismiss = { navController.popBackStack() },
                     onCreateRohstoff = { handel ->
-                        if (viewModel.erfasseRohstoffhandel(handel)) {
-                            navController.popBackStack()
+                        nachPasswort(listOf(handel.besitzer.name, handel.erwerber.name)) {
+                            if (viewModel.erfasseRohstoffhandel(handel)) {
+                                navController.popBackStack()
+                            }
                         }
                     },
                     onCreateAnleihe = { handel ->
-                        if (viewModel.erfasseAnleihenhandel(handel)) {
-                            navController.popBackStack()
+                        nachPasswort(listOf(handel.besitzer.name, handel.erwerber.name)) {
+                            if (viewModel.erfasseAnleihenhandel(handel)) {
+                                navController.popBackStack()
+                            }
                         }
                     },
                 )
+                passwortAnfrage?.let { anfrage ->
+                    SpielerPasswortDialog(
+                        spielerNamen = anfrage.spielerNamen,
+                        beiAbbruch = { passwortAnfrage = null },
+                        beiBestaetigen = { passwoerter ->
+                            if (viewModel.pruefeSpielerPasswoerter(passwoerter)) {
+                                passwortAnfrage = null
+                                anfrage.aktion()
+                                true
+                            } else false
+                        },
+                    )
+                }
             }
         }
 
         composable(route = Screen.NewCredit.route) {
             MitAktuellemSpiel(viewModel, navController) { spiel ->
+                var passwortAnfrage by remember(spiel) { mutableStateOf<PasswortAnfrage?>(null) }
                 AnleiheDialog(
                     spiel = spiel,
                     aktuellerSpielerName = viewModel.spielZustand.collectAsState().value
@@ -438,11 +512,34 @@ fun Navigation(viewModel: GameViewModel) {
                         ?: spiel.spielerStringListe.firstOrNull().orEmpty(),
                     onDismiss = { navController.popBackStack() },
                     onCreate = { handel ->
-                        if (viewModel.erfasseAnleihenhandel(handel)) {
-                            navController.popBackStack()
+                        val geschuetzteSpieler = viewModel.passwortGeschuetzteSpieler(
+                            listOf(handel.besitzer.name, handel.erwerber.name),
+                        )
+                        val aktion = {
+                            if (viewModel.erfasseAnleihenhandel(handel)) {
+                                navController.popBackStack()
+                            }
+                        }
+                        if (geschuetzteSpieler.isEmpty()) {
+                            aktion()
+                        } else {
+                            passwortAnfrage = PasswortAnfrage(geschuetzteSpieler, aktion)
                         }
                     },
                 )
+                passwortAnfrage?.let { anfrage ->
+                    SpielerPasswortDialog(
+                        spielerNamen = anfrage.spielerNamen,
+                        beiAbbruch = { passwortAnfrage = null },
+                        beiBestaetigen = { passwoerter ->
+                            if (viewModel.pruefeSpielerPasswoerter(passwoerter)) {
+                                passwortAnfrage = null
+                                anfrage.aktion()
+                                true
+                            } else false
+                        },
+                    )
+                }
             }
         }
 

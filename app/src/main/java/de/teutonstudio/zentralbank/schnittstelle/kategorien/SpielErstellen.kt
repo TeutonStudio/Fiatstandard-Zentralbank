@@ -35,6 +35,7 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.MAXIMALE_SPIELER_ANZAHL
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereBauteile
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereLeitzinsatzZiele
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereSpieler
+import de.teutonstudio.zentralbank.fachlogik.modell.hasheSpielerPasswort
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereWarenkorb
 import java.util.UUID
 
@@ -63,13 +64,19 @@ fun SpielErstellen(
     nachAbschluß: () -> Unit,
     seite: MutableIntState = remember { mutableIntStateOf(1) },
     vorbelegteKarte: KartenVorlage? = null,
+    vorbelegtePasswoerter: Map<String, String> = emptyMap(),
 ) {
     val spieler = remember { mutableStateMapOf(
         "Spieler 1" to 100.toZahlungsmittel(),
         "Spieler 2" to 100.toZahlungsmittel(),
         "Spieler 3" to 100.toZahlungsmittel(),
     ) }
-    val spielerGültig = remember { mutableStateOf(true) }
+    val spielerGültig = remember { mutableStateOf(false) }
+    val spielerPasswoerter = remember(vorbelegtePasswoerter) {
+        mutableStateMapOf<String, String>().apply {
+            spieler.keys.forEach { name -> put(name, vorbelegtePasswoerter[name].orEmpty()) }
+        }
+    }
     val ausgewaehlteKarte = remember { mutableStateOf(vorbelegteKarte) }
     val warenkorb = remember { mutableStateMapOf<Rohstoffe, Int>() }
     val zentralbankZiele = remember { mutableListOf(15f,2f,.5f,2f) }
@@ -112,7 +119,7 @@ fun SpielErstellen(
         anleitung = remember { mutableStateOf(false) }
     ) {
         when (seite.intValue) {
-            1 -> { definiereSpieler(spielerGültig,spieler) }
+            1 -> { definiereSpieler(spielerGültig, spieler, spielerPasswoerter) }
             2 -> {
                 Row(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.weight(1f)) {
@@ -188,7 +195,11 @@ fun SpielErstellen(
                     } else {
                         gemeinsameBauteile
                     }.toMutableMap()
-                    Spieler(name, bauteile) to (spieler[name] ?: Zahlungsmittel())
+                    Spieler(
+                        name = name,
+                        runde0gebaut = bauteile,
+                        passwortHash = hasheSpielerPasswort(spielerPasswoerter.getValue(name)),
+                    ) to (spieler[name] ?: Zahlungsmittel())
                 }.toMap()
                 val startRohstoffe = startRohstoffeZuordnen(
                     spielerNamen = spielerNamen,

@@ -77,6 +77,7 @@ fun Handelslinie.handelslinieIconPfad(): Int = when (this) {
 fun Wirtschaftsregionen.wirtschaftseinheitIconPfad(): Int = when (this) {
     Wirtschaftsregionen.GESCHÄFTSBANK -> R.drawable.wirtschaftseinheit_geschaeftsbank
     Wirtschaftsregionen.VIEHHOF -> R.drawable.wirtschaftseinheit_viehhof
+    Wirtschaftsregionen.ANGLER -> R.drawable.leer
     Wirtschaftsregionen.ZIEGELBRENNER -> R.drawable.wirtschaftseinheit_ziegelbrenner
     Wirtschaftsregionen.LEHMINE -> R.drawable.wirtschaftseinheit_lehmmine
     Wirtschaftsregionen.FÖRSTER -> R.drawable.wirtschaftseinheit_foerster
@@ -110,6 +111,7 @@ fun BauteilTyp.handelslinieIconPfadOderNull(): Int? = when (this) {
 fun BauteilTyp.wirtschaftseinheitIconPfadOderNull(): Int? = when (this) {
     BauteilTyp.GESCHAEFTSBANK -> R.drawable.wirtschaftseinheit_geschaeftsbank
     BauteilTyp.VIEHHOF -> R.drawable.wirtschaftseinheit_viehhof
+    BauteilTyp.ANGLER -> R.drawable.leer
     BauteilTyp.ZIEGELBRENNER -> R.drawable.wirtschaftseinheit_ziegelbrenner
     BauteilTyp.LEHMINE -> R.drawable.wirtschaftseinheit_lehmmine
     BauteilTyp.FOERSTER -> R.drawable.wirtschaftseinheit_foerster

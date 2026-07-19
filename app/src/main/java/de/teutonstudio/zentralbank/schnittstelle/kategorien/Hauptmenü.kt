@@ -18,6 +18,7 @@ fun Hauptmenü(
     beiNeu: () -> Unit,
     beiLade: () -> Unit,
     beiLebensraeume: () -> Unit,
+    beiSpielstaende: () -> Unit,
 ) {
     Titel {
         Column(
@@ -41,12 +42,23 @@ fun Hauptmenü(
                     beiKlick = beiLade,
                 )
             }
-            ImageCard(
-                bild_index = R.drawable.lebensraeume,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                bild_label = "Lebensräume verwalten",
-                beiKlick = beiLebensraeume,
-            )
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ImageCard(
+                    bild_index = R.drawable.lebensraeume,
+                    modifier = Modifier.weight(1f),
+                    bild_label = "Lebensräume verwalten",
+                    beiKlick = beiLebensraeume,
+                )
+                ImageCard(
+                    bild_index = R.drawable.loadgameicon,
+                    modifier = Modifier.weight(1f),
+                    bild_label = "Spielstände verwalten",
+                    beiKlick = beiSpielstaende,
+                )
+            }
         }
     }
 }
@@ -56,6 +68,6 @@ fun Hauptmenü(
 @Composable
 private fun HauptmenüPreview() {
     Column {
-        Hauptmenü({}, {}, {})
+        Hauptmenü({}, {}, {}, {})
     }
 }

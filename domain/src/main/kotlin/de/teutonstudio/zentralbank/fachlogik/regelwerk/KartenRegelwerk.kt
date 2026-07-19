@@ -30,6 +30,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.istBefahrbar
 import de.teutonstudio.zentralbank.fachlogik.modell.istSpezialfeldInnenkante
 import de.teutonstudio.zentralbank.fachlogik.modell.istSpezialfeldMittelpunkt
+import de.teutonstudio.zentralbank.fachlogik.modell.istTeichfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import de.teutonstudio.zentralbank.fachlogik.modell.sindBenachbarteKanten
@@ -238,6 +239,7 @@ internal object KartenRegelwerk {
                         KantenBelegung(
                             position = ereignis.kante,
                             gebautInRunde = zustand.rundenzähler,
+                            erbautVon = ereignis.spieler,
                         )).kantenSortiert(),
                 ),
             ),
@@ -255,6 +257,7 @@ internal object KartenRegelwerk {
         require(ereignis.feld in karte.landNachPosition) {
             "Eine neutrale Anlage darf nur auf einem Geländefeld stehen."
         }
+        pruefeFeldAnlagenStandort(karte, ereignis.feld, ereignis.anlage)
         require(karte.belegung.felder.none { it.position == ereignis.feld }) {
             "Das gewählte Feld ist bereits belegt."
         }
@@ -778,6 +781,7 @@ internal object KartenRegelwerk {
                 kanten = (karte.belegung.kanten + KantenBelegung(
                     position = ereignis.kante,
                     gebautInRunde = zustand.rundenzähler,
+                    erbautVon = ereignis.spieler,
                 )).kantenSortiert(),
             ),
         )
@@ -811,6 +815,7 @@ internal object KartenRegelwerk {
         require(ereignis.feld in karte.landNachPosition) {
             "Eine neutrale Anlage darf nur auf einem Geländefeld stehen."
         }
+        pruefeFeldAnlagenStandort(karte, ereignis.feld, ereignis.anlage)
         require(karte.belegung.felder.none { it.position == ereignis.feld }) {
             "Das gewählte Feld ist bereits belegt."
         }
@@ -826,6 +831,21 @@ internal object KartenRegelwerk {
             ),
         )
         return schliesseRundeNullPlatzierungAb(danach, ereignis.errichter, bauteil)
+    }
+
+    private fun pruefeFeldAnlagenStandort(
+        karte: Spielkarte,
+        feld: de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld,
+        anlage: FeldAnlage,
+    ) {
+        val istAngler = (anlage as? FeldAnlage.Wirtschaftsregion)?.bauteil == BauteilTyp.ANGLER
+        require(istAngler == karte.istTeichfeld(feld)) {
+            if (istAngler) {
+                "Ein Angler kann nur auf einem Feld des Teich-Spezialfelds gebaut werden."
+            } else {
+                "Auf einem Feld des Teich-Spezialfelds kann nur ein Angler gebaut werden."
+            }
+        }
     }
 
     private fun pruefeRundeNullPlatzierung(

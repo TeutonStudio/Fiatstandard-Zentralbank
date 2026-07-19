@@ -46,6 +46,7 @@ data class RohstoffMenge(
 data class Spieler(
     val id: SpielerId,
     val name: String,
+    val passwortHash: String = "",
     val rohstoffe: Map<Rohstoff, Int> = emptyMap(),
     val geldkonto: Geld = Geld.NULL,
     val anleihen: List<AnleiheId> = emptyList(),

@@ -68,7 +68,7 @@ class Karten3DZuordnungTest {
     }
 
     @Test
-    fun schienenNutzenJeNachEndpunktenSpielerfarbeOderNeutraleFarbe() {
+    fun kontrollierteObjekteNutzenSpielerfarbeUndSchienenBleibenBeimErbauer() {
         val ecken = listOf(
             KartenEcke(6, 4),
             KartenEcke(8, 4),
@@ -88,7 +88,13 @@ class Karten3DZuordnungTest {
                 ecken = listOf(
                     EckBelegung(ecken.first(), EckGebaeudeTyp.HAUPTBAHNHOF, anna),
                 ),
-                kanten = linien.map(::KantenBelegung),
+                kanten = linien.map { linie ->
+                    KantenBelegung(
+                        position = linie,
+                        gebautInRunde = 3,
+                        erbautVon = anna,
+                    )
+                },
                 felder = listOf(
                     FeldBelegung(
                         position = angrenzendeFelder(linien.first()).first(),
@@ -111,11 +117,15 @@ class Karten3DZuordnungTest {
             ),
         )
 
-        val neutraleFarbe = nurAnna.kantenObjekte
+        val linienFarbe = nurAnna.kantenObjekte
             .first { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
             .typ.farbe
-        assertNotEquals(annasFarbe, neutraleFarbe)
-        assertEquals(neutraleFarbe, nurAnna.feldObjekte.single().typ.farbe)
+        assertEquals(annasFarbe, linienFarbe)
+        val schienenInfos = nurAnna.kantenObjekte
+            .first { objekt -> objekt.typ.form == SpielObjektForm.SCHIENE }
+            .typ.infos.associate { info -> info.bezeichnung to info.wert }
+        assertEquals("3 von anna", schienenInfos["Gebaut in Runde"])
+        assertEquals(annasFarbe, nurAnna.feldObjekte.single().typ.farbe)
         assertTrue(
             nurAnna.feldObjekte.single().typ.infos.contains(
                 SpielObjektInfoEintrag("Zustand", "intakt"),
@@ -172,7 +182,7 @@ class Karten3DZuordnungTest {
             .toSet()
 
         assertEquals(1, gemeinsameLinienfarben.size)
-        assertEquals(neutraleFarbe, gemeinsameLinienfarben.single())
+        assertEquals(annasFarbe, gemeinsameLinienfarben.single())
         assertNotEquals(bertsFarbe, gemeinsameLinienfarben.single())
     }
 
@@ -278,6 +288,8 @@ class Karten3DZuordnungTest {
         assertEquals("schiff-1", schiff.objektId)
         assertEquals(route, schiff.bewegungsRoute)
         assertEquals(direkteRoute.anfang, schiff.routenStart)
+        assertEquals(modell.eckObjekte.first().typ.farbe, schiff.typ.farbe)
+        assertEquals(setOf("anna"), schiff.typ.spieler)
         assertEquals(
             route.toSet(),
             modell.kantenObjekte

@@ -20,6 +20,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
+import de.teutonstudio.zentralbank.fachlogik.modell.hasheSpielerPasswort
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -178,5 +179,25 @@ class DomainMappingTest {
             mapOf(Rohstoff.SCHWEROEL to 2),
             zustand.spieler.first { it.name == "Bert" }.rohstoffe,
         )
+    }
+
+    @Test
+    fun neuesSpielUebernimmtNurDenPasswortHashInDenFachspielstand() {
+        val hash = hasheSpielerPasswort("anna-geheim")
+        val anna = Spieler(
+            name = "Anna",
+            runde0gebaut = mapOf(Verwaltungsstandort.HAUPTBAHNHOF to 1),
+            passwortHash = hash,
+        )
+        val spiel = Spiel(
+            leitzinssatz = 0f,
+            spieler = linkedMapOf(anna to Zahlungsmittel()),
+            warenkorb = emptyMap(),
+            inflationsziel = 2f,
+            normaleAbweichung = 0.5f,
+            starkeAbweichung = 2f,
+        )
+
+        assertEquals(hash, spiel.zuSpielZustand().spieler.single().passwortHash)
     }
 }

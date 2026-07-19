@@ -24,6 +24,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import de.teutonstudio.zentralbank.R
 import de.teutonstudio.zentralbank.datenbank.Ausland
@@ -49,7 +50,10 @@ fun SpielerAnzahlAuswahl(
 }
 
 @Composable
-fun SpielerDaten(spieler: MutableState<Pair<String, Zahlungsmittel>>) {
+fun SpielerDaten(
+    spieler: MutableState<Pair<String, Zahlungsmittel>>,
+    passwort: MutableState<String>? = null,
+) {
     val eingabeBetrag = remember { mutableIntStateOf(spieler.value.second.toIntOderNull()) }
     LaunchedEffect(eingabeBetrag.intValue) { spieler.value = spieler.value.first to eingabeBetrag.intValue.toZahlungsmittel() }
     Card( modifier = ModiPad5) { Row(verticalAlignment = Alignment.CenterVertically, modifier = ModiPad5) {
@@ -63,6 +67,16 @@ fun SpielerDaten(spieler: MutableState<Pair<String, Zahlungsmittel>>) {
                 modifier = ModiPad5,
             )
             ZahlungsmittelEingabe("Startguthaben des Spielers", eingabeBetrag)
+            passwort?.let { passwortEingabe ->
+                TextField(
+                    value = passwortEingabe.value,
+                    onValueChange = { passwortEingabe.value = it },
+                    label = { Text("Passwort des Spielers") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = ModiPad5,
+                )
+            }
         } }
     }
 }
@@ -72,6 +86,7 @@ private fun spielerDaten(idx: Int): MutableState<Pair<String, Zahlungsmittel>> =
 fun definiereSpieler(
     gültig: MutableState<Boolean>,
     spieler: MutableMap<String, Zahlungsmittel>,
+    passwoerter: MutableMap<String, String>? = null,
 ) {
     val maxSpieler = MAXIMALE_SPIELER_ANZAHL
     val spielerAnzahl = remember { mutableIntStateOf(spieler.size) }
@@ -80,26 +95,47 @@ fun definiereSpieler(
         if (it in liste.indices) mutableStateOf(liste[it])
         else spielerDaten(it+1)
     }.toMutableList() }
+    val spielerPasswoerter = remember {
+        val namen = spieler.keys.toList()
+        MutableList(maxSpieler) { index ->
+            mutableStateOf(namen.getOrNull(index)?.let { passwoerter?.get(it) }.orEmpty())
+        }
+    }
     val istGültig by remember {
         derivedStateOf {
             val namen = spielerWerte.take(spielerAnzahl.intValue).map { it.value.first.trim() }
-            namen.all { it.isNotBlank() } && namen.size == namen.filter { it != Geschäftsbank.name && it != Ausland.name }.toSet().size
+            namen.all { it.isNotBlank() } &&
+                namen.size == namen.filter { it != Geschäftsbank.name && it != Ausland.name }.toSet().size &&
+                (passwoerter == null || spielerPasswoerter
+                    .take(spielerAnzahl.intValue)
+                    .all { eingabe -> eingabe.value.isNotBlank() })
         }
     }
     LaunchedEffect(istGültig) {
         gültig.value = istGültig
     }
-    LaunchedEffect(spielerWerte) {
-        snapshotFlow { spielerWerte.take(spielerAnzahl.intValue).map { it.value } }.collect { werte ->
+    LaunchedEffect(spielerWerte, spielerPasswoerter) {
+        snapshotFlow {
+            spielerWerte.take(spielerAnzahl.intValue).map { it.value } to
+                spielerPasswoerter.take(spielerAnzahl.intValue).map { it.value }
+        }.collect { (werte, passwortWerte) ->
             spieler.clear()
-            werte.forEach { spieler[it.first.trim()] = it.second }
+            passwoerter?.clear()
+            werte.forEachIndexed { index, wert ->
+                val name = wert.first.trim()
+                spieler[name] = wert.second
+                passwoerter?.set(name, passwortWerte[index])
+            }
         }
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         SpielerAnzahlAuswahl(maxSpieler,spielerAnzahl)
         LazyColumn(horizontalAlignment = Alignment.CenterHorizontally) {
             items(spielerAnzahl.intValue) {
-                SpielerDaten(spielerWerte[it])
+                SpielerDaten(
+                    spielerWerte[it],
+                    if (passwoerter != null) spielerPasswoerter[it] else null,
+                )
             }
         }
     }

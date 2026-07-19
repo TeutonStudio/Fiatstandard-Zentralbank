@@ -156,12 +156,6 @@ enum class AuflagenEbene {
     SPEZIAL,
 }
 
-/** Bestimmt, was eine Ein-Finger-Ziehbewegung mit der Kamera macht. */
-enum class KameraInteraktionsModus {
-    DREHEN,
-    VERSCHIEBEN,
-}
-
 data class DreieckTreffer(
     val position: DreieckPosition,
     val naechsteEcke: Int,

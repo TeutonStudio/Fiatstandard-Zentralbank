@@ -37,7 +37,6 @@ class Spielbrett3DSmokeTest {
                     Spielbrett3D(
                         modell = karte.zu3DModell(zeigeBearbeitungsRaster = true),
                         betrachtungsStatus = betrachtungsStatus,
-                        kameraInteraktionsModus = KameraInteraktionsModus.VERSCHIEBEN,
                     )
                 }
             }

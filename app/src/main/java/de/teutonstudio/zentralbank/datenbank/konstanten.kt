@@ -59,6 +59,7 @@ val Bauteil.farbe: Color get() = when (this) {
     Verwaltungsstandort.GROSSHAFEN -> Color(0xFF88764F)
     Wirtschaftsregionen.GESCHÄFTSBANK -> Color(0xFF6B6288)
     Wirtschaftsregionen.VIEHHOF -> Color(0xFF47756C)
+    Wirtschaftsregionen.ANGLER -> Color(0xFF3F728F)
     Wirtschaftsregionen.ZIEGELBRENNER -> Color(0xFF8A604D)
     Wirtschaftsregionen.LEHMINE -> Color(0xFF5F784F)
     Wirtschaftsregionen.FÖRSTER -> Color(0xFF786183)
@@ -125,6 +126,7 @@ private fun wirtschaftsstandortBaukosten(): EnumMap<Rohstoffe, Int> =
 enum class Wirtschaftsregionen(override val str:String, override val kosten: EnumMap<Rohstoffe,Int>, val ertrag: Map<Rohstoffe,Int>, val verbrauch: Map<Rohstoffe,Int>): Bauteil {
     GESCHÄFTSBANK("geschäftsbank",wirtschaftsstandortBaukosten(),emptyMap(),emptyMap()),
     VIEHHOF("viehhof",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(nahrung=1),emptyMap()),
+    ANGLER("angler",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(nahrung=1),emptyMap()),
     ZIEGELBRENNER("ziegelbrenner",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(ziegel=1),Rohstoffe.anzahl(lehm=1)),
     LEHMINE("lehmmine",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(lehm=1),emptyMap()),
     FÖRSTER("förster",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(holz=1),emptyMap()),

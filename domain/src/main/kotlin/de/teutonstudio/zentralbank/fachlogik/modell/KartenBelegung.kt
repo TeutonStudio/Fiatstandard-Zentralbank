@@ -86,6 +86,7 @@ data class KantenBelegung(
     val position: KartenKante,
     val zustand: BauwerkZustand = BauwerkZustand.INTAKT,
     val gebautInRunde: Int? = null,
+    val erbautVon: SpielerId? = null,
 ) {
     init {
         require(gebautInRunde == null || gebautInRunde >= 0) {
@@ -273,6 +274,15 @@ data class KartenBelegung(
         felder.forEach { belegung ->
             require(belegung.position in karte.landNachPosition) {
                 "Eine Feldanlage darf nur auf Gelände stehen: ${belegung.position}."
+            }
+            val istAngler = (belegung.anlage as? FeldAnlage.Wirtschaftsregion)?.bauteil ==
+                BauteilTyp.ANGLER
+            require(istAngler == karte.istTeichfeld(belegung.position)) {
+                if (istAngler) {
+                    "Ein Angler darf nur auf einem Teichfeld stehen: ${belegung.position}."
+                } else {
+                    "Auf einem Teichfeld darf nur ein Angler stehen: ${belegung.position}."
+                }
             }
         }
         ecken.forEach { belegung ->

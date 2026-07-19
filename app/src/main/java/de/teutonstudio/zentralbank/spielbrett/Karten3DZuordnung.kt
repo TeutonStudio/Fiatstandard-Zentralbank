@@ -139,8 +139,12 @@ fun Spielkarte.zu3DModell(
         kantenObjekte = belegung.kanten.map { eintrag ->
             val zustand = eintrag.zustand.zuDarstellungsZustand()
             val gewalthaber = KartenAuswertung.gewalthaber(this, eintrag.position)
-            val verbundeneSpieler = KartenAuswertung.verbundeneSpieler(this, eintrag.position)
-                .mapTo(mutableSetOf(), SpielerId::wert)
+            val verbundeneSpielerIds = KartenAuswertung.verbundeneSpieler(this, eintrag.position)
+            val kontrollierenderSpieler = gewalthaber
+                ?: eintrag.erbautVon
+                ?: spielerReihenfolge.firstOrNull { spieler -> spieler in verbundeneSpielerIds }
+                ?: verbundeneSpielerIds.minByOrNull(SpielerId::wert)
+            val verbundeneSpieler = verbundeneSpielerIds.mapTo(mutableSetOf(), SpielerId::wert)
             KantenObjektAuflage(
                 position = eintrag.position,
                 typ = SpielObjektTyp(
@@ -148,12 +152,12 @@ fun Spielkarte.zu3DModell(
                     farbe = if (zustand == ObjektDarstellungsZustand.ZERSTOERT) {
                         ZerstoertFarbe
                     } else {
-                        gewalthaber?.let(::spielerFarbe) ?: NeutralFarbe
+                        kontrollierenderSpieler?.let(::spielerFarbe) ?: NeutralFarbe
                     },
                     form = SpielObjektForm.SCHIENE,
                     zustand = zustand,
                     infos = bauwerkInfos(
-                        spieler = gewalthaber?.wert ?: "neutral",
+                        spieler = kontrollierenderSpieler?.wert ?: "neutral",
                         gebaeude = "Handelslinie",
                         bauteil = BauteilTyp.EISENBAHNLINIE,
                         gebautInRunde = eintrag.gebautInRunde,
@@ -164,6 +168,7 @@ fun Spielkarte.zu3DModell(
                                 verbundeneSpieler.anzeigeTextOderNeutral(),
                             ),
                         ),
+                        gebautVon = eintrag.erbautVon?.wert ?: "unbekannt",
                     ),
                     spieler = verbundeneSpieler,
                 ),
@@ -180,7 +185,7 @@ fun Spielkarte.zu3DModell(
                 position = gerichteteRoute.first(),
                 typ = SpielObjektTyp(
                     name = "Frachtschiff ${seeweg.id}",
-                    farbe = NeutralFarbe,
+                    farbe = spielerFarbe(seeweg.besitzer),
                     form = SpielObjektForm.FRACHTSCHIFF,
                     infos = listOf(
                         SpielObjektInfoEintrag("Spieler", seeweg.besitzer.wert),
@@ -262,11 +267,22 @@ fun Spielkarte.zu3DModell(
         },
         feldObjekte = belegung.felder.map { eintrag ->
             val effektiv = KartenAuswertung.effektiverZustand(this, eintrag, konflikte)
-            val angeschlosseneSpieler = KartenAuswertung.anschlussStaerke(
+            val anschlussStaerken = KartenAuswertung.anschlussStaerke(
                 this,
                 eintrag.position,
                 konflikte,
             )
+            val kontrollierenderSpieler = anschlussStaerken.entries
+                .sortedWith(
+                    compareByDescending<Map.Entry<SpielerId, Int>> { (_, staerke) -> staerke }
+                        .thenBy { (spieler, _) ->
+                            spielerReihenfolge.indexOf(spieler).takeIf { it >= 0 } ?: Int.MAX_VALUE
+                        }
+                        .thenBy { (spieler, _) -> spieler.wert },
+                )
+                .firstOrNull()
+                ?.key
+            val angeschlosseneSpieler = anschlussStaerken
                 .keys
                 .mapTo(mutableSetOf(), SpielerId::wert)
             val zustand = when (effektiv) {
@@ -294,7 +310,8 @@ fun Spielkarte.zu3DModell(
                     name = name,
                     farbe = when (effektiv) {
                         AnlagenZustand.AKTIV,
-                        AnlagenZustand.VERLASSEN -> NeutralFarbe
+                        AnlagenZustand.VERLASSEN ->
+                            kontrollierenderSpieler?.let(::spielerFarbe) ?: NeutralFarbe
                         AnlagenZustand.ZERSTOERT -> ZerstoertFarbe
                     },
                     form = when (eintrag.anlage) {
@@ -411,13 +428,18 @@ private fun bauwerkInfos(
     gebautInRunde: Int?,
     zustand: ObjektDarstellungsZustand,
     weitere: List<SpielObjektInfoEintrag> = emptyList(),
+    gebautVon: String? = null,
 ): List<SpielObjektInfoEintrag> = listOf(
     SpielObjektInfoEintrag("Spieler", spieler),
     SpielObjektInfoEintrag("Gebäude", gebaeude),
     SpielObjektInfoEintrag("Kosten", bauteil?.kosten.alsRohstoffText()),
     SpielObjektInfoEintrag("Erträge", ertrag.alsRohstoffText()),
     SpielObjektInfoEintrag("Verbrauch", bauteil?.verbrauch.alsRohstoffText()),
-    SpielObjektInfoEintrag("Gebaut in Runde", gebautInRunde?.toString() ?: "nicht erfasst"),
+    SpielObjektInfoEintrag(
+        "Gebaut in Runde",
+        (gebautInRunde?.toString() ?: "nicht erfasst") +
+            gebautVon?.let { erbauer -> " von $erbauer" }.orEmpty(),
+    ),
     SpielObjektInfoEintrag("Zustand", zustand.anzeigeName()),
 ) + weitere
 

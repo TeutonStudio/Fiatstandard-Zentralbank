@@ -35,6 +35,9 @@ class SpielErstellenTest {
         composeTestRule
             .onNodeWithText("Spieler Anzahl: ")
             .assertIsDisplayed()
+        composeTestRule
+            .onAllNodesWithText("Passwort des Spielers")
+            .assertCountEquals(3)
     }
 
     @Test
@@ -168,6 +171,11 @@ class SpielErstellenTest {
                 vorbelegteKarte = KartenVorlage(
                     id = "test-vorlage",
                     name = "Testkarte",
+                ),
+                vorbelegtePasswoerter = mapOf(
+                    "Spieler 1" to "eins",
+                    "Spieler 2" to "zwei",
+                    "Spieler 3" to "drei",
                 ),
             )
         }

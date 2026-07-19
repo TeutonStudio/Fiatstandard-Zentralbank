@@ -119,6 +119,7 @@ class KartenRegelwerkTest {
 
         assertEquals(anna, nachHauptbahnhof.aktiverSpieler)
         assertEquals(anna, nachSchiene.aktiverSpieler)
+        assertEquals(anna, nachSchiene.karte?.belegung?.kanten?.single()?.erbautVon)
         assertEquals(bert, nachViehhof.aktiverSpieler)
         assertEquals(Spielabschnitt.REGULAER, danach.spielabschnitt)
         assertTrue(danach.rundeNullRestbestand.orEmpty().isEmpty())
@@ -303,6 +304,10 @@ class KartenRegelwerkTest {
             start,
             SpielEreignis.SchieneGebaut(anna, geplanteLinie),
         ).getOrThrow()
+        assertEquals(
+            anna,
+            nachHandelslinie.karte?.belegung?.kantenNachPosition?.get(geplanteLinie)?.erbautVon,
+        )
         val danach = SpielRegelwerk.wendeAn(
             nachHandelslinie,
             SpielEreignis.EckGebaeudeGebaut(anna, ziel, EckGebaeudeTyp.BAHNHOF),
@@ -626,6 +631,40 @@ class KartenRegelwerkTest {
             assertEquals(8, rohstoffe[Rohstoff.ZIEGEL])
             assertEquals(10, rohstoffe[Rohstoff.STAHL])
         }
+    }
+
+    @Test
+    fun anglerProduziertNahrungUndKannNurAufTeichfeldernGebautWerden() {
+        val mitte = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
+        val teich = Spezialfeld(SpezialfeldTyp.TEICH, mitte)
+        val teichfeld = teich.positionen.first()
+        val normalesFeld = KartenFeld(5, 5, DreieckHaelfte.UNTEN)
+        val start = zustand().mitSpezialfeld(teich)
+        val angler = FeldAnlage.Wirtschaftsregion(BauteilTyp.ANGLER)
+
+        val danach = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.NeutraleAnlageErrichtet(anna, teichfeld, angler),
+        ).getOrThrow()
+
+        assertEquals(BauteilTyp.ANGLER, (danach.karte?.belegung?.felder?.single()?.anlage as FeldAnlage.Wirtschaftsregion).bauteil)
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1), BauteilTyp.ANGLER.ertrag)
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                start,
+                SpielEreignis.NeutraleAnlageErrichtet(anna, normalesFeld, angler),
+            ).isFailure,
+        )
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                start,
+                SpielEreignis.NeutraleAnlageErrichtet(
+                    anna,
+                    teichfeld,
+                    FeldAnlage.Wirtschaftsregion(BauteilTyp.VIEHHOF),
+                ),
+            ).isFailure,
+        )
     }
 
     @Test

@@ -23,6 +23,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.pruefePasswort
 import de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 import de.teutonstudio.zentralbank.fachlogik.schnittstelle.GespeichertesSpiel
@@ -125,6 +126,24 @@ class GameViewModel(application: Application): AndroidViewModel(application) {
 
     fun meldeSpielFehler(meldung: String) {
         _spielFehler.tryEmit(meldung)
+    }
+
+    fun passwortGeschuetzteSpieler(spielerNamen: Collection<String>): List<String> {
+        val spielerNachName = spielAblauf?.zustand?.spieler.orEmpty().associateBy { it.name }
+        return spielerNamen
+            .distinct()
+            .filter { name -> spielerNachName[name]?.passwortHash?.isNotBlank() == true }
+    }
+
+    fun pruefeSpielerPasswoerter(passwoerter: Map<String, String>): Boolean {
+        val spielerNachName = spielAblauf?.zustand?.spieler.orEmpty().associateBy { it.name }
+        val gueltig = passwoerter.isNotEmpty() && passwoerter.all { (name, passwort) ->
+            spielerNachName[name]?.pruefePasswort(passwort) == true
+        }
+        if (!gueltig) {
+            _spielFehler.tryEmit("Die Willenserklärung wurde durch ein falsches Passwort abgelehnt.")
+        }
+        return gueltig
     }
 
     fun spielstandBeenden(nachBeenden: () -> Unit) {

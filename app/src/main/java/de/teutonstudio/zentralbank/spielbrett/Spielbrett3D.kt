@@ -108,6 +108,7 @@ private const val WASSER_MINDEST_SICHTWEITE = 10_000f
 private const val BRETT_RAND = 0.35f
 private const val KAMERA_FOKUS_HOEHE = AUFLAGEN_HOEHE * 0.2f
 private const val OBJEKT_BASIS_HOEHE = AUFLAGEN_HOEHE + 0.03f
+private const val HANDELSLINIEN_BASIS_HOEHE = AUFLAGEN_HOEHE - 0.04f
 
 private val WasserFarbe = Color(0xFF1565A8)
 private val NachtWasserFarbe = Color(0xFF061A31)
@@ -128,13 +129,10 @@ private val GrundFarbeDunkel = WasserRasterDunkel
  *
  * Die Grundflaeche besteht aus gleichseitigen Dreiecken mit der geometrischen Hoehe 2.
  * Land wird mit abgeschraegten Kanten dargestellt; Spezialauflagen liegen auf einer getrennten
- * visuellen Ebene. Ziehen dreht die Kamera, eine Zwei-Finger-Geste verschiebt sie und Pinch zoomt.
+ * visuellen Ebene. Ein Finger verschiebt die Karte, zwei Finger drehen und zoomen sie.
  *
  * [betrachtungsStatus] enthaelt dieselbe Transformation, die auch die Gesten veraendern. Dadurch
  * kann die Ansicht von aussen beobachtet, ueber Schaltflaechen gesteuert oder gespeichert werden.
- * [kameraInteraktionsModus] schaltet die Ein-Finger-Geste zwischen Orbit-Drehung und einer
- * Verschiebung des Kamerafokus parallel zur Kartenebene um.
- *
  * Beispiel:
  * ```kotlin
  * Spielbrett3D(
@@ -157,7 +155,6 @@ fun Spielbrett3D(
     modifier: Modifier = Modifier,
     betrachtungsStatus: BetrachtungsTransformationsStatus =
         rememberBetrachtungsTransformationsStatus(),
-    kameraInteraktionsModus: KameraInteraktionsModus = KameraInteraktionsModus.DREHEN,
     onDreieckBeruehrt: ((DreieckTreffer) -> Unit)? = null,
     statischeVorschau: Boolean = false,
     himmel: HimmelsDarstellung = HimmelsDarstellung.fuerUhrzeit(12f),
@@ -244,13 +241,12 @@ fun Spielbrett3D(
     val aktuellerSeewegEmpfaenger = rememberUpdatedState(beiAktivemSeeweg)
     val betrachtungsGesten = remember(
         betrachtungsStatus,
-        kameraInteraktionsModus,
         cameraNode,
         geometrie,
         modell.unbegrenztesBearbeitungsRaster,
         bauwerkHoverZiele,
     ) {
-        BetrachtungsGesten(betrachtungsStatus, kameraInteraktionsModus) { x, y ->
+        BetrachtungsGesten(betrachtungsStatus) { x, y ->
             val strahl = cameraNode.view?.screenToRay(x, y) ?: return@BetrachtungsGesten
             val angeklicktesBauwerk = bauwerkHoverZiele.findeTreffer(
                 ursprungX = strahl.origin.x,
@@ -717,6 +713,11 @@ fun Spielbrett3D(
                                 materialInstance = objektMaterialien.getValue(objekt.typ),
                             )
                         } else {
+                            val basisHoehe = if (objekt.typ.form == SpielObjektForm.SCHIENE) {
+                                HANDELSLINIEN_BASIS_HOEHE
+                            } else {
+                                OBJEKT_BASIS_HOEHE
+                            }
                             CubeNode(
                                 size = Size(
                                     x = laenge,
@@ -726,7 +727,7 @@ fun Spielbrett3D(
                                 materialInstance = objektMaterialien.getValue(objekt.typ),
                                 position = Position(
                                     x = (anfang.x + ende.x) / 2f,
-                                    y = OBJEKT_BASIS_HOEHE + if (markierung) 0.08f else 0.12f,
+                                    y = basisHoehe + if (markierung) 0.08f else 0.12f,
                                     z = (anfang.z + ende.z) / 2f,
                                 ),
                                 rotation = Rotation(
@@ -1412,11 +1413,7 @@ internal fun List<BauwerkHoverZiel>.angehefteteZieleFuer(
     if (ziel.typ.form != SpielObjektForm.HAUPTBAHNHOF) return listOf(ziel)
     val spieler = ziel.typ.spieler.singleOrNull() ?: return listOf(ziel)
     return filter { kandidat ->
-        spieler in kandidat.typ.spieler && kandidat.typ.form !in setOf(
-            SpielObjektForm.FRACHTSCHIFF,
-            SpielObjektForm.PANZER,
-            SpielObjektForm.KRIEGSSCHIFF,
-        )
+        spieler in kandidat.typ.spieler && kandidat.typ.form != SpielObjektForm.SCHIENE
     }
         .distinctBy(BauwerkHoverZiel::schluessel)
 }
@@ -1525,7 +1522,6 @@ private fun SpielObjektTyp.feldAbmessungen(): ObjektAbmessungen = when (form) {
 
 private class BetrachtungsGesten(
     private val status: BetrachtungsTransformationsStatus,
-    private val einFingerModus: KameraInteraktionsModus,
     private val beiTippen: (x: Float, y: Float) -> Unit,
 ) {
     private var letzteZeigerAnzahl = 0
@@ -1566,32 +1562,6 @@ private class BetrachtungsGesten(
                     val deltaY = schwerpunktY - letzterSchwerpunktY
 
                     if (zeigerAnzahl == 1) {
-                        when (einFingerModus) {
-                            KameraInteraktionsModus.DREHEN -> status.dreheUmFokus(
-                                azimutDeltaGrad = -deltaX * 0.3f,
-                                neigungsDeltaGrad = -deltaY * 0.24f,
-                            )
-                            KameraInteraktionsModus.VERSCHIEBEN -> {
-                                val welteinheitenProPixel = berechneWelteinheitenProPixel(
-                                    ansichtsGroesse = ansichtsGroesse,
-                                    szenengroesse = szenengroesse,
-                                    zoom = status.zoom,
-                                )
-                                if (welteinheitenProPixel != null) {
-                                    status.verschiebeDurchBildschirmgeste(
-                                        deltaX = deltaX,
-                                        deltaY = deltaY,
-                                        welteinheitenProPixel = welteinheitenProPixel,
-                                    )
-                                }
-                            }
-                        }
-                    } else if (zeigerAnzahl >= 2) {
-                        val spannweite = ereignis.spannweite()
-                        if (letzteSpannweite > 0f && spannweite > 0f) {
-                            status.zoome(spannweite / letzteSpannweite)
-                        }
-
                         val welteinheitenProPixel = berechneWelteinheitenProPixel(
                             ansichtsGroesse = ansichtsGroesse,
                             szenengroesse = szenengroesse,
@@ -1604,6 +1574,16 @@ private class BetrachtungsGesten(
                                 welteinheitenProPixel = welteinheitenProPixel,
                             )
                         }
+                    } else if (zeigerAnzahl >= 2) {
+                        val spannweite = ereignis.spannweite()
+                        if (letzteSpannweite > 0f && spannweite > 0f) {
+                            status.zoome(spannweite / letzteSpannweite)
+                        }
+
+                        status.dreheUmFokus(
+                            azimutDeltaGrad = -deltaX * 0.3f,
+                            neigungsDeltaGrad = -deltaY * 0.24f,
+                        )
                         letzteSpannweite = spannweite
                     }
                 }

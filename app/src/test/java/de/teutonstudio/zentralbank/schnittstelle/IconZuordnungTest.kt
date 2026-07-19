@@ -36,6 +36,7 @@ class IconZuordnungTest {
     private val wirtschaftseinheitZuordnungen = listOf(
         Wirtschaftsregionen.GESCHÄFTSBANK to BauteilTyp.GESCHAEFTSBANK,
         Wirtschaftsregionen.VIEHHOF to BauteilTyp.VIEHHOF,
+        Wirtschaftsregionen.ANGLER to BauteilTyp.ANGLER,
         Wirtschaftsregionen.ZIEGELBRENNER to BauteilTyp.ZIEGELBRENNER,
         Wirtschaftsregionen.LEHMINE to BauteilTyp.LEHMINE,
         Wirtschaftsregionen.FÖRSTER to BauteilTyp.FOERSTER,
@@ -87,7 +88,14 @@ class IconZuordnungTest {
             }
         }
 
-        assertEquals(wirtschaftseinheitZuordnungen.size, iconPfade.distinct().size)
+        assertEquals(
+            wirtschaftseinheitZuordnungen.size - 1,
+            iconPfade.filterNot { it == de.teutonstudio.zentralbank.R.drawable.leer }.distinct().size,
+        )
+        assertEquals(
+            de.teutonstudio.zentralbank.R.drawable.leer,
+            Wirtschaftsregionen.ANGLER.wirtschaftseinheitIconPfad(),
+        )
         assertTrue(
             BauteilTyp.entries
                 .filter { it.art != BauteilArt.WIRTSCHAFTSREGION }

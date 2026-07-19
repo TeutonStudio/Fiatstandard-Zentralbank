@@ -77,6 +77,13 @@ enum class BauteilTyp(
         ertrag = rohstoffe(Rohstoff.NAHRUNG to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
+    ANGLER(
+        text = "angler",
+        art = BauteilArt.WIRTSCHAFTSREGION,
+        kosten = wirtschaftsstandortBaukosten(),
+        ertrag = rohstoffe(Rohstoff.NAHRUNG to 1),
+        produktionsArt = ProduktionsArt.ABBAU,
+    ),
     ZIEGELBRENNER(
         text = "ziegelbrenner",
         art = BauteilArt.WIRTSCHAFTSREGION,

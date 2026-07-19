@@ -34,6 +34,11 @@ fun Spielkarte.enthaeltFeld(position: KartenFeld): Boolean =
 fun KartenVorlage.enthaeltFeld(position: KartenFeld): Boolean =
     hexagon.enthaelt(position)
 
+fun Spielkarte.istTeichfeld(position: KartenFeld): Boolean =
+    spezialfelder.any { spezialfeld ->
+        spezialfeld.typ == SpezialfeldTyp.TEICH && position in spezialfeld.positionen
+    }
+
 fun KartenHexagon.enthaelt(position: KartenFeld): Boolean =
     benoetigterRadius(position) <= radius
 

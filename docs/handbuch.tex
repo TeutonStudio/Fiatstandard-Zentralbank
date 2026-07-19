@@ -44,7 +44,7 @@
 
 % Makros
 \newcommand{\DFVersion}{Arbeitsfassung 0.3}
-\newcommand{\DFStand}{18. Juli 2026}
+\newcommand{\DFStand}{19. Juli 2026}
 \newcommand{\begriff}[1]{\textbf{#1}}
 \newcommand{\marker}[1]{\textsf{#1}}
 \newcommand{\offen}[1]{\begin{framed}\noindent\textbf{Offen / zu entscheiden:} #1\end{framed}}
@@ -131,8 +131,9 @@ Grossbahnhoefe & Aufwertung eines bestehenden Bahnhofs. Erhoehen Ertrag staerker
 Haefen & Spielerabhaengige Gebaeude auf geeigneten Ecken mit Wasser- und Gelaendezugang. \\
 Grosshaefen & Aufwertung eines bestehenden Hafens mit hoeherer Frachtschiffkapazitaet. \\
 Schienen & Spielerabhaengige Verbindungen auf Kanten zwischen zwei Gelaendefeldern. \\
-Geschaeftsbanken & Neutrale Gebaeude in der Farbe der Zentralbank. Sie koennen statt Abbaueinheiten auf Gelaendefelder gebaut werden. \\
-Abbaueinheiten & Neutrale Anlagen auf Gelaendefeldern. Sie erzeugen Rohstoffertrag fuer angeschlossene Spieler. \\
+Geschaeftsbanken & Kontrollierbare Wirtschaftsstandorte auf Gelaendefeldern. \\
+Abbaueinheiten & Kontrollierbare Anlagen auf Gelaendefeldern. Sie erzeugen Rohstoffertrag fuer angeschlossene Spieler. \\
+Angler & Abbaustandort auf einem Dreieck des Teich-Spezialfelds. Er erzeugt Nahrung. \\
 Frachtschiffe & Spielerabhaengige Einheiten zur Verbindung von zwei Haefen. Jedes Frachtschiff besitzt zwei Faehnchen zur Definition von Import- und Exportrichtung. \\
 Panzer & Spielerabhaengige Truppen auf Kanten an Gelaendefeldern. Eine Kantenbewegung kostet 1 Diesel. \\
 Kriegsschiffe & Spielerabhaengige Truppen auf Kanten an Wasserfeldern. Eine Kantenbewegung kostet 1 Schweroel. \\
@@ -148,6 +149,16 @@ Grossbahnhof und Grosshafen werden nicht als eigenstaendige Neubauten geplant.
 Der Spieler waehlt am bestehenden eigenen Bahnhof beziehungsweise Hafen im
 Hoverfenster \emph{Aufwerten}. Ist der Planungsmodus aktiv, landet diese Aufwertung
 wie ein Neubau im Planungswarenkorb.
+
+Ein Klick auf den Hauptbahnhof heftet die Hoverfenster aller zugeordneten Objekte
+des Spielers an, ausgenommen Eisenbahnlinien. Das Hoverfenster einer einzelnen
+Eisenbahnlinie zeigt bei der Baurunde zusaetzlich den Erbauer im Format
+\enquote{Runde von Spieler}.
+
+Kontrollierte Bauwerke, Wirtschaftsstandorte, Frachtschiffe und intakte
+Handelslinien werden in der Farbe des kontrollierenden Spielers dargestellt.
+Bei einer Handelslinie ohne eindeutigen Endpunkt-Kontrolleur bleibt der beim Bau
+gespeicherte Erbauer fuer die Farbzuordnung massgeblich.
 
 \section{Geld und Waehrung}
 In diesem Spiel wird zwischen \begriff{Geld} und \begriff{Waehrung} unterschieden.
@@ -191,7 +202,9 @@ geometrisch unbequem und mit erstaunlich viel Verwaltungsaufwand.
 Ein \begriff{Teich} ist ein solches sechsteiliges Spezialfeld. Seine gemeinsame
 mittlere Ecke ist nicht bebaubar. Ebenso duerfen die sechs Kanten von den
 aeusseren Ecken zur Teichmitte keine Schienen tragen. Die sechs umgebenden
-Dreiecksfelder bleiben normale Gelaendefelder.
+Dreiecksfelder bleiben Gelaendefelder, sind aber fuer den Wirtschaftsstandort
+\begriff{Angler} reserviert. Der Angler kann nur dort gebaut werden und erzeugt
+als Abbaustandort automatisch 1 Nahrung je angeschlossenem Prozug.
 
 \section{Ecken und Kanten}
 \begin{itemize}
@@ -234,7 +247,7 @@ Die Rohstoffzuordnung der Gelaendefelder ist noch offen. Fest steht bisher nur: 
 \section{Rohstoffe}
 Die Fachregeln verwenden zehn Rohstoffe:
 \begin{description}
-  \item[Nahrung] Abbauprodukt des Viehhofs und Versorgungsgut aller Bahn- und Hafenstandorte.
+  \item[Nahrung] Abbauprodukt des Viehhofs und des Anglers sowie Versorgungsgut aller Bahn- und Hafenstandorte.
   \item[Lehm] Abbauprodukt der Lehmmine und Einsatz des Ziegelbrenners.
   \item[Ziegel] Produkt des Ziegelbrenners und Baumaterial.
   \item[Holz] Abbauprodukt des Foersters und Baumaterial.
@@ -489,6 +502,18 @@ Spieler} kann die Ausstattung fuer jeden Spieler getrennt erfasst werden. Ist de
 Schalter aus, zeigt die App die Startausstattung nur einmal und uebernimmt dieselben
 Gebaeude und Rohstoffmengen fuer alle Spieler. Jeder Spieler besitzt genau einen
 Hauptbahnhof als Startbestand; das Startgeld wird in der Spielerdefinition festgelegt.
+Ausserdem erhaelt jeder Spieler ein eigenes Passwort. Die App speichert davon nur
+eine Pruefsumme. Beim Zugwechsel bestaetigt der aktive Spieler damit das Zugende;
+bei Rohstoff- und Anleihenhandel bestaetigen alle beteiligten Spieler ihre
+Willenserklaerung.
+
+Das Startmenue ist als Raster aus zwei mal zwei Feldern aufgebaut: Neues Spiel,
+Spiel laden, Lebensraeume verwalten und Spielstaende verwalten. Beim Laden kann
+kein Spielstand geloescht werden; diese Funktion liegt ausschliesslich in der
+Spielstandsverwaltung.
+
+Auf dem 3D-Spielbrett verschiebt eine Ein-Finger-Geste die Ansicht. Eine
+Zwei-Finger-Geste dreht die Ansicht und steuert zugleich den Zoom.
 
 \section{Runde 0}
 In Runde 0 setzen die Spieler reihum ihre Hauptbahnhoefe. Der Abstand zwischen bebauten Ecken muss mindestens drei Kanten betragen.

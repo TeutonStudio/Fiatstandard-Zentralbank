@@ -61,6 +61,7 @@ fun Bauteil.zuBauteilTyp(): BauteilTyp = when (this) {
     Verwaltungsstandort.GROSSHAFEN -> BauteilTyp.GROSSHAFEN
     Wirtschaftsregionen.GESCHÄFTSBANK -> BauteilTyp.GESCHAEFTSBANK
     Wirtschaftsregionen.VIEHHOF -> BauteilTyp.VIEHHOF
+    Wirtschaftsregionen.ANGLER -> BauteilTyp.ANGLER
     Wirtschaftsregionen.ZIEGELBRENNER -> BauteilTyp.ZIEGELBRENNER
     Wirtschaftsregionen.LEHMINE -> BauteilTyp.LEHMINE
     Wirtschaftsregionen.FÖRSTER -> BauteilTyp.FOERSTER
@@ -93,6 +94,7 @@ fun Spiel.zuSpielZustand(): SpielZustand {
         FachSpieler(
             id = spielerIds.getValue(spieler),
             name = spieler.name,
+            passwortHash = spieler.passwortHash,
             rohstoffe = startRohstoffe[spieler.name]
                 .orEmpty()
                 .mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
