@@ -72,6 +72,8 @@ object SpielRegelwerk {
                 KartenRegelwerk.kriegsEinheitBauen(zustand, ereignis)
             is SpielEreignis.KriegsEinheitBewegt ->
                 KartenRegelwerk.kriegsEinheitBewegen(zustand, ereignis)
+            is SpielEreignis.KriegsEinheitenBewegt ->
+                KartenRegelwerk.kriegsEinheitenBewegen(zustand, ereignis)
             is SpielEreignis.KriegsEinheitEntfernt ->
                 KartenRegelwerk.kriegsEinheitEntfernen(zustand, ereignis)
             is SpielEreignis.KriegErklaert ->

@@ -221,11 +221,6 @@ data class KartenBelegung(
         require(kriegseinheiten.size == kriegseinheiten.map(KriegsEinheitBelegung::id).toSet().size) {
             "Kriegseinheiten-IDs müssen eindeutig sein."
         }
-        require(
-            kriegseinheiten.size == kriegseinheiten.map(KriegsEinheitBelegung::position).toSet().size,
-        ) {
-            "Auf jeder Kante darf höchstens eine Kriegseinheit stehen."
-        }
         val hauptbahnhoefeNachSpieler = ecken
             .asSequence()
             .filter { belegung -> belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF }

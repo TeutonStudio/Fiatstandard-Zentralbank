@@ -195,10 +195,11 @@ Eine Ortsart akzeptiert nur die dafür erlaubten Inhalte:
 | Seeweg | Frachtschiff zwischen zwei Hafen-Ecken | Spieler sowie Import-/Exportrichtung |
 | Krieg | Panzer oder Kriegsschiff | Spieler; Bau im Epizug, fremde Infrastruktur nur im Krieg befahrbar |
 
-Pro Ecke, Kante und Feld ist zunächst höchstens eine Belegung zulässig. Auf
-Wasserfeldern gibt es keine Feldbelegung. Seewege und Kriegseinheiten werden als
-eigene, spätere Ausbaustufe modelliert und nicht künstlich in eine normale
-Kante oder ein Feld gezwungen.
+Pro Ecke und Feld sowie für die bauliche Kantenbelegung ist höchstens eine
+Belegung zulässig. Auf einer Kante dürfen dagegen mehrere einzeln identifizierte
+Kriegseinheiten stehen. Wasserfelder besitzen keine Feldbelegung. Seewege und
+Kriegseinheiten werden als eigene Belegungsarten modelliert und nicht künstlich
+in eine normale Bau- oder Feldbelegung gezwungen.
 
 Die vorhandenen Mengen in `Spieler.bauteile` werden nicht parallel als zweite
 Wahrheit gepflegt. Sie werden entweder aus der Kartenbelegung ausgewertet oder
@@ -239,7 +240,8 @@ Werkzeugleiste zeigt drei Zielgruppen:
 
 - **Ecke:** Hauptbahnhof, Bahnhof, Großbahnhof, Hafen, Großhafen, aufwerten,
   beschädigen/reparieren oder entfernen.
-- **Kante:** Schiene setzen, beschädigen/reparieren oder entfernen.
+- **Kante:** Schiene setzen, Panzer oder Kriegsschiff bauen,
+  beschädigen/reparieren oder entfernen.
 - **Feld:** Abbaueinheit mit Rohstoff oder Geschäftsbank setzen, Zustand ändern
   oder entfernen.
 
@@ -247,6 +249,10 @@ Der Ablauf einer Eingabe ist:
 
 1. Zielgruppe und Aktion wählen.
 2. Falls erforderlich den handelnden Spieler beziehungsweise den Rohstoff wählen.
+
+Truppenbewegungen werden nicht als Werkzeug und nicht im Planmodus angeboten.
+Der Spieler öffnet stattdessen das Hoverfenster eines eigenen Truppenstapels,
+wählt dort die zu bewegende Anzahl und anschließend die benachbarte Zielkante.
 3. Passende Ecke, Kante oder passendes Feld antippen.
 4. Ziel hervorheben und die fachliche Vorprüfung samt Kosten und Regelbegründung
    anzeigen.
@@ -292,7 +298,8 @@ Mindestens folgende Regeln werden automatisiert:
 
 - Ort liegt innerhalb des Kartenbereichs.
 - Ein Feld kann nur belegt werden, wenn es Gelände ist.
-- Pro Ecke, Kante oder Feld gibt es höchstens eine zulässige Belegung.
+- Pro Ecke und Feld sowie je baulicher Kantenbelegung gibt es höchstens eine
+  zulässige Belegung; Kriegseinheiten dürfen sich auf einer Kante stapeln.
 - Eine Schiene liegt nur an einer Kante zwischen zwei Geländefeldern.
 - Ein Hauptbahnhof liegt nur an sechs Geländefeldern. Hauptbahnhof, Großbahnhof
   und Bahnhof erlauben höchstens sechs, vier beziehungsweise drei

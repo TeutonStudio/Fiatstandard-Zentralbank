@@ -29,10 +29,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -86,6 +88,7 @@ import io.github.sceneview.utils.screenToRay
 import io.github.sceneview.utils.worldToScreen
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -162,8 +165,10 @@ fun Spielbrett3D(
     bauwerkInfoFreiraum: PaddingValues = PaddingValues(),
     aufwertbareEcken: Set<KartenEcke> = emptySet(),
     aenderbareSeewege: Set<String> = emptySet(),
+    beweglicheTruppen: Set<String> = emptySet(),
     beiEckgebaeudeAufwerten: ((KartenEcke) -> Unit)? = null,
     beiSeewegRouteAendern: ((String) -> Unit)? = null,
+    beiTruppenBewegen: ((List<String>) -> Unit)? = null,
     beiAktivemSeeweg: ((String?) -> Unit)? = null,
 ) {
     if (LocalInspectionMode.current || statischeVorschau) {
@@ -797,8 +802,16 @@ fun Spielbrett3D(
             freiraum = bauwerkInfoFreiraum,
             aufwertbareEcken = aufwertbareEcken,
             aenderbareSeewege = aenderbareSeewege,
+            beweglicheTruppen = beweglicheTruppen,
             beiEckgebaeudeAufwerten = beiEckgebaeudeAufwerten,
             beiSeewegRouteAendern = beiSeewegRouteAendern,
+            beiTruppenBewegen = beiTruppenBewegen?.let { empfaenger ->
+                { ids ->
+                    angehefteteBauwerke = emptyList()
+                    bauwerkUnterZeiger = null
+                    empfaenger(ids)
+                }
+            },
             modifier = Modifier.matchParentSize(),
         )
     }
@@ -812,8 +825,10 @@ private fun BauwerkInfoEbene(
     freiraum: PaddingValues,
     aufwertbareEcken: Set<KartenEcke>,
     aenderbareSeewege: Set<String>,
+    beweglicheTruppen: Set<String>,
     beiEckgebaeudeAufwerten: ((KartenEcke) -> Unit)?,
     beiSeewegRouteAendern: ((String) -> Unit)?,
+    beiTruppenBewegen: ((List<String>) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val dichte = LocalDensity.current
@@ -948,6 +963,35 @@ private fun BauwerkInfoEbene(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text("Route ändern")
+                            }
+                        }
+                        val beweglicheIds = ziel.objektIds.filter { id ->
+                            id in beweglicheTruppen
+                        }
+                        if (beweglicheIds.isNotEmpty() && beiTruppenBewegen != null) {
+                            var anzahl by remember(ziel.schluessel, beweglicheIds) {
+                                mutableIntStateOf(beweglicheIds.size)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            ) {
+                                TextButton(
+                                    onClick = { anzahl-- },
+                                    enabled = anzahl > 1,
+                                ) { Text("−") }
+                                Text("$anzahl von ${beweglicheIds.size}")
+                                TextButton(
+                                    onClick = { anzahl++ },
+                                    enabled = anzahl < beweglicheIds.size,
+                                ) { Text("+") }
+                            }
+                            Button(
+                                onClick = { beiTruppenBewegen(beweglicheIds.take(anzahl)) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(if (anzahl == 1) "1 Truppe bewegen" else "$anzahl Truppen bewegen")
                             }
                         }
                     }
@@ -1133,7 +1177,9 @@ internal data class BauwerkHoverZiel(
     val prioritaet: Int,
     val infoPosition: Position,
     val ecke: KartenEcke? = null,
+    val kante: KartenKante? = null,
     val objektId: String? = null,
+    val objektIds: List<String> = emptyList(),
 ) {
     fun trefferWertung(
         ursprungX: Float,
@@ -1228,7 +1274,7 @@ private fun erstelleBauwerkHoverZiele(
     geometrie: SpielbrettGeometrie,
 ): List<BauwerkHoverZiel> = buildList {
     modell.kantenObjekte
-        .filter { objekt -> objekt.typ.istBauwerk }
+        .filter { objekt -> objekt.typ.hatHoverInfo }
         .forEach { objekt ->
             val hoverKanten = objekt.bewegungsRoute.ifEmpty { listOf(objekt.position) }
             hoverKanten.forEach route@ { kante ->
@@ -1238,7 +1284,7 @@ private fun erstelleBauwerkHoverZiele(
                 val mitteZ = (anfang.z + ende.z) / 2f
                 add(
                     BauwerkHoverZiel(
-                        schluessel = "kante:$kante:${objekt.typ.name}",
+                        schluessel = "kante:$kante:${objekt.typ.name}:${objekt.objektIds.joinToString()}",
                         typ = objekt.typ,
                         trefferAnfang = Position(
                             x = anfang.x,
@@ -1251,20 +1297,27 @@ private fun erstelleBauwerkHoverZiele(
                             z = ende.z,
                         ),
                         trefferRadius = 0.30f,
-                        prioritaet = 2,
+                        prioritaet = if (
+                            objekt.typ.form in setOf(
+                                SpielObjektForm.PANZER,
+                                SpielObjektForm.KRIEGSSCHIFF,
+                            )
+                        ) 1 else 2,
                         infoPosition = Position(
                             x = mitteX,
                             y = OBJEKT_BASIS_HOEHE + 0.78f,
                             z = mitteZ,
                         ),
+                        kante = objekt.position,
                         objektId = objekt.objektId,
+                        objektIds = objekt.objektIds,
                     ),
                 )
             }
         }
 
     modell.feldObjekte
-        .filter { objekt -> objekt.typ.istBauwerk }
+        .filter { objekt -> objekt.typ.hatHoverInfo }
         .forEach { objekt ->
             val mitte = geometrie.dreieck(objekt.position).mittelpunkt
             val abmessungen = objekt.typ.feldAbmessungen()
@@ -1294,7 +1347,7 @@ private fun erstelleBauwerkHoverZiele(
         }
 
     modell.eckObjekte
-        .filter { objekt -> objekt.typ.istBauwerk }
+        .filter { objekt -> objekt.typ.hatHoverInfo }
         .forEach { objekt ->
             val punkt = geometrie.punkt(objekt.position) ?: return@forEach
             val abmessungen = objekt.typ.eckAbmessungen()
@@ -1325,11 +1378,9 @@ private fun erstelleBauwerkHoverZiele(
         }
 }
 
-private val SpielObjektTyp.istBauwerk: Boolean
+private val SpielObjektTyp.hatHoverInfo: Boolean
     get() = when (form) {
         SpielObjektForm.TEICH,
-        SpielObjektForm.PANZER,
-        SpielObjektForm.KRIEGSSCHIFF,
         SpielObjektForm.MARKIERUNG -> false
         else -> true
     }
@@ -1361,7 +1412,11 @@ internal fun List<BauwerkHoverZiel>.angehefteteZieleFuer(
     if (ziel.typ.form != SpielObjektForm.HAUPTBAHNHOF) return listOf(ziel)
     val spieler = ziel.typ.spieler.singleOrNull() ?: return listOf(ziel)
     return filter { kandidat ->
-        spieler in kandidat.typ.spieler && kandidat.typ.form != SpielObjektForm.FRACHTSCHIFF
+        spieler in kandidat.typ.spieler && kandidat.typ.form !in setOf(
+            SpielObjektForm.FRACHTSCHIFF,
+            SpielObjektForm.PANZER,
+            SpielObjektForm.KRIEGSSCHIFF,
+        )
     }
         .distinctBy(BauwerkHoverZiel::schluessel)
 }

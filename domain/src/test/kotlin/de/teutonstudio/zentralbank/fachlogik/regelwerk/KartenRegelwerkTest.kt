@@ -911,6 +911,47 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun mehrereTruppenStehenAufEinerKanteUndBewegenSichGemeinsam() {
+        val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
+        val start = zustand().mitKontrollierterHandelslinie(kanten[0], anna)
+        val mitErstemPanzer = SpielRegelwerk.wendeAn(
+            start,
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "panzer-anna-1",
+                spieler = anna,
+                typ = KriegsEinheitTyp.PANZER,
+                kante = kanten[0],
+            ),
+        ).getOrThrow()
+        val mitStapel = SpielRegelwerk.wendeAn(
+            mitErstemPanzer,
+            SpielEreignis.KriegsEinheitGebaut(
+                id = "panzer-anna-2",
+                spieler = anna,
+                typ = KriegsEinheitTyp.PANZER,
+                kante = kanten[0],
+            ),
+        ).getOrThrow()
+
+        val danach = SpielRegelwerk.wendeAn(
+            mitStapel,
+            SpielEreignis.KriegsEinheitenBewegt(
+                spieler = anna,
+                ids = listOf("panzer-anna-1", "panzer-anna-2"),
+                weg = listOf(kanten[1]),
+            ),
+        ).getOrThrow()
+
+        assertEquals(2, mitStapel.karte?.belegung?.kriegseinheiten?.count {
+            it.position == kanten[0]
+        })
+        assertTrue(danach.karte?.belegung?.kriegseinheiten.orEmpty().all {
+            it.position == kanten[1]
+        })
+        assertEquals(8, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
+    }
+
+    @Test
     fun bewegungOhneGenugTreibstoffAendertWederBestandNochPosition() {
         val kanten = KartenFeld(2, 2, DreieckHaelfte.UNTEN).kanten()
         val start = zustand().mitKontrollierterHandelslinie(kanten[0], anna).copy(

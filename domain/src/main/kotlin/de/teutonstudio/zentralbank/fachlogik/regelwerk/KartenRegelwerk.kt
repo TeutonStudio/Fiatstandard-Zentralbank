@@ -538,14 +538,11 @@ internal object KartenRegelwerk {
         val kante = when (val alterOrt = ereignis.ort) {
             is KartenOrt.Kante -> alterOrt.position
             is KartenOrt.Feld -> alterOrt.position.kanten().firstOrNull { kandidat ->
-                karte.istBefahrbar(ereignis.typ, kandidat) &&
-                    karte.belegung.kriegseinheiten.none { einheit ->
-                        einheit.position == kandidat
-                    }
+                karte.istBefahrbar(ereignis.typ, kandidat)
             } ?: error("Der alte Feldort kann keiner befahrbaren Kartenkante zugeordnet werden.")
             is KartenOrt.Ecke -> error("Kriegseinheiten werden auf einer Kartenkante eingesetzt.")
         }
-        pruefeFreieBefahrbareKante(karte, ereignis.typ, kante)
+        pruefeBefahrbareKante(karte, ereignis.typ, kante)
         return zustand.mitBelegung { belegung ->
             belegung.copy(
                 kriegseinheiten = (belegung.kriegseinheiten + KriegsEinheitBelegung(
@@ -571,7 +568,7 @@ internal object KartenRegelwerk {
         require(karte.belegung.kriegseinheiten.none { einheit -> einheit.id == ereignis.id }) {
             "Die Kriegseinheiten-ID ist bereits vergeben."
         }
-        pruefeFreieBefahrbareKante(karte, ereignis.typ, ereignis.kante)
+        pruefeBefahrbareKante(karte, ereignis.typ, ereignis.kante)
         when (ereignis.typ) {
             KriegsEinheitTyp.PANZER -> require(
                 karte.belegung.kantenNachPosition[ereignis.kante]
@@ -609,40 +606,65 @@ internal object KartenRegelwerk {
     fun kriegsEinheitBewegen(
         zustand: SpielZustand,
         ereignis: SpielEreignis.KriegsEinheitBewegt,
+    ): SpielZustand = kriegsEinheitenBewegen(
+        zustand = zustand,
+        spieler = ereignis.spieler,
+        ids = listOf(ereignis.id),
+        weg = ereignis.weg,
+    )
+
+    fun kriegsEinheitenBewegen(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.KriegsEinheitenBewegt,
+    ): SpielZustand = kriegsEinheitenBewegen(
+        zustand = zustand,
+        spieler = ereignis.spieler,
+        ids = ereignis.ids,
+        weg = ereignis.weg,
+    )
+
+    private fun kriegsEinheitenBewegen(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+        ids: List<String>,
+        weg: List<KartenKante>,
     ): SpielZustand {
         val karte = regulaereKarte(zustand)
-        val einheit = karte.belegung.kriegseinheiten.firstOrNull { it.id == ereignis.id }
-            ?: error("Die Kriegseinheit wurde nicht gefunden.")
-        require(einheit.besitzer == ereignis.spieler) {
-            "Nur der Besitzer darf die Kriegseinheit bewegen."
+        require(ids.isNotEmpty()) { "Es muss mindestens eine Kriegseinheit gewählt werden." }
+        require(ids.size == ids.toSet().size) { "Jede Kriegseinheit darf nur einmal gewählt werden." }
+        val einheitenNachId = karte.belegung.kriegseinheiten.associateBy(KriegsEinheitBelegung::id)
+        val einheiten = ids.map { id ->
+            einheitenNachId[id] ?: error("Die Kriegseinheit $id wurde nicht gefunden.")
         }
-        require(ereignis.weg.isNotEmpty()) { "Der Bewegungsweg darf nicht leer sein." }
-        val besetzteKanten = karte.belegung.kriegseinheiten
-            .asSequence()
-            .filterNot { andere -> andere.id == einheit.id }
-            .map(KriegsEinheitBelegung::position)
-            .toSet()
-        var vorher = einheit.position
-        ereignis.weg.forEach { ziel ->
+        require(einheiten.all { einheit -> einheit.besitzer == spieler }) {
+            "Nur der Besitzer darf die Kriegseinheiten bewegen."
+        }
+        val start = einheiten.map(KriegsEinheitBelegung::position).distinct().singleOrNull()
+            ?: error("Gemeinsam bewegte Kriegseinheiten müssen auf derselben Kante stehen.")
+        val typ = einheiten.map(KriegsEinheitBelegung::typ).distinct().singleOrNull()
+            ?: error("Gemeinsam bewegte Kriegseinheiten müssen denselben Typ haben.")
+        require(weg.isNotEmpty()) { "Der Bewegungsweg darf nicht leer sein." }
+        var vorher = start
+        weg.forEach { ziel ->
             require(sindBenachbarteKanten(vorher, ziel)) {
-                "Eine Kriegseinheit kann nur auf eine benachbarte Kante ziehen."
+                "Kriegseinheiten können nur auf eine benachbarte Kante ziehen."
             }
-            require(ziel !in besetzteKanten) { "Die Zielkante ist bereits durch eine Truppe belegt." }
-            pruefeBefahrbareKante(karte, einheit.typ, ziel)
-            pruefeFremdeHandelslinie(zustand, karte, einheit.besitzer, ziel)
+            pruefeBefahrbareKante(karte, typ, ziel)
+            pruefeFremdeHandelslinie(zustand, karte, spieler, ziel)
             vorher = ziel
         }
         val nachTreibstoff = RohstoffRegelwerk.rohstoffeBuchen(
             zustand = zustand,
-            spieler = ereignis.spieler,
-            mengen = einheit.typ.bewegungsKosten(ereignis.weg.size),
+            spieler = spieler,
+            mengen = typ.bewegungsKosten(weg.size * einheiten.size),
             faktor = -1,
         )
-        val ziel = ereignis.weg.last()
+        val ziel = weg.last()
+        val bewegteIds = ids.toSet()
         return nachTreibstoff.mitBelegung { belegung ->
             belegung.copy(
                 kriegseinheiten = belegung.kriegseinheiten.map { bisher ->
-                    if (bisher.id == einheit.id) {
+                    if (bisher.id in bewegteIds) {
                         bisher.copy(ort = KartenOrt.Kante(ziel))
                     } else {
                         bisher
@@ -667,17 +689,6 @@ internal object KartenRegelwerk {
                 kriegseinheiten = belegung.kriegseinheiten.filterNot { it.id == ereignis.id },
             )
         }
-    }
-
-    private fun pruefeFreieBefahrbareKante(
-        karte: Spielkarte,
-        typ: KriegsEinheitTyp,
-        kante: KartenKante,
-    ) {
-        require(karte.belegung.kriegseinheiten.none { einheit -> einheit.position == kante }) {
-            "Auf der gewählten Kante steht bereits eine Truppe."
-        }
-        pruefeBefahrbareKante(karte, typ, kante)
     }
 
     private fun pruefeBefahrbareKante(

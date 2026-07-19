@@ -104,6 +104,7 @@ internal object ZugRegelwerk {
             is SpielEreignis.KriegsEinheitEingesetzt,
             is SpielEreignis.KriegsEinheitGebaut,
             is SpielEreignis.KriegsEinheitBewegt,
+            is SpielEreignis.KriegsEinheitenBewegt,
             is SpielEreignis.KriegsEinheitEntfernt,
             is SpielEreignis.KriegErklaert,
             is SpielEreignis.KriegBeendet -> {
@@ -216,6 +217,7 @@ internal object ZugRegelwerk {
         is SpielEreignis.KriegsEinheitEingesetzt -> spieler
         is SpielEreignis.KriegsEinheitGebaut -> spieler
         is SpielEreignis.KriegsEinheitBewegt -> spieler
+        is SpielEreignis.KriegsEinheitenBewegt -> spieler
         is SpielEreignis.KriegsEinheitEntfernt -> spieler
         is SpielEreignis.KriegErklaert -> aggressor
         is SpielEreignis.KriegBeendet -> spielerA

@@ -611,21 +611,31 @@ Ereignisse duerfen tendenziell Schulden, Zinssaetze, Rohstoffpreise, Marktwerte 
 Ein Krieg beginnt durch eine Kriegserklaerung im Epizug. Im Prozug ist sie gesperrt. Dabei wird festgehalten, welche Spieler beteiligt sind, welches Ziel angegriffen wird und welche Kriegseinheiten eingesetzt werden.
 
 \section{Kriegseinheiten}
-Spieler koennen im Epizug auch ohne bestehenden Krieg Truppen bauen und Bau sowie Bewegung bereits im Planmodus vormerken. Fuer den Bau selbst sind in dieser Fassung noch keine Rohstoffkosten festgelegt. Jede Kante kann hoechstens eine Truppe tragen. Es gibt zwei Truppentypen:
+Spieler koennen im Epizug auch ohne bestehenden Krieg Truppen bauen und den Bau
+bereits im Planmodus vormerken. Truppenbewegungen sind kein Bestandteil des
+Planmodus. Auf einer Kante duerfen mehrere Truppen stehen. Fuer den Bau selbst
+sind in dieser Fassung noch keine Rohstoffkosten festgelegt. Es gibt zwei
+Truppentypen:
 \begin{description}
   \item[Panzer] Werden auf einer eigenen, intakten Handelslinie gebaut, stehen auf Kanten, die an mindestens ein Gelaendefeld grenzen, und werden zur Belagerung von Bahnhoefen, Grossbahnhoefen, Haefen und Grosshaefen eingesetzt.
   \item[Kriegsschiffe] Werden auf einer Seekante an einem eigenen, intakten Hafen oder Grosshafen gebaut, stehen auf Kanten, die an mindestens ein Wasserfeld grenzen, und werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
 \end{description}
 
 \section{Treibstoffverbrauch}
-Eine Bewegung fuehrt von der aktuellen Kante auf eine benachbarte Kante mit gemeinsamer Ecke. Fuer jeden einzelnen solchen Schritt wird Treibstoff verbraucht:
+Eine Bewegung wird im Hoverfenster eines eigenen Truppenstapels begonnen. Dort
+waehlt der Spieler, wie viele gleichartige Truppen gemeinsam bewegt werden. Nach
+der Wahl einer benachbarten Zielkante ziehen alle gewaehlten Truppen atomar auf
+diese Kante; dort bereits stehende Truppen verhindern die Bewegung nicht. Fuer
+jede bewegte Truppe und jeden einzelnen Schritt wird Treibstoff verbraucht:
 
 \begin{itemize}
   \item Ein Panzer verbraucht 1 Diesel je Kantenbewegung.
   \item Ein Kriegsschiff verbraucht 1 Schweroel je Kantenbewegung.
 \end{itemize}
 
-Ein mehrschrittiger Weg wird nur ausgefuehrt, wenn der gesamte benoetigte Treibstoff vorhanden ist. Andernfalls bleiben sowohl Rohstoffbestand als auch Truppenposition unveraendert.
+Ein Weg wird nur ausgefuehrt, wenn der gesamte fuer alle gewaehlten Truppen
+benoetigte Treibstoff vorhanden ist. Andernfalls bleiben sowohl Rohstoffbestand
+als auch alle Truppenpositionen unveraendert.
 
 Eine von einem anderen Spieler kontrollierte Handelslinie darf nur befahren werden, solange mit diesem Spieler ein Krieg besteht.
 

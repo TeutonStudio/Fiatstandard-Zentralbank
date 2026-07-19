@@ -87,6 +87,31 @@ class SpielbrettBauwerkHoverTest {
     }
 
     @Test
+    fun `Truppenstapel hat auf seiner Kante Vorrang vor Handelslinie`() {
+        val handelslinie = ziel(
+            name = "Handelslinie",
+            form = SpielObjektForm.SCHIENE,
+            prioritaet = 2,
+        )
+        val truppenstapel = ziel(
+            name = "2 × Panzer",
+            form = SpielObjektForm.PANZER,
+            prioritaet = 1,
+        )
+
+        val treffer = listOf(handelslinie, truppenstapel).findeTreffer(
+            ursprungX = 0f,
+            ursprungY = 3f,
+            ursprungZ = 0f,
+            richtungX = 0f,
+            richtungY = -1f,
+            richtungZ = 0f,
+        )
+
+        assertEquals(truppenstapel, treffer)
+    }
+
+    @Test
     fun `Hauptbahnhof heftet alle zugeordneten Bauwerke seines Spielers an`() {
         val hauptbahnhof = ziel(
             name = "Hauptbahnhof",

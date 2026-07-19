@@ -242,6 +242,14 @@ sealed interface SpielEreignis {
     ) : SpielEreignis
 
     @Serializable
+    data class KriegsEinheitenBewegt(
+        val spieler: SpielerId,
+        val ids: List<String>,
+        /** Jede Kante ist ein gemeinsamer Schritt nach der aktuellen Position. */
+        val weg: List<KartenKante>,
+    ) : SpielEreignis
+
+    @Serializable
     data class KriegsEinheitEntfernt(
         val spieler: SpielerId,
         val id: String,

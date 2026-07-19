@@ -52,6 +52,12 @@ private val AuswahlFarbe = Color(0xFFFFD600)
 private val TeichFarbe = Color(0xFF1565A8)
 private val RoutenFarbe = Color(0xFF00E5FF)
 
+private data class TruppenStapelSchluessel(
+    val position: KartenKante,
+    val typ: KriegsEinheitTyp,
+    val besitzer: SpielerId,
+)
+
 fun KartenVorlage.zu3DModell(
     zeigeBearbeitungsRaster: Boolean = false,
 ): Spielbrett3DModell = alsSpielkarte().zu3DModell(
@@ -192,27 +198,48 @@ fun Spielkarte.zu3DModell(
                         seeweg.hafenB
                 },
             )
-        } + belegung.kriegseinheiten.map { einheit ->
-            KantenObjektAuflage(
-                position = einheit.position,
-                typ = SpielObjektTyp(
-                    name = "${einheit.typ.anzeigeName()} ${einheit.id}",
-                    farbe = spielerFarbe(einheit.besitzer),
-                    form = when (einheit.typ) {
-                        KriegsEinheitTyp.PANZER -> SpielObjektForm.PANZER
-                        KriegsEinheitTyp.KRIEGSSCHIFF -> SpielObjektForm.KRIEGSSCHIFF
-                    },
-                    infos = listOf(
-                        SpielObjektInfoEintrag("Spieler", einheit.besitzer.wert),
-                        SpielObjektInfoEintrag(
-                            "Bewegung",
-                            "1 ${einheit.typ.bewegungsRohstoff.anzeigeName()} je Kante",
-                        ),
-                    ),
-                    spieler = setOf(einheit.besitzer.wert),
-                ),
+        } + belegung.kriegseinheiten
+            .groupBy { einheit ->
+                TruppenStapelSchluessel(einheit.position, einheit.typ, einheit.besitzer)
+            }
+            .entries
+            .sortedWith(
+                compareBy<Map.Entry<TruppenStapelSchluessel, *>> { eintrag ->
+                    eintrag.key.position.anfang
+                }
+                    .thenBy { eintrag -> eintrag.key.position.ende }
+                    .thenBy { eintrag -> eintrag.key.besitzer.wert }
+                    .thenBy { eintrag -> eintrag.key.typ.ordinal },
             )
-        } + (hervorhebung as? KartenOrt.Kante)?.let { markierung ->
+            .map { (schluessel, einheiten) ->
+                val ids = einheiten.map { einheit -> einheit.id }.sorted()
+                KantenObjektAuflage(
+                    position = schluessel.position,
+                    typ = SpielObjektTyp(
+                        name = if (ids.size == 1) {
+                            "${schluessel.typ.anzeigeName()} ${ids.single()}"
+                        } else {
+                            "${ids.size} × ${schluessel.typ.anzeigeName()}"
+                        },
+                        farbe = spielerFarbe(schluessel.besitzer),
+                        form = when (schluessel.typ) {
+                            KriegsEinheitTyp.PANZER -> SpielObjektForm.PANZER
+                            KriegsEinheitTyp.KRIEGSSCHIFF -> SpielObjektForm.KRIEGSSCHIFF
+                        },
+                        infos = listOf(
+                            SpielObjektInfoEintrag("Spieler", schluessel.besitzer.wert),
+                            SpielObjektInfoEintrag("Truppen", ids.size.toString()),
+                            SpielObjektInfoEintrag(
+                                "Bewegung",
+                                "1 ${schluessel.typ.bewegungsRohstoff.anzeigeName()} " +
+                                    "je Truppe und Kante",
+                            ),
+                        ),
+                        spieler = setOf(schluessel.besitzer.wert),
+                    ),
+                    objektIds = ids,
+                )
+            } + (hervorhebung as? KartenOrt.Kante)?.let { markierung ->
             KantenObjektAuflage(
                 markierung.position,
                 SpielObjektTyp(

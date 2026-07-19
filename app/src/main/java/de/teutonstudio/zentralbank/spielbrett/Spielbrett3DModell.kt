@@ -140,6 +140,7 @@ data class KantenObjektAuflage(
     val position: KartenKante,
     val typ: SpielObjektTyp,
     val objektId: String? = null,
+    val objektIds: List<String> = emptyList(),
     val bewegungsRoute: List<KartenKante> = emptyList(),
     val routenStart: KartenEcke? = null,
 )

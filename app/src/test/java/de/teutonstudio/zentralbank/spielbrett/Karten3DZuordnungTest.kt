@@ -202,9 +202,38 @@ class Karten3DZuordnungTest {
         assertEquals(kante, panzer.position)
         assertEquals(SpielObjektForm.PANZER, panzer.typ.form)
         assertTrue(
-            panzer.typ.infos.contains(SpielObjektInfoEintrag("Bewegung", "1 Diesel je Kante")),
+            panzer.typ.infos.contains(
+                SpielObjektInfoEintrag("Bewegung", "1 Diesel je Truppe und Kante"),
+            ),
         )
         assertTrue(modell.feldObjekte.isEmpty())
+    }
+
+    @Test
+    fun mehrerePanzerAufEinerKanteWerdenAlsStapelDargestellt() {
+        val kante = KartenKante.zwischen(KartenEcke(2, 0), KartenEcke(3, 2))
+        val panzer = listOf("panzer-anna-2", "panzer-anna-1").map { id ->
+            KriegsEinheitBelegung(
+                id = id,
+                typ = KriegsEinheitTyp.PANZER,
+                besitzer = anna,
+                ort = KartenOrt.Kante(kante),
+            )
+        }
+        val modell = Spielkarte(
+            id = "panzer-stapel",
+            name = "Panzerstapel",
+            hexagon = KartenHexagon(radius = 3),
+            gelaendefelder = angrenzendeFelder(kante).map { feld ->
+                GelaendeFeld(feld, GelaendeTyp.EBENE)
+            },
+            belegung = KartenBelegung(kriegseinheiten = panzer),
+        ).zu3DModell(spielerReihenfolge = listOf(anna, bert))
+
+        val stapel = modell.kantenObjekte.single()
+        assertEquals("2 × Panzer", stapel.typ.name)
+        assertEquals(listOf("panzer-anna-1", "panzer-anna-2"), stapel.objektIds)
+        assertTrue(stapel.typ.infos.contains(SpielObjektInfoEintrag("Truppen", "2")))
     }
 
     @Test

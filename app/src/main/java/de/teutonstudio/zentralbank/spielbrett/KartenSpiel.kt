@@ -56,7 +56,6 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
-import de.teutonstudio.zentralbank.fachlogik.modell.bewegungsKosten
 import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.bauteilIconPfadOderNull
@@ -122,9 +121,7 @@ private enum class SpielKartenWerkzeug(
 
 private val planbareWerkzeuge: List<SpielKartenWerkzeug> =
     SpielKartenWerkzeug.entries.filter { eintrag ->
-        (eintrag.startBauteil != null ||
-            eintrag.startKriegsEinheit != null ||
-            eintrag == SpielKartenWerkzeug.TRUPPE_BEWEGEN) &&
+        (eintrag.startBauteil != null || eintrag.startKriegsEinheit != null) &&
             eintrag != SpielKartenWerkzeug.HAUPTBAHNHOF &&
             !eintrag.nurRundeNull
     }
@@ -212,6 +209,8 @@ fun KartenSpielBildschirm(
     var seewegBearbeitungId by remember { mutableStateOf<String?>(null) }
     var aktiverSeewegId by remember { mutableStateOf<String?>(null) }
     var truppenStart by remember { mutableStateOf<KartenOrt.Kante?>(null) }
+    var ausgewaehlteTruppenIds by remember { mutableStateOf(emptyList<String>()) }
+    var werkzeugVorTruppenbewegung by remember { mutableStateOf<SpielKartenWerkzeug?>(null) }
     var werkzeugVorHoverAufwertung by remember { mutableStateOf<SpielKartenWerkzeug?>(null) }
     var planungsmodus by remember(zustand.spielabschnitt, aktiverSpieler) {
         mutableStateOf(false)
@@ -243,12 +242,19 @@ fun KartenSpielBildschirm(
         )
     }
 
+    val beendeTruppenbewegung: () -> Unit = {
+        truppenStart = null
+        ausgewaehlteTruppenIds = emptyList()
+        werkzeugVorTruppenbewegung?.let { vorher -> werkzeug = vorher }
+        werkzeugVorTruppenbewegung = null
+    }
+
     val setzePlanungsmodus: (Boolean) -> Unit = { aktiv ->
+        beendeTruppenbewegung()
         planungsmodus = aktiv && zustand.spielabschnitt == Spielabschnitt.REGULAER
         ausgewaehltesZiel = null
         seewegStart = null
         seewegBearbeitungId = null
-        truppenStart = null
         planungsFehler = null
         if (!planungsmodus) {
             geplanteBauten = emptyList()
@@ -260,7 +266,7 @@ fun KartenSpielBildschirm(
     val bauwerkPlanen: (KartenOrt) -> Unit = planen@ { ziel ->
         if (werkzeug !in planbareWerkzeuge) {
             planungsFehler =
-                "Im Planungsmodus können Bauwerke, Einheiten und Truppenbewegungen gewählt werden."
+                "Im Planungsmodus können Bauwerke und neue Einheiten gewählt werden."
             return@planen
         }
         val ereignis = runCatching {
@@ -271,26 +277,15 @@ fun KartenSpielBildschirm(
                 seewegStart = seewegStart,
                 seewegBearbeitungId = seewegBearbeitungId,
                 truppenStart = truppenStart,
+                truppenIds = ausgewaehlteTruppenIds,
             )
         }.getOrElse { fehler ->
             planungsFehler = fehler.message ?: "Das Vorhaben konnte nicht erstellt werden."
             return@planen
         }
-        val kosten = when (ereignis) {
-            is SpielEreignis.KriegsEinheitBewegt -> {
-                val einheit = planungsZustand.karte?.belegung?.kriegseinheiten
-                    .orEmpty()
-                    .firstOrNull { belegung -> belegung.id == ereignis.id }
-                    ?: run {
-                        planungsFehler = "Die zu bewegende Einheit wurde nicht gefunden."
-                        return@planen
-                    }
-                einheit.typ.bewegungsKosten(ereignis.weg.size)
-            }
-            else -> werkzeug.planungsKosten ?: run {
-                planungsFehler = "Für dieses Vorhaben ist kein Rohstoffbedarf definiert."
-                return@planen
-            }
+        val kosten = werkzeug.planungsKosten ?: run {
+            planungsFehler = "Für dieses Vorhaben ist kein Rohstoffbedarf definiert."
+            return@planen
         }
         val pruefzustand = planungsZustand.mitZusaetzlichenRohstoffen(
             fehlendeBauRohstoffe(planungsZustand, kosten),
@@ -312,6 +307,7 @@ fun KartenSpielBildschirm(
         seewegStart = null
         seewegBearbeitungId = null
         truppenStart = null
+        ausgewaehlteTruppenIds = emptyList()
     }
 
     LaunchedEffect(vorgewaehltesBauteil) {
@@ -419,11 +415,11 @@ fun KartenSpielBildschirm(
                     modifier = leistenModifier,
                     werkzeug = werkzeug,
                     beiWerkzeug = { neu ->
+                        beendeTruppenbewegung()
                         werkzeug = neu
                         ausgewaehltesZiel = null
                         seewegStart = null
                         seewegBearbeitungId = null
-                        truppenStart = null
                     },
                     rohstoff = rohstoff,
                     beiRohstoff = { rohstoff = it },
@@ -442,11 +438,11 @@ fun KartenSpielBildschirm(
                     modifier = warenkorbModifier,
                     werkzeug = werkzeug,
                     beiWerkzeug = { neu ->
+                        beendeTruppenbewegung()
                         werkzeug = neu
                         ausgewaehltesZiel = null
                         seewegStart = null
                         seewegBearbeitungId = null
-                        truppenStart = null
                         planungsFehler = null
                     },
                     geplanteBauten = geplanteBauten,
@@ -532,6 +528,16 @@ fun KartenSpielBildschirm(
                 } else {
                     emptySet()
                 }
+                val beweglicheTruppen = if (
+                    !planungsmodus && epizugAktiv && ausgewaehlteTruppenIds.isEmpty()
+                ) {
+                    angezeigteKarte.belegung.kriegseinheiten
+                        .asSequence()
+                        .filter { einheit -> einheit.besitzer == aktiverSpieler }
+                        .mapTo(mutableSetOf()) { einheit -> einheit.id }
+                } else {
+                    emptySet()
+                }
                 Box(modifier = brettModifier) {
                     Spielbrett3D(
                         modell = angezeigteKarte.zu3DModell(
@@ -560,6 +566,7 @@ fun KartenSpielBildschirm(
                         },
                         aufwertbareEcken = aufwertbareEcken,
                         aenderbareSeewege = aenderbareSeewege,
+                        beweglicheTruppen = beweglicheTruppen,
                         beiEckgebaeudeAufwerten = aufwertungAusHover,
                         beiSeewegRouteAendern = { id ->
                             werkzeug = SpielKartenWerkzeug.FRACHTSCHIFF
@@ -569,10 +576,27 @@ fun KartenSpielBildschirm(
                             planungsFehler = null
                         },
                         beiAktivemSeeweg = { id -> aktiverSeewegId = id },
+                        beiTruppenBewegen = truppen@ { ids ->
+                            val einheiten = angezeigteKarte.belegung.kriegseinheiten
+                                .filter { einheit -> einheit.id in ids }
+                            val start = einheiten.map { einheit -> einheit.position }
+                                .distinct()
+                                .singleOrNull()
+                                ?: return@truppen
+                            if (einheiten.size != ids.size ||
+                                einheiten.any { einheit -> einheit.besitzer != aktiverSpieler }
+                            ) return@truppen
+                            werkzeugVorTruppenbewegung = werkzeug
+                            werkzeug = SpielKartenWerkzeug.TRUPPE_BEWEGEN
+                            truppenStart = KartenOrt.Kante(start)
+                            ausgewaehlteTruppenIds = ids
+                            ausgewaehltesZiel = null
+                        },
                         onDreieckBeruehrt = beruehrung@ { treffer ->
                             if (
                                 planungsmodus || !kompakteZentrale ||
-                                vorgewaehltesBauteil != null || seewegBearbeitungId != null
+                                vorgewaehltesBauteil != null || seewegBearbeitungId != null ||
+                                ausgewaehlteTruppenIds.isNotEmpty()
                             ) {
                                 val ziel = treffer.zuKartenOrt(werkzeug.ziel)
                                     ?: return@beruehrung
@@ -586,16 +610,12 @@ fun KartenSpielBildschirm(
                                     } else {
                                         ausgewaehltesZiel = hafen
                                     }
-                                } else if (werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN) {
+                                } else if (
+                                    werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN &&
+                                    ausgewaehlteTruppenIds.isNotEmpty()
+                                ) {
                                     val kante = ziel as KartenOrt.Kante
-                                    if (truppenStart == null) {
-                                        truppenStart = kante
-                                        planungsFehler = null
-                                    } else if (planungsmodus) {
-                                        bauwerkPlanen(kante)
-                                    } else {
-                                        ausgewaehltesZiel = kante
-                                    }
+                                    ausgewaehltesZiel = kante
                                 } else if (planungsmodus) {
                                     bauwerkPlanen(ziel)
                                 } else {
@@ -606,7 +626,7 @@ fun KartenSpielBildschirm(
                     )
                     if (
                         planungsmodus || !kompakteZentrale || vorgewaehltesBauteil != null ||
-                        seewegBearbeitungId != null
+                        seewegBearbeitungId != null || ausgewaehlteTruppenIds.isNotEmpty()
                     ) {
                         Surface(
                             modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
@@ -619,8 +639,6 @@ fun KartenSpielBildschirm(
                                         "Route ändern: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
                                     } else if (werkzeug == SpielKartenWerkzeug.FRACHTSCHIFF) {
                                         "Planen: ${if (seewegStart == null) "ersten" else "zweiten"} Hafen wählen"
-                                    } else if (werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN) {
-                                        "Planen: ${if (truppenStart == null) "Truppenkante" else "benachbarte Zielkante"} wählen"
                                     } else {
                                         "Planen: ${werkzeug.beschriftung} auf der Karte wählen"
                                     },
@@ -668,17 +686,34 @@ fun KartenSpielBildschirm(
                                     }
                                 }
                             } else {
-                                Text(
-                                    if (werkzeug == SpielKartenWerkzeug.TRUPPE_BEWEGEN) {
-                                        "Truppe bewegen: ${if (truppenStart == null) "Truppenkante" else "benachbarte Zielkante"} wählen"
-                                    } else {
+                                if (ausgewaehlteTruppenIds.isNotEmpty()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(
+                                            "${ausgewaehlteTruppenIds.size} Truppen bewegen: " +
+                                                "benachbarte Zielkante wählen",
+                                            modifier = Modifier.padding(
+                                                start = 10.dp,
+                                                top = 6.dp,
+                                                bottom = 6.dp,
+                                            ),
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
+                                        TextButton(onClick = beendeTruppenbewegung) {
+                                            Text("Abbrechen")
+                                        }
+                                    }
+                                } else {
+                                    Text(
                                         "Tippen: ${werkzeug.ziel.name.lowercase()} wählen · " +
-                                        "Ziehen: ${if (kameraModus == KameraInteraktionsModus.DREHEN) "drehen" else "verschieben"} · " +
-                                            "Zwei Finger: verschieben/zoomen"
-                                    },
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
+                                            "Ziehen: ${if (kameraModus == KameraInteraktionsModus.DREHEN) "drehen" else "verschieben"} · " +
+                                                "Zwei Finger: verschieben/zoomen",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
                             }
                         }
                     }
@@ -742,6 +777,7 @@ fun KartenSpielBildschirm(
                 seewegStart = seewegStart,
                 seewegBearbeitungId = seewegBearbeitungId,
                 truppenStart = truppenStart,
+                truppenIds = ausgewaehlteTruppenIds,
             )
         }
         val pruefung = ereignisErgebnis.mapCatching { ereignis ->
@@ -774,7 +810,7 @@ fun KartenSpielBildschirm(
                 ausgewaehltesZiel = null
                 seewegStart = null
                 seewegBearbeitungId = null
-                truppenStart = null
+                beendeTruppenbewegung()
                 beendeHoverAufwertung()
             },
             title = { Text(werkzeug.beschriftung) },
@@ -792,6 +828,14 @@ fun KartenSpielBildschirm(
                                         .first { einheit -> einheit.id == ereignis.id }
                                         .typ
                                     "Treibstoff: ${ereignis.weg.size} × " +
+                                        typ.bewegungsRohstoff.anzeigeName()
+                                }
+                                is SpielEreignis.KriegsEinheitenBewegt -> {
+                                    val typ = zustand.karte?.belegung?.kriegseinheiten
+                                        .orEmpty()
+                                        .first { einheit -> einheit.id == ereignis.ids.first() }
+                                        .typ
+                                    "Treibstoff: ${ereignis.ids.size * ereignis.weg.size} × " +
                                         typ.bewegungsRohstoff.anzeigeName()
                                 }
                                 is SpielEreignis.KriegsEinheitEntfernt ->
@@ -837,7 +881,7 @@ fun KartenSpielBildschirm(
                     ausgewaehltesZiel = null
                     seewegStart = null
                     seewegBearbeitungId = null
-                    truppenStart = null
+                    beendeTruppenbewegung()
                     beendeHoverAufwertung()
                 }) { Text("Abbrechen") }
             },
@@ -850,7 +894,7 @@ fun KartenSpielBildschirm(
                             ausgewaehltesZiel = null
                             seewegStart = null
                             seewegBearbeitungId = null
-                            truppenStart = null
+                            beendeTruppenbewegung()
                             beendeHoverAufwertung()
                         },
                     ) { Text("Bestätigen") }
@@ -866,7 +910,7 @@ fun KartenSpielBildschirm(
                                 ausgewaehltesZiel = null
                                 seewegStart = null
                                 seewegBearbeitungId = null
-                                truppenStart = null
+                                beendeTruppenbewegung()
                                 beendeHoverAufwertung()
                                 beiBauauftragBeendet()
                             },
@@ -882,7 +926,7 @@ fun KartenSpielBildschirm(
                                     ausgewaehltesZiel = null
                                     seewegStart = null
                                     seewegBearbeitungId = null
-                                    truppenStart = null
+                                    beendeTruppenbewegung()
                                     beendeHoverAufwertung()
                                     beiBauauftragBeendet()
                                 }
@@ -1040,7 +1084,7 @@ private fun BauwerkWarenkorb(
                             beiWerkzeug = beiWerkzeug,
                         )
                         Text(
-                            "Danach Bauort oder Start- und Zielkante auf der Karte antippen.",
+                            "Danach den Bau- oder Einsatzort auf der Karte antippen.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -1229,7 +1273,7 @@ private fun SpielWerkzeugleiste(
             )
         } else if (planungsmodus) {
             Text(
-                "Planbare Bauwerke, Einheiten und Bewegungen",
+                "Planbare Bauwerke und neue Einheiten",
                 style = MaterialTheme.typography.titleSmall,
             )
             WerkzeugChips(
@@ -1251,7 +1295,9 @@ private fun SpielWerkzeugleiste(
             Text("Kante", style = MaterialTheme.typography.titleSmall)
             WerkzeugChips(
                 werkzeuge = SpielKartenWerkzeug.entries.filter {
-                    it.ziel == KartenZielModus.KANTE && !it.nurRundeNull
+                    it.ziel == KartenZielModus.KANTE &&
+                        it != SpielKartenWerkzeug.TRUPPE_BEWEGEN &&
+                        !it.nurRundeNull
                 },
                 ausgewaehlt = werkzeug,
                 beiWerkzeug = beiWerkzeug,
@@ -1329,6 +1375,7 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
     seewegStart: KartenOrt.Ecke?,
     seewegBearbeitungId: String?,
     truppenStart: KartenOrt.Kante?,
+    truppenIds: List<String>,
 ): SpielEreignis {
     val spieler = requireNotNull(zustand.aktiverSpieler) { "Es ist kein Spieler aktiv." }
     return when (this) {
@@ -1412,14 +1459,24 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
         }
         SpielKartenWerkzeug.TRUPPE_BEWEGEN -> {
             val start = requireNotNull(truppenStart) { "Bitte zuerst eine Truppenkante wählen." }
-            val einheit = zustand.karte?.belegung?.kriegseinheiten
+            require(truppenIds.isNotEmpty()) {
+                "Die zu bewegenden Truppen müssen im Hoverfenster gewählt werden."
+            }
+            val einheitenNachId = zustand.karte?.belegung?.kriegseinheiten
                 .orEmpty()
-                .singleOrNull { belegung -> belegung.position == start.position }
-                ?: error("Auf der gewählten Startkante steht nicht genau eine Truppe.")
-            require(einheit.besitzer == spieler) { "Nur die eigene Truppe darf bewegt werden." }
-            SpielEreignis.KriegsEinheitBewegt(
+                .associateBy { einheit -> einheit.id }
+            val einheiten = truppenIds.map { id ->
+                einheitenNachId[id] ?: error("Die gewählte Truppe $id wurde nicht gefunden.")
+            }
+            require(einheiten.all { einheit -> einheit.position == start.position }) {
+                "Die gewählten Truppen stehen nicht mehr auf derselben Startkante."
+            }
+            require(einheiten.all { einheit -> einheit.besitzer == spieler }) {
+                "Nur eigene Truppen dürfen bewegt werden."
+            }
+            SpielEreignis.KriegsEinheitenBewegt(
                 spieler = spieler,
-                id = einheit.id,
+                ids = truppenIds,
                 weg = listOf((ziel as KartenOrt.Kante).position),
             )
         }
@@ -1427,8 +1484,10 @@ private fun SpielKartenWerkzeug.erstelleEreignis(
             val kante = (ziel as KartenOrt.Kante).position
             val einheit = zustand.karte?.belegung?.kriegseinheiten
                 .orEmpty()
-                .singleOrNull { belegung -> belegung.position == kante }
-                ?: error("Auf der gewählten Kante steht nicht genau eine Truppe.")
+                .firstOrNull { belegung ->
+                    belegung.position == kante && belegung.besitzer == spieler
+                }
+                ?: error("Auf der gewählten Kante steht keine eigene Truppe.")
             SpielEreignis.KriegsEinheitEntfernt(spieler = spieler, id = einheit.id)
         }
         SpielKartenWerkzeug.ABBAUEINHEIT -> SpielEreignis.NeutraleAnlageErrichtet(
