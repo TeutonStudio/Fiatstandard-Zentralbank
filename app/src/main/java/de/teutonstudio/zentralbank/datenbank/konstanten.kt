@@ -118,18 +118,22 @@ enum class Verwaltungsstandort(override val str: String, override val kosten: En
     HAFEN("hafen",Rohstoffe.anzahl(holz = 1, ziegel = 2) + Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=1,diesel=1)),
     GROSSHAFEN("großhafen",Rohstoffe.anzahl(holz = 2, ziegel = 3) + 2*Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=2,diesel=2)),
 }
+
+private fun wirtschaftsstandortBaukosten(): EnumMap<Rohstoffe, Int> =
+    Rohstoffe.anzahl(holz = 3, ziegel = 2)
+
 enum class Wirtschaftsregionen(override val str:String, override val kosten: EnumMap<Rohstoffe,Int>, val ertrag: Map<Rohstoffe,Int>, val verbrauch: Map<Rohstoffe,Int>): Bauteil {
-    GESCHÄFTSBANK("geschäftsbank",Rohstoffe.anzahl(),emptyMap(),emptyMap()),
-    VIEHHOF("viehhof",Rohstoffe.anzahl(),Rohstoffe.anzahl(nahrung=1),emptyMap()),
-    ZIEGELBRENNER("ziegelbrenner",Rohstoffe.anzahl(),Rohstoffe.anzahl(ziegel=1),Rohstoffe.anzahl(lehm=1)),
-    LEHMINE("lehmmine",Rohstoffe.anzahl(),Rohstoffe.anzahl(lehm=1),emptyMap()),
-    FÖRSTER("förster",Rohstoffe.anzahl(),Rohstoffe.anzahl(holz=1),emptyMap()),
-    BOHRTURM("bohrturm",Rohstoffe.anzahl(),Rohstoffe.anzahl(rohöl = 1),emptyMap()),
-    RAFFINERIE("raffinerie",Rohstoffe.anzahl(),Rohstoffe.anzahl(diesel=2,schweröl=1),Rohstoffe.anzahl(rohöl=2)),
-    SRAFINNERIE("synthetik raffinerie",Rohstoffe.anzahl(),Rohstoffe.anzahl(diesel=2,schweröl=1),Rohstoffe.anzahl(kohle=3)),
-    KOHLEMINE("kohlemine",Rohstoffe.anzahl(),Rohstoffe.anzahl(kohle=1),emptyMap()),
-    STAHLFABRIK("stahlfabrik",Rohstoffe.anzahl(),Rohstoffe.anzahl(stahl=2),Rohstoffe.anzahl(eisen=1,kohle=1)),
-    EISENMINE("eisenmine",Rohstoffe.anzahl(),Rohstoffe.anzahl(eisen=1),emptyMap()),
+    GESCHÄFTSBANK("geschäftsbank",wirtschaftsstandortBaukosten(),emptyMap(),emptyMap()),
+    VIEHHOF("viehhof",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(nahrung=1),emptyMap()),
+    ZIEGELBRENNER("ziegelbrenner",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(ziegel=1),Rohstoffe.anzahl(lehm=1)),
+    LEHMINE("lehmmine",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(lehm=1),emptyMap()),
+    FÖRSTER("förster",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(holz=1),emptyMap()),
+    BOHRTURM("bohrturm",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(rohöl = 1),emptyMap()),
+    RAFFINERIE("raffinerie",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(diesel=2,schweröl=1),Rohstoffe.anzahl(rohöl=2)),
+    SRAFINNERIE("synthetik raffinerie",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(diesel=2,schweröl=1),Rohstoffe.anzahl(kohle=3)),
+    KOHLEMINE("kohlemine",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(kohle=1),emptyMap()),
+    STAHLFABRIK("stahlfabrik",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(stahl=2),Rohstoffe.anzahl(eisen=1,kohle=1)),
+    EISENMINE("eisenmine",wirtschaftsstandortBaukosten(),Rohstoffe.anzahl(eisen=1),emptyMap()),
 }
 
 enum class Rohstoffe(val str: String, val farbe: Color) {

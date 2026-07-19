@@ -257,8 +257,16 @@ internal object KartenRegelwerk {
         require(karte.belegung.felder.none { it.position == ereignis.feld }) {
             "Das gewählte Feld ist bereits belegt."
         }
-        val aktuelleKarte = requireNotNull(zustand.karte)
-        return zustand.copy(
+        val bauteil = when (val anlage = ereignis.anlage) {
+            is FeldAnlage.Abbaueinheit -> null
+            FeldAnlage.Geschaeftsbank -> BauteilTyp.GESCHAEFTSBANK
+            is FeldAnlage.Wirtschaftsregion -> anlage.bauteil
+        }
+        val nachKosten = bauteil?.let {
+            bucheKosten(zustand, ereignis.errichter, it)
+        } ?: zustand
+        val aktuelleKarte = requireNotNull(nachKosten.karte)
+        return nachKosten.copy(
             karte = aktuelleKarte.copy(
                 belegung = aktuelleKarte.belegung.copy(
                     felder = (aktuelleKarte.belegung.felder + FeldBelegung(

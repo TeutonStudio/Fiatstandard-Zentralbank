@@ -28,6 +28,8 @@ import de.teutonstudio.zentralbank.datenbank.Handelslinie
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
 import de.teutonstudio.zentralbank.datenbank.farbe
+import de.teutonstudio.zentralbank.daten.zuordnung.zuBauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.istInRundeNullPlatzierbar
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.TextCard
@@ -62,11 +64,13 @@ fun definiereBauteilMenge(
     }
 }
 
-private val einträge = mapOf(
+private val einträge = mapOf<String, Iterable<Bauteil>>(
     "Handelslinien" to Handelslinie.entries as Iterable<Bauteil>,
     "Verwaltungsstandorte" to Verwaltungsstandort.entries as Iterable<Bauteil>,
     "Wirtschaftsregionen" to Wirtschaftsregionen.entries as Iterable<Bauteil>,
-)
+).mapValues { (_, bauteile) ->
+    bauteile.filter { bauteil -> bauteil.zuBauteilTyp().istInRundeNullPlatzierbar }
+}
 @Composable
 fun definiereBauteile(
     fürWenn: String = "",

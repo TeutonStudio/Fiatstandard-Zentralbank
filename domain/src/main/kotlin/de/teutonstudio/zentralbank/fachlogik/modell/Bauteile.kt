@@ -67,19 +67,19 @@ enum class BauteilTyp(
     GESCHAEFTSBANK(
         text = "geschaeftsbank",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
     ),
     VIEHHOF(
         text = "viehhof",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.NAHRUNG to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
     ZIEGELBRENNER(
         text = "ziegelbrenner",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.ZIEGEL to 1),
         verbrauch = rohstoffe(Rohstoff.LEHM to 1),
         produktionsArt = ProduktionsArt.VERARBEITUNG,
@@ -87,28 +87,28 @@ enum class BauteilTyp(
     LEHMINE(
         text = "lehmmine",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.LEHM to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
     FOERSTER(
         text = "foerster",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.HOLZ to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
     BOHRTURM(
         text = "bohrturm",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.ROHOEL to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
     RAFFINERIE(
         text = "raffinerie",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.DIESEL to 2, Rohstoff.SCHWEROEL to 1),
         verbrauch = rohstoffe(Rohstoff.ROHOEL to 2),
         produktionsArt = ProduktionsArt.VERARBEITUNG,
@@ -116,7 +116,7 @@ enum class BauteilTyp(
     SYNTHETIK_RAFFINERIE(
         text = "synthetik raffinerie",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.DIESEL to 2, Rohstoff.SCHWEROEL to 1),
         verbrauch = rohstoffe(Rohstoff.KOHLE to 3),
         produktionsArt = ProduktionsArt.VERARBEITUNG,
@@ -124,14 +124,14 @@ enum class BauteilTyp(
     KOHLEMINE(
         text = "kohlemine",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.KOHLE to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
     STAHLFABRIK(
         text = "stahlfabrik",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.STAHL to 2),
         verbrauch = rohstoffe(Rohstoff.EISEN to 1, Rohstoff.KOHLE to 1),
         produktionsArt = ProduktionsArt.VERARBEITUNG,
@@ -139,7 +139,7 @@ enum class BauteilTyp(
     EISENMINE(
         text = "eisenmine",
         art = BauteilArt.WIRTSCHAFTSREGION,
-        kosten = emptyMap(),
+        kosten = wirtschaftsstandortBaukosten(),
         ertrag = rohstoffe(Rohstoff.EISEN to 1),
         produktionsArt = ProduktionsArt.ABBAU,
     ),
@@ -147,7 +147,12 @@ enum class BauteilTyp(
 
 /** Bauteile, die in Runde 0 genau einer Ecke, Kante oder einem Dreieck zugeordnet werden. */
 val BauteilTyp.istInRundeNullPlatzierbar: Boolean
-    get() = this != BauteilTyp.FRACHTSCHIFF
+    get() = this != BauteilTyp.FRACHTSCHIFF &&
+        this != BauteilTyp.GROSSBAHNHOF &&
+        this != BauteilTyp.GROSSHAFEN
+
+private fun wirtschaftsstandortBaukosten(): Map<Rohstoff, Int> =
+    rohstoffe(Rohstoff.HOLZ to 3, Rohstoff.ZIEGEL to 2)
 
 fun rohstoffe(vararg mengen: Pair<Rohstoff, Int>): Map<Rohstoff, Int> {
     return mengen.toMap().filterValues { it != 0 }

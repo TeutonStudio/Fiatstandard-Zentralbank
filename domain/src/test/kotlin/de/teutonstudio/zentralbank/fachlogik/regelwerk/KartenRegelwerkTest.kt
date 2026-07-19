@@ -608,6 +608,27 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun wirtschaftsstandortBuchtBeimBauDreiHolzUndZweiZiegel() {
+        val feld = KartenFeld(2, 2, DreieckHaelfte.UNTEN)
+        val anlagen = listOf(
+            FeldAnlage.Geschaeftsbank,
+            FeldAnlage.Wirtschaftsregion(BauteilTyp.RAFFINERIE),
+        )
+
+        anlagen.forEach { anlage ->
+            val danach = SpielRegelwerk.wendeAn(
+                zustand(),
+                SpielEreignis.NeutraleAnlageErrichtet(anna, feld, anlage),
+            ).getOrThrow()
+
+            val rohstoffe = danach.spieler.first { it.id == anna }.rohstoffe
+            assertEquals(7, rohstoffe[Rohstoff.HOLZ])
+            assertEquals(8, rohstoffe[Rohstoff.ZIEGEL])
+            assertEquals(10, rohstoffe[Rohstoff.STAHL])
+        }
+    }
+
+    @Test
     fun kartenereignisIstRueckgaengigUndWiederholbar() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val start = zustand().mitHandelslinieZu(ecke)
@@ -624,17 +645,19 @@ class KartenRegelwerkTest {
     }
 
     @Test
-    fun grossbahnhofKannNurDurchAufwertungEntstehen() {
+    fun grossgebaeudeKoennenNurDurchAufwertungEntstehen() {
         val ecke = KartenFeld(2, 2, DreieckHaelfte.UNTEN).ecken().first()
         val start = zustand().mitHandelslinieZu(ecke)
 
-        val direktbau = SpielRegelwerk.wendeAn(
-            start,
-            SpielEreignis.EckGebaeudeGebaut(anna, ecke, EckGebaeudeTyp.GROSSBAHNHOF),
-        )
+        listOf(EckGebaeudeTyp.GROSSBAHNHOF, EckGebaeudeTyp.GROSSHAFEN).forEach { typ ->
+            val direktbau = SpielRegelwerk.wendeAn(
+                start,
+                SpielEreignis.EckGebaeudeGebaut(anna, ecke, typ),
+            )
 
-        assertTrue(direktbau.isFailure)
-        assertTrue(direktbau.exceptionOrNull()?.message.orEmpty().contains("Aufwertung"))
+            assertTrue(direktbau.isFailure)
+            assertTrue(direktbau.exceptionOrNull()?.message.orEmpty().contains("Aufwertung"))
+        }
     }
 
     @Test
@@ -672,6 +695,10 @@ class KartenRegelwerkTest {
         val bauteile = danach.spieler.first { it.id == anna }.bauteile
         assertEquals(null, bauteile[BauteilTyp.BAHNHOF])
         assertEquals(1, bauteile[BauteilTyp.GROSSBAHNHOF])
+        val rohstoffe = danach.spieler.first { it.id == anna }.rohstoffe
+        assertEquals(6, rohstoffe[Rohstoff.HOLZ])
+        assertEquals(7, rohstoffe[Rohstoff.ZIEGEL])
+        assertEquals(8, rohstoffe[Rohstoff.STAHL])
     }
 
     @Test

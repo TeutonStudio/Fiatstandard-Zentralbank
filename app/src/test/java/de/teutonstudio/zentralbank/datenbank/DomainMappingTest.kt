@@ -1,6 +1,8 @@
 package de.teutonstudio.zentralbank.datenbank
 
 import de.teutonstudio.zentralbank.daten.zuordnung.zuGeld
+import de.teutonstudio.zentralbank.daten.zuordnung.zuBauteilTyp
+import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
@@ -23,6 +25,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DomainMappingTest {
+    @Test
+    fun alteUndNeueBauteilmodelleVerwendenDieselbenBaukosten() {
+        Bauteil.entries.forEach { bauteil ->
+            val alteKosten = bauteil.kosten
+                .filterValues { menge -> menge != 0 }
+                .mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
+
+            assertEquals(bauteil.str, bauteil.zuBauteilTyp().kosten, alteKosten)
+        }
+    }
+
     @Test
     fun zahlungsmittelWirdAlsCentbasiertesDomainGeldAbgebildet() {
         assertEquals(Geld.cent(12_300), 123.toZahlungsmittel().zuGeld())
