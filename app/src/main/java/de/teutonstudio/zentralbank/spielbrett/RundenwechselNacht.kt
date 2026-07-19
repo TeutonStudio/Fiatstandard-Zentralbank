@@ -36,8 +36,11 @@ fun RundenwechselNacht(
     val fortschritt = remember(zustand.rundenzähler) { Animatable(0f) }
     val aktuellerAbschluss by rememberUpdatedState(beiAbgeschlossen)
     val karte = zustand.karte
-    val modell = remember(karte, zustand.spieler) {
-        karte?.zu3DModell(spielerReihenfolge = zustand.spieler.map { it.id })
+    val modell = remember(karte, zustand.spieler, zustand.konflikte) {
+        karte?.zu3DModell(
+            spielerReihenfolge = zustand.spieler.map { it.id },
+            konflikte = zustand.konflikte,
+        )
     }
     val betrachtungsStatus = rememberBetrachtungsTransformationsStatus(
         BetrachtungsTransformation(

@@ -75,6 +75,12 @@ Aus der Anleitung ergeben sich folgende feste Anforderungen:
   Dreieckskante. Panzer werden auf eigenen Handelslinien und Kriegsschiffe an
   eigenen Häfen gebaut; fremd kontrollierte Handelslinien sind für Truppen nur
   während eines Krieges befahrbar.
+- Ein Wirtschaftsstandort erzeugt nur dann Ertrag oder Verarbeitungskapazität,
+  wenn eine durchgehende Route über intakte Schienen und eigene, passend
+  gerichtete Frachtschiffe bis zum eigenen intakten Hauptbahnhof besteht. Im
+  Krieg sperren gegnerische Panzer ihre Handelslinienkante und Kriegsschiffe die
+  über ihre Kante verlaufenden Frachtschiffrouten; vorhandene Alternativrouten
+  bleiben nutzbar.
 - Nach erfolgreicher Belagerung werden Eckgebäude zu einer zerstörten neutralen
   Variante.
 
@@ -434,6 +440,8 @@ der Kartenansicht erkennbar.
 ### Etappe 6 – Regelableitungen und Sonderobjekte
 
 - [x] Ertrag und Kontrolle aus der tatsächlichen Nachbarschaft auswerten.
+- [x] Ertrags- und Verarbeitungswege bis zum Hauptbahnhof suchen sowie
+  kriegsabhängige Blockaden mit Alternativrouten auswerten.
 - [x] Verlassene neutrale Anlagen ableiten.
 - [x] Hafenverbindungen und Frachtschiffe als Seewege modellieren.
 - [x] Temporäre Panzer und Kriegsschiffe an den Konfliktzustand anbinden.
@@ -457,6 +465,10 @@ maßgebliche Quelle und benötigen keine manuell parallel gepflegten Bauteilmeng
   Verbot einer Schienenkreuzung ohne Bahnhof.
 - Routenkontrolle, neutrale Routen und Abrissrechte für gleiche, verschiedene
   und nur einen Bauwerk-Endpunkt.
+- Gemischte Transportwege über Schienen und Frachtschiffe zum Hauptbahnhof,
+  gerichtete Frachtschiffe sowie Panzer- und Kriegsschiffblockaden im Krieg.
+- Alternative Transportwege halten einen Wirtschaftsstandort trotz Blockade
+  aktiv; eine vollständige Blockade verhindert die Ertragsbuchung im Prozug.
 - Ausschluss doppelter oder ortsfremder Belegung.
 - Runde-0-Abstand der Hauptbahnhöfe.
 - erlaubte und verbotene Aufwertungen.

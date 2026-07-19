@@ -13,6 +13,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
@@ -62,6 +63,7 @@ fun Spielkarte.zu3DModell(
     spielerReihenfolge: List<SpielerId> = emptyList(),
     hervorhebung: KartenOrt? = null,
     routenHervorhebung: Set<KartenKante> = emptySet(),
+    konflikte: Set<Konflikt> = emptySet(),
 ): Spielbrett3DModell {
     val farben = spielerReihenfolge.mapIndexed { index, spieler ->
         spieler to SpielerPalette.getOrElse(index) { Color(0xFF707070) }
@@ -232,8 +234,12 @@ fun Spielkarte.zu3DModell(
             )
         },
         feldObjekte = belegung.felder.map { eintrag ->
-            val effektiv = KartenAuswertung.effektiverZustand(this, eintrag)
-            val angeschlosseneSpieler = KartenAuswertung.anschlussStaerke(this, eintrag.position)
+            val effektiv = KartenAuswertung.effektiverZustand(this, eintrag, konflikte)
+            val angeschlosseneSpieler = KartenAuswertung.anschlussStaerke(
+                this,
+                eintrag.position,
+                konflikte,
+            )
                 .keys
                 .mapTo(mutableSetOf(), SpielerId::wert)
             val zustand = when (effektiv) {

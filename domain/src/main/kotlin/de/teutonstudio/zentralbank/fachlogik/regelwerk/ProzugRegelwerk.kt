@@ -25,7 +25,7 @@ internal object ProzugRegelwerk {
         }
         val karte = zustand.karte
         val abbauErtraege = karte?.let {
-            KartenAuswertung.abbauErtrag(it, zug.spieler)
+            KartenAuswertung.abbauErtrag(it, zug.spieler, zustand.konflikte)
         }.orEmpty()
         val verwaltung = karte?.let {
             KartenAuswertung.verwaltungsStandorte(it, zug.spieler)
@@ -70,7 +70,11 @@ internal object ProzugRegelwerk {
         val zug = pruefeProzug(zustand, ereignis.zugId)
         require(ereignis.laeufe > 0) { "Die Zahl der Verarbeitungsläufe muss positiv sein." }
         val karte = requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }
-        val standort = KartenAuswertung.verarbeitungsStandorte(karte, zug.spieler)
+        val standort = KartenAuswertung.verarbeitungsStandorte(
+            karte,
+            zug.spieler,
+            zustand.konflikte,
+        )
             .firstOrNull { it.feld == ereignis.feld }
             ?: error("Der Verarbeitungsstandort ist für den aktiven Spieler nicht nutzbar.")
         val id = ProduktionsStandortId(ereignis.feld)

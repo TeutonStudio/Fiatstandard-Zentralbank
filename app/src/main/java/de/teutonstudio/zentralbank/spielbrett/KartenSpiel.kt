@@ -538,6 +538,7 @@ fun KartenSpielBildschirm(
                             spielerReihenfolge = zustand.spieler.map { it.id },
                             hervorhebung = ausgewaehltesZiel ?: seewegStart ?: truppenStart,
                             routenHervorhebung = hervorgehobeneRoute,
+                            konflikte = zustand.konflikte,
                         ),
                         modifier = Modifier.fillMaxSize(),
                         betrachtungsStatus = betrachtungsStatus,

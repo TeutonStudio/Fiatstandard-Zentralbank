@@ -63,7 +63,13 @@ object ProzugAuswertung {
             Geld.NULL
         }
         val produktionsStandorte = zustand.karte
-            ?.let { karte -> KartenAuswertung.verarbeitungsStandorte(karte, zug.spieler) }
+            ?.let { karte ->
+                KartenAuswertung.verarbeitungsStandorte(
+                    karte,
+                    zug.spieler,
+                    zustand.konflikte,
+                )
+            }
             .orEmpty()
             .map { standort ->
                 val id = ProduktionsStandortId(standort.feld)

@@ -17,7 +17,12 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
+import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
 import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.ProzugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
@@ -52,6 +57,33 @@ class SpielRegelwerkTest {
         assertEquals(2, begonnen.spieler.first().rohstoffe[Rohstoff.NAHRUNG])
         assertTrue(doppelt.isFailure)
         assertEquals(2, begonnen.spieler.first().rohstoffe[Rohstoff.NAHRUNG])
+    }
+
+    @Test
+    fun blockierteHandelslinieVerhindertAbbauImProzug() {
+        val grundkarte = karte(FeldAnlage.Abbaueinheit(Rohstoff.NAHRUNG))
+        val blockierteLinie = KartenKante.zwischen(feld.ecken().last(), kante.anfang)
+        val blockierteKarte = grundkarte.copy(
+            belegung = grundkarte.belegung.copy(
+                kanten = listOf(KantenBelegung(blockierteLinie)),
+                kriegseinheiten = listOf(
+                    KriegsEinheitBelegung(
+                        id = "panzer-bert-blockade",
+                        typ = KriegsEinheitTyp.PANZER,
+                        besitzer = bert,
+                        ort = KartenOrt.Kante(blockierteLinie),
+                    ),
+                ),
+            ),
+        )
+        val start = zustand(karte = blockierteKarte).copy(
+            konflikte = setOf(Konflikt(anna, bert)),
+        )
+
+        val begonnen = anwenden(start, SpielEreignis.ProzugBegonnen(1L))
+
+        assertTrue(begonnen.spieler.first { it.id == anna }.rohstoffe.isEmpty())
+        assertTrue(begonnen.zugStatus!!.prozug.abbauErtraege.isEmpty())
     }
 
     @Test
@@ -303,7 +335,13 @@ class SpielRegelwerkTest {
     )
 
     private fun karte(anlage: FeldAnlage): Spielkarte {
-        val land = angrenzendeFelder(kante).map { GelaendeFeld(it, GelaendeTyp.EBENE) }
+        val verbindungsKante = KartenKante.zwischen(
+            feld.ecken().last(),
+            kante.anfang,
+        )
+        val land = (angrenzendeFelder(kante) + angrenzendeFelder(verbindungsKante))
+            .distinct()
+            .map { GelaendeFeld(it, GelaendeTyp.EBENE) }
         return Spielkarte(
             id = "prozug-test",
             name = "Prozug-Test",
@@ -314,7 +352,7 @@ class SpielRegelwerkTest {
                     EckBelegung(kante.anfang, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
                     EckBelegung(feld.ecken().last(), EckGebaeudeTyp.BAHNHOF, anna),
                 ),
-                kanten = listOf(KantenBelegung(kante)),
+                kanten = listOf(KantenBelegung(kante), KantenBelegung(verbindungsKante)),
                 felder = listOf(FeldBelegung(feld, anlage)),
             ),
         )

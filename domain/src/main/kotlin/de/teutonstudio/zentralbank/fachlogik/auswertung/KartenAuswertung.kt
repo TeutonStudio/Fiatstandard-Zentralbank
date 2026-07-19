@@ -2,14 +2,18 @@ package de.teutonstudio.zentralbank.fachlogik.auswertung
 
 import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
@@ -17,6 +21,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ProduktionsArt
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
+import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
+import java.util.ArrayDeque
 
 data class VerarbeitungsStandort(
     val feld: KartenFeld,
@@ -32,6 +38,26 @@ data class VerwaltungsStandort(
     val bedarf: Map<Rohstoff, Int>,
 )
 
+sealed interface TransportAbschnitt {
+    data class Handelslinie(val kante: KartenKante) : TransportAbschnitt
+
+    data class Frachtschiff(
+        val seewegId: String,
+        val von: KartenEcke,
+        val nach: KartenEcke,
+        val wasserweg: List<KartenKante>,
+    ) : TransportAbschnitt
+}
+
+data class TransportWeg(
+    val spieler: SpielerId,
+    val feld: KartenFeld,
+    val start: KartenEcke,
+    val hauptbahnhof: KartenEcke,
+    val anschlussStaerke: Int,
+    val abschnitte: List<TransportAbschnitt>,
+)
+
 object KartenAuswertung {
     fun istHafenstandort(karte: Spielkarte, ecke: KartenEcke): Boolean {
         val nachbarn = angrenzendeFelder(ecke)
@@ -43,48 +69,44 @@ object KartenAuswertung {
     fun anschlussStaerke(
         karte: Spielkarte,
         feld: KartenFeld,
-    ): Map<SpielerId, Int> {
-        if (feld !in karte.landNachPosition) return emptyMap()
-        val staerken = mutableMapOf<SpielerId, Int>()
-        feld.kanten().forEach { kante ->
-            karte.belegung.kantenNachPosition[kante]
-                ?.takeIf { it.zustand == BauwerkZustand.INTAKT }
-                ?.let { schiene ->
-                    verbundeneSpieler(karte, schiene.position).forEach { spieler ->
-                        staerken[spieler] = maxOf(staerken[spieler] ?: 0, 1)
-                    }
-                }
+        konflikte: Set<Konflikt> = emptySet(),
+    ): Map<SpielerId, Int> = karte.belegung.ecken
+        .asSequence()
+        .filter { belegung ->
+            belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF &&
+                belegung.zustand == BauwerkZustand.INTAKT
         }
-        feld.ecken().forEach { ecke ->
-            karte.belegung.eckenNachPosition[ecke]
-                ?.takeIf { it.zustand == BauwerkZustand.INTAKT }
-                ?.let { gebaeude ->
-                    val besitzer = gebaeude.besitzer ?: return@let
-                    val staerke = when (gebaeude.typ) {
-                        EckGebaeudeTyp.GROSSBAHNHOF, EckGebaeudeTyp.GROSSHAFEN -> 3
-                        EckGebaeudeTyp.BAHNHOF, EckGebaeudeTyp.HAFEN -> 2
-                        EckGebaeudeTyp.HAUPTBAHNHOF -> 0
-                    }
-                    staerken[besitzer] = maxOf(staerken[besitzer] ?: 0, staerke)
-                }
+        .mapNotNull { belegung -> belegung.besitzer }
+        .distinct()
+        .mapNotNull { spieler ->
+            transportWeg(karte, feld, spieler, konflikte)
+                ?.let { weg -> spieler to weg.anschlussStaerke }
         }
-        return staerken.filterValues { it > 0 }
-    }
+        .toMap()
 
-    fun effektiverZustand(karte: Spielkarte, belegung: FeldBelegung): AnlagenZustand = when {
+    fun effektiverZustand(
+        karte: Spielkarte,
+        belegung: FeldBelegung,
+        konflikte: Set<Konflikt> = emptySet(),
+    ): AnlagenZustand = when {
         belegung.zustand == AnlagenZustand.ZERSTOERT -> AnlagenZustand.ZERSTOERT
-        anschlussStaerke(karte, belegung.position).isEmpty() -> AnlagenZustand.VERLASSEN
+        anschlussStaerke(karte, belegung.position, konflikte).isEmpty() ->
+            AnlagenZustand.VERLASSEN
         else -> AnlagenZustand.AKTIV
     }
 
-    fun ertrag(karte: Spielkarte, feld: KartenFeld): Map<SpielerId, Int> {
+    fun ertrag(
+        karte: Spielkarte,
+        feld: KartenFeld,
+        konflikte: Set<Konflikt> = emptySet(),
+    ): Map<SpielerId, Int> {
         val belegung = karte.belegung.felderNachPosition[feld] ?: return emptyMap()
         val istGeschaeftsbank = belegung.anlage == FeldAnlage.Geschaeftsbank ||
             (belegung.anlage as? FeldAnlage.Wirtschaftsregion)?.bauteil ==
             BauteilTyp.GESCHAEFTSBANK
         if (istGeschaeftsbank) return emptyMap()
-        return if (effektiverZustand(karte, belegung) == AnlagenZustand.AKTIV) {
-            anschlussStaerke(karte, feld)
+        return if (effektiverZustand(karte, belegung, konflikte) == AnlagenZustand.AKTIV) {
+            anschlussStaerke(karte, feld, konflikte)
         } else {
             emptyMap()
         }
@@ -93,9 +115,11 @@ object KartenAuswertung {
     fun abbauErtrag(
         karte: Spielkarte,
         spieler: SpielerId,
+        konflikte: Set<Konflikt> = emptySet(),
     ): Map<Rohstoff, Int> = karte.belegung.felder
         .flatMap { belegung ->
-            val menge = ertrag(karte, belegung.position)[spieler] ?: return@flatMap emptyList()
+            val menge = ertrag(karte, belegung.position, konflikte)[spieler]
+                ?: return@flatMap emptyList()
             when (val anlage = belegung.anlage) {
                 is FeldAnlage.Abbaueinheit -> mapOf(anlage.rohstoff to 1)
                 is FeldAnlage.Wirtschaftsregion -> if (
@@ -114,12 +138,14 @@ object KartenAuswertung {
     fun verarbeitungsStandorte(
         karte: Spielkarte,
         spieler: SpielerId,
+        konflikte: Set<Konflikt> = emptySet(),
     ): List<VerarbeitungsStandort> = karte.belegung.felder.mapNotNull { belegung ->
         val wirtschaft = belegung.anlage as? FeldAnlage.Wirtschaftsregion
             ?: return@mapNotNull null
         val typ = wirtschaft.bauteil
         if (typ.produktionsArt != ProduktionsArt.VERARBEITUNG) return@mapNotNull null
-        val kapazitaet = ertrag(karte, belegung.position)[spieler] ?: return@mapNotNull null
+        val kapazitaet = ertrag(karte, belegung.position, konflikte)[spieler]
+            ?: return@mapNotNull null
         VerarbeitungsStandort(
             feld = belegung.position,
             typ = typ,
@@ -177,11 +203,92 @@ object KartenAuswertung {
         karte: Spielkarte,
         feld: KartenFeld,
         spieler: SpielerId,
+        konflikte: Set<Konflikt> = emptySet(),
     ): Boolean {
         val belegung = karte.belegung.felderNachPosition[feld] ?: return false
         return belegung.anlage == FeldAnlage.Geschaeftsbank &&
-            effektiverZustand(karte, belegung) == AnlagenZustand.AKTIV &&
-            spieler in anschlussStaerke(karte, feld)
+            effektiverZustand(karte, belegung, konflikte) == AnlagenZustand.AKTIV &&
+            spieler in anschlussStaerke(karte, feld, konflikte)
+    }
+
+    fun transportWeg(
+        karte: Spielkarte,
+        feld: KartenFeld,
+        spieler: SpielerId,
+        konflikte: Set<Konflikt> = emptySet(),
+    ): TransportWeg? {
+        if (feld !in karte.landNachPosition) return null
+        val hauptbahnhof = karte.belegung.ecken.firstOrNull { belegung ->
+            belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF &&
+                belegung.besitzer == spieler &&
+                belegung.zustand == BauwerkZustand.INTAKT
+        }?.position ?: return null
+        val blockierteGleise = blockierteKanten(
+            karte = karte,
+            spieler = spieler,
+            konflikte = konflikte,
+            typ = KriegsEinheitTyp.PANZER,
+        )
+        val blockierteSeeKanten = blockierteKanten(
+            karte = karte,
+            spieler = spieler,
+            konflikte = konflikte,
+            typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+        )
+        val befahrbareGleise = karte.belegung.kanten
+            .asSequence()
+            .filter { gleis ->
+                gleis.zustand == BauwerkZustand.INTAKT &&
+                    gleis.position !in blockierteGleise
+            }
+            .mapTo(mutableSetOf(), KantenBelegung::position)
+        val graph = transportGraph(
+            karte = karte,
+            spieler = spieler,
+            befahrbareGleise = befahrbareGleise,
+            blockierteSeeKanten = blockierteSeeKanten,
+        )
+        val anschluesse = buildList {
+            feld.ecken().forEach { ecke ->
+                karte.belegung.eckenNachPosition[ecke]
+                    ?.takeIf { gebaeude ->
+                        gebaeude.besitzer == spieler &&
+                            gebaeude.zustand == BauwerkZustand.INTAKT
+                    }
+                    ?.anschlussStaerke()
+                    ?.takeIf { staerke -> staerke > 0 }
+                    ?.let { staerke -> add(TransportAnschluss(ecke, staerke, emptyList())) }
+            }
+            feld.kanten()
+                .filter { kante -> kante in befahrbareGleise }
+                .forEach { kante ->
+                    val vorlauf = listOf(TransportAbschnitt.Handelslinie(kante))
+                    add(TransportAnschluss(kante.anfang, 1, vorlauf))
+                    add(TransportAnschluss(kante.ende, 1, vorlauf))
+                }
+        }
+        anschluesse.map(TransportAnschluss::staerke)
+            .distinct()
+            .sortedDescending()
+            .forEach { staerke ->
+                findeTransportWeg(
+                    graph = graph,
+                    anschluesse = anschluesse.filter { anschluss ->
+                        anschluss.staerke == staerke
+                    },
+                    hauptbahnhof = hauptbahnhof,
+                )?.let { (start, abschnitte) ->
+                    return TransportWeg(
+                        spieler = spieler,
+                        feld = feld,
+                        start = start,
+                        hauptbahnhof = hauptbahnhof,
+                        anschlussStaerke = staerke,
+                        abschnitte = abschnitte,
+                    )
+                }
+            }
+        return null
     }
 
     fun mitHauptbahnhofVerbundeneSchienen(
@@ -216,6 +323,148 @@ object KartenAuswertung {
         karte: Spielkarte,
         kante: KartenKante,
     ): Set<SpielerId> = verbundeneSpieler(karte, kante)
+
+    private fun blockierteKanten(
+        karte: Spielkarte,
+        spieler: SpielerId,
+        konflikte: Set<Konflikt>,
+        typ: KriegsEinheitTyp,
+    ): Set<KartenKante> = karte.belegung.kriegseinheiten
+        .asSequence()
+        .filter { einheit ->
+            einheit.typ == typ &&
+                einheit.besitzer != spieler &&
+                konflikte.any { konflikt -> konflikt.betrifft(spieler, einheit.besitzer) }
+        }
+        .mapTo(mutableSetOf()) { einheit -> einheit.position }
+
+    private fun transportGraph(
+        karte: Spielkarte,
+        spieler: SpielerId,
+        befahrbareGleise: Set<KartenKante>,
+        blockierteSeeKanten: Set<KartenKante>,
+    ): Map<KartenEcke, List<TransportSchritt>> {
+        val graph = mutableMapOf<KartenEcke, MutableList<TransportSchritt>>()
+        fun verbinden(
+            a: KartenEcke,
+            b: KartenEcke,
+            vonANachB: TransportAbschnitt,
+            vonBNachA: TransportAbschnitt,
+        ) {
+            graph.getOrPut(a) { mutableListOf() }.add(TransportSchritt(b, vonANachB))
+            graph.getOrPut(b) { mutableListOf() }.add(TransportSchritt(a, vonBNachA))
+        }
+
+        befahrbareGleise.sortedWith(kartenKantenVergleich).forEach { kante ->
+            val abschnitt = TransportAbschnitt.Handelslinie(kante)
+            verbinden(kante.anfang, kante.ende, abschnitt, abschnitt)
+        }
+        karte.belegung.seewege
+            .asSequence()
+            .filter { seeweg -> seeweg.besitzer == spieler }
+            .sortedBy { seeweg -> seeweg.id }
+            .forEach { seeweg ->
+                val wasserweg = karte.kuerzesterWasserweg(seeweg.hafenA, seeweg.hafenB)
+                    ?: return@forEach
+                if (wasserweg.any { kante -> kante in blockierteSeeKanten }) return@forEach
+                val (von, nach, gerichteterWasserweg) = when (seeweg.richtung) {
+                    FrachtRichtung.A_NACH_B -> Triple(
+                        seeweg.hafenA,
+                        seeweg.hafenB,
+                        wasserweg,
+                    )
+                    FrachtRichtung.B_NACH_A -> Triple(
+                        seeweg.hafenB,
+                        seeweg.hafenA,
+                        wasserweg.asReversed(),
+                    )
+                }
+                graph.getOrPut(von) { mutableListOf() }.add(
+                    TransportSchritt(
+                        ziel = nach,
+                        abschnitt = TransportAbschnitt.Frachtschiff(
+                            seewegId = seeweg.id,
+                            von = von,
+                            nach = nach,
+                            wasserweg = gerichteterWasserweg,
+                        ),
+                    ),
+                )
+            }
+        return graph.mapValues { (_, schritte) ->
+            schritte.sortedWith(
+                compareBy<TransportSchritt> { schritt -> schritt.ziel }
+                    .thenBy { schritt -> schritt.abschnitt.sortierSchluessel() },
+            )
+        }
+    }
+
+    private fun findeTransportWeg(
+        graph: Map<KartenEcke, List<TransportSchritt>>,
+        anschluesse: List<TransportAnschluss>,
+        hauptbahnhof: KartenEcke,
+    ): Pair<KartenEcke, List<TransportAbschnitt>>? {
+        val starts = anschluesse
+            .sortedWith(
+                compareBy<TransportAnschluss> { anschluss -> anschluss.ecke }
+                    .thenBy { anschluss -> anschluss.vorlauf.joinToString { it.sortierSchluessel() } },
+            )
+            .distinctBy(TransportAnschluss::ecke)
+        val startNachEcke = starts.associateBy(TransportAnschluss::ecke)
+        startNachEcke[hauptbahnhof]?.let { start ->
+            return start.ecke to start.vorlauf
+        }
+        val besucht = startNachEcke.keys.toMutableSet()
+        val offen = ArrayDeque<KartenEcke>()
+        starts.forEach { start -> offen.add(start.ecke) }
+        val vorgaenger = mutableMapOf<KartenEcke, Pair<KartenEcke, TransportAbschnitt>>()
+        while (offen.isNotEmpty()) {
+            val aktuell = offen.removeFirst()
+            graph[aktuell].orEmpty().forEach { schritt ->
+                if (!besucht.add(schritt.ziel)) return@forEach
+                vorgaenger[schritt.ziel] = aktuell to schritt.abschnitt
+                if (schritt.ziel == hauptbahnhof) {
+                    val rueckwaerts = mutableListOf<TransportAbschnitt>()
+                    var ecke = hauptbahnhof
+                    while (ecke !in startNachEcke) {
+                        val (vorher, abschnitt) = vorgaenger.getValue(ecke)
+                        rueckwaerts += abschnitt
+                        ecke = vorher
+                    }
+                    val start = startNachEcke.getValue(ecke)
+                    return start.ecke to (start.vorlauf + rueckwaerts.asReversed())
+                }
+                offen.add(schritt.ziel)
+            }
+        }
+        return null
+    }
+
+    private fun EckBelegung.anschlussStaerke(): Int = when (typ) {
+        EckGebaeudeTyp.GROSSBAHNHOF, EckGebaeudeTyp.GROSSHAFEN -> 3
+        EckGebaeudeTyp.BAHNHOF, EckGebaeudeTyp.HAFEN -> 2
+        EckGebaeudeTyp.HAUPTBAHNHOF -> 0
+    }
+
+    private fun TransportAbschnitt.sortierSchluessel(): String = when (this) {
+        is TransportAbschnitt.Handelslinie ->
+            "gleis:${kante.anfang.x}:${kante.anfang.y}:${kante.ende.x}:${kante.ende.y}"
+        is TransportAbschnitt.Frachtschiff -> "seeweg:$seewegId:${von.x}:${von.y}:${nach.x}:${nach.y}"
+    }
+
+    private data class TransportAnschluss(
+        val ecke: KartenEcke,
+        val staerke: Int,
+        val vorlauf: List<TransportAbschnitt>,
+    )
+
+    private data class TransportSchritt(
+        val ziel: KartenEcke,
+        val abschnitt: TransportAbschnitt,
+    )
+
+    private val kartenKantenVergleich = compareBy<KartenKante> { kante -> kante.anfang }
+        .thenBy { kante -> kante.ende }
 
     private fun routenEndpunkte(
         karte: Spielkarte,

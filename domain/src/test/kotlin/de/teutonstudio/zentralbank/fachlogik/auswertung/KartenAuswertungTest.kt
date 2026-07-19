@@ -6,6 +6,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
@@ -15,12 +16,20 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
+import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SeewegBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
+import de.teutonstudio.zentralbank.fachlogik.modell.benachbarteEcken
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
+import de.teutonstudio.zentralbank.fachlogik.modell.wasserKanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -32,7 +41,11 @@ class KartenAuswertungTest {
     private val bert = SpielerId("bert")
     private val feld = KartenFeld(2, 2, DreieckHaelfte.UNTEN)
     private val kante = feld.kanten().first()
-    private val land = angrenzendeFelder(kante).map { GelaendeFeld(it, GelaendeTyp.EBENE) }
+    private val verbindungsKante = KartenKante.zwischen(feld.ecken().last(), kante.anfang)
+    private val land = feld.kanten()
+        .flatMap(::angrenzendeFelder)
+        .distinct()
+        .map { GelaendeFeld(it, GelaendeTyp.EBENE) }
 
     @Test
     fun besteAnschlussartBestimmtErtrag() {
@@ -40,7 +53,7 @@ class KartenAuswertungTest {
             ecken = listOf(
                 EckBelegung(feld.ecken().last(), EckGebaeudeTyp.GROSSBAHNHOF, anna),
             ),
-            kanten = listOf(KantenBelegung(kante)),
+            kanten = listOf(KantenBelegung(verbindungsKante)),
         )
 
         assertEquals(mapOf(anna to 3), KartenAuswertung.ertrag(karte, feld))
@@ -67,6 +80,7 @@ class KartenAuswertungTest {
         staerken.forEach { (typ, staerke) ->
             val karte = karte(
                 ecken = listOf(EckBelegung(feld.ecken().last(), typ, anna)),
+                kanten = listOf(KantenBelegung(verbindungsKante)),
             )
 
             assertEquals(typ.name, mapOf(anna to staerke), KartenAuswertung.ertrag(karte, feld))
@@ -85,6 +99,145 @@ class KartenAuswertungTest {
 
         assertEquals(AnlagenZustand.VERLASSEN, KartenAuswertung.effektiverZustand(karte, belegung))
         assertTrue(KartenAuswertung.ertrag(karte, feld).isEmpty())
+    }
+
+    @Test
+    fun panzerBlockiertNurOhneAlternativeRouteDenTransportZumHauptbahnhof() {
+        val (a, b, hauptbahnhof) = feld.ecken()
+        val zubringer = KartenKante.zwischen(a, b)
+        val blockierteLinie = KartenKante.zwischen(b, hauptbahnhof)
+        val alternativeLinie = KartenKante.zwischen(a, hauptbahnhof)
+        val panzer = KriegsEinheitBelegung(
+            id = "panzer-bert-1",
+            typ = KriegsEinheitTyp.PANZER,
+            besitzer = bert,
+            ort = KartenOrt.Kante(blockierteLinie),
+        )
+        val konflikt = setOf(Konflikt(anna, bert))
+        val direkterWeg = transportKarte(
+            hauptbahnhof = hauptbahnhof,
+            gleise = listOf(zubringer, blockierteLinie),
+            kriegseinheiten = listOf(panzer),
+        )
+        val mitAlternative = transportKarte(
+            hauptbahnhof = hauptbahnhof,
+            gleise = listOf(zubringer, blockierteLinie, alternativeLinie),
+            kriegseinheiten = listOf(panzer),
+        )
+
+        assertEquals(mapOf(anna to 1), KartenAuswertung.ertrag(direkterWeg, feld))
+        assertTrue(KartenAuswertung.ertrag(direkterWeg, feld, konflikt).isEmpty())
+        val umleitung = requireNotNull(
+            KartenAuswertung.transportWeg(mitAlternative, feld, anna, konflikt),
+        )
+        assertEquals(1, umleitung.anschlussStaerke)
+        assertTrue(
+            umleitung.abschnitte.none { abschnitt ->
+                abschnitt == TransportAbschnitt.Handelslinie(blockierteLinie)
+            },
+        )
+        assertEquals(mapOf(anna to 1), KartenAuswertung.ertrag(mitAlternative, feld, konflikt))
+    }
+
+    @Test
+    fun frachtschiffVerbindetInselstandortUndWirdImKriegAufSeinerRouteBlockiert() {
+        val wasserkarte = Spielkarte(
+            id = "wasser-grundlage",
+            name = "Wasser-Grundlage",
+            hexagon = KartenHexagon(radius = 5),
+        )
+        fun landGleisGegenueber(
+            hafen: KartenEcke,
+            andererHafen: KartenEcke,
+            seeNachbarn: Set<KartenFeld>,
+        ): KartenKante? = benachbarteEcken(hafen)
+            .asSequence()
+            .filter { ecke -> ecke != andererHafen }
+            .map { ecke -> KartenKante.zwischen(hafen, ecke) }
+            .firstOrNull { kandidat ->
+                val nachbarn = angrenzendeFelder(kandidat)
+                nachbarn.all(wasserkarte::enthaeltFeld) &&
+                    nachbarn.none { feld -> feld in seeNachbarn }
+            }
+        val (seeKante, hafenA, hafenB) = wasserkarte.wasserKanten()
+            .asSequence()
+            .flatMap { kante ->
+                sequenceOf(
+                    Triple(kante, kante.anfang, kante.ende),
+                    Triple(kante, kante.ende, kante.anfang),
+                )
+            }
+            .first { (kante, start, ziel) ->
+                val seeNachbarn = angrenzendeFelder(kante).toSet()
+                angrenzendeFelder(start).any { feld ->
+                    wasserkarte.enthaeltFeld(feld) && feld !in seeNachbarn
+                } && landGleisGegenueber(ziel, start, seeNachbarn) != null
+            }
+        val seeNachbarn = angrenzendeFelder(seeKante).toSet()
+        val quellFeld = angrenzendeFelder(hafenA).first { kandidat ->
+            wasserkarte.enthaeltFeld(kandidat) && kandidat !in seeNachbarn
+        }
+        val festlandGleis = requireNotNull(
+            landGleisGegenueber(hafenB, hafenA, seeNachbarn),
+        )
+        val hauptbahnhof = if (festlandGleis.anfang == hafenB) {
+            festlandGleis.ende
+        } else {
+            festlandGleis.anfang
+        }
+        val land = (listOf(quellFeld) + angrenzendeFelder(festlandGleis))
+            .distinct()
+            .map { GelaendeFeld(it, GelaendeTyp.EBENE) }
+        val schiff = SeewegBelegung(
+            id = "frachter-anna-1",
+            hafenA = hafenA,
+            hafenB = hafenB,
+            besitzer = anna,
+            richtung = FrachtRichtung.A_NACH_B,
+        )
+        val kriegsschiff = KriegsEinheitBelegung(
+            id = "kriegsschiff-bert-1",
+            typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+            besitzer = bert,
+            ort = KartenOrt.Kante(seeKante),
+        )
+        val karte = wasserkarte.copy(
+            gelaendefelder = land,
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(hafenA, EckGebaeudeTyp.HAFEN, anna),
+                    EckBelegung(hafenB, EckGebaeudeTyp.HAFEN, anna),
+                    EckBelegung(hauptbahnhof, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                ),
+                kanten = listOf(KantenBelegung(festlandGleis)),
+                felder = listOf(
+                    FeldBelegung(
+                        quellFeld,
+                        FeldAnlage.Wirtschaftsregion(BauteilTyp.VIEHHOF),
+                    ),
+                ),
+                seewege = listOf(schiff),
+                kriegseinheiten = listOf(kriegsschiff),
+            ),
+        )
+
+        val friedensWeg = requireNotNull(KartenAuswertung.transportWeg(karte, quellFeld, anna))
+        assertTrue(friedensWeg.abschnitte.any { it is TransportAbschnitt.Frachtschiff })
+        assertEquals(mapOf(anna to 2), KartenAuswertung.ertrag(karte, quellFeld))
+        val gegenDieFrachtrichtung = karte.copy(
+            belegung = karte.belegung.copy(
+                seewege = listOf(schiff.copy(richtung = FrachtRichtung.B_NACH_A)),
+                kriegseinheiten = emptyList(),
+            ),
+        )
+        assertNull(KartenAuswertung.transportWeg(gegenDieFrachtrichtung, quellFeld, anna))
+        assertTrue(
+            KartenAuswertung.ertrag(
+                karte,
+                quellFeld,
+                setOf(Konflikt(anna, bert)),
+            ).isEmpty(),
+        )
     }
 
     @Test
@@ -212,6 +365,33 @@ class KartenAuswertungTest {
             },
             kanten = kanten,
             felder = listOf(FeldBelegung(feld, anlage)),
+        ),
+    )
+
+    private fun transportKarte(
+        hauptbahnhof: KartenEcke,
+        gleise: List<KartenKante>,
+        kriegseinheiten: List<KriegsEinheitBelegung> = emptyList(),
+    ) = Spielkarte(
+        id = "transport-auswertung",
+        name = "Transport-Auswertung",
+        hexagon = KartenHexagon(radius = 8),
+        gelaendefelder = feld.kanten()
+            .flatMap(::angrenzendeFelder)
+            .distinct()
+            .map { GelaendeFeld(it, GelaendeTyp.EBENE) },
+        belegung = KartenBelegung(
+            ecken = listOf(
+                EckBelegung(hauptbahnhof, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+            ),
+            kanten = gleise.map(::KantenBelegung),
+            felder = listOf(
+                FeldBelegung(
+                    feld,
+                    FeldAnlage.Wirtschaftsregion(BauteilTyp.VIEHHOF),
+                ),
+            ),
+            kriegseinheiten = kriegseinheiten,
         ),
     )
 }
