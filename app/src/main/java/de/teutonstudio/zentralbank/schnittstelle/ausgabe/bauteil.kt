@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -152,16 +153,29 @@ fun zeigeBauteilPreis(
                     } else { Box(modifier = Modifier) }
                 }
             }
-            Text(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 5.dp)
-                    .wrapContentSize(Alignment.Center)
                     .gridItem(columnSpan = hAnzahl),
-                text = "${bauteil.str.replaceFirstChar{ it.uppercase() }}: ${bauteil.kosten.zuPreis(marktpreise).zuMark()}",
-                textAlign = TextAlign.Center,
-                fontSize = 25.sp,
-            )
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                bauteil.bauteilIconPfadOderNull()?.let { iconPfad ->
+                    Image(
+                        painter = painterResource(iconPfad),
+                        contentDescription = null,
+                        modifier = Modifier.size(44.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Text(
+                    text = "${bauteil.str.replaceFirstChar { it.uppercase() }}: " +
+                        bauteil.kosten.zuPreis(marktpreise).zuMark(),
+                    textAlign = TextAlign.Center,
+                    fontSize = 25.sp,
+                )
+            }
         }
     }
 }

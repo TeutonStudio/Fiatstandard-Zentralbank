@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.spielbrett
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -34,6 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
@@ -54,6 +58,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
+import de.teutonstudio.zentralbank.schnittstelle.ausgabe.bauteilIconPfadOderNull
 
 private enum class SpielKartenWerkzeug(
     val beschriftung: String,
@@ -1238,9 +1243,24 @@ private fun WerkzeugChips(
             FilterChip(
                 selected = ausgewaehlt == eintrag,
                 onClick = { beiWerkzeug(eintrag) },
+                leadingIcon = eintrag.startBauteil?.bauteilIconPfadOderNull()?.let { iconPfad ->
+                    {
+                        Image(
+                            painter = painterResource(iconPfad),
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
+                },
                 label = {
                     val menge = eintrag.startBauteil?.let { mengen[it] }
-                    Text(if (menge == null) eintrag.beschriftung else "${eintrag.beschriftung} · $menge")
+                    val beschriftung = if (menge == null) {
+                        eintrag.beschriftung
+                    } else {
+                        "${eintrag.beschriftung} · $menge"
+                    }
+                    Text(beschriftung)
                 },
             )
         }
