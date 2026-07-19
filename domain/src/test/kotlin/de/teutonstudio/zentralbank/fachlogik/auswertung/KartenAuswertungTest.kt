@@ -48,6 +48,37 @@ class KartenAuswertungTest {
     }
 
     @Test
+    fun gleisAnDerFeldkanteErzeugtEinfachenErtrag() {
+        val karte = karte(kanten = listOf(KantenBelegung(kante)))
+
+        assertEquals(mapOf(anna to 1), KartenAuswertung.ertrag(karte, feld))
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1), KartenAuswertung.abbauErtrag(karte, anna))
+    }
+
+    @Test
+    fun verwaltungsgebaeudeAnDerFeldeckeVervielfachenDenErtrag() {
+        val staerken = mapOf(
+            EckGebaeudeTyp.BAHNHOF to 2,
+            EckGebaeudeTyp.HAFEN to 2,
+            EckGebaeudeTyp.GROSSBAHNHOF to 3,
+            EckGebaeudeTyp.GROSSHAFEN to 3,
+        )
+
+        staerken.forEach { (typ, staerke) ->
+            val karte = karte(
+                ecken = listOf(EckBelegung(feld.ecken().last(), typ, anna)),
+            )
+
+            assertEquals(typ.name, mapOf(anna to staerke), KartenAuswertung.ertrag(karte, feld))
+            assertEquals(
+                typ.name,
+                mapOf(Rohstoff.NAHRUNG to staerke),
+                KartenAuswertung.abbauErtrag(karte, anna),
+            )
+        }
+    }
+
+    @Test
     fun anlageOhneAnschlussIstVerlassenUndErtraglos() {
         val karte = karte()
         val belegung = karte.belegung.felder.single()
@@ -80,6 +111,26 @@ class KartenAuswertungTest {
 
         assertFalse(KartenAuswertung.kontrolliertGeschaeftsbank(ohne, feld, anna))
         assertTrue(KartenAuswertung.kontrolliertGeschaeftsbank(mit, feld, anna))
+    }
+
+    @Test
+    fun geschaeftsbankErzeugtAuchMitGrossgebaeudeKeinenErtrag() {
+        val geschaeftsbanken = listOf(
+            FeldAnlage.Geschaeftsbank,
+            FeldAnlage.Wirtschaftsregion(BauteilTyp.GESCHAEFTSBANK),
+        )
+
+        geschaeftsbanken.forEach { geschaeftsbank ->
+            val karte = karte(
+                anlage = geschaeftsbank,
+                ecken = listOf(
+                    EckBelegung(feld.ecken().last(), EckGebaeudeTyp.GROSSHAFEN, anna),
+                ),
+            )
+
+            assertTrue(KartenAuswertung.ertrag(karte, feld).isEmpty())
+            assertTrue(KartenAuswertung.abbauErtrag(karte, anna).isEmpty())
+        }
     }
 
     @Test

@@ -280,8 +280,8 @@ Element & Ort & Funktion \\
 Hauptbahnhof & Ecke & Start- und Kerngebaeude eines Spielers. Von ihm aus wird Infrastruktur gedacht und Kriegskosten werden gemessen. \\
 Bahnhof & Ecke & Anschlussstaerke 2. Muss im Prozug mit 1 Nahrung und 1 Kohle versorgt werden. \\
 Grossbahnhof & Ecke & Anschlussstaerke 3. Muss im Prozug mit 2 Nahrung und 2 Kohle versorgt werden. \\
-Hafen & Ecke & Ermoeglicht Seeanschluss und Auslandshandel. Kapazitaet fuer 1 Frachtschiff; Versorgung mit 1 Nahrung und 1 Diesel. \\
-Grosshafen & Ecke & Kapazitaet fuer 2 Frachtschiffe; Versorgung mit 2 Nahrung und 2 Diesel. \\
+Hafen & Ecke & Anschlussstaerke 2; ermoeglicht Seeanschluss und Auslandshandel. Kapazitaet fuer 1 Frachtschiff; Versorgung mit 1 Nahrung und 1 Diesel. \\
+Grosshafen & Ecke & Anschlussstaerke 3 und Kapazitaet fuer 2 Frachtschiffe; Versorgung mit 2 Nahrung und 2 Diesel. \\
 Schiene & Kante & Verbindung auf einer Kante zwischen zwei Gelaendefeldern. Ermoeglicht Ertrag 1 an angrenzenden Abbaueinheiten. \\
 Viehhof, Lehmmine, Foerster, Bohrturm, Kohlemine, Eisenmine & Gelaendefeld & Abbaustandorte. Ertraege gehen beim Prozugbeginn automatisch an angeschlossene Spieler. \\
 Ziegelbrenner & Gelaendefeld & Verarbeitung: 1 Lehm zu 1 Ziegel je Lauf. \\
@@ -369,14 +369,17 @@ Ein Abbaustandort steht auf einem Gelaendefeld. Beim Beginn jedes Prozuges erhal
 Anschluss am Feld & Ertrag \\
 \midrule
 Eigene Schiene an einer Kante des Feldes & 1 Rohstoff \\
-Eigener Bahnhof an einer Ecke des Feldes & 2 Rohstoffe \\
-Eigener Grossbahnhof an einer Ecke des Feldes & 3 Rohstoffe \\
+Eigener Bahnhof oder Hafen an einer Ecke des Feldes & 2 Rohstoffe \\
+Eigener Grossbahnhof oder Grosshafen an einer Ecke des Feldes & 3 Rohstoffe \\
 Kein angeschlossener Spieler & kein Ertrag; die Anlage gilt als verlassen \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
 Ist mehr als ein Spieler angeschlossen, besitzt jeder Spieler seine eigene Anschlusskapazitaet und erhaelt beziehungsweise verarbeitet nach seiner besten eigenen Anschlussart.
+
+Eine Geschaeftsbank erzeugt selbst keinen Rohstoffertrag. Angrenzende Infrastruktur
+bestimmt bei ihr ausschliesslich Nutzung und Kontrolle.
 
 \section{Freiwillige Verarbeitung}
 Verarbeitungsstandorte erzeugen niemals automatischen Ertrag. Im Prozug waehlt der Spieler je Standort null bis zur Anschlussstaerke viele Laeufe. Einsatz und saemtliche Produkte eines Laufs werden atomar gebucht. Mehrere Teilbestueckungen sind bis zur Gesamtkapazitaet erlaubt; fehlt auch nur ein Einsatzstoff, findet die betreffende Buchung nicht statt.
@@ -761,8 +764,8 @@ Nachdem jeder Spieler einmal an der Reihe war:
 Anschluss & Ertrag \\
 \midrule
 Schiene an Kante & 1 \\
-Bahnhof an Ecke & 2 \\
-Grossbahnhof an Ecke & 3 \\
+Bahnhof oder Hafen an Ecke & 2 \\
+Grossbahnhof oder Grosshafen an Ecke & 3 \\
 Kein Anschluss & 0 \\
 \bottomrule
 \end{tabular}

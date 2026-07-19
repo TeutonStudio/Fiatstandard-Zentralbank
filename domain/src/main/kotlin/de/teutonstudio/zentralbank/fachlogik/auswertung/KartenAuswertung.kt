@@ -61,10 +61,9 @@ object KartenAuswertung {
                 ?.let { gebaeude ->
                     val besitzer = gebaeude.besitzer ?: return@let
                     val staerke = when (gebaeude.typ) {
-                        EckGebaeudeTyp.GROSSBAHNHOF -> 3
-                        EckGebaeudeTyp.BAHNHOF -> 2
+                        EckGebaeudeTyp.GROSSBAHNHOF, EckGebaeudeTyp.GROSSHAFEN -> 3
+                        EckGebaeudeTyp.BAHNHOF, EckGebaeudeTyp.HAFEN -> 2
                         EckGebaeudeTyp.HAUPTBAHNHOF -> 0
-                        EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN -> 0
                     }
                     staerken[besitzer] = maxOf(staerken[besitzer] ?: 0, staerke)
                 }
@@ -80,6 +79,10 @@ object KartenAuswertung {
 
     fun ertrag(karte: Spielkarte, feld: KartenFeld): Map<SpielerId, Int> {
         val belegung = karte.belegung.felderNachPosition[feld] ?: return emptyMap()
+        val istGeschaeftsbank = belegung.anlage == FeldAnlage.Geschaeftsbank ||
+            (belegung.anlage as? FeldAnlage.Wirtschaftsregion)?.bauteil ==
+            BauteilTyp.GESCHAEFTSBANK
+        if (istGeschaeftsbank) return emptyMap()
         return if (effektiverZustand(karte, belegung) == AnlagenZustand.AKTIV) {
             anschlussStaerke(karte, feld)
         } else {
