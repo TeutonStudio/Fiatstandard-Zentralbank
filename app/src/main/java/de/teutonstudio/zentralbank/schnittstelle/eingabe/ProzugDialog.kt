@@ -1,7 +1,6 @@
 package de.teutonstudio.zentralbank.schnittstelle.eingabe
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -54,13 +53,15 @@ fun ProzugDialog(
                     if (zustand.produktion.isEmpty()) Text("Keine nutzbaren Verarbeitungsstandorte.")
                     zustand.produktion.forEach { standort ->
                         Text(standort.titel, fontWeight = FontWeight.SemiBold)
-                        Text("${standort.rezept} · ${standort.kapazitaet}")
-                        Row {
-                            (1..standort.moeglicheLaeufe).forEach { laeufe ->
-                                TextButton(onClick = { onVerarbeiten(standort.feld, laeufe) }) {
-                                    Text("$laeufe Lauf" + if (laeufe == 1) "" else "e")
+                        Text(standort.rezept)
+                        when {
+                            standort.bereitsVerwendet -> Text("In diesem Prozug bereits verwendet")
+                            standort.kannVerarbeiten -> {
+                                TextButton(onClick = { onVerarbeiten(standort.feld, 1) }) {
+                                    Text("Einmal verarbeiten")
                                 }
                             }
+                            else -> Text("Nicht verwendbar: Einsatzstoffe fehlen")
                         }
                     }
                 }

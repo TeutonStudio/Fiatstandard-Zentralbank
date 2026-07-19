@@ -4,8 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -35,6 +39,22 @@ import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereWarenkorb
 import java.util.UUID
 
 internal const val STARTBAUWERKE_LAZY_ROW = "startbauwerke_spieler"
+internal const val UNTERSCHIEDLICHE_STARTAUSSTATTUNG = "unterschiedliche_startausstattung"
+
+internal fun startRohstoffeZuordnen(
+    spielerNamen: List<String>,
+    unterschiedlich: Boolean,
+    proSpieler: List<Map<Rohstoffe, Int>>,
+    gemeinsam: Map<Rohstoffe, Int>,
+): Map<String, Map<Rohstoffe, Int>> {
+    require(!unterschiedlich || proSpieler.size >= spielerNamen.size) {
+        "Für jeden Spieler werden eigene Startrohstoffe benötigt."
+    }
+    return spielerNamen.mapIndexed { idx, name ->
+        val auswahl = if (unterschiedlich) proSpieler[idx] else gemeinsam
+        name to auswahl.filterValues { menge -> menge > 0 }.toMap()
+    }.toMap()
+}
 
 @Composable
 fun SpielErstellen(
@@ -60,6 +80,16 @@ fun SpielErstellen(
             }.toMutableMap()
         }
     }
+    val startRohstoffeProSpieler = remember {
+        List(MAXIMALE_SPIELER_ANZAHL) { mutableStateMapOf<Rohstoffe, Int>() }
+    }
+    val gemeinsameBauteile = remember {
+        Bauteil.entries.associateWith { bauteil ->
+            if (bauteil == Verwaltungsstandort.HAUPTBAHNHOF) 1 else 0
+        }.toMutableMap()
+    }
+    val gemeinsameStartRohstoffe = remember { mutableStateMapOf<Rohstoffe, Int>() }
+    val unterschiedlicheStartausstattung = remember { mutableStateOf(true) }
     val spielerNamen = spieler.keys.toList()
     val abschlussSeite = 5
     Titel(
@@ -100,24 +130,72 @@ fun SpielErstellen(
                 )
             }
             4 -> {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag(STARTBAUWERKE_LAZY_ROW),
-                ) {
-                    itemsIndexed(spielerNamen) { idx, spielerName ->
-                        definiereBauteile(
-                            fürWenn = "für $spielerName",
-                            inhalt = bauteileProSpieler[idx],
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    ) {
+                        Text(
+                            text = "Unterschiedliche Startausstattung je Spieler",
+                            modifier = Modifier.weight(1f),
                         )
+                        Switch(
+                            checked = unterschiedlicheStartausstattung.value,
+                            onCheckedChange = { unterschiedlich ->
+                                unterschiedlicheStartausstattung.value = unterschiedlich
+                            },
+                            modifier = Modifier.testTag(UNTERSCHIEDLICHE_STARTAUSSTATTUNG),
+                        )
+                    }
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag(STARTBAUWERKE_LAZY_ROW),
+                    ) {
+                        if (unterschiedlicheStartausstattung.value) {
+                            itemsIndexed(spielerNamen) { idx, spielerName ->
+                                Row {
+                                    definiereBauteile(
+                                        fürWenn = "für $spielerName",
+                                        inhalt = bauteileProSpieler[idx],
+                                    )
+                                    definiereWarenkorb(
+                                        inhalt = startRohstoffeProSpieler[idx],
+                                        titel = "Startrohstoffe für $spielerName",
+                                    )
+                                }
+                            }
+                        } else {
+                            item {
+                                Row {
+                                    definiereBauteile(
+                                        fürWenn = "für alle Spieler",
+                                        inhalt = gemeinsameBauteile,
+                                    )
+                                    definiereWarenkorb(
+                                        inhalt = gemeinsameStartRohstoffe,
+                                        titel = "Startrohstoffe für alle Spieler",
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
             abschlussSeite -> {
                 val ausgabe = spielerNamen.mapIndexed { idx, name ->
-                    val bauteile = bauteileProSpieler[idx].toMutableMap()
+                    val bauteile = if (unterschiedlicheStartausstattung.value) {
+                        bauteileProSpieler[idx]
+                    } else {
+                        gemeinsameBauteile
+                    }.toMutableMap()
                     Spieler(name, bauteile) to (spieler[name] ?: Zahlungsmittel())
                 }.toMap()
+                val startRohstoffe = startRohstoffeZuordnen(
+                    spielerNamen = spielerNamen,
+                    unterschiedlich = unterschiedlicheStartausstattung.value,
+                    proSpieler = startRohstoffeProSpieler,
+                    gemeinsam = gemeinsameStartRohstoffe,
+                )
                 val karte = ausgewaehlteKarte.value
                 if (karte == null) {
                     Text("Bitte zuerst eine Spielkarte auswählen.")
@@ -130,6 +208,7 @@ fun SpielErstellen(
                         normaleAbweichung = zentralbankZiele[2],
                         starkeAbweichung = zentralbankZiele[3],
                         karte = karte.alsSpielkarte(spielId = "spiel-${UUID.randomUUID()}"),
+                        startRohstoffe = startRohstoffe,
                     )
                     LaunchedEffect(Unit) {
                         erstelleSpiel(daten, nachAbschluß)

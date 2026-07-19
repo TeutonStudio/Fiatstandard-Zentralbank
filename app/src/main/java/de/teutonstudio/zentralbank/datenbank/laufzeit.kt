@@ -265,7 +265,17 @@ open class Spiel(
     private val handel: Handelsregister, // Handelsdaten während des Spiels
     private val konflikt: Kriegsregister,
     val karte: Spielkarte? = null,
+    val startRohstoffe: Map<String, Map<Rohstoffe, Int>> = emptyMap(),
 ) {
+    init {
+        require(startRohstoffe.keys.all { name -> spieler.any { it.name == name } }) {
+            "Startrohstoffe dürfen nur Spielern des Spiels zugeordnet werden."
+        }
+        require(startRohstoffe.values.all { mengen -> mengen.values.all { it >= 0 } }) {
+            "Startrohstoffmengen dürfen nicht negativ sein."
+        }
+    }
+
     private var aktiverSpielerName: String? = spieler.firstOrNull()?.name
 
     public val preisinflationswarenkorb: Map<Rohstoffe, Int> =
@@ -281,12 +291,13 @@ open class Spiel(
         normaleAbweichung: Float,
         starkeAbweichung: Float,
         karte: Spielkarte? = null,
+        startRohstoffe: Map<String, Map<Rohstoffe, Int>> = emptyMap(),
     ): this(
         mutableListOf(Runde(0,leitzinssatz)),
         spieler.keys.toList(), warenkorb, (inflationsziel to normaleAbweichung to starkeAbweichung).toTriple(),
         Handelsregister(spieler.map { (spieler,guthaben) ->
             Anleihenhandel(spieler, Geschäftsbank,Anleihe(spieler, Zahlungsmittel(),-guthaben,1),Zahlungsmittel())
-        }.toSet()), Kriegsregister(), karte,
+        }.toSet()), Kriegsregister(), karte, startRohstoffe,
     )
 
 /*    constructor(daten:SpielDaten): this(

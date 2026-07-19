@@ -68,7 +68,9 @@ internal object ProzugRegelwerk {
         ereignis: SpielEreignis.VerarbeitungAusgefuehrt,
     ): SpielZustand {
         val zug = pruefeProzug(zustand, ereignis.zugId)
-        require(ereignis.laeufe > 0) { "Die Zahl der Verarbeitungsläufe muss positiv sein." }
+        require(ereignis.laeufe == 1) {
+            "Jeder Verarbeitungsstandort kann im Prozug genau einmal verwendet werden."
+        }
         val karte = requireNotNull(zustand.karte) { "Der Spielstand besitzt keine Spielkarte." }
         val standort = KartenAuswertung.verarbeitungsStandorte(
             karte,
@@ -81,8 +83,8 @@ internal object ProzugRegelwerk {
         val bisher = zug.prozug.produktionsBuchungen
             .filter { it.standort == id }
             .sumOf { it.laeufe }
-        require(bisher + ereignis.laeufe <= standort.maximaleLaeufe) {
-            "Die Verarbeitungskapazität des Standortes ist überschritten."
+        require(bisher == 0) {
+            "Der Verarbeitungsstandort wurde in diesem Prozug bereits verwendet."
         }
         val einsatz = standort.einsatzJeLauf.mapValues { (_, menge) -> menge * ereignis.laeufe }
         val ertrag = standort.ertragJeLauf.mapValues { (_, menge) -> menge * ereignis.laeufe }

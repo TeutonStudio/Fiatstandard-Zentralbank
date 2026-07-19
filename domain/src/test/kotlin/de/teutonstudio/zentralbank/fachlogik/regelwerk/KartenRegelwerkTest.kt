@@ -745,6 +745,58 @@ class KartenRegelwerkTest {
     }
 
     @Test
+    fun grosshafenHatKapazitaetFuerZweiFrachtschiffe() {
+        val start = zustand()
+        val wasserKante = requireNotNull(start.karte).wasserKanten().first()
+        val hafenA = wasserKante.anfang
+        val hafenB = wasserKante.ende
+        val mitGrosshaefen = start.copy(
+            karte = start.karte?.copy(
+                belegung = KartenBelegung(
+                    ecken = listOf(
+                        EckBelegung(hafenA, EckGebaeudeTyp.GROSSHAFEN, anna),
+                        EckBelegung(hafenB, EckGebaeudeTyp.GROSSHAFEN, anna),
+                    ),
+                ),
+            ),
+        )
+        val erstes = SpielRegelwerk.wendeAn(
+            mitGrosshaefen,
+            SpielEreignis.SeewegEingerichtet(
+                id = "grosshafen-schiff-1",
+                spieler = anna,
+                hafenA = hafenA,
+                hafenB = hafenB,
+                richtung = FrachtRichtung.A_NACH_B,
+            ),
+        ).getOrThrow()
+        val zweites = SpielRegelwerk.wendeAn(
+            erstes,
+            SpielEreignis.SeewegEingerichtet(
+                id = "grosshafen-schiff-2",
+                spieler = anna,
+                hafenA = hafenA,
+                hafenB = hafenB,
+                richtung = FrachtRichtung.B_NACH_A,
+            ),
+        ).getOrThrow()
+        val drittes = SpielRegelwerk.wendeAn(
+            zweites,
+            SpielEreignis.SeewegEingerichtet(
+                id = "grosshafen-schiff-3",
+                spieler = anna,
+                hafenA = hafenA,
+                hafenB = hafenB,
+                richtung = FrachtRichtung.A_NACH_B,
+            ),
+        )
+
+        assertEquals(2, zweites.karte?.belegung?.seewege?.size)
+        assertTrue(drittes.isFailure)
+        assertTrue(drittes.exceptionOrNull()?.message.orEmpty().contains("kapazität", ignoreCase = true))
+    }
+
+    @Test
     fun frachtschiffRouteKannZwischenEigenenHaefenGeaendertWerden() {
         val start = zustand()
         val karte = requireNotNull(start.karte)

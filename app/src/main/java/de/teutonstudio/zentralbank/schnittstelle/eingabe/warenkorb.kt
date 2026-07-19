@@ -62,9 +62,10 @@ fun definiereRohstoffMenge(
 @Composable
 fun definiereWarenkorb(
     inhalt: MutableMap<Rohstoffe, Int> = remember { mutableStateMapOf<Rohstoffe, Int>() },
+    titel: String = "Warenkorb",
 ) {
     Column(ModiPad5, horizontalAlignment = Alignment.CenterHorizontally) {
-        TextCard(text = "Warenkorb",fontSize = 40.sp) {}
+        TextCard(text = titel,fontSize = 40.sp) {}
         Card(modifier = ModiPad5) { LazyColumn(
             horizontalAlignment = Alignment.Start,
             modifier = ModiPad10

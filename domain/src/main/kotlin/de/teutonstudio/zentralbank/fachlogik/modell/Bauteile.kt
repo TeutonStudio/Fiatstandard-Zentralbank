@@ -29,6 +29,7 @@ enum class BauteilTyp(
         text = "hauptbahnhof",
         art = BauteilArt.VERWALTUNGSSTANDORT,
         kosten = emptyMap(),
+        verbrauch = rohstoffe(Rohstoff.NAHRUNG to 3, Rohstoff.KOHLE to 3),
     ),
     EISENBAHNLINIE(
         text = "eisenbahnlinie",
@@ -56,13 +57,13 @@ enum class BauteilTyp(
         text = "hafen",
         art = BauteilArt.VERWALTUNGSSTANDORT,
         kosten = rohstoffe(Rohstoff.HOLZ to 1, Rohstoff.ZIEGEL to 2, Rohstoff.STAHL to 2),
-        verbrauch = rohstoffe(Rohstoff.NAHRUNG to 1, Rohstoff.DIESEL to 1),
+        verbrauch = rohstoffe(Rohstoff.NAHRUNG to 1, Rohstoff.SCHWEROEL to 1),
     ),
     GROSSHAFEN(
         text = "grosshafen",
         art = BauteilArt.VERWALTUNGSSTANDORT,
         kosten = rohstoffe(Rohstoff.HOLZ to 2, Rohstoff.ZIEGEL to 3, Rohstoff.STAHL to 4),
-        verbrauch = rohstoffe(Rohstoff.NAHRUNG to 2, Rohstoff.DIESEL to 2),
+        verbrauch = rohstoffe(Rohstoff.NAHRUNG to 2, Rohstoff.SCHWEROEL to 2),
     ),
     GESCHAEFTSBANK(
         text = "geschaeftsbank",

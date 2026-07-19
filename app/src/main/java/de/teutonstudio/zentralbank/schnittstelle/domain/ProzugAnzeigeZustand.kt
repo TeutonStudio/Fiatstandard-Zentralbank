@@ -28,8 +28,8 @@ data class ProduktionsAnzeige(
     val feld: KartenFeld,
     val titel: String,
     val rezept: String,
-    val kapazitaet: String,
-    val moeglicheLaeufe: Int,
+    val bereitsVerwendet: Boolean,
+    val kannVerarbeiten: Boolean,
 )
 
 data class VerwaltungsAnzeige(
@@ -97,8 +97,8 @@ fun SpielZustand.zuProzugAnzeigeZustand(): ProzugAnzeigeZustand? {
                 titel = "${standort.typ.text} · ${standort.standort.feld}",
                 rezept = "${standort.einsatzJeLauf.mengenText()} → " +
                     standort.ertragJeLauf.mengenText(),
-                kapazitaet = "${standort.gebuchteLaeufe}/${standort.maximaleLaeufe} Läufe gebucht",
-                moeglicheLaeufe = standort.mitBestandMoeglicheLaeufe,
+                bereitsVerwendet = standort.gebuchteLaeufe > 0,
+                kannVerarbeiten = standort.mitBestandMoeglicheLaeufe > 0,
             )
         },
         verwaltung = verwaltung,

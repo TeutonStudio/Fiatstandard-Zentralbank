@@ -29,6 +29,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.benachbarteEcken
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.enthaeltFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
+import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
 import de.teutonstudio.zentralbank.fachlogik.modell.wasserKanten
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,6 +64,40 @@ class KartenAuswertungTest {
     @Test
     fun gleisAnDerFeldkanteErzeugtEinfachenErtrag() {
         val karte = karte(kanten = listOf(KantenBelegung(kante)))
+
+        assertEquals(mapOf(anna to 1), KartenAuswertung.ertrag(karte, feld))
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1), KartenAuswertung.abbauErtrag(karte, anna))
+    }
+
+    @Test
+    fun gleisDasNurZuEinerFeldeckeFuehrtErzeugtEinfachenErtrag() {
+        val startEcke = feld.ecken().first()
+        val feldKanten = feld.kanten().toSet()
+        val zubringer = benachbarteEcken(startEcke)
+            .map { nachbar -> KartenKante.zwischen(startEcke, nachbar) }
+            .first { kandidat -> kandidat !in feldKanten }
+        val hauptbahnhof = if (zubringer.anfang == startEcke) {
+            zubringer.ende
+        } else {
+            zubringer.anfang
+        }
+        val karte = Spielkarte(
+            id = "eckanschluss",
+            name = "Eckanschluss",
+            hexagon = KartenHexagon(radius = 8),
+            gelaendefelder = (angrenzendeFelder(zubringer) + feld)
+                .distinct()
+                .map { GelaendeFeld(it, GelaendeTyp.EBENE) },
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(hauptbahnhof, EckGebaeudeTyp.HAUPTBAHNHOF, anna),
+                ),
+                kanten = listOf(KantenBelegung(zubringer)),
+                felder = listOf(
+                    FeldBelegung(feld, FeldAnlage.Abbaueinheit(Rohstoff.NAHRUNG)),
+                ),
+            ),
+        )
 
         assertEquals(mapOf(anna to 1), KartenAuswertung.ertrag(karte, feld))
         assertEquals(mapOf(Rohstoff.NAHRUNG to 1), KartenAuswertung.abbauErtrag(karte, anna))
@@ -140,7 +175,7 @@ class KartenAuswertungTest {
     }
 
     @Test
-    fun frachtschiffVerbindetInselstandortUndWirdImKriegAufSeinerRouteBlockiert() {
+    fun frachtschiffVerbindetInselstandortUndWirdImKriegAmHafenBlockiert() {
         val wasserkarte = Spielkarte(
             id = "wasser-grundlage",
             name = "Wasser-Grundlage",
@@ -224,6 +259,7 @@ class KartenAuswertungTest {
         val friedensWeg = requireNotNull(KartenAuswertung.transportWeg(karte, quellFeld, anna))
         assertTrue(friedensWeg.abschnitte.any { it is TransportAbschnitt.Frachtschiff })
         assertEquals(mapOf(anna to 2), KartenAuswertung.ertrag(karte, quellFeld))
+        assertTrue(KartenAuswertung.kannAussenhandelBetreiben(karte, anna))
         val gegenDieFrachtrichtung = karte.copy(
             belegung = karte.belegung.copy(
                 seewege = listOf(schiff.copy(richtung = FrachtRichtung.B_NACH_A)),
@@ -237,6 +273,75 @@ class KartenAuswertungTest {
                 quellFeld,
                 setOf(Konflikt(anna, bert)),
             ).isEmpty(),
+        )
+        assertFalse(
+            KartenAuswertung.kannAussenhandelBetreiben(
+                karte,
+                anna,
+                setOf(Konflikt(anna, bert)),
+            ),
+        )
+    }
+
+    @Test
+    fun kriegsschiffAufInnererWasserrouteBlockiertKeinenHafen() {
+        val grundkarte = Spielkarte(
+            id = "innerer-seeweg",
+            name = "Innerer Seeweg",
+            hexagon = KartenHexagon(radius = 5),
+        )
+        val wasserecken = grundkarte.wasserKanten()
+            .flatMap { kante -> listOf(kante.anfang, kante.ende) }
+            .distinct()
+        val (hafenA, hafenB, wasserweg) = wasserecken.firstNotNullOf { a ->
+            wasserecken.firstNotNullOfOrNull { b ->
+                if (a == b) return@firstNotNullOfOrNull null
+                grundkarte.kuerzesterWasserweg(a, b)
+                    ?.takeIf { weg ->
+                        weg.any { kante ->
+                            a !in setOf(kante.anfang, kante.ende) &&
+                                b !in setOf(kante.anfang, kante.ende)
+                        }
+                    }
+                    ?.let { weg -> Triple(a, b, weg) }
+            }
+        }
+        val innereKante = wasserweg.first { kante ->
+            hafenA !in setOf(kante.anfang, kante.ende) &&
+                hafenB !in setOf(kante.anfang, kante.ende)
+        }
+        val karte = grundkarte.copy(
+            belegung = KartenBelegung(
+                ecken = listOf(
+                    EckBelegung(hafenA, EckGebaeudeTyp.HAFEN, anna),
+                    EckBelegung(hafenB, EckGebaeudeTyp.HAFEN, anna),
+                ),
+                seewege = listOf(
+                    SeewegBelegung(
+                        id = "frachter-anna-innen",
+                        hafenA = hafenA,
+                        hafenB = hafenB,
+                        besitzer = anna,
+                        richtung = FrachtRichtung.A_NACH_B,
+                    ),
+                ),
+                kriegseinheiten = listOf(
+                    KriegsEinheitBelegung(
+                        id = "kriegsschiff-bert-innen",
+                        typ = KriegsEinheitTyp.KRIEGSSCHIFF,
+                        besitzer = bert,
+                        ort = KartenOrt.Kante(innereKante),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(
+            KartenAuswertung.kannAussenhandelBetreiben(
+                karte,
+                anna,
+                setOf(Konflikt(anna, bert)),
+            ),
         )
     }
 
@@ -252,6 +357,39 @@ class KartenAuswertungTest {
         assertEquals(1, standort.maximaleLaeufe)
         assertEquals(mapOf(Rohstoff.LEHM to 1), standort.einsatzJeLauf)
         assertEquals(mapOf(Rohstoff.ZIEGEL to 1), standort.ertragJeLauf)
+    }
+
+    @Test
+    fun alleVerwaltungsstandorteHabenDenFestgelegtenProzugVerbrauch() {
+        val typen = listOf(
+            EckGebaeudeTyp.BAHNHOF,
+            EckGebaeudeTyp.GROSSBAHNHOF,
+            EckGebaeudeTyp.HAFEN,
+            EckGebaeudeTyp.GROSSHAFEN,
+            EckGebaeudeTyp.HAUPTBAHNHOF,
+        )
+        val ecken = (listOf(feld) + feld.kanten().flatMap(::angrenzendeFelder))
+            .flatMap(KartenFeld::ecken)
+            .distinct()
+            .take(typen.size)
+        val karte = Spielkarte(
+            id = "verwaltungsverbrauch",
+            name = "Verwaltungsverbrauch",
+            hexagon = KartenHexagon(radius = 8),
+            gelaendefelder = land,
+            belegung = KartenBelegung(
+                ecken = typen.zip(ecken) { typ, ecke -> EckBelegung(ecke, typ, anna) },
+            ),
+        )
+
+        val bedarf = KartenAuswertung.verwaltungsStandorte(karte, anna)
+            .associate { standort -> standort.typ to standort.bedarf }
+
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.KOHLE to 1), bedarf[EckGebaeudeTyp.BAHNHOF])
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 2, Rohstoff.KOHLE to 2), bedarf[EckGebaeudeTyp.GROSSBAHNHOF])
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.SCHWEROEL to 1), bedarf[EckGebaeudeTyp.HAFEN])
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 2, Rohstoff.SCHWEROEL to 2), bedarf[EckGebaeudeTyp.GROSSHAFEN])
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 3, Rohstoff.KOHLE to 3), bedarf[EckGebaeudeTyp.HAUPTBAHNHOF])
     }
 
     @Test

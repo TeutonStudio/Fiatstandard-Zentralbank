@@ -182,10 +182,10 @@ Die folgenden Punkte dürfen nicht durch zufällige UI- oder Datenmodellentschei
 | R1 | Wann ist das Unvermögen fällig? | Bestehendes Legacy-Verhalten übernehmen: einmal je Spielzug ab der Runde nach Emission bis vor Fälligkeit; in der Fälligkeitsrunde nur Rückkauf des Sondervermögens. |
 | R2 | Wer erhält eine im Prozug fällige Zahlung? | Gläubiger zu Beginn des Prozuges als Forderungsempfänger festschreiben. Späterer Handel ändert diese bereits fällige Forderung nicht. |
 | R3 | Darf eine bereits fällige Anleihe im selben Prozug noch gehandelt werden? | Nein. Erst die fällige Zahlung/Rückzahlung; dadurch werden Umgehungen der Zahlungspflicht verhindert. |
-| R4 | Wie viele Verarbeitungsläufe besitzt ein Standort? | Anschlussstärke 1/2/3 als maximale Zahl identischer Produktionsläufe verwenden; der Nutzer wählt 0 bis Maximum. |
-| R5 | Wann werden Einsatz und Ertrag einer Verarbeitung gebucht? | Atomar pro Standortentscheidung: entweder vollständigen Einsatz abbuchen und vollständigen Ertrag gutschreiben oder gar nichts ändern. Mehrere bewusste Teilbestückungen bleiben bis zur Gesamtkapazität möglich. |
-| R6 | Können mehrere Spieler denselben Wirtschaftsstandort im selben Rundenumlauf verarbeiten lassen? | TO BE DEFINED. Empfehlung: Jeder angeschlossene Spieler erhält seine eigene Anschlusskapazität, sofern die allgemeine Mehrfachnutzungsregel bestätigt wird. |
-| R7 | Welche Verwaltungsstandorte müssen versorgt werden? | Alle eigenen intakten Bahn-/Hafenstandorte auf der Karte; Hauptbahnhof verbraucht nichts. Wirkung belagerter Standorte ausdrücklich festlegen. |
+| R4 | Wie viele Verarbeitungsläufe besitzt ein Standort? | Jeder angeschlossene Verarbeitungsstandort darf im Prozug höchstens einmal bewusst verwendet werden. Null Verwendungen bleiben erlaubt. |
+| R5 | Wann werden Einsatz und Ertrag einer Verarbeitung gebucht? | Atomar bei der einmaligen Standortentscheidung: entweder vollständigen Einsatz abbuchen und vollständigen Ertrag gutschreiben oder gar nichts ändern. |
+| R6 | Können mehrere Spieler denselben Wirtschaftsstandort im selben Rundenumlauf verarbeiten lassen? | Jeder angeschlossene Spieler erhält in seinem eigenen Prozug eine unabhängige einmalige Verwendungsmöglichkeit. |
+| R7 | Welche Verwaltungsstandorte müssen versorgt werden? | Alle eigenen intakten Bahn-/Hafenstandorte einschließlich Hauptbahnhof auf der Karte. Wirkung belagerter Standorte ausdrücklich festlegen. |
 | R8 | Was geschieht mit einem nicht versorgten Verwaltungsstandort? | Im neuen Ziel zunächst kein einzelnes Abschalten zulassen: Der Prozug ist insgesamt erfolglos. Die konkrete Schuldenfolge bleibt R12. |
 | R9 | Welche Handelsarten umfasst „jede Form von Handel“ im Prozug? | Spielerhandel, Außenhandel, Sekundärhandel von Anleihen und freiwilliger Rückkauf; Geschäftsbank-Emission separat über die Emissionsaktion. |
 | R10 | Wo liegt der Ereigniswurf künftig? | TO BE DEFINED. Empfehlung: als automatisch erzwungener Teil zu Beginn des Epizuges, bevor freie Aktionen möglich werden. |
@@ -199,7 +199,7 @@ Die Umsetzung der normalen Erfolgsschiene kann bis zur abstrahierten Fehlschlags
 
 ### 4.1 Für die Umsetzung festgehaltene Arbeitsregeln
 
-Für den Umbau vom 18.07.2026 gelten R1 bis R5, R7 bis R9, R14 und R15 gemäß der Empfehlung in der Tabelle. Zusätzlich gilt für R6 die empfohlene eigene Anschlusskapazität je angeschlossenem Spieler. Belagerte und zerstörte Verwaltungsstandorte erzeugen keinen Versorgungssnapshot. Eine fällige Anleihe bleibt bis zur Begleichung ihres festgeschriebenen Pflichtpostens für Handel und freiwilligen Rückkauf gesperrt. Eine Geschäftsbankemission schöpft den Emissionserlös ausdrücklich, ohne das Bankkonto negativ zu buchen.
+Für den Umbau vom 18.07.2026 gelten R1 bis R5, R7 bis R9, R14 und R15 gemäß der Empfehlung in der Tabelle. Zusätzlich gilt für R6 die unabhängige einmalige Verwendungsmöglichkeit je angeschlossenem Spieler und eigenem Prozug. Belagerte und zerstörte Verwaltungsstandorte erzeugen keinen Versorgungssnapshot. Eine fällige Anleihe bleibt bis zur Begleichung ihres festgeschriebenen Pflichtpostens für Handel und freiwilligen Rückkauf gesperrt. Eine Geschäftsbankemission schöpft den Emissionserlös ausdrücklich, ohne das Bankkonto negativ zu buchen.
 
 R10 bis R12 bleiben sichtbar blockiert: Der Ereigniswurf ist noch nicht in den produktiven Zugablauf eingehängt, der Prozug besitzt keine Aufgabeaktion, und ein offener Prozug löst keine erfundene Schuldenfolge aus. Zu R13 bleibt der vorhandene, nach mehr als drei friedlichen aufeinanderfolgenden Überschuldungszügen fällige Schuldenstrich vorläufig zusätzlich bestehen; seine spätere Konsolidierung mit R12 ist weiterhin erforderlich.
 
@@ -273,12 +273,11 @@ enum class ProduktionsArt {
 Für jeden verarbeitenden Standort liefert eine reine Auswertung:
 
 - Standort und Typ,
-- Anschlussstärke/Maximalläufe,
+- vorhandener Transportanschluss,
 - Einsatz je Lauf,
 - Ertrag je Lauf,
-- bereits gebuchte Läufe,
-- noch verbleibende Läufe,
-- mit aktuellem Bestand noch mögliche Läufe.
+- ob der Standort bereits verwendet wurde,
+- ob der aktuelle Bestand für die einmalige Verwendung reicht.
 
 `KartenAuswertung.rohstoffErtrag()` wird aufgeteilt, zum Beispiel in:
 
@@ -354,7 +353,7 @@ Empfohlene Ereignisse:
 | Ereignis | Wirkung |
 | --- | --- |
 | `ProzugBegonnen(zugId)` | validiert aktiven Spieler/Phase, schreibt Verpflichtungssnapshot und bucht automatische Abbauerträge genau einmal |
-| `VerarbeitungAusgefuehrt(zugId, feld, laeufe)` | bucht Einsatz und Ertrag eines verarbeitenden Standortes atomar; die Summe aller Buchungen darf die Standortkapazität nicht überschreiten |
+| `VerarbeitungAusgefuehrt(zugId, feld, laeufe)` | akzeptiert aus Kompatibilitätsgründen nur `laeufe = 1`, bucht Einsatz und Ertrag atomar und lehnt eine zweite Verwendung desselben Standortes im Prozug ab |
 | `VerwaltungsstandortVersorgt(zugId, ecke)` | zieht das vollständige Rezept ab und markiert genau diesen Standort als versorgt |
 | `VerbindlichkeitBeglichen(zugId, verbindlichkeitId)` | überträgt den exakten Betrag an den festgeschriebenen Empfänger und markiert die Forderung als bezahlt |
 | `AnleiheEmittiert(...)` | legt die Anleihe mit Emissions- und Fälligkeitsdaten an und bucht den Emissionserlös atomar |
@@ -542,13 +541,13 @@ Für jeden verarbeitenden Standort:
 
 - Standort und Wirtschaftsart,
 - Rezept „Einsatz → Ertrag“ je Lauf,
-- maximale Läufe aus Anschluss/Kapazität,
-- wählbare Laufzahl,
-- resultierender Gesamteinsatz und Gesamtertrag,
+- Status „noch nicht verwendet“ oder „bereits verwendet“,
+- Aktion „Einmal verarbeiten“,
+- Einsatz und Ertrag der einmaligen Verwendung,
 - verständlicher Grund, wenn der aktuelle Bestand nicht reicht,
-- bereits gebuchte und noch verfügbare Läufe; weitere Teilbestückung nur durch eine neue bewusste Aktion und nur bis zur Gesamtkapazität.
+- keine weitere Aktion nach erfolgreicher Verwendung im selben Prozug.
 
-Die Auswahl von null Läufen bleibt erlaubt. Verarbeitung ist eine Möglichkeit zur Deckung, keine eigene Abschlussbedingung.
+Das Auslassen der Aktion bleibt erlaubt. Verarbeitung ist eine Möglichkeit zur Deckung, keine eigene Abschlussbedingung.
 
 ### 9.4 Verwaltungsversorgung
 
@@ -642,7 +641,7 @@ Der Abschnitt „Fixkosten“ muss umbenannt und fachlich ersetzt werden:
 
 - Versorgung findet im Prozug statt.
 - Bedarf wird pro aktivem Verwaltungsstandort angegeben.
-- Bahnhof/Großbahnhof verbrauchen laut Code Nahrung und Kohle, Hafen/Großhafen Nahrung und Diesel; das widerspricht der aktuellen Handbuchangabe Öl und Nahrung.
+- Bahnhof/Großbahnhof verbrauchen Nahrung und Kohle, Hafen/Großhafen Nahrung und Schweröl, der Hauptbahnhof 3 Nahrung und 3 Kohle.
 - Umgang mit belagerten, zerstörten und unverbundenen Standorten festlegen.
 - vollständige statt nur „voraussichtliche“ Verbrauchstabelle einfügen.
 
@@ -651,9 +650,9 @@ Der Abschnitt „Fixkosten“ muss umbenannt und fachlich ersetzt werden:
 Das Kapitel „Eigentum, Kontrolle und neutrale Anlagen“ wird in mindestens zwei Regeln getrennt:
 
 1. **Automatischer Abbau:** Ertrag wird beim Beginn des Prozuges entsprechend Anschlussstärke gutgeschrieben.
-2. **Freiwillige Verarbeitung:** Der aktive Spieler wählt im Prozug je Standort die Zahl der Läufe und stellt die erforderlichen Einsatzstoffe bereit.
+2. **Freiwillige Verarbeitung:** Der aktive Spieler entscheidet im Prozug je Standort über null oder genau eine Verwendung und stellt die erforderlichen Einsatzstoffe bereit.
 
-Zusätzlich sind R4 und R6 zu dokumentieren: Kapazität/Anschlussstärke sowie Mehrfachnutzung durch verschiedene Spieler.
+Zusätzlich sind R4 und R6 zu dokumentieren: höchstens eine Verwendung je Spieler-Prozug sowie Mehrfachnutzung durch verschiedene Spieler.
 
 ### 10.6 Anleihen und Zahlungen
 
@@ -863,7 +862,7 @@ Abnahme:
 - Prozug beginnt für den richtigen aktiven Spieler.
 - Automatischer Abbauertrag wird genau einmal gebucht.
 - Abbaustandorte und verarbeitende Standorte werden getrennt ausgewertet.
-- Verarbeitung mit 0, 1 und maximalen Läufen.
+- Verarbeitung mit null oder genau einer Verwendung je Standort.
 - Verarbeitung oberhalb der Kapazität wird abgelehnt.
 - Verarbeitung mit fehlendem Einsatz wird ohne Teilbuchung abgelehnt.
 - Mehrere Produkte eines Rezepts werden gemeinsam gebucht.

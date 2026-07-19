@@ -93,6 +93,10 @@ fun Spiel.zuSpielZustand(): SpielZustand {
         FachSpieler(
             id = spielerIds.getValue(spieler),
             name = spieler.name,
+            rohstoffe = startRohstoffe[spieler.name]
+                .orEmpty()
+                .mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
+                .filterValues { menge -> menge > 0 },
             geldkonto = spielerSaldo.lastOrNull()?.get(spieler)?.zuGeld() ?: Geld.NULL,
             anleihen = anleihenNachBesitzer[spieler.name].orEmpty(),
             bauteile = spieler.erhalteBauSaldoZurRunde()

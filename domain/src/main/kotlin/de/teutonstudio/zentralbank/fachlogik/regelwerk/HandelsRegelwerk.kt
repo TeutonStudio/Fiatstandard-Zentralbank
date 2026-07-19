@@ -42,7 +42,13 @@ internal object HandelsRegelwerk {
         require(ereignis.menge > 0) { "Außenhandelsmenge muss positiv sein." }
         require(ereignis.preis > Geld.NULL) { "Außenhandelspreis muss positiv sein." }
         val karte = requireNotNull(zustand.karte) { "Außenhandel benötigt eine Spielkarte." }
-        require(KartenAuswertung.kannAussenhandelBetreiben(karte, ereignis.spieler)) {
+        require(
+            KartenAuswertung.kannAussenhandelBetreiben(
+                karte,
+                ereignis.spieler,
+                zustand.konflikte,
+            ),
+        ) {
             "Außenhandel benötigt einen aktiven Hafen mit Frachtschiffverbindung."
         }
         val mengen = mapOf(ereignis.rohstoff to ereignis.menge)

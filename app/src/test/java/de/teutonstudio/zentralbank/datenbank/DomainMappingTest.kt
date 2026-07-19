@@ -37,6 +37,17 @@ class DomainMappingTest {
     }
 
     @Test
+    fun verwaltungsstandorteVerwendenInBeidenModellenDenselbenProzugVerbrauch() {
+        Verwaltungsstandort.entries.forEach { standort ->
+            val alterVerbrauch = standort.verbrauch
+                .filterValues { menge -> menge != 0 }
+                .mapKeys { (rohstoff, _) -> rohstoff.zuRohstoff() }
+
+            assertEquals(standort.str, standort.zuBauteilTyp().verbrauch, alterVerbrauch)
+        }
+    }
+
+    @Test
     fun zahlungsmittelWirdAlsCentbasiertesDomainGeldAbgebildet() {
         assertEquals(Geld.cent(12_300), 123.toZahlungsmittel().zuGeld())
     }
@@ -134,6 +145,38 @@ class DomainMappingTest {
         assertEquals(
             mapOf(BauteilTyp.HAUPTBAHNHOF to 1),
             zustand.rundeNullRestbestand?.get(SpielerId("Bert")),
+        )
+    }
+
+    @Test
+    fun neuesSpielUebernimmtStartrohstoffeInDenFachspielstand() {
+        val anna = Spieler("Anna", mapOf(Verwaltungsstandort.HAUPTBAHNHOF to 1))
+        val bert = Spieler("Bert", mapOf(Verwaltungsstandort.HAUPTBAHNHOF to 1))
+        val spiel = Spiel(
+            leitzinssatz = 0f,
+            spieler = linkedMapOf(
+                anna to Zahlungsmittel(),
+                bert to Zahlungsmittel(),
+            ),
+            warenkorb = emptyMap(),
+            inflationsziel = 2f,
+            normaleAbweichung = 0.5f,
+            starkeAbweichung = 2f,
+            startRohstoffe = mapOf(
+                "Anna" to mapOf(Rohstoffe.NAHRUNG to 4, Rohstoffe.KOHLE to 3),
+                "Bert" to mapOf(Rohstoffe.SCHWERÖL to 2),
+            ),
+        )
+
+        val zustand = spiel.zuSpielZustand()
+
+        assertEquals(
+            mapOf(Rohstoff.NAHRUNG to 4, Rohstoff.KOHLE to 3),
+            zustand.spieler.first { it.name == "Anna" }.rohstoffe,
+        )
+        assertEquals(
+            mapOf(Rohstoff.SCHWEROEL to 2),
+            zustand.spieler.first { it.name == "Bert" }.rohstoffe,
         )
     }
 }

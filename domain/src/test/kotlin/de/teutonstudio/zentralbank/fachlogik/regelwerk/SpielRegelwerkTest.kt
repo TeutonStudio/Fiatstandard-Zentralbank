@@ -93,23 +93,61 @@ class SpielRegelwerkTest {
             karte = karte(FeldAnlage.Wirtschaftsregion(BauteilTyp.RAFFINERIE)),
         )
         val begonnen = anwenden(start, SpielEreignis.ProzugBegonnen(1L))
+        assertEquals(mapOf(Rohstoff.ROHOEL to 4), begonnen.spieler.first().rohstoffe)
 
         val verarbeitet = anwenden(
             begonnen,
-            SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 2),
+            SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 1),
         )
         val annaDanach = verarbeitet.spieler.first()
 
-        assertEquals(null, annaDanach.rohstoffe[Rohstoff.ROHOEL])
-        assertEquals(4, annaDanach.rohstoffe[Rohstoff.DIESEL])
-        assertEquals(2, annaDanach.rohstoffe[Rohstoff.SCHWEROEL])
-        assertEquals(
-            begonnen,
+        assertEquals(2, annaDanach.rohstoffe[Rohstoff.ROHOEL])
+        assertEquals(2, annaDanach.rohstoffe[Rohstoff.DIESEL])
+        assertEquals(1, annaDanach.rohstoffe[Rohstoff.SCHWEROEL])
+        assertTrue(
+            SpielRegelwerk.wendeAn(
+                verarbeitet,
+                SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 1),
+            ).isFailure,
+        )
+        assertTrue(
             SpielRegelwerk.wendeAn(
                 begonnen,
-                SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 3),
-            ).getOrNull() ?: begonnen,
+                SpielEreignis.VerarbeitungAusgefuehrt(1L, feld, 2),
+            ).isFailure,
         )
+    }
+
+    @Test
+    fun prozugKannOhneFreiwilligeVerarbeitungAbgeschlossenWerden() {
+        val begonnen = anwenden(
+            zustand(
+                annaRohstoffe = mapOf(
+                    Rohstoff.NAHRUNG to 4,
+                    Rohstoff.KOHLE to 4,
+                    Rohstoff.ROHOEL to 2,
+                ),
+                karte = karte(FeldAnlage.Wirtschaftsregion(BauteilTyp.RAFFINERIE)),
+            ),
+            SpielEreignis.ProzugBegonnen(1L),
+        )
+        val bahnhofVersorgt = anwenden(
+            begonnen,
+            SpielEreignis.VerwaltungsstandortVersorgt(1L, feld.ecken().last()),
+        )
+        val hauptbahnhofVersorgt = anwenden(
+            bahnhofVersorgt,
+            SpielEreignis.VerwaltungsstandortVersorgt(1L, kante.anfang),
+        )
+
+        val epizug = anwenden(
+            hauptbahnhofVersorgt,
+            SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
+        )
+
+        assertEquals(ZugPhase.Epizug, epizug.zugStatus?.phase)
+        assertEquals(2, epizug.spieler.first().rohstoffe[Rohstoff.ROHOEL])
+        assertTrue(epizug.zugStatus?.prozug?.produktionsBuchungen.orEmpty().isEmpty())
     }
 
     @Test
@@ -202,7 +240,7 @@ class SpielRegelwerkTest {
     fun prozugMitOffenemPostenKannNichtAbgeschlossenWerden() {
         val begonnen = anwenden(
             zustand(
-                annaRohstoffe = mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.KOHLE to 1),
+                annaRohstoffe = mapOf(Rohstoff.NAHRUNG to 4, Rohstoff.KOHLE to 4),
                 karte = karte(FeldAnlage.Geschaeftsbank),
             ),
             SpielEreignis.ProzugBegonnen(1L),
@@ -212,16 +250,21 @@ class SpielRegelwerkTest {
             begonnen,
             SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
         )
-        val versorgt = anwenden(
+        val bahnhofVersorgt = anwenden(
             begonnen,
             SpielEreignis.VerwaltungsstandortVersorgt(1L, feld.ecken().last()),
         )
+        val hauptbahnhofVersorgt = anwenden(
+            bahnhofVersorgt,
+            SpielEreignis.VerwaltungsstandortVersorgt(1L, kante.anfang),
+        )
         val epizug = anwenden(
-            versorgt,
+            hauptbahnhofVersorgt,
             SpielEreignis.ProzugErfolgreichAbgeschlossen(1L),
         )
 
         assertTrue(gesperrt.isFailure)
+        assertEquals(2, begonnen.zugStatus?.prozug?.verwaltungsVerpflichtungen?.size)
         assertEquals(ZugPhase.Epizug, epizug.zugStatus?.phase)
         assertEquals(anna, epizug.aktiverSpieler)
     }

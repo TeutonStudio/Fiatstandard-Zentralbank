@@ -112,11 +112,11 @@ enum class Handelslinie(override val str: String, override val kosten: EnumMap<R
     SEE("frachtschiff",Rohstoffe.anzahl(stahl = 2)),
 }
 enum class Verwaltungsstandort(override val str: String, override val kosten: EnumMap<Rohstoffe,Int>, val verbrauch: Map<Rohstoffe,Int>): Bauteil {
-    HAUPTBAHNHOF("hauptbahnhof", Rohstoffe.anzahl(), Rohstoffe.anzahl()),
+    HAUPTBAHNHOF("hauptbahnhof", Rohstoffe.anzahl(), Rohstoffe.anzahl(nahrung=3,kohle=3)),
     BAHNHOF("bahnhof",Rohstoffe.anzahl(holz = 1, ziegel = 2) + Handelslinie.LAND.kosten,Rohstoffe.anzahl(nahrung=1,kohle=1)),
     GROSSBAHNHOF("großbahnhof",Rohstoffe.anzahl(holz = 2, ziegel = 3) + 2*Handelslinie.LAND.kosten,Rohstoffe.anzahl(nahrung=2,kohle=2)),
-    HAFEN("hafen",Rohstoffe.anzahl(holz = 1, ziegel = 2) + Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=1,diesel=1)),
-    GROSSHAFEN("großhafen",Rohstoffe.anzahl(holz = 2, ziegel = 3) + 2*Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=2,diesel=2)),
+    HAFEN("hafen",Rohstoffe.anzahl(holz = 1, ziegel = 2) + Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=1,schweröl=1)),
+    GROSSHAFEN("großhafen",Rohstoffe.anzahl(holz = 2, ziegel = 3) + 2*Handelslinie.SEE.kosten,Rohstoffe.anzahl(nahrung=2,schweröl=2)),
 }
 
 private fun wirtschaftsstandortBaukosten(): EnumMap<Rohstoffe, Int> =

@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.schnittstelle.kategorien
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -120,6 +121,31 @@ class SpielErstellenTest {
         composeTestRule
             .onNodeWithText("Bauteile für Spieler 3")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun startausstattungKannGemeinsamFuerAlleSpielerErfasstWerden() {
+        composeTestRule.setContent {
+            SpielErstellen(
+                nachAbbruch = {},
+                erstelleSpiel = { _, _ -> },
+                nachAbschluß = {},
+                seite = remember { mutableIntStateOf(4) },
+            )
+        }
+
+        composeTestRule
+            .onNodeWithText("Startrohstoffe für Spieler 1")
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithTag(UNTERSCHIEDLICHE_STARTAUSSTATTUNG)
+            .performClick()
+        composeTestRule
+            .onNodeWithText("Startrohstoffe für alle Spieler")
+            .assertIsDisplayed()
+        composeTestRule
+            .onAllNodesWithText("Startrohstoffe für Spieler 1")
+            .assertCountEquals(0)
     }
 
     @Test

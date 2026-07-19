@@ -144,12 +144,13 @@ object KartenAuswertung {
             ?: return@mapNotNull null
         val typ = wirtschaft.bauteil
         if (typ.produktionsArt != ProduktionsArt.VERARBEITUNG) return@mapNotNull null
-        val kapazitaet = ertrag(karte, belegung.position, konflikte)[spieler]
-            ?: return@mapNotNull null
+        if (ertrag(karte, belegung.position, konflikte)[spieler] == null) {
+            return@mapNotNull null
+        }
         VerarbeitungsStandort(
             feld = belegung.position,
             typ = typ,
-            maximaleLaeufe = kapazitaet,
+            maximaleLaeufe = 1,
             einsatzJeLauf = typ.verbrauch,
             ertragJeLauf = typ.ertrag,
         )
@@ -166,8 +167,7 @@ object KartenAuswertung {
         .asSequence()
         .filter { belegung ->
             belegung.besitzer == spieler &&
-                belegung.zustand == BauwerkZustand.INTAKT &&
-                belegung.typ != EckGebaeudeTyp.HAUPTBAHNHOF
+                belegung.zustand == BauwerkZustand.INTAKT
         }
         .map { belegung ->
             val bauteil = when (belegung.typ) {
@@ -185,17 +185,21 @@ object KartenAuswertung {
     fun kannAussenhandelBetreiben(
         karte: Spielkarte,
         spieler: SpielerId,
+        konflikte: Set<Konflikt> = emptySet(),
     ): Boolean {
+        val blockierteHaefen = blockierteHaefen(karte, spieler, konflikte)
         val eigeneIntakteHaefen = karte.belegung.ecken
             .filter { belegung ->
                 belegung.besitzer == spieler &&
                     belegung.zustand == BauwerkZustand.INTAKT &&
+                    belegung.position !in blockierteHaefen &&
                     belegung.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN)
             }
             .mapTo(mutableSetOf()) { it.position }
         return karte.belegung.seewege.any { seeweg ->
             seeweg.besitzer == spieler &&
-                (seeweg.hafenA in eigeneIntakteHaefen || seeweg.hafenB in eigeneIntakteHaefen)
+                seeweg.hafenA in eigeneIntakteHaefen &&
+                seeweg.hafenB in eigeneIntakteHaefen
         }
     }
 
@@ -229,12 +233,7 @@ object KartenAuswertung {
             konflikte = konflikte,
             typ = KriegsEinheitTyp.PANZER,
         )
-        val blockierteSeeKanten = blockierteKanten(
-            karte = karte,
-            spieler = spieler,
-            konflikte = konflikte,
-            typ = KriegsEinheitTyp.KRIEGSSCHIFF,
-        )
+        val blockierteHaefen = blockierteHaefen(karte, spieler, konflikte)
         val befahrbareGleise = karte.belegung.kanten
             .asSequence()
             .filter { gleis ->
@@ -246,26 +245,25 @@ object KartenAuswertung {
             karte = karte,
             spieler = spieler,
             befahrbareGleise = befahrbareGleise,
-            blockierteSeeKanten = blockierteSeeKanten,
+            blockierteHaefen = blockierteHaefen,
         )
         val anschluesse = buildList {
             feld.ecken().forEach { ecke ->
                 karte.belegung.eckenNachPosition[ecke]
                     ?.takeIf { gebaeude ->
                         gebaeude.besitzer == spieler &&
-                            gebaeude.zustand == BauwerkZustand.INTAKT
+                            gebaeude.zustand == BauwerkZustand.INTAKT &&
+                            gebaeude.position !in blockierteHaefen
                     }
                     ?.anschlussStaerke()
                     ?.takeIf { staerke -> staerke > 0 }
                     ?.let { staerke -> add(TransportAnschluss(ecke, staerke, emptyList())) }
             }
-            feld.kanten()
-                .filter { kante -> kante in befahrbareGleise }
-                .forEach { kante ->
-                    val vorlauf = listOf(TransportAbschnitt.Handelslinie(kante))
-                    add(TransportAnschluss(kante.anfang, 1, vorlauf))
-                    add(TransportAnschluss(kante.ende, 1, vorlauf))
+            feld.ecken().forEach { ecke ->
+                if (befahrbareGleise.any { kante -> kante.anfang == ecke || kante.ende == ecke }) {
+                    add(TransportAnschluss(ecke, 1, emptyList()))
                 }
+            }
         }
         anschluesse.map(TransportAnschluss::staerke)
             .distinct()
@@ -342,7 +340,7 @@ object KartenAuswertung {
         karte: Spielkarte,
         spieler: SpielerId,
         befahrbareGleise: Set<KartenKante>,
-        blockierteSeeKanten: Set<KartenKante>,
+        blockierteHaefen: Set<KartenEcke>,
     ): Map<KartenEcke, List<TransportSchritt>> {
         val graph = mutableMapOf<KartenEcke, MutableList<TransportSchritt>>()
         fun verbinden(
@@ -362,11 +360,13 @@ object KartenAuswertung {
         karte.belegung.seewege
             .asSequence()
             .filter { seeweg -> seeweg.besitzer == spieler }
+            .filter { seeweg ->
+                seeweg.hafenA !in blockierteHaefen && seeweg.hafenB !in blockierteHaefen
+            }
             .sortedBy { seeweg -> seeweg.id }
             .forEach { seeweg ->
                 val wasserweg = karte.kuerzesterWasserweg(seeweg.hafenA, seeweg.hafenB)
                     ?: return@forEach
-                if (wasserweg.any { kante -> kante in blockierteSeeKanten }) return@forEach
                 val (von, nach, gerichteterWasserweg) = when (seeweg.richtung) {
                     FrachtRichtung.A_NACH_B -> Triple(
                         seeweg.hafenA,
@@ -445,6 +445,24 @@ object KartenAuswertung {
         EckGebaeudeTyp.BAHNHOF, EckGebaeudeTyp.HAFEN -> 2
         EckGebaeudeTyp.HAUPTBAHNHOF -> 0
     }
+
+    private fun blockierteHaefen(
+        karte: Spielkarte,
+        spieler: SpielerId,
+        konflikte: Set<Konflikt>,
+    ): Set<KartenEcke> = karte.belegung.kriegseinheiten
+        .asSequence()
+        .filter { einheit ->
+            einheit.typ == KriegsEinheitTyp.KRIEGSSCHIFF &&
+                einheit.besitzer != spieler &&
+                konflikte.any { konflikt -> konflikt.betrifft(spieler, einheit.besitzer) }
+        }
+        .flatMap { einheit -> sequenceOf(einheit.position.anfang, einheit.position.ende) }
+        .filter { ecke ->
+            karte.belegung.eckenNachPosition[ecke]?.typ in
+                setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN)
+        }
+        .toSet()
 
     private fun TransportAbschnitt.sortierSchluessel(): String = when (this) {
         is TransportAbschnitt.Handelslinie ->
