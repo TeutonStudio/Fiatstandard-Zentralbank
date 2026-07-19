@@ -112,6 +112,8 @@ private val planbareWerkzeuge: List<SpielKartenWerkzeug> =
             !eintrag.nurRundeNull
     }
 
+private val KompakteKopfleistenHoehe = 146.dp
+
 private data class GeplanterBauauftrag(
     val werkzeug: SpielKartenWerkzeug,
     val bauteil: BauteilTyp,
@@ -504,7 +506,7 @@ fun KartenSpielBildschirm(
                         bauwerkInfoFreiraum = if (kompakteZentrale) {
                             PaddingValues(
                                 start = 140.dp,
-                                top = 146.dp,
+                                top = KompakteKopfleistenHoehe,
                                 end = if (
                                     planungsmodus && verfuegbareBreite >= 720.dp
                                 ) 352.dp else 0.dp,
@@ -673,7 +675,7 @@ fun KartenSpielBildschirm(
                     Modifier
                         .align(Alignment.CenterEnd)
                         .padding(
-                            top = if (kompakteZentrale) 146.dp else 8.dp,
+                            top = if (kompakteZentrale) KompakteKopfleistenHoehe else 8.dp,
                             end = 8.dp,
                             bottom = if (kompakteZentrale) 56.dp else 8.dp,
                         )

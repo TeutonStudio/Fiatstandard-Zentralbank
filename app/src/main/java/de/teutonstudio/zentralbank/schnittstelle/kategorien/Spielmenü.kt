@@ -56,6 +56,22 @@ enum class SpielmenueBereich(
     AUSSENHANDEL("Außenhandel", R.drawable.foreign),
 }
 
+internal val verarbeiteteRohstoffe = listOf(
+    Rohstoff.ZIEGEL,
+    Rohstoff.DIESEL,
+    Rohstoff.SCHWEROEL,
+    Rohstoff.STAHL,
+)
+
+internal val unverarbeiteteRohstoffe = listOf(
+    Rohstoff.NAHRUNG,
+    Rohstoff.LEHM,
+    Rohstoff.HOLZ,
+    Rohstoff.ROHOEL,
+    Rohstoff.KOHLE,
+    Rohstoff.EISEN,
+)
+
 @Composable
 fun Spielmenü(
     zustand: SpielZustand,
@@ -130,41 +146,18 @@ fun Spielmenü(
                 }
             }
             Spacer(modifier = Modifier.width(5.dp))
-            Rohstoff.entries.forEach { rohstoff ->
-                val darstellung = rohstoff.zuRohstoffe()
-                val farbe = darstellung.farbe
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = farbe,
-                    contentColor = farbe.lesbareSchriftfarbe(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(
-                            modifier = Modifier.size(28.dp * ROHSTOFF_ICON_SKALIERUNG),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            zeigeRohstoff(
-                                rohstoff = darstellung,
-                                iconSize = 28.dp,
-                                text = false,
-                            )
-                        }
-                        Text(
-                            text = darstellung.str.replaceFirstChar(Char::uppercase),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                        Text(
-                            text = aktiverSpieler?.rohstoffe?.getOrDefault(rohstoff, 0)
-                                ?.toString() ?: "0",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-            }
+            RohstoffBestandsGruppe(
+                rohstoffe = verarbeiteteRohstoffe,
+                bestand = { rohstoff ->
+                    aktiverSpieler?.rohstoffe?.getOrDefault(rohstoff, 0) ?: 0
+                },
+            )
+            RohstoffBestandsGruppe(
+                rohstoffe = unverarbeiteteRohstoffe,
+                bestand = { rohstoff ->
+                    aktiverSpieler?.rohstoffe?.getOrDefault(rohstoff, 0) ?: 0
+                },
+            )
         }
 
         Surface(
@@ -224,6 +217,52 @@ fun Spielmenü(
                     modifier = Modifier.widthIn(max = 110.dp),
                     style = MaterialTheme.typography.labelSmall,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RohstoffBestandsGruppe(
+    rohstoffe: List<Rohstoff>,
+    bestand: (Rohstoff) -> Int,
+) {
+    Row(
+        modifier = Modifier.padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        rohstoffe.forEach { rohstoff ->
+            val darstellung = rohstoff.zuRohstoffe()
+            val farbe = darstellung.farbe
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = farbe,
+                contentColor = farbe.lesbareSchriftfarbe(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 5.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = Modifier.size(28.dp * ROHSTOFF_ICON_SKALIERUNG),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        zeigeRohstoff(
+                            rohstoff = darstellung,
+                            iconSize = 28.dp,
+                            text = false,
+                        )
+                    }
+                    Text(
+                        text = darstellung.str.replaceFirstChar(Char::uppercase),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Text(
+                        text = bestand(rohstoff).toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
     }

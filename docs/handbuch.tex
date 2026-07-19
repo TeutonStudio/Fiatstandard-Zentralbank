@@ -127,9 +127,9 @@ Gelaendefelder & Dreiecksfelder mit Rohstoffbezug. Jedes Gelaendefeld kann je na
 Zentralbank & Zentrales Element des Geldsystems. Sie emittiert die Waehrung Mark. \\
 Hauptbahnhoefe & Startgebaeude der Spieler und Kern ihrer Infrastruktur. \\
 Bahnhoefe & Spielerabhaengige Gebaeude auf Ecken. Erhoehen Ertrag angrenzender Abbaueinheiten. \\
-Grossbahnhoefe & Staerkere Bahnhoefe auf Ecken. Erhoehen Ertrag staerker und zaehlen fuer Kontrolle und Versorgung. \\
+Grossbahnhoefe & Aufwertung eines bestehenden Bahnhofs. Erhoehen Ertrag staerker und zaehlen fuer Kontrolle und Versorgung. \\
 Haefen & Spielerabhaengige Gebaeude auf geeigneten Ecken mit Wasser- und Gelaendezugang. \\
-Grosshaefen & Staerkere Haefen mit hoeherer Frachtschiffkapazitaet. \\
+Grosshaefen & Aufwertung eines bestehenden Hafens mit hoeherer Frachtschiffkapazitaet. \\
 Schienen & Spielerabhaengige Verbindungen auf Kanten zwischen zwei Gelaendefeldern. \\
 Geschaeftsbanken & Neutrale Gebaeude in der Farbe der Zentralbank. Sie koennen statt Abbaueinheiten auf Gelaendefelder gebaut werden. \\
 Abbaueinheiten & Neutrale Anlagen auf Gelaendefeldern. Sie erzeugen Rohstoffertrag fuer angeschlossene Spieler. \\
@@ -143,6 +143,11 @@ Anleihenkarten & Ausfuellbare Vorlagen fuer Anleihen zwischen Spielern oder gege
 App & Verwaltet Anleihen, Rohstoffhandel, Anleihenhandel, Zahlungen, Marktwert und Auslandshandelskosten. \\
 \bottomrule
 \end{longtable}
+
+Grossbahnhof und Grosshafen werden nicht als eigenstaendige Neubauten geplant.
+Der Spieler waehlt am bestehenden eigenen Bahnhof beziehungsweise Hafen im
+Hoverfenster \emph{Aufwerten}. Ist der Planungsmodus aktiv, landet diese Aufwertung
+wie ein Neubau im Planungswarenkorb.
 
 \section{Geld und Waehrung}
 In diesem Spiel wird zwischen \begriff{Geld} und \begriff{Waehrung} unterschieden.
@@ -284,7 +289,7 @@ Raffinerie & Gelaendefeld & Verarbeitung: 2 Rohoel zu 2 Diesel und 1 Schweroel j
 Synthetische Raffinerie & Gelaendefeld & Verarbeitung: 3 Kohle zu 2 Diesel und 1 Schweroel je Lauf. \\
 Stahlfabrik & Gelaendefeld & Verarbeitung: 1 Eisen und 1 Kohle zu 2 Stahl je Lauf. \\
 Geschaeftsbank & Gelaendefeld & Neutrales Bankgebaeude in Zentralbankfarbe. Kann statt einer Abbaueinheit gebaut werden und wird durch angrenzende Infrastruktur genutzt. \\
-Frachtschiff & Seeweg & Verbindet zwei Haefen. Import- und Exportrichtung werden durch zwei Faehnchen markiert. \\
+Frachtschiff & Seeweg & Pendelt zwischen zwei Haefen auf dem kuerzesten Weg aus Wasser--Wasser-Kanten. \\
 Panzer & Kante & Truppe gegen Landziele; kann im Epizug gebaut werden und benoetigt 1 Diesel je Kantenbewegung. \\
 Kriegsschiff & Kante & Truppe gegen Haefen und Seewege; kann im Epizug gebaut werden und benoetigt 1 Schweroel je Kantenbewegung. \\
 \bottomrule
@@ -529,7 +534,12 @@ Mehr Hafeninfrastruktur verbessert damit die Bedingungen fuer Auslandshandel. We
 \section{Haefen und Frachtschiffe}
 Schienen koennen Inseln nicht direkt mit dem Hauptbahnhof verbinden. Fuer getrennte Landmassen werden zwei Haefen und ein Frachtschiff benoetigt.
 
-Ein Frachtschiff verbindet zwei Haefen. Es besitzt zwei Faehnchen, die an die jeweiligen Haefen gesteckt werden. Die Faehnchen definieren Import- und Exportrichtung dieses Schiffes.
+Ein Frachtschiff pendelt zwischen zwei eigenen intakten Haefen. Seine Route ist
+der kuerzeste zusammenhaengende Weg, der ausschliesslich aus Kanten zwischen zwei
+Wasserfeldern besteht. Wird das Frachtschiff angeheftet, hebt die App alle Kanten
+dieser Route hervor. Ueber \emph{Route aendern} im Hoverfenster koennen zwei neue
+eigene Haefen als Endpunkte gewaehlt werden; die kuerzeste Wasserroute wird danach
+neu berechnet.
 
 \section{Kapazitaet}
 \begin{center}
@@ -590,8 +600,6 @@ Spieler koennen im Epizug auch ohne bestehenden Krieg Truppen bauen. Fuer den Ba
   \item[Kriegsschiffe] Stehen auf Kanten, die an mindestens ein Wasserfeld grenzen, und werden zur Blockade von Haefen und zur Unterstuetzung von Kuestenzielen eingesetzt.
 \end{description}
 
-Gebautes Material bleibt nach einem Friedensschluss auf dem Spielfeld und kann in spaeteren Konflikten erneut verwendet werden.
-
 \section{Treibstoffverbrauch}
 Eine Bewegung fuehrt von der aktuellen Kante auf eine benachbarte Kante mit gemeinsamer Ecke. Fuer jeden einzelnen solchen Schritt wird Treibstoff verbraucht:
 
@@ -601,6 +609,20 @@ Eine Bewegung fuehrt von der aktuellen Kante auf eine benachbarte Kante mit geme
 \end{itemize}
 
 Ein mehrschrittiger Weg wird nur ausgefuehrt, wenn der gesamte benoetigte Treibstoff vorhanden ist. Andernfalls bleiben sowohl Rohstoffbestand als auch Truppenposition unveraendert.
+
+\section{Kampfaufloesung}
+Beim Kriegsende werden Panzer und Kriegsschiffe jeweils getrennt nach demselben
+Schema ausgewertet:
+
+\begin{itemize}
+  \item Bei gleicher Truppenzahl ueberlebt auf keiner Seite eine Einheit.
+  \item Bei einer Einheit Vorsprung ueberlebt genau eine Einheit der staerkeren Seite.
+  \item Bei zwei Einheiten Vorsprung ueberleben drei Einheiten der staerkeren Seite, hoechstens jedoch die tatsaechlich vorhandene Anzahl.
+  \item Ab drei Einheiten Vorsprung ueberleben alle Einheiten der staerkeren Seite; alle gegnerischen Einheiten dieses Typs werden entfernt.
+\end{itemize}
+
+Andere Spieler und der jeweils andere Truppentyp werden von der einzelnen
+Typauswertung nicht beruehrt.
 
 \section{Blockade und Belagerung}
 Haefen koennen durch Kriegsschiffe blockiert werden. Bahnhoefe, Grossbahnhoefe, Haefen und Grosshaefen koennen durch Panzer belagert werden.
@@ -676,7 +698,6 @@ Dieses Kapitel sammelt alle Punkte, die fuer eine vollstaendige Fassung noch ent
 \section{Baukosten und Kriegskosten}
 \begin{itemize}
   \item Noch fehlende Kosten fuer Wirtschafts- und Kriegseinheiten festlegen.
-  \item Treibstoffart und Verbrauch von Panzern und Kriegsschiffen pro Bewegungsschritt festlegen.
 \end{itemize}
 
 \section{Bankensystem}
@@ -689,7 +710,6 @@ Dieses Kapitel sammelt alle Punkte, die fuer eine vollstaendige Fassung noch ent
 \section{Krieg}
 \begin{itemize}
   \item Belagerungsdauer je Zieltyp festlegen.
-  \item Verteidigungsformel festlegen.
   \item Blockadewirkung von Kriegsschiffen praezisieren.
 \end{itemize}
 
