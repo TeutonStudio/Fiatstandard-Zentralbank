@@ -1,9 +1,14 @@
 package de.teutonstudio.zentralbank.datenbank
 
+import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.felder
 
 /** Kompakte, quellcodefähige Spiegelung der größten gebündelten Europa-Vorlage. */
@@ -29,6 +34,16 @@ private val europaKontinentalRaster = """
     ...........E.EE................................................E..................................................
 """.trimIndent().filterNot { zeichen -> zeichen.isWhitespace() }
 
+private val testSpielerHauptbahnhofPositionen = listOf(
+    KartenEcke(0, 0),
+    KartenEcke(34, -4),
+    KartenEcke(-24, 24),
+    KartenEcke(18, 28),
+    KartenEcke(-6, -32),
+    KartenEcke(-25, -6),
+    KartenEcke(16, -20),
+)
+
 private fun baueTestSpielEuropaKarte(): Spielkarte {
     val hexagon = KartenHexagon(radius = 19)
     require(europaKontinentalRaster.length.toLong() == hexagon.anzahlFelder) {
@@ -46,11 +61,25 @@ private fun baueTestSpielEuropaKarte(): Spielkarte {
         }
         gelaende?.let { typ -> GelaendeFeld(position, typ) }
     }
+    require(testSpielerHauptbahnhofPositionen.size == testSpielerNamen.size) {
+        "Jeder Testspieler braucht genau eine Hauptbahnhofposition."
+    }
+    val hauptbahnhoefe = testSpielerNamen.zip(
+        testSpielerHauptbahnhofPositionen,
+    ) { spielerName, position ->
+        EckBelegung(
+            position = position,
+            typ = EckGebaeudeTyp.HAUPTBAHNHOF,
+            besitzer = SpielerId(spielerName),
+            gebautInRunde = 0,
+        )
+    }
     return Spielkarte(
         id = "testspiel-europa-5-kontinental",
         name = "Testspiel – Europa 5 – Kontinental",
         hexagon = hexagon,
         gelaendefelder = gelaendefelder,
+        belegung = KartenBelegung(ecken = hauptbahnhoefe),
     )
 }
 

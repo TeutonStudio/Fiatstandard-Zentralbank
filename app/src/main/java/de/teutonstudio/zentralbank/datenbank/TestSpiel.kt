@@ -273,7 +273,7 @@ private val startKontrolle: Map<Wirtschaftsregionen, Int> = mapOf(
     Wirtschaftsregionen.GESCHÄFTSBANK to 1,
 )
 
-private val testSpieler = listOf(
+internal val testSpielerNamen = listOf(
     "Anna",
     "Bernd",
     "Clara",
@@ -281,7 +281,9 @@ private val testSpieler = listOf(
     "Eva",
     "Franz",
     "Georg",
-).map { name ->
+)
+
+private val testSpieler = testSpielerNamen.map { name ->
     Spieler(name, startBau, startKontrolle)
 }
 

@@ -15,7 +15,9 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
+import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -36,6 +38,32 @@ class DomainMappingTest {
         assertEquals("testspiel-europa-5-kontinental", state.karte?.id)
         assertEquals(19, state.karte?.hexagon?.radius)
         assertEquals(1281, state.karte?.gelaendefelder?.size)
+        val karte = requireNotNull(state.karte)
+        val hauptbahnhoefe = karte.belegung.ecken.filter { belegung ->
+            belegung.typ == EckGebaeudeTyp.HAUPTBAHNHOF
+        }
+        assertEquals(
+            state.spieler.map { spieler -> spieler.id }.toSet(),
+            hauptbahnhoefe.mapNotNull(EckBelegung::besitzer).toSet(),
+        )
+        assertTrue(
+            hauptbahnhoefe.all { hauptbahnhof ->
+                angrenzendeFelder(hauptbahnhof.position).all { feld ->
+                    feld in karte.landNachPosition
+                }
+            },
+        )
+        assertTrue(
+            hauptbahnhoefe.indices.all { index ->
+                hauptbahnhoefe.drop(index + 1).all { andererHauptbahnhof ->
+                    kantenAbstand(
+                        hauptbahnhoefe[index].position,
+                        andererHauptbahnhof.position,
+                        maximal = 2,
+                    ) == null
+                }
+            },
+        )
         assertTrue(state.marktpreise.keys.containsAll(Rohstoff.entries))
         assertEquals(
             setOf(
