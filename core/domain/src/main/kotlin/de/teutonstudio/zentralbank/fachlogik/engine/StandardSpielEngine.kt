@@ -4,6 +4,7 @@ import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.auswertung.ProzugAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.RundenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.SpielEndeAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsAuswertung
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
@@ -37,57 +38,7 @@ class StandardSpielEngine : SpielEngine {
         zustand: SpielZustand,
         spieler: SpielerId,
     ): List<SpielAktion> {
-        if (zustand.ergebnis != null || spieler in zustand.ausgeschiedeneSpieler) return emptyList()
-        val zug = zustand.zugStatus ?: return emptyList()
-        if (zustand.aktiverSpieler != spieler || zug.spieler != spieler) return emptyList()
-
-        val kandidaten: List<SpielAktion> = when (zug.phase) {
-            ZugPhase.Prozug -> if (!zug.prozug.begonnen) {
-                listOf(SpielAktion.ProzugBeginnen(zug.zugId))
-            } else {
-                val plan = ProzugAuswertung.plan(zustand)
-                buildList<SpielAktion> {
-                    plan?.produktionsStandorte
-                        ?.filter { it.verbleibendeLaeufe > 0 && it.mitBestandMoeglicheLaeufe > 0 }
-                        ?.forEach { standort ->
-                            add(
-                                SpielAktion.VerarbeitungAusfuehren(
-                                    zugId = zug.zugId,
-                                    feld = standort.standort.feld,
-                                ),
-                            )
-                        }
-                    zug.prozug.verwaltungsVerpflichtungen
-                        .filter { it.id !in zug.prozug.versorgteStandorte }
-                        .forEach { verpflichtung ->
-                            add(
-                                SpielAktion.VerwaltungsstandortVersorgen(
-                                    zugId = zug.zugId,
-                                    ecke = verpflichtung.id.ecke,
-                                ),
-                            )
-                        }
-                    zug.prozug.verbindlichkeiten
-                        .filter { it.id !in zug.prozug.beglicheneVerbindlichkeiten }
-                        .forEach { verbindlichkeit ->
-                            add(
-                                SpielAktion.VerbindlichkeitBegleichen(
-                                    zugId = zug.zugId,
-                                    verbindlichkeit = verbindlichkeit.id,
-                                ),
-                            )
-                        }
-                    if (plan?.kannErfolgreichAbschliessen == true) {
-                        add(SpielAktion.ProzugAbschliessen(zug.zugId))
-                    }
-                }
-            }
-
-            ZugPhase.Epizug -> listOf(SpielAktion.ZugBeenden)
-        }
-        return (kandidaten + SpielAktion.Aufgeben(spieler))
-            .distinct()
-            .filter { aktion -> pruefe(zustand, aktion).isSuccess }
+        return AktionsAuswertung.erlaubteAktionen(zustand, spieler).aktionen
     }
 
     private fun ereignisseFuer(

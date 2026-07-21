@@ -14,6 +14,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 private val protokollJson = Json {
     classDiscriminator = "art"
@@ -65,7 +67,9 @@ fun SpielAktion.zuDto(): SpielAktionDto = when (this) {
         SpielAktionDto.VerbindlichkeitBegleichen(zugId, verbindlichkeit.zuDto())
     is SpielAktion.ProzugAbschliessen -> SpielAktionDto.ProzugAbschliessen(zugId)
     SpielAktion.ZugBeenden -> SpielAktionDto.ZugBeenden
-    else -> error("Aktion ${this::class.simpleName} ist in API v$API_VERSION noch nicht freigegeben.")
+    else -> SpielAktionDto.ErweiterteAktion(
+        protokollJson.encodeToString(SpielAktion.serializer(), this),
+    )
 }
 
 fun SpielAktionDto.zuDomain(): SpielAktion = when (this) {
@@ -82,6 +86,10 @@ fun SpielAktionDto.zuDomain(): SpielAktion = when (this) {
         SpielAktion.VerbindlichkeitBegleichen(zugId, verbindlichkeit.zuDomain())
     is SpielAktionDto.ProzugAbschliessen -> SpielAktion.ProzugAbschliessen(zugId)
     SpielAktionDto.ZugBeenden -> SpielAktion.ZugBeenden
+    is SpielAktionDto.ErweiterteAktion -> protokollJson.decodeFromString(
+        SpielAktion.serializer(),
+        kodierung,
+    )
 }
 
 fun SpielEreignis.zuDto(): SpielEreignisDto = SpielEreignisDto(

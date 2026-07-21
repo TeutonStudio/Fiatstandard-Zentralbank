@@ -34,6 +34,14 @@ sealed interface SpielAktionDto {
 
     @Serializable
     data object ZugBeenden : SpielAktionDto
+
+    /**
+     * Versionierter Übergang für neue Domain-Aktionen, bis sie als eigene komfortable
+     * Browser-DTOs benötigt werden. Der Server dekodiert weiterhin strikt über den
+     * serialisierbaren `SpielAktion`-Serializer und validiert mit derselben Engine.
+     */
+    @Serializable
+    data class ErweiterteAktion(val kodierung: String) : SpielAktionDto
 }
 
 @Serializable
