@@ -52,7 +52,7 @@ Browser gespeichert.
 ## Simulation und Trainingsdatenexport
 
 ```bash
-./gradlew :tools:simulation:run --args="--spiele 2 --seed 42 --max-entscheidungen 500 --spieler zufall,wirtschaft,sicherheit --karte kleine-wirtschaft-v1 --ausgabe build/simulation"
+./gradlew :tools:simulation:run --args="--spiele 2 --seed 42 --max-entscheidungen 500 --spieler sicherheit --karte kleine-wirtschaft-v1 --ausgabe build/simulation"
 
 # separater Massentest mit 1.000 deterministischen Partien
 ./gradlew :tools:simulation:massentest
