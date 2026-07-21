@@ -32,6 +32,23 @@ class StandardSpielEngineTest {
     }
 
     @Test
+    fun inkonsistenterEingangszustandWirdVorDerAktionAbgelehnt() {
+        val fehlerhafterStart = start.copy(
+            spieler = listOf(
+                start.spieler.single().copy(rohstoffe = mapOf(Rohstoff.HOLZ to -1)),
+            ),
+        )
+
+        val ergebnis = engine.anwenden(
+            fehlerhafterStart,
+            SpielAktion.ProzugBeginnen(1L),
+        )
+
+        assertTrue(ergebnis.isFailure)
+        assertEquals(-1, fehlerhafterStart.spieler.single().rohstoffe[Rohstoff.HOLZ])
+    }
+
+    @Test
     fun erlaubteAktionenFuehrenMitDerselbenEngineDurchEinenZug() {
         val begonnen = engine.anwenden(start, SpielAktion.ProzugBeginnen(1L)).getOrThrow()
         val abschliessen = engine.erlaubteAktionen(begonnen.zustand, anna)

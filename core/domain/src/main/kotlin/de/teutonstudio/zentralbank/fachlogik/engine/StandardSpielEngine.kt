@@ -5,6 +5,7 @@ import de.teutonstudio.zentralbank.fachlogik.auswertung.ProzugAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.RundenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.SpielEndeAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ZustandsInvarianten
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
@@ -27,10 +28,12 @@ class StandardSpielEngine : SpielEngine {
         zustand: SpielZustand,
         aktion: SpielAktion,
     ): Result<SpielSchrittErgebnis> = runCatching {
+        ZustandsInvarianten.pruefe(zustand).getOrThrow()
         val ereignisse = ereignisseFuer(zustand, aktion)
         val folgezustand = ereignisse.fold(zustand) { zwischenzustand, ereignis ->
             SpielRegelwerk.wendeAn(zwischenzustand, ereignis).getOrThrow()
         }
+        ZustandsInvarianten.pruefe(folgezustand).getOrThrow()
         SpielSchrittErgebnis(folgezustand, ereignisse)
     }
 
