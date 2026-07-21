@@ -19,10 +19,21 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
+import de.teutonstudio.zentralbank.fachlogik.modell.AusscheidensGrund
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielErgebnis
 import kotlinx.serialization.Serializable
 
 @Serializable
 sealed interface SpielEreignis {
+    @Serializable
+    data class SpielerAusgeschieden(
+        val spieler: SpielerId,
+        val grund: AusscheidensGrund,
+    ) : SpielEreignis
+
+    @Serializable
+    data class PartieBeendet(val ergebnis: SpielErgebnis) : SpielEreignis
+
     @Serializable
     data class ProzugBegonnen(
         val zugId: Long,

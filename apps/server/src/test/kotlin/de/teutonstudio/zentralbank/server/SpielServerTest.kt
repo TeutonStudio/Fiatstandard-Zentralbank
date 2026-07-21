@@ -87,12 +87,14 @@ class SpielServerTest {
             )
             assertEquals(200, aktionenAntwort.statusCode())
             val aktionen = json.decodeFromString<ErlaubteAktionenDto>(aktionenAntwort.body())
-            assertTrue(aktionen.aktionen.single() is SpielAktionDto.ProzugBeginnen)
+            val prozugBeginnen = aktionen.aktionen.single {
+                it is SpielAktionDto.ProzugBeginnen
+            }
 
             val schrittAntwort = client.send(
                 jsonAnfrage(
                     "$basis/api/v1/games/${erstellt.spielId}/actions",
-                    json.encodeToString(AktionAusfuehrenAnfrageDto(aktion = aktionen.aktionen.single())),
+                    json.encodeToString(AktionAusfuehrenAnfrageDto(aktion = prozugBeginnen)),
                 ),
                 HttpResponse.BodyHandlers.ofString(),
             )

@@ -13,6 +13,16 @@ internal object ZugRegelwerk {
         zustand: SpielZustand,
         ereignis: SpielEreignis,
     ) {
+        if (zustand.ergebnis != null) {
+            error("Die Partie ist bereits beendet; weitere Aktionen sind nicht zulässig.")
+        }
+        if (ereignis is SpielEreignis.PartieBeendet) return
+        if (ereignis is SpielEreignis.SpielerAusgeschieden) {
+            require(ereignis.spieler == zustand.aktiverSpieler) {
+                "Nur der aktive Spieler kann ausscheiden."
+            }
+            return
+        }
         if (ereignis is SpielEreignis.WarenkorbGeaendert) return
         if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
             require(ereignis.istRundeNullPlatzierung()) {
@@ -35,6 +45,8 @@ internal object ZugRegelwerk {
         }
 
         when (ereignis) {
+            is SpielEreignis.SpielerAusgeschieden,
+            is SpielEreignis.PartieBeendet -> Unit // vor dem when abschließend geprüft
             is SpielEreignis.ProzugBegonnen -> {
                 require(zug.phase == ZugPhase.Prozug && !zug.prozug.begonnen) {
                     "Der Prozug wurde bereits begonnen oder ist nicht aktiv."
@@ -157,8 +169,14 @@ internal object ZugRegelwerk {
     ): SpielZustand {
         val aktuellerIndex = zustand.spieler.indexOfFirst { it.id == aktuellerSpieler }
         require(aktuellerIndex >= 0) { "Aktiver Spieler ist unbekannt." }
-        val naechsterSpieler = zustand.spieler[(aktuellerIndex + 1) % zustand.spieler.size]
-        val neueRunde = if (aktuellerIndex == zustand.spieler.lastIndex) {
+        val naechsterIndex = (1..zustand.spieler.size)
+            .asSequence()
+            .map { versatz -> (aktuellerIndex + versatz) % zustand.spieler.size }
+            .firstOrNull { index ->
+                zustand.spieler[index].id !in zustand.ausgeschiedeneSpieler
+            } ?: error("Es ist kein spielfähiger Spieler mehr vorhanden.")
+        val naechsterSpieler = zustand.spieler[naechsterIndex]
+        val neueRunde = if (naechsterIndex <= aktuellerIndex) {
             zustand.rundenzähler + 1
         } else {
             zustand.rundenzähler
@@ -227,6 +245,7 @@ internal object ZugRegelwerk {
         is SpielEreignis.KriegsEinheitEntfernt -> spieler
         is SpielEreignis.KriegErklaert -> aggressor
         is SpielEreignis.KriegBeendet -> spielerA
+        is SpielEreignis.SpielerAusgeschieden -> spieler
         else -> null
     }
 }

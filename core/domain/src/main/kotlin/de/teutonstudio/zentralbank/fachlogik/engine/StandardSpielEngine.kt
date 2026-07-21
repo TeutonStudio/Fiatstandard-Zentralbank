@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.fachlogik.engine
 import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.auswertung.ProzugAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.RundenAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.SpielEndeAuswertung
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
@@ -28,6 +29,7 @@ class StandardSpielEngine : SpielEngine {
         zustand: SpielZustand,
         spieler: SpielerId,
     ): List<SpielAktion> {
+        if (zustand.ergebnis != null || spieler in zustand.ausgeschiedeneSpieler) return emptyList()
         val zug = zustand.zugStatus ?: return emptyList()
         if (zustand.aktiverSpieler != spieler || zug.spieler != spieler) return emptyList()
 
@@ -75,7 +77,9 @@ class StandardSpielEngine : SpielEngine {
 
             ZugPhase.Epizug -> listOf(SpielAktion.ZugBeenden)
         }
-        return kandidaten.filter { aktion -> pruefe(zustand, aktion).isSuccess }
+        return (kandidaten + SpielAktion.Aufgeben(spieler))
+            .distinct()
+            .filter { aktion -> pruefe(zustand, aktion).isSuccess }
     }
 
     private fun ereignisseFuer(
@@ -83,7 +87,9 @@ class StandardSpielEngine : SpielEngine {
         aktion: SpielAktion,
     ): List<SpielEreignis> {
         if (aktion == SpielAktion.ZugBeenden) return zugBeendenEreignisse(zustand)
+        if (aktion is SpielAktion.Aufgeben) return aufgebenEreignisse(zustand, aktion)
         return listOf(when (aktion) {
+            is SpielAktion.Aufgeben -> error("Wird als mehrstufige Regelfolge aufgelöst.")
             is SpielAktion.ProzugBeginnen -> SpielEreignis.ProzugBegonnen(aktion.zugId)
             is SpielAktion.VerarbeitungAusfuehren -> SpielEreignis.VerarbeitungAusgefuehrt(
                 zugId = aktion.zugId,
@@ -144,6 +150,38 @@ class StandardSpielEngine : SpielEngine {
         }
         val naechsterZug = requireNotNull(zwischenzustand.zugStatus)
         ereignisse += SpielEreignis.ProzugBegonnen(naechsterZug.zugId)
+        return ereignisse
+    }
+
+    private fun aufgebenEreignisse(
+        zustand: SpielZustand,
+        aktion: SpielAktion.Aufgeben,
+    ): List<SpielEreignis> {
+        val vorherigeRunde = zustand.rundenzähler
+        val ereignisse = mutableListOf<SpielEreignis>(
+            SpielEreignis.SpielerAusgeschieden(
+                spieler = aktion.spieler,
+                grund = de.teutonstudio.zentralbank.fachlogik.modell.AusscheidensGrund.AUFGABE,
+            ),
+        )
+        var zwischenzustand = SpielRegelwerk.wendeAn(zustand, ereignisse.last()).getOrThrow()
+        val ergebnis = SpielEndeAuswertung.ergebnisFallsBeendet(zwischenzustand)
+        if (ergebnis != null) {
+            ereignisse += SpielEreignis.PartieBeendet(ergebnis)
+            return ereignisse
+        }
+        if (zwischenzustand.rundenzähler > vorherigeRunde) {
+            val werte = RundenAuswertung.naechsteRundenwerte(zwischenzustand)
+            val rundenereignis = SpielEreignis.RundeBegonnen(
+                werte.runde,
+                werte.marktpreise,
+                werte.leitzins,
+                werte.preisinflation,
+            )
+            ereignisse += rundenereignis
+            zwischenzustand = SpielRegelwerk.wendeAn(zwischenzustand, rundenereignis).getOrThrow()
+        }
+        ereignisse += SpielEreignis.ProzugBegonnen(requireNotNull(zwischenzustand.zugStatus).zugId)
         return ereignisse
     }
 }

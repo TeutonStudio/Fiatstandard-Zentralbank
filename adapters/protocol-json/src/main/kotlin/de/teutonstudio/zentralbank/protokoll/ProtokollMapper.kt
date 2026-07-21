@@ -8,6 +8,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitArt
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
@@ -51,6 +52,7 @@ fun SpielZustand.zuDto(): SpielZustandDto = SpielZustandDto(
 )
 
 fun SpielAktion.zuDto(): SpielAktionDto = when (this) {
+    is SpielAktion.Aufgeben -> SpielAktionDto.Aufgeben(spieler.wert)
     is SpielAktion.ProzugBeginnen -> SpielAktionDto.ProzugBeginnen(zugId)
     is SpielAktion.VerarbeitungAusfuehren -> SpielAktionDto.VerarbeitungAusfuehren(
         zugId = zugId,
@@ -67,6 +69,7 @@ fun SpielAktion.zuDto(): SpielAktionDto = when (this) {
 }
 
 fun SpielAktionDto.zuDomain(): SpielAktion = when (this) {
+    is SpielAktionDto.Aufgeben -> SpielAktion.Aufgeben(SpielerId(spielerId))
     is SpielAktionDto.ProzugBeginnen -> SpielAktion.ProzugBeginnen(zugId)
     is SpielAktionDto.VerarbeitungAusfuehren -> SpielAktion.VerarbeitungAusfuehren(
         zugId = zugId,

@@ -10,6 +10,9 @@ object SpielRegelwerk {
     ): Result<SpielZustand> = runCatching {
         ZugRegelwerk.pruefeFreigabe(zustand, ereignis)
         when (ereignis) {
+            is SpielEreignis.SpielerAusgeschieden ->
+                PartieRegelwerk.spielerAusscheiden(zustand, ereignis)
+            is SpielEreignis.PartieBeendet -> PartieRegelwerk.partieBeenden(zustand, ereignis)
             is SpielEreignis.ProzugBegonnen ->
                 ProzugRegelwerk.beginnen(zustand, ereignis)
             is SpielEreignis.VerarbeitungAusgefuehrt ->

@@ -98,6 +98,9 @@ data class SpielZustand(
     val marktpreisBeobachtungen: Map<Rohstoff, List<Geld>> = emptyMap(),
     val geldpolitik: Geldpolitik = Geldpolitik(),
     val rundenwerte: List<Rundenwerte> = emptyList(),
+    val ausgeschiedeneSpieler: Set<SpielerId> = emptySet(),
+    val ausscheidensReihenfolge: List<SpielerId> = emptyList(),
+    val ergebnis: SpielErgebnis? = null,
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
     val zugStatus: ZugStatus? = aktiverSpieler?.let {

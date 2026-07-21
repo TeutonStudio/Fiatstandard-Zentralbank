@@ -18,6 +18,10 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 sealed interface SpielAktion {
+    /** Aufgabe ist eine ausdrückliche Spielerentscheidung und keine Zeitstrafe. */
+    @Serializable
+    data class Aufgeben(val spieler: SpielerId) : SpielAktion
+
     @Serializable
     data class ProzugBeginnen(val zugId: Long) : SpielAktion
 

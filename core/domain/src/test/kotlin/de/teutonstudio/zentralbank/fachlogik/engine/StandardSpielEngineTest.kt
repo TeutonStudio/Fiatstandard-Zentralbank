@@ -11,6 +11,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class StandardSpielEngineTest {
@@ -33,10 +34,11 @@ class StandardSpielEngineTest {
     @Test
     fun erlaubteAktionenFuehrenMitDerselbenEngineDurchEinenZug() {
         val begonnen = engine.anwenden(start, SpielAktion.ProzugBeginnen(1L)).getOrThrow()
-        val abschliessen = engine.erlaubteAktionen(begonnen.zustand, anna).single()
+        val abschliessen = engine.erlaubteAktionen(begonnen.zustand, anna)
+            .single { it is SpielAktion.ProzugAbschliessen }
         val epizug = engine.anwenden(begonnen.zustand, abschliessen).getOrThrow()
 
-        assertEquals(listOf(SpielAktion.ZugBeenden), engine.erlaubteAktionen(epizug.zustand, anna))
+        assertTrue(SpielAktion.ZugBeenden in engine.erlaubteAktionen(epizug.zustand, anna))
         assertEquals(1, begonnen.ereignisse.size)
     }
 
@@ -140,5 +142,45 @@ class StandardSpielEngineTest {
                 ereignisse = verlauf,
             ).zustand,
         )
+    }
+
+    @Test
+    fun aufgabeFuehrtZumLetztenSpielerUndBeendeterZustandLehntAktionenAb() {
+        val bert = SpielerId("Bert")
+        val carla = SpielerId("Carla")
+        val startMitDrei = SpielZustand(
+            spieler = listOf(
+                Spieler(anna, "Anna"),
+                Spieler(bert, "Bert"),
+                Spieler(carla, "Carla"),
+            ),
+        )
+        val ersterSchritt = engine.anwenden(
+            startMitDrei,
+            SpielAktion.Aufgeben(anna),
+        ).getOrThrow()
+
+        assertNull(ersterSchritt.zustand.ergebnis)
+        assertEquals(bert, ersterSchritt.zustand.aktiverSpieler)
+        assertTrue(ersterSchritt.zustand.zugStatus?.prozug?.begonnen == true)
+
+        val letzterSchritt = engine.anwenden(
+            ersterSchritt.zustand,
+            SpielAktion.Aufgeben(bert),
+        ).getOrThrow()
+        val ergebnis = requireNotNull(letzterSchritt.zustand.ergebnis)
+
+        assertEquals(carla, ergebnis.gewinner)
+        assertEquals(listOf(carla, bert, anna), ergebnis.platzierungen)
+        assertNull(letzterSchritt.zustand.aktiverSpieler)
+        assertTrue(engine.erlaubteAktionen(letzterSchritt.zustand, carla).isEmpty())
+        assertTrue(
+            engine.anwenden(letzterSchritt.zustand, SpielAktion.Aufgeben(carla)).isFailure,
+        )
+        val replay = SpielAblauf(
+            startMitDrei,
+            ersterSchritt.ereignisse + letzterSchritt.ereignisse,
+        ).zustand
+        assertEquals(letzterSchritt.zustand, replay)
     }
 }
