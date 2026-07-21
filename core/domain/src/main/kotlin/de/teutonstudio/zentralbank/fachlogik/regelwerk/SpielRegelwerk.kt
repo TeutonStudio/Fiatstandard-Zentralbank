@@ -86,6 +86,23 @@ object SpielRegelwerk {
                 marktpreise = ereignis.marktpreise,
                 leitzins = ereignis.leitzins,
             )
+            is SpielEreignis.RundeBegonnen -> {
+                require(ereignis.runde == zustand.rundenzähler) {
+                    "Die Rundenwerte gehören nicht zur laufenden Runde."
+                }
+                zustand.copy(
+                    marktpreise = ereignis.marktpreise,
+                    leitzins = ereignis.leitzins,
+                    marktpreisBeobachtungen = emptyMap(),
+                    rundenwerte = zustand.rundenwerte +
+                        de.teutonstudio.zentralbank.fachlogik.modell.Rundenwerte(
+                            runde = ereignis.runde,
+                            marktpreise = ereignis.marktpreise,
+                            leitzins = ereignis.leitzins,
+                            preisinflation = ereignis.preisinflation,
+                        ),
+                )
+            }
             SpielEreignis.ZugBeendet -> ZugRegelwerk.zugBeenden(zustand)
         }
     }

@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.fachlogik.engine
 
 import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.auswertung.ProzugAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.RundenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
@@ -16,7 +17,7 @@ class StandardSpielEngine : SpielEngine {
         zustand: SpielZustand,
         aktion: SpielAktion,
     ): Result<SpielSchrittErgebnis> = runCatching {
-        val ereignisse = ereignisseFuer(aktion)
+        val ereignisse = ereignisseFuer(zustand, aktion)
         val folgezustand = ereignisse.fold(zustand) { zwischenzustand, ereignis ->
             SpielRegelwerk.wendeAn(zwischenzustand, ereignis).getOrThrow()
         }
@@ -77,8 +78,12 @@ class StandardSpielEngine : SpielEngine {
         return kandidaten.filter { aktion -> pruefe(zustand, aktion).isSuccess }
     }
 
-    private fun ereignisseFuer(aktion: SpielAktion): List<SpielEreignis> = listOf(
-        when (aktion) {
+    private fun ereignisseFuer(
+        zustand: SpielZustand,
+        aktion: SpielAktion,
+    ): List<SpielEreignis> {
+        if (aktion == SpielAktion.ZugBeenden) return zugBeendenEreignisse(zustand)
+        return listOf(when (aktion) {
             is SpielAktion.ProzugBeginnen -> SpielEreignis.ProzugBegonnen(aktion.zugId)
             is SpielAktion.VerarbeitungAusfuehren -> SpielEreignis.VerarbeitungAusgefuehrt(
                 zugId = aktion.zugId,
@@ -91,7 +96,7 @@ class StandardSpielEngine : SpielEngine {
                 SpielEreignis.VerbindlichkeitBeglichen(aktion.zugId, aktion.verbindlichkeit)
             is SpielAktion.ProzugAbschliessen ->
                 SpielEreignis.ProzugErfolgreichAbgeschlossen(aktion.zugId)
-            SpielAktion.ZugBeenden -> SpielEreignis.ZugBeendet
+            SpielAktion.ZugBeenden -> error("Wird als mehrstufige Regelfolge aufgelöst.")
             is SpielAktion.WarenkorbAendern -> SpielEreignis.WarenkorbGeaendert(aktion.warenkorb)
             is SpielAktion.RohstoffHandeln -> SpielEreignis.RohstoffHandel(
                 kaeufer = aktion.kaeufer,
@@ -115,6 +120,30 @@ class StandardSpielEngine : SpielEngine {
                 spielerA = aktion.spielerA,
                 spielerB = aktion.spielerB,
             )
-        },
-    )
+        })
+    }
+
+    private fun zugBeendenEreignisse(zustand: SpielZustand): List<SpielEreignis> {
+        val vorherigeRunde = zustand.rundenzähler
+        val vorherigeZugId = zustand.zugStatus?.zugId
+        val ereignisse = mutableListOf<SpielEreignis>(SpielEreignis.ZugBeendet)
+        var zwischenzustand = SpielRegelwerk.wendeAn(zustand, ereignisse.last()).getOrThrow()
+        val zugHatGewechselt = zwischenzustand.zugStatus?.zugId != vorherigeZugId
+        if (!zugHatGewechselt) return ereignisse
+
+        if (zwischenzustand.rundenzähler > vorherigeRunde) {
+            val werte = RundenAuswertung.naechsteRundenwerte(zwischenzustand)
+            val rundenereignis = SpielEreignis.RundeBegonnen(
+                runde = werte.runde,
+                marktpreise = werte.marktpreise,
+                leitzins = werte.leitzins,
+                preisinflation = werte.preisinflation,
+            )
+            ereignisse += rundenereignis
+            zwischenzustand = SpielRegelwerk.wendeAn(zwischenzustand, rundenereignis).getOrThrow()
+        }
+        val naechsterZug = requireNotNull(zwischenzustand.zugStatus)
+        ereignisse += SpielEreignis.ProzugBegonnen(naechsterZug.zugId)
+        return ereignisse
+    }
 }

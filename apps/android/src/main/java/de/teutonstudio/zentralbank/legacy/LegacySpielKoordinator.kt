@@ -343,62 +343,13 @@ class LegacySpielKoordinator(
 
     private fun uebernehmeEreignisErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
         if (nachher.rundenzähler > vorher.rundenzähler) {
-            beginneNaechsteRunde(nachher)?.let { neuerRundenzustand ->
-                _rundenwechselAnzeige.value = neuerRundenzustand
-            }
+            aktualisiereSpielZustand(nachher)
+            _rundenwechselAnzeige.value = nachher
         } else {
             aktualisiereSpielZustand(nachher)
             starteProzugFallsNoetig()
         }
         speichereAktuellenFachSpielstand()
-    }
-
-    private fun beginneNaechsteRunde(nachZugende: SpielZustand): SpielZustand? {
-        try {
-            aktuellesSpiel.beginneNaechsteRunde()
-        } catch (throwable: Throwable) {
-            _spielFehler.tryEmit(throwable.message ?: "Neue Runde konnte nicht begonnen werden.")
-            return null
-        }
-
-        val spielDaten = aktuelleDaten.first
-        val rundenIndex = aktuellesSpiel.aktuelleRunde - 1
-        val rundenDaten = RundeDaten(
-            index = rundenIndex,
-            zinsatz = aktuellesSpiel.aktuellerLeitzinssatz,
-        ).copy(spielID = spielDaten.spielID)
-        val neueDatenListe = aktuelleDaten.second + rundenDaten
-        aktuelleDaten = spielDaten to neueDatenListe
-
-        val aktuelleWirtschaftsdaten = aktuellesSpiel.zuSpielZustand()
-        val ablauf = requireNotNull(spielAblauf)
-        val aktualisierung = SpielEreignis.RundenwerteAktualisiert(
-            runde = nachZugende.rundenzähler,
-            marktpreise = aktuelleWirtschaftsdaten.marktpreise,
-            leitzins = aktuelleWirtschaftsdaten.leitzins,
-        )
-        val synchronisiert = ablauf.ereignisAnwenden(aktualisierung).getOrElse { fehler ->
-            _spielFehler.tryEmit(fehler.message ?: "Rundenwerte konnten nicht übernommen werden.")
-            return null
-        }
-        aktualisiereSpielZustand(synchronisiert)
-
-        if (spielDaten.spielID == (-1).toLong()) return synchronisiert
-
-        _spielDatenListe.update { spiele ->
-            spiele + (spielDaten to neueDatenListe)
-        }
-        scope.launch(Dispatchers.IO) {
-            try {
-                datenbankBereit.await()
-                tabellenSpeicher.insertRunde(rundenDaten)
-            } catch (throwable: Throwable) {
-                _spielFehler.tryEmit(
-                    throwable.message ?: "Neue Runde konnte nicht gespeichert werden."
-                )
-            }
-        }
-        return synchronisiert
     }
 
     private fun starteProzugFallsNoetig() {

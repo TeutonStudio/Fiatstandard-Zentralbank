@@ -94,11 +94,43 @@ data class SpielZustand(
     val ueberschuldungen: List<UeberschuldungsStatus> = emptyList(),
     val marktpreise: Map<Rohstoff, Geld> = emptyMap(),
     val leitzins: Basispunkte = Basispunkte.NULL,
+    /** Einzelpreise der laufenden Runde; daraus entstehen die Preise der Folgerunde. */
+    val marktpreisBeobachtungen: Map<Rohstoff, List<Geld>> = emptyMap(),
+    val geldpolitik: Geldpolitik = Geldpolitik(),
+    val rundenwerte: List<Rundenwerte> = emptyList(),
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
     val zugStatus: ZugStatus? = aktiverSpieler?.let {
         ZugStatus(zugId = 1L, spieler = it, phase = ZugPhase.Prozug)
     },
+)
+
+/**
+ * Ganzzahlige Entsprechung der bisherigen Android-Geldpolitik. Alle Werte sind
+ * Basispunkte, damit die Domain weder Float noch Double für Geldregeln benötigt.
+ */
+@Serializable
+data class Geldpolitik(
+    val inflationsziel: Basispunkte = Basispunkte.prozent(2),
+    val normaleAbweichung: Basispunkte = Basispunkte.prozent(1),
+    val starkeAbweichung: Basispunkte = Basispunkte.prozent(3),
+    val leitzinsSchritt: Basispunkte = Basispunkte.prozent(1),
+) {
+    init {
+        require(normaleAbweichung.wert >= 0) { "Normale Abweichung darf nicht negativ sein." }
+        require(starkeAbweichung.wert >= normaleAbweichung.wert) {
+            "Starke Abweichung muss mindestens so groß wie die normale Abweichung sein."
+        }
+        require(leitzinsSchritt.wert >= 0) { "Leitzinsschritt darf nicht negativ sein." }
+    }
+}
+
+@Serializable
+data class Rundenwerte(
+    val runde: Int,
+    val marktpreise: Map<Rohstoff, Geld>,
+    val leitzins: Basispunkte,
+    val preisinflation: Basispunkte? = null,
 )
 
 @Serializable

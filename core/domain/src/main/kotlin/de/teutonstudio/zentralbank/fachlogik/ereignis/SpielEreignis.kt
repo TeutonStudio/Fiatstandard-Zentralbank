@@ -280,6 +280,15 @@ sealed interface SpielEreignis {
         val leitzins: Basispunkte,
     ) : SpielEreignis
 
+    /** Vollständig vom Domain-Kern berechneter Beginn einer neuen Runde. */
+    @Serializable
+    data class RundeBegonnen(
+        val runde: Int,
+        val marktpreise: Map<Rohstoff, Geld>,
+        val leitzins: Basispunkte,
+        val preisinflation: Basispunkte? = null,
+    ) : SpielEreignis
+
     @Serializable
     data object ZugBeendet : SpielEreignis
 }

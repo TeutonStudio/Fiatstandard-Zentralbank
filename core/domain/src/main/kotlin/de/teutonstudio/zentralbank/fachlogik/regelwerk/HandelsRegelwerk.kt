@@ -32,7 +32,7 @@ internal object HandelsRegelwerk {
             von = KontoId.Spieler(ereignis.kaeufer),
             an = KontoId.Spieler(ereignis.verkaeufer),
             betrag = ereignis.preis,
-        )
+        ).marktpreisBeobachten(ereignis.rohstoff, ereignis.preis, ereignis.menge)
     }
 
     fun mitAuslandHandeln(
@@ -81,6 +81,18 @@ internal object HandelsRegelwerk {
                     ereignis.preis,
                 )
             }
-        }
+        }.marktpreisBeobachten(ereignis.rohstoff, ereignis.preis, ereignis.menge)
+    }
+
+    private fun SpielZustand.marktpreisBeobachten(
+        rohstoff: de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff,
+        gesamtpreis: Geld,
+        menge: Int,
+    ): SpielZustand {
+        val einzelpreis = Geld.cent(gesamtpreis.cent / menge)
+        return copy(
+            marktpreisBeobachtungen = marktpreisBeobachtungen +
+                (rohstoff to (marktpreisBeobachtungen[rohstoff].orEmpty() + einzelpreis)),
+        )
     }
 }

@@ -83,7 +83,7 @@ Der Server verwendet bewusst den JDK-HTTP-Server als kleinen JVM-Transport. Die
 Application- und Domain-Grenzen erlauben einen späteren Austausch gegen Ktor,
 ohne Regeln oder Persistenz umzubauen.
 
-## Ablauf eines Simulationsschritts
+## Ablauf eines Simulationsschritts (Ist-Stand vor Trainingsumbau)
 
 1. Die Simulation fragt `SpielEngine.erlaubteAktionen` ab.
 2. Eine austauschbare `SpielStrategie` wählt mit einer lokalen,
@@ -94,9 +94,13 @@ ohne Regeln oder Persistenz umzubauen.
 5. Beobachtung, erlaubte und gewählte Aktion, Belohnungskomponenten,
    Folgezustand und Ereignisse werden als eine JSONL-Zeile exportiert.
 
-Wenn das Domain-Modell keinen Endzustand meldet, endet eine Episode am
-Schrittlimit. Eine Endbedingung oder Gewinnerbewertung wird nicht in die Engine
-hineinerfunden.
+Der am 21. Juli 2026 geprüfte Ausgangsstand besitzt noch keinen fachlichen
+Endzustand: Episoden enden deshalb technisch am Schrittlimit. Auch
+`RundenwerteAktualisiert` wird beim vollen Rundenwechsel noch durch den
+Android-`LegacySpielKoordinator` erzeugt. Diese beiden Grenzen sind keine
+Zielarchitektur; der laufende KI-Trainingsumbau ersetzt sie durch Domain-Regeln,
+spielerbezogene Beobachtungen und eine echte `reset`/`step`-Umgebung. Der
+detaillierte Codebefund steht in `KI_TRAININGSUMBAU_ISTSTAND.md`.
 
 ## Persistenz
 

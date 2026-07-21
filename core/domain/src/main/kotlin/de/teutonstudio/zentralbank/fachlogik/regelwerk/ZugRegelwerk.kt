@@ -120,6 +120,12 @@ internal object ZugRegelwerk {
                         ereignis.runde == zustand.rundenzähler,
                 ) { "Rundenwerte werden genau vor Beginn des neuen Prozuges aktualisiert." }
             }
+            is SpielEreignis.RundeBegonnen -> {
+                require(
+                    zug.phase == ZugPhase.Prozug && !zug.prozug.begonnen &&
+                        ereignis.runde == zustand.rundenzähler,
+                ) { "Eine neue Runde wird genau vor dem ersten Prozug begonnen." }
+            }
             is SpielEreignis.Schuldenstrich -> Unit
             is SpielEreignis.HauptbahnhofPlatziert ->
                 error("Ein Hauptbahnhof kann nur in Runde 0 platziert werden.")
