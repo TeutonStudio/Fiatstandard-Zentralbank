@@ -42,6 +42,22 @@ class AgentenUndEpisodenTest {
     }
 
     @Test
+    fun wirtschaftsagentWaehltNurGueltigeAktionenUndBeendetPartie() {
+        val ergebnis = SimulationsLaeufer().ausfuehren(
+            SimulationsKonfiguration(
+                spiele = 2,
+                seed = 21,
+                maximaleEntscheidungen = 500,
+                agenten = listOf("wirtschaft"),
+            ),
+        )
+
+        assertTrue(ergebnis.statistik.fehler.isEmpty())
+        assertEquals(2, ergebnis.statistik.beendet)
+        assertEquals(0, ergebnis.statistik.truncations)
+    }
+
+    @Test
     fun episodenexportImportUndModellkodierungSindDeterministisch() {
         val ergebnis = SimulationsLaeufer().ausfuehren(
             SimulationsKonfiguration(2, 9, 200),

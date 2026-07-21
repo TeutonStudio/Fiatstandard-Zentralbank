@@ -2,6 +2,7 @@ package de.teutonstudio.zentralbank.simulation
 
 import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.engine.Zufallsquelle
+import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 
 interface SpielAgent {
     val name: String
@@ -83,13 +84,26 @@ class WirtschaftsAgent : SpielAgent {
         is SpielAktion.EckGebaeudeBauen -> 550
         is SpielAktion.EckGebaeudeAufwerten -> 525
         is SpielAktion.SchieneBauen -> 500
-        is SpielAktion.HandelsangebotErstellen -> 350
+        is SpielAktion.HandelsangebotErstellen ->
+            if (punkt.beobachtung.angebote.isEmpty()) 350 else 50
         SpielAktion.ZugBeenden -> 100
-        is SpielAktion.Aufgeben -> if (
+        is SpielAktion.Aufgeben -> when {
+            prozugIstNichtMehrErfuellbar(punkt) -> 800
             punkt.beobachtung.runde >= 20 &&
-            punkt.spieler != (punkt.beobachtung.gegner.map { it.id } + punkt.spieler)
-                .minBy { it.wert }
-        ) 200 else -1_000
+                punkt.spieler != (punkt.beobachtung.gegner.map { it.id } + punkt.spieler)
+                    .minBy { it.wert } -> 200
+            else -> -1_000
+        }
         else -> 0
+    }
+
+    private fun prozugIstNichtMehrErfuellbar(punkt: Entscheidungspunkt): Boolean {
+        if (punkt.beobachtung.zug?.phase != ZugPhase.Prozug) return false
+        return punkt.aktionsRaum.aktionen.none { aktion ->
+            aktion is SpielAktion.VerbindlichkeitBegleichen ||
+                aktion is SpielAktion.VerwaltungsstandortVersorgen ||
+                aktion is SpielAktion.VerarbeitungAusfuehren ||
+                aktion is SpielAktion.ProzugAbschliessen
+        }
     }
 }
