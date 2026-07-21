@@ -17,6 +17,7 @@ internal object ZugRegelwerk {
             error("Die Partie ist bereits beendet; weitere Aktionen sind nicht zulässig.")
         }
         if (ereignis is SpielEreignis.PartieBeendet) return
+        if (ereignis is SpielEreignis.AngeboteAbgelaufen) return
         if (ereignis is SpielEreignis.SpielerAusgeschieden) {
             require(ereignis.spieler == zustand.aktiverSpieler) {
                 "Nur der aktive Spieler kann ausscheiden."
@@ -45,6 +46,55 @@ internal object ZugRegelwerk {
         }
 
         when (ereignis) {
+            is SpielEreignis.HandelsangebotErstellt -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.angebot.anbieter == zug.spieler) {
+                    "Nur der aktive Spieler darf ein Angebot erstellen."
+                }
+            }
+            is SpielEreignis.HandelsangebotAngenommen -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.angenommenVon == zug.spieler) {
+                    "Nur der aktive Spieler darf ein Angebot annehmen."
+                }
+            }
+            is SpielEreignis.HandelsangebotAbgelehnt -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.abgelehntVon == zug.spieler) {
+                    "Nur der aktive Spieler darf ein Angebot ablehnen."
+                }
+            }
+            is SpielEreignis.HandelsangebotZurueckgezogen -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.spieler == zug.spieler) {
+                    "Nur der aktive Spieler darf sein Angebot zurückziehen."
+                }
+            }
+            is SpielEreignis.AnleihenangebotErstellt -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.angebot.anbieter == zug.spieler) {
+                    "Nur der aktive Spieler darf ein Anleihenangebot erstellen."
+                }
+            }
+            is SpielEreignis.AnleihenangebotAngenommen -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.angenommenVon == zug.spieler) {
+                    "Nur der aktive Spieler darf ein Anleihenangebot annehmen."
+                }
+            }
+            is SpielEreignis.AnleihenangebotAbgelehnt -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.abgelehntVon == zug.spieler) {
+                    "Nur der aktive Spieler darf ein Anleihenangebot ablehnen."
+                }
+            }
+            is SpielEreignis.AnleihenangebotZurueckgezogen -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.spieler == zug.spieler) {
+                    "Nur der aktive Spieler darf sein Anleihenangebot zurückziehen."
+                }
+            }
+            is SpielEreignis.AngeboteAbgelaufen -> Unit
             is SpielEreignis.SpielerAusgeschieden,
             is SpielEreignis.PartieBeendet -> Unit // vor dem when abschließend geprüft
             is SpielEreignis.ProzugBegonnen -> {
@@ -246,6 +296,14 @@ internal object ZugRegelwerk {
         is SpielEreignis.KriegErklaert -> aggressor
         is SpielEreignis.KriegBeendet -> spielerA
         is SpielEreignis.SpielerAusgeschieden -> spieler
+        is SpielEreignis.HandelsangebotErstellt -> angebot.anbieter
+        is SpielEreignis.HandelsangebotAngenommen -> angenommenVon
+        is SpielEreignis.HandelsangebotAbgelehnt -> abgelehntVon
+        is SpielEreignis.HandelsangebotZurueckgezogen -> spieler
+        is SpielEreignis.AnleihenangebotErstellt -> angebot.anbieter
+        is SpielEreignis.AnleihenangebotAngenommen -> angenommenVon
+        is SpielEreignis.AnleihenangebotAbgelehnt -> abgelehntVon
+        is SpielEreignis.AnleihenangebotZurueckgezogen -> spieler
         else -> null
     }
 }

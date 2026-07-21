@@ -104,6 +104,9 @@ data class SpielZustand(
     val naechsteAnleiheNummer: Long = 1L,
     val naechsteSeewegNummer: Long = 1L,
     val naechsteEinheitenNummer: Long = 1L,
+    val handelsAngebote: List<HandelsAngebot> = emptyList(),
+    val anleihenAngebote: List<AnleihenAngebot> = emptyList(),
+    val naechsteAngebotsNummer: Long = 1L,
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
     val zugStatus: ZugStatus? = aktiverSpieler?.let {

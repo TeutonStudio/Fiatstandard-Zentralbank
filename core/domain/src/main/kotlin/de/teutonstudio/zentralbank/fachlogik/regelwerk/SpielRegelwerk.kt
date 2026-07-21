@@ -10,6 +10,24 @@ object SpielRegelwerk {
     ): Result<SpielZustand> = runCatching {
         ZugRegelwerk.pruefeFreigabe(zustand, ereignis)
         when (ereignis) {
+            is SpielEreignis.HandelsangebotErstellt ->
+                AngebotsRegelwerk.handelsangebotErstellen(zustand, ereignis)
+            is SpielEreignis.HandelsangebotAngenommen ->
+                AngebotsRegelwerk.handelsangebotAnnehmen(zustand, ereignis)
+            is SpielEreignis.HandelsangebotAbgelehnt ->
+                AngebotsRegelwerk.handelsangebotAblehnen(zustand, ereignis)
+            is SpielEreignis.HandelsangebotZurueckgezogen ->
+                AngebotsRegelwerk.handelsangebotZurueckziehen(zustand, ereignis)
+            is SpielEreignis.AnleihenangebotErstellt ->
+                AngebotsRegelwerk.anleihenangebotErstellen(zustand, ereignis)
+            is SpielEreignis.AnleihenangebotAngenommen ->
+                AngebotsRegelwerk.anleihenangebotAnnehmen(zustand, ereignis)
+            is SpielEreignis.AnleihenangebotAbgelehnt ->
+                AngebotsRegelwerk.anleihenangebotAblehnen(zustand, ereignis)
+            is SpielEreignis.AnleihenangebotZurueckgezogen ->
+                AngebotsRegelwerk.anleihenangebotZurueckziehen(zustand, ereignis)
+            is SpielEreignis.AngeboteAbgelaufen ->
+                AngebotsRegelwerk.angeboteAblaufen(zustand, ereignis)
             is SpielEreignis.SpielerAusgeschieden ->
                 PartieRegelwerk.spielerAusscheiden(zustand, ereignis)
             is SpielEreignis.PartieBeendet -> PartieRegelwerk.partieBeenden(zustand, ereignis)

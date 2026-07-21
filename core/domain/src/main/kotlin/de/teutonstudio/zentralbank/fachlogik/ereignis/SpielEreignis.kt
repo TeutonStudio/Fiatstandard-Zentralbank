@@ -21,10 +21,62 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Basispunkte
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 import de.teutonstudio.zentralbank.fachlogik.modell.AusscheidensGrund
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielErgebnis
+import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebot
+import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotId
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebot
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebotId
 import kotlinx.serialization.Serializable
 
 @Serializable
 sealed interface SpielEreignis {
+    @Serializable
+    data class HandelsangebotErstellt(val angebot: HandelsAngebot) : SpielEreignis
+
+    @Serializable
+    data class HandelsangebotAngenommen(
+        val angebot: HandelsAngebotId,
+        val angenommenVon: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class HandelsangebotAbgelehnt(
+        val angebot: HandelsAngebotId,
+        val abgelehntVon: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class HandelsangebotZurueckgezogen(
+        val angebot: HandelsAngebotId,
+        val spieler: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class AnleihenangebotErstellt(val angebot: AnleihenAngebot) : SpielEreignis
+
+    @Serializable
+    data class AnleihenangebotAngenommen(
+        val angebot: AnleihenAngebotId,
+        val angenommenVon: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class AnleihenangebotAbgelehnt(
+        val angebot: AnleihenAngebotId,
+        val abgelehntVon: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class AnleihenangebotZurueckgezogen(
+        val angebot: AnleihenAngebotId,
+        val spieler: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class AngeboteAbgelaufen(
+        val handelsangebote: List<HandelsAngebotId>,
+        val anleihenangebote: List<AnleihenAngebotId>,
+    ) : SpielEreignis
+
     @Serializable
     data class SpielerAusgeschieden(
         val spieler: SpielerId,

@@ -14,6 +14,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
+import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotId
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebotId
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
@@ -131,6 +133,61 @@ sealed interface SpielAktion {
     data class SchuldenstrichDurchfuehren(
         val spieler: SpielerId,
         val entfernteBahnwege: Int,
+    ) : SpielAktion
+
+    /** Erstellt nur ein Angebot; Bestände werden dabei nicht reserviert oder übertragen. */
+    @Serializable
+    data class HandelsangebotErstellen(
+        val spieler: SpielerId,
+        val empfaenger: SpielerId? = null,
+        val angeboteneRohstoffe: Map<Rohstoff, Int> = emptyMap(),
+        val geforderteRohstoffe: Map<Rohstoff, Int> = emptyMap(),
+        val angebotenerGeldbetrag: Geld = Geld.NULL,
+        val geforderterGeldbetrag: Geld = Geld.NULL,
+    ) : SpielAktion
+
+    @Serializable
+    data class HandelsangebotAnnehmen(
+        val spieler: SpielerId,
+        val angebot: HandelsAngebotId,
+    ) : SpielAktion
+
+    @Serializable
+    data class HandelsangebotAblehnen(
+        val spieler: SpielerId,
+        val angebot: HandelsAngebotId,
+    ) : SpielAktion
+
+    @Serializable
+    data class HandelsangebotZurueckziehen(
+        val spieler: SpielerId,
+        val angebot: HandelsAngebotId,
+    ) : SpielAktion
+
+    @Serializable
+    data class AnleihenangebotErstellen(
+        val spieler: SpielerId,
+        val empfaenger: SpielerId? = null,
+        val anleihe: AnleiheId,
+        val preis: Geld,
+    ) : SpielAktion
+
+    @Serializable
+    data class AnleihenangebotAnnehmen(
+        val spieler: SpielerId,
+        val angebot: AnleihenAngebotId,
+    ) : SpielAktion
+
+    @Serializable
+    data class AnleihenangebotAblehnen(
+        val spieler: SpielerId,
+        val angebot: AnleihenAngebotId,
+    ) : SpielAktion
+
+    @Serializable
+    data class AnleihenangebotZurueckziehen(
+        val spieler: SpielerId,
+        val angebot: AnleihenAngebotId,
     ) : SpielAktion
 
     @Serializable

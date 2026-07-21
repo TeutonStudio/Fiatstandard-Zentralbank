@@ -11,6 +11,11 @@ import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
+import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebot
+import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotId
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebot
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebotId
+import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotStatus
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 
 class StandardSpielEngine : SpielEngine {
@@ -173,6 +178,50 @@ class StandardSpielEngine : SpielEngine {
                 aktion.spieler,
                 aktion.entfernteBahnwege,
             )
+            is SpielAktion.HandelsangebotErstellen -> SpielEreignis.HandelsangebotErstellt(
+                HandelsAngebot(
+                    id = HandelsAngebotId(zustand.naechsteAngebotsNummer),
+                    anbieter = aktion.spieler,
+                    empfaenger = aktion.empfaenger,
+                    angeboteneRohstoffe = aktion.angeboteneRohstoffe,
+                    geforderteRohstoffe = aktion.geforderteRohstoffe,
+                    angebotenerGeldbetrag = aktion.angebotenerGeldbetrag,
+                    geforderterGeldbetrag = aktion.geforderterGeldbetrag,
+                    erstelltInZug = requireNotNull(zustand.zugStatus).zugId,
+                    erstelltInRunde = zustand.rundenzähler,
+                ),
+            )
+            is SpielAktion.HandelsangebotAnnehmen -> SpielEreignis.HandelsangebotAngenommen(
+                aktion.angebot,
+                aktion.spieler,
+            )
+            is SpielAktion.HandelsangebotAblehnen -> SpielEreignis.HandelsangebotAbgelehnt(
+                aktion.angebot,
+                aktion.spieler,
+            )
+            is SpielAktion.HandelsangebotZurueckziehen ->
+                SpielEreignis.HandelsangebotZurueckgezogen(aktion.angebot, aktion.spieler)
+            is SpielAktion.AnleihenangebotErstellen -> SpielEreignis.AnleihenangebotErstellt(
+                AnleihenAngebot(
+                    id = AnleihenAngebotId(zustand.naechsteAngebotsNummer),
+                    anbieter = aktion.spieler,
+                    empfaenger = aktion.empfaenger,
+                    anleihe = aktion.anleihe,
+                    preis = aktion.preis,
+                    erstelltInZug = requireNotNull(zustand.zugStatus).zugId,
+                    erstelltInRunde = zustand.rundenzähler,
+                ),
+            )
+            is SpielAktion.AnleihenangebotAnnehmen -> SpielEreignis.AnleihenangebotAngenommen(
+                aktion.angebot,
+                aktion.spieler,
+            )
+            is SpielAktion.AnleihenangebotAblehnen -> SpielEreignis.AnleihenangebotAbgelehnt(
+                aktion.angebot,
+                aktion.spieler,
+            )
+            is SpielAktion.AnleihenangebotZurueckziehen ->
+                SpielEreignis.AnleihenangebotZurueckgezogen(aktion.angebot, aktion.spieler)
             is SpielAktion.ProzugBeginnen -> SpielEreignis.ProzugBegonnen(aktion.zugId)
             is SpielAktion.VerarbeitungAusfuehren -> SpielEreignis.VerarbeitungAusgefuehrt(
                 zugId = aktion.zugId,
@@ -221,6 +270,11 @@ class StandardSpielEngine : SpielEngine {
         if (!zugHatGewechselt) return ereignisse
 
         if (zwischenzustand.rundenzähler > vorherigeRunde) {
+            val ablauf = ablaufereignis(zwischenzustand)
+            if (ablauf != null) {
+                ereignisse += ablauf
+                zwischenzustand = SpielRegelwerk.wendeAn(zwischenzustand, ablauf).getOrThrow()
+            }
             val werte = RundenAuswertung.naechsteRundenwerte(zwischenzustand)
             val rundenereignis = SpielEreignis.RundeBegonnen(
                 runde = werte.runde,
@@ -254,6 +308,11 @@ class StandardSpielEngine : SpielEngine {
             return ereignisse
         }
         if (zwischenzustand.rundenzähler > vorherigeRunde) {
+            val ablauf = ablaufereignis(zwischenzustand)
+            if (ablauf != null) {
+                ereignisse += ablauf
+                zwischenzustand = SpielRegelwerk.wendeAn(zwischenzustand, ablauf).getOrThrow()
+            }
             val werte = RundenAuswertung.naechsteRundenwerte(zwischenzustand)
             val rundenereignis = SpielEreignis.RundeBegonnen(
                 werte.runde,
@@ -266,5 +325,22 @@ class StandardSpielEngine : SpielEngine {
         }
         ereignisse += SpielEreignis.ProzugBegonnen(requireNotNull(zwischenzustand.zugStatus).zugId)
         return ereignisse
+    }
+
+    private fun ablaufereignis(zustand: SpielZustand): SpielEreignis.AngeboteAbgelaufen? {
+        val handel = zustand.handelsAngebote.filter {
+            it.status == HandelsAngebotStatus.OFFEN && it.erstelltInRunde < zustand.rundenzähler
+        }.map { it.id }
+        val anleihen = zustand.anleihenAngebote.filter {
+            it.status == HandelsAngebotStatus.OFFEN && it.erstelltInRunde < zustand.rundenzähler
+        }.map { it.id }
+        return if (handel.isEmpty() && anleihen.isEmpty()) {
+            null
+        } else {
+            SpielEreignis.AngeboteAbgelaufen(
+                handelsangebote = handel,
+                anleihenangebote = anleihen,
+            )
+        }
     }
 }
