@@ -134,14 +134,22 @@ object AktionsAuswertung {
                     ?.takeIf { it > Geld.NULL }
                     ?: Geld.mark(1)
                 empfaenger.forEach { ziel ->
-                    add(
-                        SpielAktion.HandelsangebotErstellen(
-                            spieler = spieler,
-                            empfaenger = ziel,
-                            angeboteneRohstoffe = mapOf(rohstoff to 1),
-                            geforderterGeldbetrag = preis,
-                        ),
-                    )
+                    val bereitsOffen = zustand.handelsAngebote.any { angebot ->
+                        angebot.status == HandelsAngebotStatus.OFFEN &&
+                            angebot.anbieter == spieler && angebot.empfaenger == ziel &&
+                            angebot.angeboteneRohstoffe == mapOf(rohstoff to 1) &&
+                            angebot.geforderterGeldbetrag == preis
+                    }
+                    if (!bereitsOffen) {
+                        add(
+                            SpielAktion.HandelsangebotErstellen(
+                                spieler = spieler,
+                                empfaenger = ziel,
+                                angeboteneRohstoffe = mapOf(rohstoff to 1),
+                                geforderterGeldbetrag = preis,
+                            ),
+                        )
+                    }
                 }
             }
     }
@@ -150,15 +158,20 @@ object AktionsAuswertung {
         zustand: SpielZustand,
         spieler: SpielerId,
     ): List<SpielAktion> = buildList {
-        listOf(10L, 50L, 100L).forEach { nennwert ->
-            add(
-                SpielAktion.AnleiheEmittieren(
-                    spieler = spieler,
-                    nennwert = Geld.mark(nennwert),
-                    zinsBasispunkte = zustand.leitzins.wert,
-                    laufzeitRunden = 3,
-                ),
-            )
+        val bereitsInRundeEmittiert = zustand.anleihen.values.any {
+            it.emittent == spieler && it.emissionsRunde == zustand.rundenzähler
+        }
+        if (!bereitsInRundeEmittiert) {
+            listOf(10L, 50L, 100L).forEach { nennwert ->
+                add(
+                    SpielAktion.AnleiheEmittieren(
+                        spieler = spieler,
+                        nennwert = Geld.mark(nennwert),
+                        zinsBasispunkte = zustand.leitzins.wert,
+                        laufzeitRunden = 3,
+                    ),
+                )
+            }
         }
         val bestand = zustand.spieler.first { it.id == spieler }
         val andere = zustand.spieler.map { it.id }

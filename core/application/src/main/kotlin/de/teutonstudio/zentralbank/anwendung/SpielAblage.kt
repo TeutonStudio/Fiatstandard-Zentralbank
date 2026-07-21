@@ -5,8 +5,9 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
+import de.teutonstudio.zentralbank.fachlogik.engine.AKTUELLE_REGEL_VERSION
 
-const val AKTUELLE_ENGINE_VERSION = "1.1.0"
+const val AKTUELLE_ENGINE_VERSION = AKTUELLE_REGEL_VERSION
 const val AKTUELLE_SPIELSTAND_SCHEMA_VERSION = 1
 
 @Serializable

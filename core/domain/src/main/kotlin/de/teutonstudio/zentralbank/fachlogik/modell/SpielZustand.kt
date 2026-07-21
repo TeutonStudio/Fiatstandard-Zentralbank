@@ -1,6 +1,8 @@
 package de.teutonstudio.zentralbank.fachlogik.modell
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 @JvmInline
 @Serializable
@@ -46,6 +48,8 @@ data class RohstoffMenge(
 data class Spieler(
     val id: SpielerId,
     val name: String,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val passwortHash: String = "",
     val rohstoffe: Map<Rohstoff, Int> = emptyMap(),
     val geldkonto: Geld = Geld.NULL,
