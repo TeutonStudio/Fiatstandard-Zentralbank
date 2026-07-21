@@ -20,8 +20,7 @@ class TrainingsUmgebungTest {
         val rechtsStart = rechts.reset(szenario, 42)
 
         assertEquals(linksStart, rechtsStart)
-        val aktion = linksStart.aktionsRaum.aktionen
-            .first { it is SpielAktion.ProzugAbschliessen }
+        val aktion = linksStart.aktionsRaum.aktionen.first()
         val linksSchritt = links.step(aktion)
         val rechtsSchritt = rechts.step(aktion)
 
@@ -39,7 +38,7 @@ class TrainingsUmgebungTest {
 
         val fremdeAufgabe = SpielAktion.Aufgeben(SpielerId("nicht-aktiv"))
         assertTrue(runCatching { links.step(fremdeAufgabe) }.isFailure)
-        links.step(punkt.aktionsRaum.aktionen.first { it is SpielAktion.ProzugAbschliessen })
+        links.step(punkt.aktionsRaum.aktionen.first())
 
         assertEquals(rechtsVorher, rechts.zustand)
         assertNotEquals(links.zustand, rechts.zustand)
@@ -50,7 +49,7 @@ class TrainingsUmgebungTest {
         val umgebung = StandardTrainingsUmgebung(maximaleEntscheidungen = 1)
         val punkt = umgebung.reset(szenario, 1)
         val uebergang = umgebung.step(
-            punkt.aktionsRaum.aktionen.first { it is SpielAktion.ProzugAbschliessen },
+            punkt.aktionsRaum.aktionen.first(),
         )
 
         assertTrue(uebergang.truncated)
@@ -75,5 +74,18 @@ class TrainingsUmgebungTest {
         assertFalse(uebergang.truncated)
         assertTrue(uebergang.ergebnis?.gewinner != null)
         assertTrue(runCatching { umgebung.step(SpielAktion.ZugBeenden) }.isFailure)
+    }
+
+    @Test
+    fun baselineEnthaeltEineDeterministischeKarteMitStartstandorten() {
+        val links = szenario.startzustand(42)
+        val rechts = szenario.startzustand(42)
+
+        assertEquals(links, rechts)
+        assertEquals(18, links.karte?.gelaendefelder?.size)
+        assertEquals(3, links.karte?.belegung?.ecken?.size)
+        assertTrue(links.karte?.belegung?.ecken?.all {
+            it.typ == de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp.HAUPTBAHNHOF
+        } == true)
     }
 }
