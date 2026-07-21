@@ -47,6 +47,7 @@ class StandardTrainingsUmgebung(
     private var technischBeendet: Boolean = false
     private var szenarioId: String? = null
     private var startSeed: Long? = null
+    private var aktuellerPunkt: Entscheidungspunkt? = null
 
     val startzustand: SpielZustand
         get() = requireNotNull(ablauf).startzustand
@@ -74,9 +75,11 @@ class StandardTrainingsUmgebung(
             ).getOrThrow()
             automatisch.ereignisse.forEach { neuerAblauf.ereignisAnwenden(it).getOrThrow() }
         }
-        return requireNotNull(entscheidungspunkt(neuerAblauf.zustand)) {
+        val punkt = requireNotNull(entscheidungspunkt(neuerAblauf.zustand)) {
             "Das Szenario besitzt beim Reset keinen Entscheidungspunkt."
         }
+        aktuellerPunkt = punkt
+        return punkt
     }
 
     override fun step(aktion: SpielAktion): TrainingsUebergang {
@@ -85,7 +88,7 @@ class StandardTrainingsUmgebung(
             "Nach Ende oder Truncation ist kein weiterer Schritt zulässig."
         }
         val vorher = spielAblauf.zustand
-        val punkt = requireNotNull(entscheidungspunkt(vorher)) {
+        val punkt = requireNotNull(aktuellerPunkt) {
             "Der nichtterminale Zustand besitzt keinen Entscheidungspunkt."
         }
         require(aktion in punkt.aktionsRaum.aktionen) {
@@ -100,12 +103,16 @@ class StandardTrainingsUmgebung(
         val terminated = spielAblauf.zustand.ergebnis != null
         val truncated = !terminated && entscheidungen >= maximaleEntscheidungen
         technischBeendet = truncated
+        val naechsterPunkt = if (terminated || truncated) {
+            null
+        } else {
+            requireNotNull(entscheidungspunkt(spielAblauf.zustand)) {
+                "Nichtterminaler Zustand besitzt keinen erlaubten Folgepunkt."
+            }
+        }
+        aktuellerPunkt = naechsterPunkt
         return TrainingsUebergang(
-            naechsterPunkt = if (terminated || truncated) null else {
-                requireNotNull(entscheidungspunkt(spielAblauf.zustand)) {
-                    "Nichtterminaler Zustand besitzt keinen erlaubten Folgepunkt."
-                }
-            },
+            naechsterPunkt = naechsterPunkt,
             belohnungen = belohnungsModell.berechne(
                 vorher,
                 spielAblauf.zustand,

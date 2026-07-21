@@ -2,6 +2,8 @@ package de.teutonstudio.zentralbank.simulation
 
 import de.teutonstudio.zentralbank.fachlogik.engine.SeedZufallsquelle
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 import kotlinx.serialization.Serializable
 
 data class SimulationsKonfiguration(
@@ -10,11 +12,13 @@ data class SimulationsKonfiguration(
     val maximaleEntscheidungen: Int,
     val agenten: List<String> = listOf("zufall"),
     val szenarioId: String = "kleine-wirtschaft-v1",
+    val parallelitaet: Int = 1,
 ) {
     init {
         require(spiele > 0) { "Die Spielanzahl muss positiv sein." }
         require(maximaleEntscheidungen > 0) { "Das Entscheidungslimit muss positiv sein." }
         require(agenten.isNotEmpty()) { "Mindestens ein Agent ist erforderlich." }
+        require(parallelitaet > 0) { "Die Parallelität muss positiv sein." }
     }
 }
 
@@ -41,16 +45,9 @@ class SimulationsLaeufer(
     private val agentenFabrik: (String) -> SpielAgent = ::agentErzeugen,
 ) {
     fun ausfuehren(konfiguration: SimulationsKonfiguration): SimulationsErgebnis {
-        val episoden = mutableListOf<SpielEpisode>()
-        val fehler = mutableListOf<String>()
-        repeat(konfiguration.spiele) { spielIndex ->
-            val episodenSeed = Math.addExact(konfiguration.seed, spielIndex.toLong())
-            runCatching {
-                spieleEpisode(konfiguration, spielIndex, episodenSeed)
-            }.onSuccess(episoden::add).onFailure { ursache ->
-                fehler += "spiel-$spielIndex: ${ursache.message ?: ursache::class.simpleName}"
-            }
-        }
+        val laeufe = spieleAusfuehren(konfiguration)
+        val episoden = laeufe.mapNotNull(EpisodenLauf::episode)
+        val fehler = laeufe.mapNotNull(EpisodenLauf::fehler)
         val beendet = episoden.count { it.ergebnis != null }
         val siege = episoden.mapNotNull { episode ->
             val gewinner = episode.ergebnis?.gewinner ?: return@mapNotNull null
@@ -73,6 +70,38 @@ class SimulationsLaeufer(
                 fehler = fehler,
             ),
         )
+    }
+
+    private fun spieleAusfuehren(
+        konfiguration: SimulationsKonfiguration,
+    ): List<EpisodenLauf> {
+        val auftrag: (Int) -> EpisodenLauf = { spielIndex ->
+            val episodenSeed = Math.addExact(konfiguration.seed, spielIndex.toLong())
+            runCatching {
+                spieleEpisode(konfiguration, spielIndex, episodenSeed)
+            }.fold(
+                onSuccess = { episode -> EpisodenLauf(spielIndex, episode, null) },
+                onFailure = { ursache ->
+                    EpisodenLauf(
+                        spielIndex,
+                        null,
+                        "spiel-$spielIndex: ${ursache.message ?: ursache::class.simpleName}",
+                    )
+                },
+            )
+        }
+        if (konfiguration.parallelitaet == 1) {
+            return List(konfiguration.spiele, auftrag)
+        }
+        val executor = Executors.newFixedThreadPool(konfiguration.parallelitaet)
+        return try {
+            (0 until konfiguration.spiele)
+                .map { index -> executor.submit(Callable { auftrag(index) }) }
+                .map { zukunft -> zukunft.get() }
+                .sortedBy(EpisodenLauf::index)
+        } finally {
+            executor.shutdown()
+        }
     }
 
     private fun spieleEpisode(
@@ -124,6 +153,12 @@ class SimulationsLaeufer(
         return episode
     }
 }
+
+private data class EpisodenLauf(
+    val index: Int,
+    val episode: SpielEpisode?,
+    val fehler: String?,
+)
 
 fun agentErzeugen(name: String): SpielAgent = when (name.lowercase()) {
     "zufall" -> ZufallsAgent()

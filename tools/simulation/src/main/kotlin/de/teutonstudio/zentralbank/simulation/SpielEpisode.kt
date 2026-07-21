@@ -34,7 +34,24 @@ data class EntscheidungsDatensatz(
     val gewaehlteAktion: SpielAktion,
     val belohnung: Float,
     val ergebnis: SpielErgebnis?,
-)
+) {
+    init {
+        require(formatVersion == AKTUELLE_EPISODEN_FORMAT_VERSION) {
+            "Nicht unterstützte Entscheidungsformatversion: $formatVersion."
+        }
+        require(regelVersion == AKTUELLE_REGEL_VERSION) {
+            "Nicht unterstützte Regelversion: $regelVersion."
+        }
+        require(beobachtungsVersion == AKTUELLE_BEOBACHTUNGS_VERSION) {
+            "Nicht unterstützte Beobachtungsversion: $beobachtungsVersion."
+        }
+        require(aktionsVersion == AKTUELLE_AKTIONS_VERSION) {
+            "Nicht unterstützte Aktionsversion: $aktionsVersion."
+        }
+        require(entscheidungsNummer >= 0L) { "Entscheidungsnummer darf nicht negativ sein." }
+        require(belohnung.isFinite()) { "Belohnung muss eine endliche Zahl sein." }
+    }
+}
 
 @Serializable
 data class SpielEpisode(
@@ -51,6 +68,37 @@ data class SpielEpisode(
     val ergebnis: SpielErgebnis?,
     val truncated: Boolean,
 ) {
+    init {
+        require(formatVersion == AKTUELLE_EPISODEN_FORMAT_VERSION) {
+            "Nicht unterstützte Episodenformatversion: $formatVersion."
+        }
+        require(regelVersion == AKTUELLE_REGEL_VERSION) {
+            "Nicht unterstützte Regelversion: $regelVersion."
+        }
+        require(beobachtungsVersion == AKTUELLE_BEOBACHTUNGS_VERSION) {
+            "Nicht unterstützte Beobachtungsversion: $beobachtungsVersion."
+        }
+        require(aktionsVersion == AKTUELLE_AKTIONS_VERSION) {
+            "Nicht unterstützte Aktionsversion: $aktionsVersion."
+        }
+        require(startzustand.spieler.all { spieler -> spieler.passwortHash.isBlank() }) {
+            "Eine Trainingsepisode darf keine Passwort-Hashes enthalten."
+        }
+        require(entscheidungen.withIndex().all { (index, entscheidung) ->
+            entscheidung.spielId == spielId &&
+                entscheidung.entscheidungsNummer == index.toLong() &&
+                entscheidung.formatVersion == formatVersion &&
+                entscheidung.regelVersion == regelVersion &&
+                entscheidung.beobachtungsVersion == beobachtungsVersion &&
+                entscheidung.aktionsVersion == aktionsVersion
+        }) {
+            "Entscheidungen müssen lückenlos nummeriert sein und zum Episodenkopf gehören."
+        }
+        require(!(truncated && ergebnis != null)) {
+            "Eine fachlich beendete Episode darf nicht zugleich trunciert sein."
+        }
+    }
+
     fun replay(): SpielZustand = SpielAblauf(startzustand, ereignisse).zustand
 }
 

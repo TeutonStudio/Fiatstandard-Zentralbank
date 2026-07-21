@@ -13,6 +13,7 @@ fun main(args: Array<String>) {
             maximaleEntscheidungen = argumente.maximaleEntscheidungen,
             agenten = argumente.agenten,
             szenarioId = argumente.karte,
+            parallelitaet = argumente.parallelitaet,
         ),
     )
     Files.createDirectories(argumente.ausgabeOrdner)
@@ -41,6 +42,7 @@ private data class SimulationsArgumente(
     val karte: String = "kleine-wirtschaft-v1",
     val ausgabeOrdner: Path = Path.of("build", "simulationen"),
     val expliziteJsonl: Path? = null,
+    val parallelitaet: Int = 1,
 ) {
     companion object {
         fun lesen(args: Array<String>): SimulationsArgumente {
@@ -67,6 +69,7 @@ private data class SimulationsArgumente(
                             expliziteJsonl = datei,
                         )
                     }
+                    "--parallel" -> wert.copy(parallelitaet = argument.toInt())
                     else -> error("Unbekanntes Argument: $schluessel")
                 }
                 index += 2

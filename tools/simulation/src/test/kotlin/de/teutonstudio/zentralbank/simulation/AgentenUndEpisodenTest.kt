@@ -1,6 +1,7 @@
 package de.teutonstudio.zentralbank.simulation
 
 import java.nio.file.Files
+import kotlinx.serialization.encodeToString
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,5 +63,33 @@ class AgentenUndEpisodenTest {
             assertArrayEquals(links.spielerMerkmale[index], rechts.spielerMerkmale[index], 0f)
         }
         assertTrue(links.aktionsMaske.contentEquals(rechts.aktionsMaske))
+    }
+
+    @Test
+    fun importLehntUnbekannteEpisodenversionAb() {
+        val episode = SimulationsLaeufer().ausfuehren(
+            SimulationsKonfiguration(1, 13, 200),
+        ).episoden.single()
+        val datei = Files.createTempFile("fiat-episode-version", ".jsonl")
+        val ungueltig = EpisodenJsonl.json.encodeToString(episode)
+            .replaceFirst("\"formatVersion\":2", "\"formatVersion\":99")
+        Files.writeString(datei, "$ungueltig\n")
+
+        assertTrue(runCatching { EpisodenJsonl.importieren(datei).toList() }.isFailure)
+    }
+
+    @Test
+    fun parallelerLaufIstMitSequentiellemLaufIdentisch() {
+        val basis = SimulationsKonfiguration(
+            spiele = 4,
+            seed = 77,
+            maximaleEntscheidungen = 200,
+            agenten = listOf("zufall", "sicherheit", "wirtschaft"),
+        )
+
+        val sequentiell = SimulationsLaeufer().ausfuehren(basis)
+        val parallel = SimulationsLaeufer().ausfuehren(basis.copy(parallelitaet = 3))
+
+        assertEquals(sequentiell, parallel)
     }
 }

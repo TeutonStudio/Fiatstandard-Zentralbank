@@ -28,6 +28,7 @@ tasks.register<JavaExec>("massentest") {
         "--seed", "42",
         "--max-entscheidungen", "500",
         "--spieler", "zufall",
+        "--parallel", "4",
         "--ausgabe", layout.buildDirectory.dir("massentest").get().asFile.absolutePath,
     )
 }
