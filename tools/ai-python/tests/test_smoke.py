@@ -1,20 +1,33 @@
 from pathlib import Path
+import json
+import tempfile
 import unittest
 
-from fiat_ai.episode_parser import lade_episode
+from fiat_ai.episode_parser import lade_episoden
 
 
 class EpisodenSmokeTest(unittest.TestCase):
     def test_exportierte_episode_wird_gelesen(self) -> None:
         pfad = Path(__file__).parent / "fixtures" / "episode.jsonl"
 
-        schritte = list(lade_episode(pfad))
+        episoden = list(lade_episoden(pfad))
 
-        self.assertEqual(1, len(schritte))
-        self.assertEqual("episode-0", schritte[0].episode_id)
-        self.assertEqual(42, schritte[0].seed)
-        self.assertEqual("Agent-1", schritte[0].actor)
-        self.assertEqual(1, schritte[0].chosen_action["zugId"])
+        self.assertEqual(1, len(episoden))
+        self.assertEqual("spiel-0", episoden[0].spiel_id)
+        self.assertEqual(42, episoden[0].seed)
+        self.assertEqual("spieler-1", episoden[0].entscheidungen[0].spieler)
+        self.assertEqual(1, episoden[0].entscheidungen[0].gewaehlte_aktion["zugId"])
+
+    def test_passwortfeld_wird_abgelehnt(self) -> None:
+        fixture = Path(__file__).parent / "fixtures" / "episode.jsonl"
+        daten = json.loads(fixture.read_text(encoding="utf-8"))
+        daten["startzustand"]["spieler"][0]["passwortHash"] = "nicht-exportieren"
+        with tempfile.TemporaryDirectory() as ordner:
+            pfad = Path(ordner) / "episode.jsonl"
+            pfad.write_text(json.dumps(daten) + "\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "Passwortfelder"):
+                list(lade_episoden(pfad))
 
 
 if __name__ == "__main__":
