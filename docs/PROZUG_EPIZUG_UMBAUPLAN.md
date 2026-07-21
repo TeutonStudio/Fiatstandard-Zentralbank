@@ -2,6 +2,12 @@
 
 Stand: 18.07.2026
 
+> Nachtrag 21.07.2026: Die inzwischen umgesetzte Versorgungsregel ersetzt die
+> frühere Annahme einer sofortigen, standortunabhängigen Ertragsgutschrift.
+> Eigenproduktion deckt zuerst den Bedarf des verantwortlichen
+> Verwaltungsstandorts; nicht versorgte Standorte geben keinen Ertrag und keine
+> Verarbeitungskapazität frei.
+
 ## 1. Ziel und Geltungsbereich
 
 Jeder reguläre Spielzug soll künftig genau aus zwei übergeordneten Phasen bestehen:

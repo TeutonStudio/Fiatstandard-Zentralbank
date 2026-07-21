@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fiatstandard Zentralbank – Web</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Fiatstandard Zentralbank</h1>
+      <p class="hinweis">Browser-Client für die serverautoritativ ausgeführte Spiel-Engine.</p>
+
+      <section>
+        <h2>Verbindung</h2>
+        <label>API-Basis-URL <input id="api-base" value="http://127.0.0.1:8080" /></label>
+        <button id="health">Server prüfen</button>
+        <output id="server-status">Noch nicht geprüft</output>
+      </section>
+
+      <section>
+        <h2>Spiel</h2>
+        <label>Spielernamen <input id="spieler" value="Anna, Bert" /></label>
+        <button id="erstellen">Spiel erstellen</button>
+        <label>Spiel-ID <input id="spiel-id" inputmode="numeric" /></label>
+        <button id="laden">Zustand laden</button>
+        <pre id="zustand">Kein Spiel geladen.</pre>
+      </section>
+
+      <section>
+        <h2>Erlaubte Aktionen</h2>
+        <button id="aktionen-laden">Aktionen abrufen</button>
+        <select id="aktionen" size="6"></select>
+        <button id="aktion-senden">Ausgewählte Aktion senden</button>
+      </section>
+
+      <section id="fehler-bereich" hidden>
+        <h2>Fehler</h2>
+        <pre id="fehler"></pre>
+      </section>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

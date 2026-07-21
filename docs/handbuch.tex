@@ -341,7 +341,18 @@ Hauptbahnhof & 3 Nahrung, 3 Kohle \\
 \end{tabular}
 \end{center}
 
-Eine Teilversorgung ist unzulaessig. Reicht der Bestand nicht, bleibt der Standort offen; der Spieler kann im selben Prozug verarbeiten, handeln oder eine Anleihe emittieren.
+Der durch einen Verwaltungsstandort erschlossene automatische Abbauertrag wird
+zuerst mit dessen eigenem Versorgungsbedarf verrechnet. Der Spieler muss nur die
+Rohstoffe aus seinem Bestand bereitstellen, die der Standort nicht selbst
+produziert. Deckt die Eigenproduktion den gesamten Bedarf, gilt der Standort
+automatisch als versorgt.
+
+Der verbleibende Ertrag wird erst gutgeschrieben, sobald der Restbedarf
+vollstaendig gedeckt ist. Ein noch nicht versorgter Standort bringt daher keinen
+Ertrag und schaltet auch die ueber ihn angeschlossene freiwillige Verarbeitung
+nicht frei. Eine Teilversorgung des Restbedarfs ist unzulaessig. Reicht der
+Bestand nicht, bleibt der Standort offen; der Spieler kann im selben Prozug
+handeln oder eine Anleihe emittieren.
 
 \section{Baukosten}
 Die derzeit im Fachmodell gebuchten Infrastrukturkosten lauten:
@@ -374,8 +385,10 @@ Aufwertung zusaetzlich zu dem bereits bestehenden normalen Gebaeude gebucht.
 Abbaueinheiten und Geschaeftsbanken gehoeren keinem Spieler dauerhaft. Sie werden genutzt, kontrolliert oder verlassen. Das ist ein kleiner, aber wichtiger Unterschied, den Menschen ueblicherweise erst beachten, nachdem etwas brennt.
 
 \section{Automatischer Abbau}
-Ein Abbaustandort steht auf einem Gelaendefeld. Beim Beginn jedes Prozuges erhalten
-angeschlossene Spieler seinen Ertrag automatisch und genau einmal. Ein Anschluss
+Ein Abbaustandort steht auf einem Gelaendefeld. Beim Beginn jedes Prozuges wird
+sein Ertrag fuer jeden angeschlossenen Spieler genau einmal ermittelt und dem
+verantwortlichen Verwaltungsstandort zugeordnet. Nach dessen Eigenversorgung
+wird der uebrige Ertrag genau einmal freigegeben. Ein Anschluss
 zaehlt nur, wenn von der angrenzenden Schiene beziehungsweise dem angrenzenden
 Bahnhof oder Hafen ein durchgehender Transportweg zum eigenen intakten
 Hauptbahnhof besteht. Ein Transportweg darf aus Schienen und eigenen
@@ -400,7 +413,7 @@ Eine Geschaeftsbank erzeugt selbst keinen Rohstoffertrag. Angrenzende Infrastruk
 bestimmt bei ihr ausschliesslich Nutzung und Kontrolle.
 
 \section{Freiwillige Verarbeitung}
-Verarbeitungsstandorte erzeugen niemals automatischen Ertrag. Im Prozug entscheidet der Spieler fuer jeden angeschlossenen Standort ausdruecklich, ob er ihn genau einmal verwendet. Die Verwendung ist freiwillig und daher keine Abschlussbedingung. Einsatz und saemtliche Produkte werden atomar gebucht; fehlt auch nur ein Einsatzstoff, bleibt der Standort unverwendet und der Bestand unveraendert.
+Verarbeitungsstandorte erzeugen niemals automatischen Ertrag. Im Prozug entscheidet der Spieler fuer jeden angeschlossenen Standort ausdruecklich, ob er ihn genau einmal verwendet. Dies ist erst nach Versorgung des fuer den Anschluss verantwortlichen Verwaltungsstandorts moeglich. Die Verwendung ist freiwillig und daher keine Abschlussbedingung. Einsatz und saemtliche Produkte werden atomar gebucht; fehlt auch nur ein Einsatzstoff, bleibt der Standort unverwendet und der Bestand unveraendert.
 
 \section{Verlassene Anlagen}
 Eine Abbaueinheit wird verlassen, wenn kein Spieler mehr von einer Kante oder Ecke
@@ -528,7 +541,7 @@ Eine Spielrunde besteht daraus, dass jeder Spieler einmal an der Reihe ist. Nach
 \section{Spielerzug}
 Jeder regulaere Spielerzug besteht genau aus zwei Phasen:
 \begin{enumerate}
-  \item \begriff{Prozug.} Der verpflichtende Dialog oeffnet automatisch. Abbauertraege werden genau einmal gutgeschrieben. Der Spieler kann Verarbeitungsstandorte bestuecken, handeln und Anleihen emittieren. Danach versorgt er jeden festgeschriebenen Verwaltungsstandort und begleicht jede festgeschriebene Zins- oder Rueckkaufforderung. Nur echte Buchungen erfuellen diese Pflichten.
+  \item \begriff{Prozug.} Der verpflichtende Dialog oeffnet automatisch. Abbauertraege werden standortbezogen ermittelt, zur Eigenversorgung verwendet und erst nach vollstaendiger Versorgung genau einmal gutgeschrieben. Der Spieler kann freigeschaltete Verarbeitungsstandorte bestuecken, handeln und Anleihen emittieren. Danach begleicht er jede festgeschriebene Zins- oder Rueckkaufforderung. Nur echte Buchungen oder vollstaendige Eigenversorgung erfuellen diese Pflichten.
   \item \begriff{Epizug.} Nach erfolgreichem Prozug darf der Spieler ohne Aktionspunktgrenze bauen, Rohstoffe und Anleihen handeln, Aussenhandel betreiben, Anleihen emittieren, Krieg erklaeren oder den Spielzug ohne weitere Aktion beenden.
 \end{enumerate}
 

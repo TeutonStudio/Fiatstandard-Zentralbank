@@ -1,0 +1,17 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #182026;
+  background: #edf1f2;
+}
+
+body { margin: 0; }
+main { max-width: 56rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+section { background: white; border: 1px solid #ccd5d8; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+label { display: block; margin: .75rem 0; }
+input, select, button { font: inherit; padding: .55rem; }
+input, select { box-sizing: border-box; width: 100%; }
+button { margin: .35rem .35rem .35rem 0; cursor: pointer; }
+output { display: block; margin-top: .5rem; }
+pre { overflow: auto; padding: .75rem; background: #f5f7f8; border-radius: .25rem; }
+.hinweis { color: #52636b; }
+#fehler-bereich { border-color: #a83232; color: #7c1818; }

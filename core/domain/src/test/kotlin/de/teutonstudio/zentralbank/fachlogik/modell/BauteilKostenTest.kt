@@ -1,0 +1,78 @@
+package de.teutonstudio.zentralbank.fachlogik.modell
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class BauteilKostenTest {
+    @Test
+    fun wirtschaftsstandorteKostenDreiHolzUndZweiZiegel() {
+        val erwarteteKosten = mapOf(Rohstoff.HOLZ to 3, Rohstoff.ZIEGEL to 2)
+        val wirtschaftsstandorte = BauteilTyp.entries.filter {
+            it.art == BauteilArt.WIRTSCHAFTSREGION
+        }
+
+        assertEquals(12, wirtschaftsstandorte.size)
+        assertTrue(wirtschaftsstandorte.all { it.kosten == erwarteteKosten })
+        assertEquals(mapOf(Rohstoff.NAHRUNG to 1), BauteilTyp.ANGLER.ertrag)
+        assertEquals(ProduktionsArt.ABBAU, BauteilTyp.ANGLER.produktionsArt)
+    }
+
+    @Test
+    fun verwaltungsstandorteUndHandelslinienVerwendenDieFestgelegtenKosten() {
+        val erwarteteKosten = mapOf(
+            BauteilTyp.HAUPTBAHNHOF to emptyMap(),
+            BauteilTyp.BAHNHOF to rohstoffe(
+                Rohstoff.HOLZ to 2,
+                Rohstoff.STAHL to 1,
+                Rohstoff.ZIEGEL to 2,
+            ),
+            BauteilTyp.GROSSBAHNHOF to rohstoffe(
+                Rohstoff.HOLZ to 4,
+                Rohstoff.STAHL to 2,
+                Rohstoff.ZIEGEL to 3,
+            ),
+            BauteilTyp.HAFEN to rohstoffe(
+                Rohstoff.HOLZ to 1,
+                Rohstoff.STAHL to 2,
+                Rohstoff.ZIEGEL to 2,
+            ),
+            BauteilTyp.GROSSHAFEN to rohstoffe(
+                Rohstoff.HOLZ to 2,
+                Rohstoff.STAHL to 4,
+                Rohstoff.ZIEGEL to 3,
+            ),
+            BauteilTyp.EISENBAHNLINIE to rohstoffe(
+                Rohstoff.HOLZ to 1,
+                Rohstoff.STAHL to 1,
+            ),
+            BauteilTyp.FRACHTSCHIFF to rohstoffe(Rohstoff.STAHL to 2),
+        )
+
+        erwarteteKosten.forEach { (bauteil, kosten) ->
+            assertEquals(bauteil.name, kosten, bauteil.kosten)
+        }
+    }
+
+    @Test
+    fun grossgebaeudeSindKeineDirektenStartplatzierungen() {
+        assertFalse(BauteilTyp.GROSSBAHNHOF.istInRundeNullPlatzierbar)
+        assertFalse(BauteilTyp.GROSSHAFEN.istInRundeNullPlatzierbar)
+        assertTrue(BauteilTyp.BAHNHOF.istInRundeNullPlatzierbar)
+        assertTrue(BauteilTyp.HAFEN.istInRundeNullPlatzierbar)
+    }
+
+    @Test
+    fun kriegseinheitenBerechnenIhrenTreibstoffJeBewegterKante() {
+        assertEquals(
+            mapOf(Rohstoff.DIESEL to 3),
+            KriegsEinheitTyp.PANZER.bewegungsKosten(3),
+        )
+        assertEquals(
+            mapOf(Rohstoff.SCHWEROEL to 2),
+            KriegsEinheitTyp.KRIEGSSCHIFF.bewegungsKosten(2),
+        )
+        assertTrue(KriegsEinheitTyp.PANZER.bewegungsKosten(0).isEmpty())
+    }
+}

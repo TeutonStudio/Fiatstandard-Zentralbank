@@ -23,5 +23,11 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "CZB"
-include(":app")
-include(":domain")
+include(":apps:android")
+include(":core:domain")
+include(":core:application")
+include(":adapters:persistence-json")
+include(":adapters:protocol-json")
+include(":apps:server")
+include(":tools:simulation")
+include(":adapters:persistence-room")

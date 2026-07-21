@@ -5,3 +5,8 @@ local.properties
 build/
 */build/
 /opencode.json
+.data/
+apps/web/dist/
+apps/web/node_modules/
+tools/ai-python/**/__pycache__/
+tools/ai-python/**/*.pyc
