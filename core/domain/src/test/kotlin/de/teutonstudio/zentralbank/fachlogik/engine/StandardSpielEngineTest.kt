@@ -183,4 +183,37 @@ class StandardSpielEngineTest {
         ).zustand
         assertEquals(letzterSchritt.zustand, replay)
     }
+
+    @Test
+    fun anleiheKennungenWerdenDeterministischVomSpielkernVergeben() {
+        val begonnen = engine.anwenden(start, SpielAktion.ProzugBeginnen(1L)).getOrThrow()
+        val erste = engine.anwenden(
+            begonnen.zustand,
+            SpielAktion.AnleiheEmittieren(
+                spieler = anna,
+                nennwert = Geld.mark(10),
+                zinsBasispunkte = 200,
+                laufzeitRunden = 2,
+            ),
+        ).getOrThrow()
+        val zweite = engine.anwenden(
+            erste.zustand,
+            SpielAktion.AnleiheEmittieren(
+                spieler = anna,
+                nennwert = Geld.mark(20),
+                zinsBasispunkte = 300,
+                laufzeitRunden = 3,
+            ),
+        ).getOrThrow()
+
+        assertEquals(setOf("anleihe-1", "anleihe-2"), zweite.zustand.anleihen.keys.map { it.wert }.toSet())
+        assertEquals(3L, zweite.zustand.naechsteAnleiheNummer)
+        assertEquals(
+            zweite.zustand,
+            SpielAblauf(
+                start,
+                begonnen.ereignisse + erste.ereignisse + zweite.ereignisse,
+            ).zustand,
+        )
+    }
 }

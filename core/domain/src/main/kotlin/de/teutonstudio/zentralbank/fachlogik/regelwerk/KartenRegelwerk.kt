@@ -471,6 +471,7 @@ internal object KartenRegelwerk {
         val nachKosten = bucheBauteil(zustand, ereignis.spieler, BauteilTyp.FRACHTSCHIFF, 1)
         val aktuelleKarte = requireNotNull(nachKosten.karte)
         return nachKosten.copy(
+            naechsteSeewegNummer = zustand.naechsteSeewegNummer + 1L,
             karte = aktuelleKarte.copy(
                 belegung = aktuelleKarte.belegung.copy(
                     seewege = (aktuelleKarte.belegung.seewege + SeewegBelegung(
@@ -556,7 +557,7 @@ internal object KartenRegelwerk {
                     ort = KartenOrt.Kante(kante),
                 )).sortedBy(KriegsEinheitBelegung::id),
             )
-        }
+        }.copy(naechsteEinheitenNummer = zustand.naechsteEinheitenNummer + 1L)
     }
 
     fun kriegsEinheitBauen(
@@ -603,7 +604,7 @@ internal object KartenRegelwerk {
                     ort = KartenOrt.Kante(ereignis.kante),
                 )).sortedBy(KriegsEinheitBelegung::id),
             )
-        }
+        }.copy(naechsteEinheitenNummer = zustand.naechsteEinheitenNummer + 1L)
     }
 
     fun kriegsEinheitBewegen(

@@ -101,6 +101,9 @@ data class SpielZustand(
     val ausgeschiedeneSpieler: Set<SpielerId> = emptySet(),
     val ausscheidensReihenfolge: List<SpielerId> = emptyList(),
     val ergebnis: SpielErgebnis? = null,
+    val naechsteAnleiheNummer: Long = 1L,
+    val naechsteSeewegNummer: Long = 1L,
+    val naechsteEinheitenNummer: Long = 1L,
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
     val zugStatus: ZugStatus? = aktiverSpieler?.let {

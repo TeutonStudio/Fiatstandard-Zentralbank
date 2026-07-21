@@ -8,6 +8,9 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.fachlogik.modell.Anleihe
+import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
+import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
 import de.teutonstudio.zentralbank.fachlogik.regelwerk.SpielRegelwerk
 
 class StandardSpielEngine : SpielEngine {
@@ -90,6 +93,86 @@ class StandardSpielEngine : SpielEngine {
         if (aktion is SpielAktion.Aufgeben) return aufgebenEreignisse(zustand, aktion)
         return listOf(when (aktion) {
             is SpielAktion.Aufgeben -> error("Wird als mehrstufige Regelfolge aufgelöst.")
+            is SpielAktion.HauptbahnhofPlatzieren -> SpielEreignis.HauptbahnhofPlatziert(
+                aktion.spieler,
+                aktion.ecke,
+            )
+            is SpielAktion.EckGebaeudeBauen -> SpielEreignis.EckGebaeudeGebaut(
+                aktion.spieler,
+                aktion.ecke,
+                aktion.typ,
+            )
+            is SpielAktion.EckGebaeudeAufwerten -> SpielEreignis.EckGebaeudeAufgewertet(
+                aktion.spieler,
+                aktion.ecke,
+                aktion.zu,
+            )
+            is SpielAktion.SchieneBauen -> SpielEreignis.SchieneGebaut(
+                aktion.spieler,
+                aktion.kante,
+            )
+            is SpielAktion.AnlageErrichten -> SpielEreignis.NeutraleAnlageErrichtet(
+                aktion.spieler,
+                aktion.feld,
+                aktion.anlage,
+            )
+            is SpielAktion.BelegungAbreissen -> SpielEreignis.KartenBelegungEntfernt(
+                aktion.spieler,
+                aktion.ort,
+                KartenAenderungsGrund.SPIELERAKTION,
+            )
+            is SpielAktion.SeewegEinrichten -> SpielEreignis.SeewegEingerichtet(
+                id = "seeweg-${zustand.naechsteSeewegNummer}",
+                spieler = aktion.spieler,
+                hafenA = aktion.hafenA,
+                hafenB = aktion.hafenB,
+                richtung = aktion.richtung,
+            )
+            is SpielAktion.SeewegEntfernen -> SpielEreignis.SeewegEntfernt(
+                aktion.spieler,
+                aktion.id,
+            )
+            is SpielAktion.KriegsEinheitBauen -> SpielEreignis.KriegsEinheitGebaut(
+                id = "einheit-${zustand.naechsteEinheitenNummer}",
+                spieler = aktion.spieler,
+                typ = aktion.typ,
+                kante = aktion.kante,
+            )
+            is SpielAktion.KriegsEinheitEinsetzen -> SpielEreignis.KriegsEinheitEingesetzt(
+                id = "einheit-${zustand.naechsteEinheitenNummer}",
+                spieler = aktion.spieler,
+                gegner = aktion.gegner,
+                typ = aktion.typ,
+                ort = aktion.ort,
+            )
+            is SpielAktion.KriegsEinheitBewegen -> SpielEreignis.KriegsEinheitBewegt(
+                spieler = aktion.spieler,
+                id = aktion.id,
+                weg = listOf(aktion.naechsteKante),
+            )
+            is SpielAktion.AnleiheEmittieren -> SpielEreignis.AnleiheEmittiert(
+                anleihe = Anleihe(
+                    id = AnleiheId("anleihe-${zustand.naechsteAnleiheNummer}"),
+                    emittent = aktion.spieler,
+                    nennwert = aktion.nennwert,
+                    zinsBasispunkte = aktion.zinsBasispunkte,
+                    laufzeitRunden = aktion.laufzeitRunden,
+                    zinsbetrag = aktion.zinsbetrag,
+                    emissionsRunde = zustand.rundenzähler,
+                ),
+                erwerber = aktion.erwerber,
+                erloes = aktion.erloes,
+            )
+            is SpielAktion.AnleiheFreiwilligZurueckkaufen ->
+                SpielEreignis.AnleiheFreiwilligZurueckgekauft(
+                    aktion.anleihe,
+                    aktion.spieler,
+                    aktion.preis,
+                )
+            is SpielAktion.SchuldenstrichDurchfuehren -> SpielEreignis.Schuldenstrich(
+                aktion.spieler,
+                aktion.entfernteBahnwege,
+            )
             is SpielAktion.ProzugBeginnen -> SpielEreignis.ProzugBegonnen(aktion.zugId)
             is SpielAktion.VerarbeitungAusfuehren -> SpielEreignis.VerarbeitungAusgefuehrt(
                 zugId = aktion.zugId,

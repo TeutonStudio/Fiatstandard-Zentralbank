@@ -21,7 +21,10 @@ internal object AnleihenRegelwerk {
         require(ereignis.erwerber != KontoId.Spieler(anleihe.emittent)) {
             "Der Emittent kann seine neue Anleihe nicht selbst erwerben."
         }
-        val mitAnleihe = zustand.copy(anleihen = zustand.anleihen + (anleihe.id to anleihe))
+        val mitAnleihe = zustand.copy(
+            anleihen = zustand.anleihen + (anleihe.id to anleihe),
+            naechsteAnleiheNummer = zustand.naechsteAnleiheNummer + 1L,
+        )
         val mitErloes = when (ereignis.erwerber) {
             KontoId.Bank -> SpielerRegelwerk.aendereSpieler(mitAnleihe, anleihe.emittent) { spieler ->
                 spieler.copy(geldkonto = spieler.geldkonto + ereignis.erloes)
