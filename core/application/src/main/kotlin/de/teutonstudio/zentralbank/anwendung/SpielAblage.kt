@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import de.teutonstudio.zentralbank.fachlogik.engine.AKTUELLE_REGEL_VERSION
 
 const val AKTUELLE_ENGINE_VERSION = AKTUELLE_REGEL_VERSION
-const val AKTUELLE_SPIELSTAND_SCHEMA_VERSION = 1
+const val AKTUELLE_SPIELSTAND_SCHEMA_VERSION = 2
 
 @Serializable
 data class SpielstandUebersicht(

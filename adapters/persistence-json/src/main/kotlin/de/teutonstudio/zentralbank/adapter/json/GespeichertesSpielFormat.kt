@@ -6,7 +6,7 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import kotlinx.serialization.Serializable
 
-const val AKTUELLE_JSON_SCHEMA_VERSION = 1
+const val AKTUELLE_JSON_SCHEMA_VERSION = 2
 
 @Serializable
 data class GespeichertesSpielFormat(
@@ -28,7 +28,7 @@ internal fun GespeichertesSpiel.zuJsonFormat(): GespeichertesSpielFormat =
     )
 
 internal fun GespeichertesSpielFormat.zuGespeichertemSpiel(): GespeichertesSpiel {
-    require(schemaVersion == AKTUELLE_JSON_SCHEMA_VERSION) {
+    require(schemaVersion in 1..AKTUELLE_JSON_SCHEMA_VERSION) {
         "Nicht unterstützte JSON-Schema-Version $schemaVersion."
     }
     val id = spielId.toLongOrNull()

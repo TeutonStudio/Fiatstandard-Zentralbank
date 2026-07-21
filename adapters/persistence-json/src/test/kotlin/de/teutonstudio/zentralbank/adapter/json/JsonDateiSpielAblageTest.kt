@@ -7,6 +7,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -40,5 +42,35 @@ class JsonDateiSpielAblageTest {
             original.aktuellerZustand(),
             neuGeoeffnet.spielLaden(19)?.aktuellerZustand(),
         )
+    }
+
+    @Test
+    fun schemaEinsWirdGelesenUndBeimSpeichernAufSchemaZweiAngehoben() = runBlocking {
+        val verzeichnis = Files.createTempDirectory("spiel-json-migration")
+        val start = SpielZustand(
+            spieler = listOf(Spieler(SpielerId("Anna"), "Anna")),
+        )
+        val alt = GespeichertesSpielFormat(
+            schemaVersion = 1,
+            engineVersion = "1.1.0",
+            spielId = "7",
+            startzustand = start,
+            ereignisse = emptyList(),
+        )
+        Files.writeString(
+            verzeichnis.resolve("spiel-7.json"),
+            spielstandJson.encodeToString(alt),
+        )
+        val ablage = JsonDateiSpielAblage(verzeichnis)
+        val geladen = requireNotNull(ablage.spielLaden(7))
+
+        assertEquals(1, geladen.schemaVersion)
+        assertEquals(start, geladen.startzustand)
+        ablage.spielSpeichern(geladen)
+
+        val neu = spielstandJson.decodeFromString<GespeichertesSpielFormat>(
+            Files.readString(verzeichnis.resolve("spiel-7.json")),
+        )
+        assertEquals(AKTUELLE_JSON_SCHEMA_VERSION, neu.schemaVersion)
     }
 }

@@ -8,7 +8,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private const val AKTUELLE_ROOM_FORMAT_VERSION = 2
+private const val AKTUELLE_ROOM_FORMAT_VERSION = 3
 
 private val spielstandJson = Json {
     classDiscriminator = "art"
@@ -25,7 +25,7 @@ fun GespeichertesSpiel.zuEntitaet(): SpielstandEntitaet = SpielstandEntitaet(
 )
 
 fun SpielstandEntitaet.zuGespeichertemSpiel(): GespeichertesSpiel {
-    require(formatVersion == AKTUELLE_ROOM_FORMAT_VERSION) {
+    require(formatVersion in 2..AKTUELLE_ROOM_FORMAT_VERSION) {
         if (formatVersion == 1) {
             "Spielstand $spielId verwendet das alte Zugformat 1. " +
                 "Es enthält keine nachweisbaren Prozug-Buchungen und kann deshalb nicht sicher geladen werden."
