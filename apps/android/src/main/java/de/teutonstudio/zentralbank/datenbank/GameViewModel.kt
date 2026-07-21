@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
+import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
@@ -32,7 +33,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val aktuellesSpielOderNull: Spiel?
         get() = koordinator.aktuellesSpielOderNull
 
-    fun ereignisAnwenden(ereignis: SpielEreignis) = koordinator.ereignisAnwenden(ereignis)
+    fun aktionAnwenden(aktion: SpielAktion) = koordinator.aktionAnwenden(aktion)
+    fun kartenEreignisAnwenden(ereignis: SpielEreignis) =
+        koordinator.kartenEreignisAnwenden(ereignis)
     fun meldeSpielFehler(meldung: String) = koordinator.meldeSpielFehler(meldung)
     fun passwortGeschuetzteSpieler(namen: Collection<String>): List<String> =
         koordinator.passwortGeschuetzteSpieler(namen)

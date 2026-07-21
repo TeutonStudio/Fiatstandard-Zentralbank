@@ -218,7 +218,7 @@ fun Navigation(viewModel: GameViewModel) {
                     ) {
                         KartenSpielBildschirm(
                             zustand = spielZustand,
-                            beiEreignis = viewModel::ereignisAnwenden,
+                            beiEreignis = viewModel::kartenEreignisAnwenden,
                             beiRueckgaengig = viewModel::ereignisRueckgaengig,
                             beiWiederholen = viewModel::ereignisWiederholen,
                             modifier = Modifier.fillMaxSize(),
@@ -396,7 +396,7 @@ fun Navigation(viewModel: GameViewModel) {
                     } else {
                         KartenSpielBildschirm(
                             zustand = zustand,
-                            beiEreignis = viewModel::ereignisAnwenden,
+                            beiEreignis = viewModel::kartenEreignisAnwenden,
                             beiRueckgaengig = viewModel::ereignisRueckgaengig,
                             beiWiederholen = viewModel::ereignisWiederholen,
                             modifier = Modifier.fillMaxSize(),

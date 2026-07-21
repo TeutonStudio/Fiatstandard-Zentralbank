@@ -100,18 +100,19 @@ class LegacySpielKoordinator(
         starteProzugFallsNoetig()
     }
 
-    fun ereignisAnwenden(ereignis: SpielEreignis) {
-        val ablauf = spielAblauf
-        if (ablauf == null) {
-            _spielFehler.tryEmit("Kein Spiel geladen.")
-            return
-        }
+    fun aktionAnwenden(aktion: SpielAktion) = wendeAktionAn(aktion)
 
-        val vorher = ablauf.zustand
-        ablauf.ereignisAnwenden(ereignis)
-            .onSuccess { zustand -> uebernehmeEreignisErgebnis(vorher, zustand) }
-            .onFailure { throwable ->
-                _spielFehler.tryEmit(throwable.message ?: "Spielereignis wurde abgelehnt.")
+    /**
+     * Übergang für die noch ereignisbasierten Karten-Callbacks. Das von der Darstellung
+     * beschriebene Vorhaben wird vor der Zustandsänderung in eine Spieleraktion übersetzt.
+     */
+    fun kartenEreignisAnwenden(ereignis: SpielEreignis) {
+        runCatching { ereignis.alsSpielerAktion() }
+            .onSuccess(::wendeAktionAn)
+            .onFailure { fehler ->
+                _spielFehler.tryEmit(
+                    fehler.message ?: "Die Kartenaktion konnte nicht zugeordnet werden.",
+                )
             }
     }
 
@@ -210,8 +211,16 @@ class LegacySpielKoordinator(
             _spielFehler.tryEmit(fehler.message ?: "Auslandseinkauf konnte nicht vorbereitet werden.")
             return false
         }
+        val fachAktionen = runCatching {
+            fachEreignisse.map { ereignis -> ereignis.alsSpielerAktion() }
+        }.getOrElse { fehler ->
+            _spielFehler.tryEmit(
+                fehler.message ?: "Bau und Auslandseinkauf enthalten keine Spieleraktion.",
+            )
+            return false
+        }
         SpielSitzung(ausgangszustand)
-            .legacyEreignisseAtomarAnwenden(fachEreignisse)
+            .aktionenAtomarAnwenden(fachAktionen)
             .exceptionOrNull()
             ?.let { fehler ->
                 _spielFehler.tryEmit(
@@ -236,7 +245,12 @@ class LegacySpielKoordinator(
             return false
         }
         val vorher = ablauf.zustand
-        val ergebnis = ablauf.legacyEreignisseAtomarAnwenden(bauEreignisse)
+        val aktionen = runCatching { bauEreignisse.map { it.alsSpielerAktion() } }
+            .getOrElse { fehler ->
+                _spielFehler.tryEmit(fehler.message ?: "Der Bauplan enthält keine Spieleraktion.")
+                return false
+            }
+        val ergebnis = ablauf.aktionenAtomarAnwenden(aktionen)
         if (ergebnis.isFailure) {
             _spielFehler.tryEmit(
                 ergebnis.exceptionOrNull()?.message ?: "Der Bauplan wurde fachlich abgelehnt."
@@ -319,26 +333,6 @@ class LegacySpielKoordinator(
             .onFailure { fehler ->
                 _spielFehler.tryEmit(fehler.message ?: "Spielaktion wurde abgelehnt.")
             }
-    }
-
-    private fun wendeEreignisseAn(ereignisse: List<SpielEreignis>) {
-        val ablauf = spielAblauf
-        if (ablauf == null) {
-            _spielFehler.tryEmit("Kein Spiel geladen.")
-            return
-        }
-
-        val vorher = ablauf.zustand
-        for (ereignis in ereignisse) {
-            val ergebnis = ablauf.ereignisAnwenden(ereignis)
-            if (ergebnis.isFailure) {
-                aktualisiereSpielZustand(ablauf.zustand)
-                val fehler = ergebnis.exceptionOrNull()
-                _spielFehler.tryEmit(fehler?.message ?: "Zug konnte nicht fortgesetzt werden.")
-                return
-            }
-        }
-        uebernehmeEreignisErgebnis(vorher, ablauf.zustand)
     }
 
     private fun uebernehmeEreignisErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
@@ -710,6 +704,40 @@ class LegacySpielKoordinator(
         aktuellesSpielOderNull?.aktualisiereAktivenSpieler(zustand.zugStatus?.spieler?.wert)
         _spielZustand.value = zustand
         _spielUebersicht.value = zustand.zuSpielUebersichtZustand()
+    }
+
+    private fun SpielEreignis.alsSpielerAktion(): SpielAktion = when (this) {
+        is SpielEreignis.AuslandsHandel -> SpielAktion.MitAuslandHandeln(
+            spieler,
+            rohstoff,
+            menge,
+            preis,
+            art,
+        )
+        is SpielEreignis.HauptbahnhofPlatziert ->
+            SpielAktion.HauptbahnhofPlatzieren(spieler, ecke)
+        is SpielEreignis.EckGebaeudeGebaut -> SpielAktion.EckGebaeudeBauen(spieler, ecke, typ)
+        is SpielEreignis.EckGebaeudeAufgewertet ->
+            SpielAktion.EckGebaeudeAufwerten(spieler, ecke, zu)
+        is SpielEreignis.SchieneGebaut -> SpielAktion.SchieneBauen(spieler, kante)
+        is SpielEreignis.NeutraleAnlageErrichtet ->
+            SpielAktion.AnlageErrichten(errichter, feld, anlage)
+        is SpielEreignis.KartenBelegungEntfernt ->
+            SpielAktion.BelegungAbreissen(spieler, ort)
+        is SpielEreignis.SeewegEingerichtet ->
+            SpielAktion.SeewegEinrichten(spieler, hafenA, hafenB, richtung)
+        is SpielEreignis.SeewegEntfernt -> SpielAktion.SeewegEntfernen(spieler, id)
+        is SpielEreignis.KriegsEinheitGebaut ->
+            SpielAktion.KriegsEinheitBauen(spieler, typ, kante)
+        is SpielEreignis.KriegsEinheitEingesetzt ->
+            SpielAktion.KriegsEinheitEinsetzen(spieler, gegner, typ, ort)
+        is SpielEreignis.KriegsEinheitBewegt -> {
+            require(weg.size == 1) { "Die UI übergibt Bewegungen schrittweise." }
+            SpielAktion.KriegsEinheitBewegen(spieler, id, weg.single())
+        }
+        else -> error(
+            "${this::class.simpleName} ist keine direkt auswählbare Bau- oder Handelsaktion.",
+        )
     }
 
     private data class SpielstandSpeicherauftrag(
