@@ -1,26 +1,24 @@
 # Architektur
 
-## Ziel und Modulübersicht
+Stand: 21. Juli 2026. Maßgeblich ist der Code auf dem aktuellen Branch; ältere
+Umbaupläne unter `docs/` sind historische Arbeitsunterlagen.
 
-Die Regeln werden einmalig im Kotlin/JVM-Kern ausgeführt. Ein Browser sendet
-nur Absichten an den Server; er berechnet keinen autoritativen Zustand. Android
-kann dieselbe Engine lokal verwenden und über Room speichern. Simulationen
-laufen ohne Android-Laufzeit.
+## Module und Abhängigkeitsrichtung
 
-| Modul | Verantwortung | Darf abhängen von |
+| Modul | Verantwortung | Direkte Projektabhängigkeiten |
 | --- | --- | --- |
-| `core/domain` | Fachmodelle, Regeln, Ereignisse, Aktionen, Engine, seed-basierte Zufallsquelle | Kotlin/JVM-Bibliotheken |
-| `core/application` | Spielsitzung, Atomizität, Undo/Redo, Laden/Speichern, Ports, Read Models, Zustandshash | `core/domain` |
-| `adapters/persistence-room` | Room-Datenbank v4, Migrationen, DAOs, Room-Mapping, `RaumSpielAblage` | Core |
+| `core/domain` | Fachzustand, Aktionen, Ereignisse, Regeln, Engine, Aktionsraum, Beobachtung, Partieende, Invarianten und deterministischer Zufall | keine |
+| `core/application` | `SpielSitzung`, atomare Aktionsfolgen, Undo/Redo, Ablageport, Read Models und Zustandshash | `core/domain` |
 | `adapters/persistence-json` | In-Memory- und atomare JSON-Dateiablage | Core |
-| `adapters/protocol-json` | versionierte, vom Domain-Modell getrennte API-DTOs | Core |
-| `apps/android` | Compose, Navigation, Lifecycle, UI-Zustände, 3D, PDF, Diagramme | Adapter und Core |
-| `apps/server` | HTTP-Transport, serverseitige Orchestrierung und Fehlerabbildung | Adapter und Core |
-| `apps/web` | nicht autoritativer TypeScript-Browser-Client | Server-HTTP-API |
-| `tools/simulation` | Headless-Episoden, Strategie, externe Bewertung, JSONL-Export | Protokoll und Core |
-| `tools/ai-python` | JSONL-Parser und NDJSON-Umgebungsschnittstelle | keine Kotlin-Regelimplementierung |
+| `adapters/persistence-room` | Room-Datenbank, Migrationen, DAOs und `RaumSpielAblage` | Core |
+| `adapters/protocol-json` | versionierte HTTP-DTOs und Domain-Zuordnung | Core |
+| `apps/android` | Compose, Navigation, Lifecycle, Darstellung, Room-Verdrahtung und Legacy-Kompatibilität | Core und Room-Adapter |
+| `apps/server` | autoritativer HTTP-Transport und strukturierte Fehlerabbildung | Core, JSON-Persistenz und Protokoll |
+| `apps/web` | nicht autoritativer TypeScript-Client | HTTP-API |
+| `tools/simulation` | Trainingsumgebung, Szenarien, Agenten, Kodierung, Belohnung, Episode und CLI | ausschließlich `core/domain` |
+| `tools/ai-python` | Parser des Episodenformats und vorbereitete NDJSON-Transportschnittstelle | keine Kotlin-Regeln |
 
-Die erlaubte Richtung ist:
+Die erlaubte Richtung lautet:
 
 ```text
 apps ───────┐
@@ -28,114 +26,166 @@ apps ───────┐
 tools ──────┘          └──────────────────────────> core/domain
 ```
 
-`core` kennt weder Apps noch konkrete Adapter. Der Gradle-Task
-`architekturPruefen` kontrolliert Android-/Compose-Importe in Core,
-Room-Importe außerhalb des Room-Adapters und rückwärts gerichtete
-Core-Projektabhängigkeiten. Er wird von den `test`- und `check`-Tasks ausgeführt.
+`tools/simulation` benötigt für den In-Process-Trainingslauf keinen Adapter und
+greift deshalb direkt auf `core/domain` zu. `architekturPruefen` verhindert
+Android-/Compose-Importe in Core, Room-Importe außerhalb des Room-Adapters sowie
+rückwärts gerichtete Core-Abhängigkeiten.
 
-## Aktion, Ereignis und Zustand
+## Maßgebliche fachliche Kette
 
-- `SpielAktion` ist eine angeforderte Entscheidung, etwa
-  `VerarbeitungAusfuehren` oder `KriegErklaeren`. Sie kann abgelehnt werden.
-- `SpielEreignis` ist eine bereits akzeptierte, serialisierbare Änderung. Nur
-  Ereignisse werden dem Verlauf hinzugefügt.
-- `SpielZustand` ist die vollständig ableitbare Sicht nach dem Falten von
-  Startzustand und Ereignisfolge durch `SpielRegelwerk`.
-- `SpielEngine` validiert Aktionen, erzeugt ein oder mehrere Ereignisse und
-  liefert `SpielSchrittErgebnis` mit Folgezustand und Ereignissen. Außerdem
-  liefert sie erlaubte Aktionen für einen Spieler.
+```text
+SpielAktion
+    ↓ StandardSpielEngine: prüfen und auflösen
+ein oder mehrere SpielEreignisse
+    ↓ SpielRegelwerk
+SpielZustand
+    ↓ AktionsAuswertung / BeobachtungsAuswertung
+AktionsRaum und SpielBeobachtung
+```
 
-Neue Clients rufen nicht direkt `SpielRegelwerk.wendeAn` auf. Die noch nicht in
-`SpielAktion` überführten Android-Funktionen verwenden vorübergehend die
-explizit benannte Ereignisbrücke in `SpielSitzung`; sie ist in der
-Legacy-Migrationsliste erfasst.
+- `SpielAktion` ist eine serialisierbare Absicht eines Spielers oder Agenten.
+  Erzeugungsaktionen enthalten keine frei wählbaren Objekt-IDs.
+- `StandardSpielEngine` prüft den Eingangszustand, erzeugt Ereignisse, faltet sie
+  über `SpielRegelwerk` und prüft den Folgezustand mit `ZustandsInvarianten`.
+- `SpielEreignis` beschreibt nur akzeptierte Zustandsänderungen. Automatische
+  Buchungen und Rundenfolgen sind Ereignisse, keine Agentenoptionen.
+- `SpielZustand` ist die einzige fachlich maßgebliche Wahrheit. Ein Zustand kann
+  vollständig aus Startzustand und geordnetem Ereignisverlauf rekonstruiert werden.
+- `AktionsAuswertung` erzeugt einen deterministisch sortierten, endlichen
+  `AktionsRaum` und lässt jede Kandidatenaktion durch dieselbe Engine prüfen.
+- `BeobachtungsAuswertung` projiziert eine spielerbezogene `SpielBeobachtung`.
 
-## Ablauf einer Android-Aktion
+## Zug, Runde und Partieende
 
-1. Compose sendet eine UI-Absicht an das 95-zeilige `GameViewModel`.
-2. Das ViewModel delegiert an den `LegacySpielKoordinator`; für den bereits
-   migrierten vertikalen Schnitt wird daraus eine `SpielAktion`.
-3. `SpielSitzung` ruft die gemeinsame `SpielEngine` auf und übernimmt alle
-   erzeugten Ereignisse atomar.
-4. `SpielRegelwerk` erzeugt den neuen `SpielZustand`; StateFlows aktualisieren
-   die Anzeige.
-5. Der Room-Adapter speichert Startzustand und Ereignisverlauf. Das ViewModel
-   greift weder auf `AppDatabase` noch auf DAOs zu.
+Ein regulärer Zug beginnt im Prozug. `ProzugBegonnen` friert die in diesem Zug
+fälligen Versorgungs- und Anleihenverpflichtungen als Snapshot ein. Ein
+Verwaltungsstandort erhält Ertrag nur nach Versorgung; eigene passende Produktion
+deckt zuerst den Eigenbedarf. Der Spieler liefert nur den verbleibenden Bedarf.
 
-Der große Übergangskoordinator hält noch Android-spezifische Ablaufanschlüsse
-und Legacy-Konvertierungen. Er ist nicht Teil von Core und sein kontrollierter
-Abbau ist in `legacy-migration.md` festgehalten.
+`ZugBeenden` kann als eine Aktion mehrere Ereignisse erzeugen:
 
-## Ablauf einer Web-Aktion
+1. `ZugBeendet` wechselt zum nächsten spielbaren Spieler.
+2. Beim Umlauf zum ersten Spieler verfallen überalterte offene Angebote.
+3. `RundeBegonnen` schreibt neue Marktpreise, Leitzins und Inflationswert in den
+   Fachzustand.
+4. `ProzugBegonnen` erzeugt den Verpflichtungssnapshot des neuen Zuges.
 
-1. Der Browser lädt Zustand und erlaubte Aktionen über `/api/v1` und sendet ein
-   versioniertes `SpielAktionDto`.
-2. Der HTTP-Layer dekodiert und prüft Transportdaten, enthält aber keine
-   Fachberechnung.
-3. `SpielServerDienst` lädt die Sitzung über `SpielDienst` und ruft dieselbe
-   injizierte `SpielEngine` wie Android und Simulation auf.
-4. Nur eine akzeptierte Aktion wird samt Ereignissen gespeichert. Ungültige
-   Aktionen liefern eine strukturierte Fehlerantwort und verändern nichts.
-5. Die Antwort enthält einen für Web-Clients bereinigten Zustands-DTO;
-   Passwort-Hashes werden nicht ausgegeben.
+Marktpreise werden aus den beobachteten Einzelpreisen der beendeten Runde
+ganzzahlig gemittelt; ohne Beobachtung bleibt der bisherige Preis erhalten. Die
+Leitzinsregel arbeitet ausschließlich in ganzzahligen Basispunkten. Replay führt
+daher zu denselben Rundenwerten.
 
-Der Server verwendet bewusst den JDK-HTTP-Server als kleinen JVM-Transport. Die
-Application- und Domain-Grenzen erlauben einen späteren Austausch gegen Ktor,
-ohne Regeln oder Persistenz umzubauen.
+`SpielErgebnis` ist der terminale Fachstatus. Aufgabe ist die ausdrückliche
+`SpielAktion.Aufgeben`. Der letzte spielfähige Spieler gewinnt; scheiden alle aus,
+gibt es keinen Gewinner. Nach `PartieBeendet` existiert kein aktiver Zug und die
+Engine lehnt normale Aktionen ab. Das technische Entscheidungslimit der Simulation
+setzt nur `truncated` und erzeugt kein Fachereignis. Eine darüber hinausgehende
+reguläre Siegbedingung ist im vorhandenen Regelhandbuch nicht definiert; der
+Enumwert `REGULAERER_SIEG` ist deshalb bewusst reserviert und noch nicht ausgelöst.
 
-## Ablauf eines Simulationsschritts (Ist-Stand vor Trainingsumbau)
+## Angebote
 
-1. Die Simulation fragt `SpielEngine.erlaubteAktionen` ab.
-2. Eine austauschbare `SpielStrategie` wählt mit einer lokalen,
-   episode-spezifischen `SeedZufallsquelle` eine Aktion.
-3. `SpielSitzung` führt die Aktion mit derselben Engine aus.
-4. Eine separate `Bewertungsfunktion` vergleicht vorher/nachher. Die neutrale
-   Beispielbewertung ist ausdrücklich nur eine Baseline.
-5. Beobachtung, erlaubte und gewählte Aktion, Belohnungskomponenten,
-   Folgezustand und Ereignisse werden als eine JSONL-Zeile exportiert.
+Rohstoff- und Anleihenangebote sind Bestandteil von `SpielZustand`. Erstellen,
+annehmen, ablehnen und zurückziehen sind Spieleraktionen. Beim Erstellen wird kein
+Bestand reserviert. Erst die Annahme prüft den aktuellen Bestand und erzeugt die
+endgültige Übertragung. Angebots-IDs stammen aus dem deterministischen Zähler des
+Fachzustands. Offene alte Angebote laufen beim Rundenwechsel ab.
 
-Der am 21. Juli 2026 geprüfte Ausgangsstand besitzt noch keinen fachlichen
-Endzustand: Episoden enden deshalb technisch am Schrittlimit. Auch
-`RundenwerteAktualisiert` wird beim vollen Rundenwechsel noch durch den
-Android-`LegacySpielKoordinator` erzeugt. Diese beiden Grenzen sind keine
-Zielarchitektur; der laufende KI-Trainingsumbau ersetzt sie durch Domain-Regeln,
-spielerbezogene Beobachtungen und eine echte `reset`/`step`-Umgebung. Der
-detaillierte Codebefund steht in `KI_TRAININGSUMBAU_ISTSTAND.md`.
+## Beobachtung und Modellkodierung
 
-## Persistenz
+Eine Beobachtung enthält die eigene Wirtschaft vollständig, vom Gegner jedoch nur
+Identität, Ausscheidensstatus, öffentliche Bauwerkzahl und emittierte Anleihen.
+Geld, Lager und Passwortdaten der Gegner sind verborgen. Gerichtete Angebote sind
+nur für Beteiligte sichtbar. Alle Listen werden stabil sortiert.
 
-Der Port `SpielAblage` gehört zu `core/application`. Beide Adapter erfüllen
-denselben Vertrags-Test.
+`BeobachtungsKodierung` Version 1 erzeugt feste, normalisierte Arrays für höchstens
+vier Spieler, 256 Felder, 512 Ecken, 768 Kanten und 512 Aktions-Hashplätze. Padding
+ist Null. Geld bleibt im Fachzustand `Geld` in Cent und wird erst in der
+Modellprojektion in `Float` umgerechnet. Die Hashmaske ist eine Baseline für
+Datensätze, keine kollisionsfreie Policy-Kodierung.
 
-- JSON speichert einen Umschlag mit `schemaVersion`, `engineVersion`,
-  `spielId`, `startzustand`, `ereignisse` und optionalem `seed`. Der
-  Datei-Adapter schreibt erst eine temporäre Datei und ersetzt dann atomar,
-  soweit das Dateisystem dies unterstützt.
-- Room speichert den maßgeblichen Fachverlauf in `FachSpielstand`. Die
-  normalisierten Tabellen `GameData`, `PlayerData`, `BuildData`, `ControlData`,
-  `RoundData`, `TradeData`, `CreditData` und `ContractData` bleiben für
-  Legacy-Kompatibilität erhalten. Keine Migration wurde entfernt; vorhanden
-  sind weiterhin 1→2, 2→3 und 3→4.
-- Die In-Memory-Ablage dient Tests, Server-Smoke-Tests und kurzlebigen Läufen.
+## Android-Aktion
 
-## Versionierung und deterministische Wiederholung
+1. Compose gibt eine UI-Absicht an das 98-zeilige `GameViewModel`.
+2. Das ViewModel delegiert an den `LegacySpielKoordinator` und dessen
+   `SpielSitzung`.
+3. Prozug, Zugende, Konflikt und Kartenbau laufen als `SpielAktion` durch
+   `StandardSpielEngine`. Noch ereignisbasierte Karten-Callbacks werden vor jeder
+   Zustandsänderung ausdrücklich in eine Spieleraktion übersetzt.
+4. Die erzeugten Ereignisse aktualisieren den StateFlow des `SpielZustand` und
+   werden als Startzustand plus Verlauf gespeichert.
+5. Das ViewModel greift weder auf DAO noch `AppDatabase` zu.
 
-Speicher- und Protokollumschläge besitzen eine Schema-/Protokollversion; die
-Regelsemantik besitzt `engineVersion`. Unbekannte JSON-Schemaversionen werden
-abgelehnt, statt still falsch gelesen zu werden. DTOs und Domain-Typen bleiben
-getrennt, damit spätere Protokollmigrationen die Engine nicht verändern.
+Das alte veränderliche `Spiel` wird noch von Finanz-, Handels- und
+Darstellungsbildschirmen gelesen und vom Koordinator für Legacy-Tabellen gepflegt.
+Es ist kein Teil der Engine. Die verbleibenden direkten Android-Ereignispfade sind
+in `legacy-migration.md` aufgelistet.
 
-Der Zustand wird ausschließlich aus `startzustand` und der geordneten Liste von
-`SpielEreignis` rekonstruiert. Die Engine verwendet keine Systemzeit, kein
-Dateisystem, Netzwerk, Android, Room oder globale Zufallsquelle. Benötigte
-Zufälligkeit wird per `Zufallsquelle` und Seed injiziert. Der kanonische
-`ZustandsHash` serialisiert sortiert und berechnet SHA-256; gleiche Eingaben
-ergeben damit denselben Hash.
+## Web-Aktion
 
-## Bewusst offene Migrationsgrenzen
+1. Der Browser sendet ein versioniertes `SpielAktionDto` an `/api/v1`.
+2. Der Server ordnet das DTO einer Domain-Aktion zu. Neue Aktionstypen können im
+   Protokoll v1 vorübergehend über den strikt serialisierten Umschlag
+   `ErweiterteAktion` transportiert werden.
+3. `SpielServerDienst` und `SpielDienst` laden die Sitzung und rufen die gemeinsame
+   Engine auf; REST-Routen enthalten keine Spielregel.
+4. Nur akzeptierte Ereignisse werden gespeichert. Fehler sind strukturiert und
+   verändern den Zustand nicht.
+5. API-Antworten enthalten keine Passwort-Hashes.
 
-Die zentralen Prozug-, Zugende-, Warenkorb-, Rohstoffhandels- und
-Konfliktaktionen verwenden bereits `SpielAktion`. Bauen, Anleihen und Teile des
-Rundenwechsels laufen noch über die atomare Ereignisbrücke und bestehende
-Legacy-Auswertungen. Diese Grenze bleibt kompilierend und getestet, ist aber
-kein Endzustand; konkrete Löschkriterien stehen in `legacy-migration.md`.
+Der Browser ist niemals autoritativ. Android darf dieselbe Engine lokal betreiben.
+
+## Simulationsschritt
+
+1. `StandardTrainingsUmgebung.reset` erzeugt aus Szenario und Seed einen
+   Startzustand und führt den zwingenden Prozugbeginn aus.
+2. Der Entscheidungspunkt enthält aktiven Spieler, dessen Beobachtung und den
+   aktuellen Aktionsraum.
+3. Ein `SpielAgent` wählt ausschließlich daraus; `ZufallsAgent` verwendet nur die
+   übergebene `SeedZufallsquelle`.
+4. `step` validiert die Mitgliedschaft im Aktionsraum und führt die Aktion über die
+   gemeinsame Engine aus.
+5. Zwingende Regelfolgen laufen bis zum nächsten echten Entscheidungspunkt.
+6. `PotentialBelohnungsModell` berechnet austauschbare Trainingsbelohnungen
+   außerhalb der Engine.
+
+`KleineWirtschaftsBaseline` erzeugt eine kleine JVM-eigene Karte mit drei getrennten
+Startinseln und Hauptbahnhöfen. Sie benötigt keine Android-Ressource. Mehrere
+Umgebungen halten ausschließlich Instanzzustand und können unabhängig laufen.
+
+## Trainingsdaten
+
+Eine JSONL-Zeile ist eine vollständige `SpielEpisode` (Format 2) mit Startzustand,
+allen Entscheidungen aller Spieler, komplettem Ereignisverlauf, Ergebnis und
+Truncation. Jeder `EntscheidungsDatensatz` enthält Beobachtung, Aktionsraum,
+gewählte Aktion und Belohnung. `replay()` faltet den gespeicherten Verlauf erneut.
+Der Export verwirft Passwörter und bricht ab, falls ein Passwortfeld serialisiert
+würde. Der Python-Parser prüft dieselbe Eigenschaft erneut.
+
+## Persistenz und Versionen
+
+- Application-Spielstandschema: 2, Regel-/Engine-Version: `2.0.0`.
+- JSON-Ablageschema: 2; Schema 1 wird geladen und beim nächsten Speichern auf 2
+  geschrieben. Dateien werden über eine temporäre Datei ersetzt.
+- Room-Datenbank: Schema 4 mit erhaltenen Migrationen 1→2, 2→3 und 3→4;
+  Fachspielstandformat 3 akzeptiert Format 2. Format 1 wird wegen eines nicht
+  verifizierbaren historischen Prozug-Snapshots ausdrücklich abgelehnt.
+- HTTP-Protokoll: v1; Domain-DTOs und Transport-DTOs bleiben getrennt.
+- Episode 2, Beobachtung 1, Aktion 1 und Modellkodierung 1.
+
+Die normalisierten Room-Tabellen bleiben als Legacy-Kompatibilität erhalten. Für
+neue Fachwahrheit ist `FachSpielstand` mit Startzustand und Ereignissen maßgeblich.
+
+## Determinismus und Invarianten
+
+Die Engine verwendet keine Systemzeit, globale Zufallsquelle, Android-API, Room,
+Dateisystem oder Netzwerk. Zufall wird über `Zufallsquelle` injiziert. IDs für
+Anleihen, Seewege, Einheiten und Angebote stammen aus serialisierten Zählern im
+Zustand. Kandidaten und Beobachtungen werden unabhängig von Map-Reihenfolgen
+sortiert.
+
+`ZustandsInvarianten` prüft unter anderem nichtnegative Rohstoff-/Bauteilbestände,
+eindeutige Spieler- und Objekt-IDs, höchstens einen Gläubiger je Anleihe, gültige
+Objektreferenzen sowie die Übereinstimmung von aktivem Spieler und Zugstatus. Der
+Massentest replayt zusätzlich jede Episode und verlangt einen nichtleeren
+Aktionsraum an jedem nichtterminalen Entscheidungspunkt.

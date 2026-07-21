@@ -1,37 +1,48 @@
 # ADR 003: Headless-Simulation und KI-Protokoll
 
-- Status: angenommen
+- Status: angenommen und umgesetzt
 - Datum: 2026-07-21
 
 ## Kontext
 
-Trainingsläufe müssen ohne Android funktionieren und exakt dieselben erlaubten
-Aktionen und Zustandsübergänge wie Produktiv-Clients verwenden. Die
-Belohnungsdefinition wird sich voraussichtlich häufiger ändern als die Regeln.
+Trainingsläufe müssen ohne Android dieselben Aktionen, Regeln, Invarianten und
+Zustandsübergänge wie Produktiv-Clients verwenden. Beobachtungs-, Kodierungs- und
+Belohnungsdefinitionen ändern sich voraussichtlich häufiger als Fachregeln.
 
 ## Entscheidung
 
-`tools/simulation` ist ein Kotlin/JVM-CLI über `SpielEngine`. Eine
-`SpielStrategie` wählt aus `erlaubteAktionen`; die Zufallsstrategie erhält einen
-deterministischen Seed. `Bewertungsfunktion` ist außerhalb der Engine injiziert
-und liefert benannte Komponenten für Überleben, Liquidität, Produktion,
-Kontrolle, Schuldenrisiko und Endergebnis.
+`tools/simulation` hängt ausschließlich von `core/domain` ab. Eine
+`StandardTrainingsUmgebung` bietet `reset(szenario, seed)` und `step(aktion)`.
+Jeder Entscheidungspunkt enthält eine spielerbezogene `SpielBeobachtung` und den
+von `AktionsAuswertung` erzeugten `AktionsRaum`. `terminated` bedeutet ausschließlich
+ein `SpielErgebnis`; ein technisches Limit setzt getrennt `truncated`.
 
-Jeder Schritt wird als versionierte JSONL-Zeile mit Episode, Engine-Version,
-Seed, Akteur, Beobachtungen, legalen/gewählten Aktionen, Komponenten,
-Ereignissen und Terminierungsdaten exportiert. Die gelieferte neutrale
-Bewertung ist eine technische Baseline, keine fachlich endgültige
-KI-Belohnungsfunktion.
+`SpielAgent` wählt `SpielAktion`. `ZufallsAgent` verwendet nur eine injizierte
+`SeedZufallsquelle`; Sicherheits- und Wirtschaftsagent sind nachvollziehbare
+Heuristikbaselines. Belohnungen werden über `BelohnungsModell` außerhalb der Engine
+berechnet. Version 1 kombiniert Terminalwerte (+1 Gewinner, -1 Verlierer, 0 echtes
+Unentschieden) mit potentialbasiertem Shaping für Liquidität, Nettovermögen,
+produktive Kapazität, aktive Infrastruktur und Schuldendienstfähigkeit.
 
-Python liest diese Episoden nur. Es dupliziert keine Kotlin-Regeln. Für spätere
-interaktive Läufe definiert die Python-Schnittstelle die NDJSON-Kommandos
-`reset`, `observe`, `legal_actions`, `step` und `close` über stdin/stdout.
+Eine JSONL-Zeile enthält eine vollständige `SpielEpisode` im Format 2. Kopf und
+Entscheidungen protokollieren Regel-, Beobachtungs- und Aktionsversion. Der
+Startzustand ist passwortbereinigt; Export und Python-Parser lehnen Passwortfelder
+zusätzlich ab. Der vollständige Ereignisverlauf ermöglicht Replay.
+
+`BeobachtungsKodierung` Version 1 ist eine ML-frameworkfreie feste Arrayprojektion
+mit Padding und Aktionsmaske. Das Python-Modul liest Episoden und bereitet nur den
+Transport für `reset`, `observe`, `legal_actions`, `step` und `close` vor; es
+dupliziert keine Spielregel.
 
 ## Folgen
 
-- Offline-Datensätze sind reproduzierbar und unabhängig von ML-Frameworks.
-- Reward Shaping kann ersetzt werden, ohne die Engine-Version zu verändern.
-- Das Schrittlimit ist eine gültige Terminierung, solange das Domain-Modell
-  noch keinen allgemeinen Spielendestatus bereitstellt.
-- Ein späterer interaktiver Kotlin-Host kann das vorbereitete NDJSON-Protokoll
-  implementieren, ohne die Python-API neu zu entwerfen.
+- Offline-Datensätze sind seed-reproduzierbar und replaybar.
+- Regel-, Beobachtungs-, Aktions-, Episoden- und Kodierungsversion können getrennt
+  weiterentwickelt werden.
+- Reward Shaping kann ausgetauscht werden, ohne die Engine zu ändern.
+- Die Hash-basierte Baseline-Aktionsmaske kann kollidieren und muss vor einem
+  produktiven Policy-Modell durch eine explizite versionierte Aktionstabelle ersetzt
+  werden.
+- Das JVM-Szenario verwendet eine kompakte generierte Karte. Android-Karten müssen
+  später in ein gemeinsames JVM-Ressourcenmodul überführt werden, wenn reale Karten
+  direkt für Training verwendet werden sollen.

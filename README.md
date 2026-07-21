@@ -52,8 +52,15 @@ Browser gespeichert.
 ## Simulation und Trainingsdatenexport
 
 ```bash
-./gradlew :tools:simulation:run --args="--episodes 2 --seed 42 --max-steps 500 --output build/simulation/episodes.jsonl"
+./gradlew :tools:simulation:run --args="--spiele 2 --seed 42 --max-entscheidungen 500 --spieler zufall,wirtschaft,sicherheit --karte kleine-wirtschaft-v1 --ausgabe build/simulation"
+
+# separater Massentest mit 1.000 deterministischen Partien
+./gradlew :tools:simulation:massentest
 ```
+
+Die CLI schreibt `episoden.jsonl` und `statistik.json` in den Ausgabeordner.
+`--episodes`, `--max-steps` und `--output` bleiben als kompatible englische
+Aliase verfügbar.
 
 Die Ausgabe ist JSONL und kann ohne duplizierte Kotlin-Regeln mit der
 Python-Brücke gelesen werden:
@@ -61,7 +68,7 @@ Python-Brücke gelesen werden:
 ```bash
 cd tools/ai-python
 python -m unittest discover -s tests
-python fiat_ai/episode_parser.py ../simulation/build/simulation/episodes.jsonl
+python fiat_ai/episode_parser.py ../simulation/build/simulation/episoden.jsonl
 ```
 
 Die Architektur und die bewusst noch vorhandenen Übergangsmodelle sind in
