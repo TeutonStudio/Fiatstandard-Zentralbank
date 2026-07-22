@@ -293,6 +293,17 @@ data class KartenBelegung(
                     "Auf einem Teichfeld darf nur ein Angler stehen: ${belegung.position}."
                 }
             }
+            val wirtschaftsregion = belegung.anlage as? FeldAnlage.Wirtschaftsregion
+            if (wirtschaftsregion?.bauteil == BauteilTyp.FOERSTER) {
+                require(karte.landNachPosition[belegung.position] == GelaendeTyp.WALD) {
+                    "Ein Förster darf nur auf einem Waldgebiet gebaut werden: ${belegung.position}."
+                }
+            }
+            if (wirtschaftsregion?.bauteil == BauteilTyp.VIEHHOF) {
+                require(karte.landNachPosition[belegung.position] == GelaendeTyp.EBENE) {
+                    "Ein Viehhof darf nur auf einer Ebene gebaut werden: ${belegung.position}."
+                }
+            }
         }
         ecken.forEach { belegung ->
             require(karte.liegtImBearbeitungsUmfeld(belegung.position)) {
