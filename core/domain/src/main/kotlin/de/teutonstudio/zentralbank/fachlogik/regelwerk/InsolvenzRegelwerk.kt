@@ -1,7 +1,6 @@
 package de.teutonstudio.zentralbank.fachlogik.regelwerk
 
 import de.teutonstudio.zentralbank.fachlogik.auswertung.AnleihenAuswertung
-import de.teutonstudio.zentralbank.fachlogik.auswertung.MarktAuswertung
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
@@ -11,7 +10,6 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Schuldenstrich
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
-import de.teutonstudio.zentralbank.fachlogik.modell.UeberschuldungsStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.ZentralbankGeldschoepfung
 
 internal object InsolvenzRegelwerk {
@@ -118,9 +116,6 @@ internal object InsolvenzRegelwerk {
                 herabgestufteStandorte = herabgestuft,
                 geldschoepfung = ausgezahlterBetrag,
             ),
-            ueberschuldungen = neuerZustand.ueberschuldungen.filterNot {
-                it.spieler == ereignis.spieler
-            },
             belagerungen = neuerZustand.belagerungen.filterNot {
                 it.verteidiger == ereignis.spieler || it.fuehrenderBelagerer == ereignis.spieler
             },
@@ -131,36 +126,4 @@ internal object InsolvenzRegelwerk {
             neuerZustand
         }
     }
-
-    fun ueberschuldungAktualisieren(
-        zustand: SpielZustand,
-        spieler: SpielerId,
-    ): SpielZustand {
-        val schuldensumme = AnleihenAuswertung.bankgehalteneSchuldensumme(zustand, spieler)
-        val marktwert = MarktAuswertung.spielerMarktwert(zustand, spieler)
-        val istImFrieden = zustand.konflikte.none { spieler in it.teilnehmer }
-        val istUeberschuldet = istImFrieden && schuldensumme > marktwert && schuldensumme > Geld.NULL
-        val bestehend = zustand.ueberschuldungen.firstOrNull { it.spieler == spieler }
-        val neuerStatus = if (istUeberschuldet) {
-            val neueSerie = (bestehend?.friedlicheUeberschuldeteZuege ?: 0) + 1
-            UeberschuldungsStatus(
-                spieler = spieler,
-                friedlicheUeberschuldeteZuege = neueSerie,
-                letztePruefungRunde = zustand.rundenzähler,
-                schuldensumme = schuldensumme,
-                marktwert = marktwert,
-                warnungAktiv = true,
-                schuldenstrichFaellig = false,
-            )
-        } else null
-        return zustand.copy(
-            ueberschuldungen = zustand.ueberschuldungen.filterNot { it.spieler == spieler } +
-                listOfNotNull(neuerStatus),
-        )
-    }
-
-    /** Schuldenstriche sind Entscheidungen beziehungsweise letzter Rettungsversuch, nie Timer. */
-    fun faelligerSchuldenstrichSpieler(zustand: SpielZustand): SpielerId? = null
-
-    fun istSchuldenstrichFaellig(zustand: SpielZustand, spieler: SpielerId): Boolean = false
 }

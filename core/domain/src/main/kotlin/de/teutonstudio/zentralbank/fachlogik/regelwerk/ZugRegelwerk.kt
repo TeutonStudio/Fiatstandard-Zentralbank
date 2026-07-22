@@ -34,18 +34,6 @@ internal object ZugRegelwerk {
         }
 
         val zug = requireNotNull(zustand.zugStatus) { "Es ist kein Zug aktiv." }
-        val faelligerSchuldenstrich = InsolvenzRegelwerk.faelligerSchuldenstrichSpieler(zustand)
-        if (faelligerSchuldenstrich != null) {
-            require(
-                ereignis is SpielEreignis.Schuldenstrich &&
-                    ereignis.spieler == faelligerSchuldenstrich,
-            ) {
-                "Zuerst muss der fällige Schuldenstrich für " +
-                    "${faelligerSchuldenstrich.wert} gebucht werden."
-            }
-            return
-        }
-
         when (ereignis) {
             is SpielEreignis.BelagerungAktualisiert,
             is SpielEreignis.FriedensvertragAbgeschlossen,
@@ -248,12 +236,7 @@ internal object ZugRegelwerk {
     fun zugBeenden(zustand: SpielZustand): SpielZustand {
         val zug = requireNotNull(zustand.zugStatus) { "Es ist kein Zug aktiv." }
         pruefeEpizug(zug)
-        val nachPruefung = InsolvenzRegelwerk.ueberschuldungAktualisieren(zustand, zug.spieler)
-        return if (InsolvenzRegelwerk.istSchuldenstrichFaellig(nachPruefung, zug.spieler)) {
-            nachPruefung
-        } else {
-            naechsterZug(nachPruefung, zug.spieler)
-        }
+        return naechsterZug(zustand, zug.spieler)
     }
 
     fun naechsterZug(

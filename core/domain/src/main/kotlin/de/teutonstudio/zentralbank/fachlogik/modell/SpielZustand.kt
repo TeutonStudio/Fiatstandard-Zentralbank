@@ -103,7 +103,6 @@ data class SpielZustand(
     val belagerungen: List<Belagerung> = emptyList(),
     val zentralbankGeldschoepfungen: List<ZentralbankGeldschoepfung> = emptyList(),
     val schuldenstriche: List<Schuldenstrich> = emptyList(),
-    val ueberschuldungen: List<UeberschuldungsStatus> = emptyList(),
     val marktpreise: Map<Rohstoff, Geld> = emptyMap(),
     val leitzins: Basispunkte = Basispunkte.NULL,
     /** Einzelpreise der laufenden Runde; daraus entstehen die Preise der Folgerunde. */
