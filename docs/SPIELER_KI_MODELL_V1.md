@@ -120,17 +120,17 @@ cd ../..
 
 ## Ausgefuehrte Abnahme am 22. Juli 2026
 
-- `./gradlew test`: erfolgreich, 314 Tests in 59 Suites; 68 Gradle-Tasks ohne
+- `./gradlew test`: erfolgreich, 316 Tests in 59 Suites; 68 Gradle-Tasks ohne
   fehlgeschlagenen Test.
 - konfliktfrei: 10.000/10.000 Episoden beendet, 0 Truncations, 0 Fehler,
   336,74 Schritte/s, Seed `2_000_000_000`.
 - vollständiger Land-/Seekrieg: 500/500 Episoden beendet, 0 Truncations,
   0 Fehler, 40,26 Schritte/s, Seed `2_100_000_000`.
 - Agentenliga: sechs sitzrotierte Spiele, 0 Fehler, alle sechs Agententypen mit
-  je drei Einsätzen und je einem Sieg; 50,56 Schritte/s. JSON und Kurztext liegen
+  je drei Einsätzen und je einem Sieg; 51,06 Schritte/s. JSON und Kurztext liegen
   unter `tools/simulation/build/liga`.
-- Python: drei Tests bestanden; ein CPU-Trainingsdurchlauf verarbeitete 88
-  Samples. Die technische Imitationsgenauigkeit betrug 63,64 Prozent.
+- Python: drei Tests bestanden; ein CPU-Trainingsdurchlauf verarbeitete 100
+  Samples. Die technische Imitationsgenauigkeit betrug 52,00 Prozent.
 - ONNX: Export und Kotlin-Laden erfolgreich; die Inferenz wählte
   `VerwaltungsstandortVersorgen` aus 22 legalen Kandidaten.
 
@@ -143,7 +143,7 @@ unveränderte Ziel von 10.000 Partien aus.
 
 ## Bekannte Einschraenkungen
 
-- Das Smoke-Modell ist absichtlich klein und mit 88 Heuristik-Samples nicht auf
+- Das Smoke-Modell ist absichtlich klein und mit 100 Heuristik-Samples nicht auf
   Spielstärke trainiert.
 - Android und Web sind Entwickleroberflächen; sie visualisieren den öffentlichen
   Zustand und senden kanonische Aktionen, besitzen aber noch kein finales Layout.

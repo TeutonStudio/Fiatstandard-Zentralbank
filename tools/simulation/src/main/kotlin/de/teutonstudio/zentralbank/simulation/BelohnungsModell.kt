@@ -51,7 +51,12 @@ class PotentialBelohnungsModell(
         if (aktion is SpielAktion.AnleiheEmittieren || aktion is SpielAktion.AnleiheAufstocken) {
             val strategischVorher = produktiverZustand(vorher, spieler.id)
             val strategischNachher = produktiverZustand(nachher, spieler.id)
-            if (strategischNachher <= strategischVorher) shaping = minOf(0f, shaping)
+            val schuldendienstVorher = tragfaehigerSchuldendienst(vorher, spieler.id)
+            val schuldendienstNachher = tragfaehigerSchuldendienst(nachher, spieler.id)
+            if (
+                strategischNachher <= strategischVorher &&
+                schuldendienstNachher <= schuldendienstVorher
+            ) shaping = minOf(0f, shaping)
         }
         if (nachher.zentralbankGeldschoepfungen.size > vorher.zentralbankGeldschoepfungen.size) {
             shaping = minOf(0f, shaping)
@@ -99,14 +104,7 @@ class PotentialBelohnungsModell(
             it.besitzer == spielerId && it.zustand == BauwerkZustand.INTAKT
         } ?: 0
         val infrastruktur = ((verwaltung + erreichbareFelder) / 30f).coerceIn(0f, 2f)
-        val faellig = AnleihenAuswertung.faelligeVerbindlichkeiten(
-            zustand,
-            spielerId,
-            zustand.zugStatus?.zugId ?: 0L,
-        ).sumOf { it.betrag.cent }
-        val schuldendienst = if (faellig <= 0L) 1f else {
-            (spieler.geldkonto.cent.toFloat() / faellig).coerceIn(0f, 1f)
-        }
+        val schuldendienst = tragfaehigerSchuldendienst(zustand, spielerId)
         val handelswege = karte?.let {
             val land = it.belegung.kanten.count { kante ->
                 KartenAuswertung.gewalthaber(it, kante.position) == spielerId
@@ -151,6 +149,17 @@ class PotentialBelohnungsModell(
                 zustand.konflikte,
             ).size
         return produktion + infrastruktur / 10f
+    }
+
+    private fun tragfaehigerSchuldendienst(zustand: SpielZustand, spieler: SpielerId): Float {
+        val faellig = AnleihenAuswertung.faelligeVerbindlichkeiten(
+            zustand,
+            spieler,
+            zustand.zugStatus?.zugId ?: 0L,
+        ).sumOf { it.betrag.cent }
+        if (faellig <= 0L) return 1f
+        val geld = zustand.spieler.single { it.id == spieler }.geldkonto.cent
+        return (geld.toFloat() / faellig).coerceIn(0f, 1f)
     }
 
     private fun kapitulationBegruendet(zustand: SpielZustand, spieler: SpielerId): Boolean {

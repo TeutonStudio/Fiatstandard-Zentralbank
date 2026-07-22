@@ -15,6 +15,28 @@ class BelohnungsModellV2Test {
     )
 
     @Test
+    fun profitableProduktionErzeugtPositivesEigenesPotential() {
+        val vorher = basis.copy(marktpreise = mapOf(Rohstoff.KOHLE to Geld.mark(10)))
+        val nachher = vorher.copy(
+            spieler = vorher.spieler.map {
+                if (it.id == anna) it.copy(rohstoffe = mapOf(Rohstoff.KOHLE to 2)) else it
+            },
+        )
+        val rewards = modell.berechne(
+            vorher,
+            nachher,
+            SpielAktion.VerarbeitungAusfuehren(
+                1L,
+                KartenFeld(0, 0, DreieckHaelfte.OBEN),
+            ),
+            null,
+        )
+
+        assertTrue(rewards.getValue(anna) > 0f)
+        assertTrue(rewards.getValue(bert) < 0f)
+    }
+
+    @Test
     fun gegnerischeExpansionBelohntNichtDenEigenenSpieler() {
         val nachher = basis.copy(
             spieler = basis.spieler.map {
@@ -38,6 +60,47 @@ class BelohnungsModellV2Test {
         )
         val aktion = SpielAktion.AnleiheEmittieren(anna, Geld.mark(100), 200, 3)
         assertTrue(modell.berechne(basis, nachher, aktion, null).getValue(anna) <= 0f)
+    }
+
+    @Test
+    fun sinnvolleAufstockungDieFaelligenRueckkaufAblöstVerbessertSchuldendienst() {
+        val alt = Anleihe(
+            id = AnleiheId("alt"),
+            emittent = anna,
+            nennwert = Geld.mark(50),
+            zinsBasispunkte = 200,
+            laufzeitRunden = 1,
+            emissionsRunde = 0,
+            faelligkeitsRunde = 2,
+        )
+        val vorher = basis.copy(
+            rundenzähler = 2,
+            anleihen = mapOf(alt.id to alt),
+            bankAnleihen = listOf(alt.id),
+        )
+        val neu = Anleihe(
+            id = AnleiheId("neu"),
+            emittent = anna,
+            nennwert = Geld.mark(80),
+            zinsBasispunkte = 200,
+            laufzeitRunden = 3,
+            emissionsRunde = 2,
+        )
+        val nachher = vorher.copy(
+            spieler = vorher.spieler.map {
+                if (it.id == anna) it.copy(geldkonto = Geld.mark(30)) else it
+            },
+            anleihen = mapOf(neu.id to neu),
+            bankAnleihen = listOf(neu.id),
+        )
+        val reward = modell.berechne(
+            vorher,
+            nachher,
+            SpielAktion.AnleiheAufstocken(anna, alt.id, neu.nennwert, 200, 3),
+            null,
+        ).getValue(anna)
+
+        assertTrue(reward > 0f)
     }
 
     @Test
