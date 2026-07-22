@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 from typing import Any, TextIO
 
@@ -88,8 +90,36 @@ class KotlinWorker:
 
     def __init__(self, repository: Path | None = None):
         root = repository or Path(__file__).resolve().parents[3]
+        installation = root / "tools" / "simulation" / "build" / "install" / "simulation"
+        gebaut = subprocess.run(
+            [
+                str(root / "gradlew"),
+                "--no-daemon",
+                "-q",
+                "--console=plain",
+                ":tools:simulation:installDist",
+            ],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if gebaut.returncode != 0:
+            diagnose = gebaut.stderr.strip() or gebaut.stdout.strip()
+            raise RuntimeError(f"Kotlin-Worker-Distribution konnte nicht gebaut werden: {diagnose}")
+        bibliotheken = sorted((installation / "lib").glob("*.jar"))
+        if not bibliotheken:
+            raise RuntimeError("Kotlin-Worker-Distribution enthält keinen JVM-Classpath.")
+        java = shutil.which("java")
+        if java is None:
+            raise RuntimeError("Für den Kotlin-Worker wurde keine Java-Laufzeit gefunden.")
         self._prozess = subprocess.Popen(
-            [str(root / "gradlew"), "-q", "--console=plain", ":tools:simulation:worker"],
+            [
+                java,
+                "-cp",
+                os.pathsep.join(str(datei) for datei in bibliotheken),
+                "de.teutonstudio.zentralbank.simulation.TrainingsWorkerLauncherKt",
+            ],
             cwd=root,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
@@ -119,7 +149,11 @@ class KotlinWorker:
             raise RuntimeError("Worker ist geschlossen.")
         self._prozess.stdin.write(json.dumps({"command": command, **data}) + "\n")
         self._prozess.stdin.flush()
-        response = json.loads(self._prozess.stdout.readline())
+        line = self._prozess.stdout.readline()
+        if not line:
+            diagnose = self._prozess.stderr.read().strip() if self._prozess.stderr else ""
+            raise EOFError(diagnose or "Kotlin-Worker hat den Antwortstrom geschlossen.")
+        response = json.loads(line)
         if not response.get("ok", False):
             raise RuntimeError(str(response.get("error")))
         return response
@@ -128,9 +162,24 @@ class KotlinWorker:
         if self._prozess.poll() is not None:
             return
         try:
-            self._request("close", {})
+            if self._prozess.stdin is not None:
+                self._prozess.stdin.write('{"command":"close"}\n')
+                self._prozess.stdin.flush()
+                self._prozess.stdin.close()
+            self._prozess.wait(timeout=10)
+        except (BrokenPipeError, subprocess.TimeoutExpired):
+            self._prozess.terminate()
+            try:
+                self._prozess.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._prozess.kill()
+                self._prozess.wait(timeout=5)
         finally:
-            self._prozess.wait(timeout=30)
+            if self._prozess.stdout is not None:
+                self._prozess.stdout.close()
+            if self._prozess.stderr is not None:
+                self._prozess.stderr.close()
+            self._environments.clear()
 
     def __enter__(self) -> "KotlinWorker":
         return self

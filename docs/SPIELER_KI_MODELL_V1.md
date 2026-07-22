@@ -133,6 +133,9 @@ cd ../..
   unter `tools/simulation/build/liga`.
 - Python: drei Tests bestanden; ein CPU-Trainingsdurchlauf verarbeitete 100
   Samples. Die technische Imitationsgenauigkeit betrug 52,00 Prozent.
+- Python-Wrapper: `reset`, `legal_actions`, `step` und sauberes `close` gegen
+  einen direkt gestarteten dauerhaften JVM-Worker erfolgreich; Runde-0-Reset
+  lieferte Beobachtungsschema 2 und drei legale Startaktionen.
 - ONNX: Export und Kotlin-Laden erfolgreich; die Inferenz wählte
   `VerwaltungsstandortVersorgen` aus 22 legalen Kandidaten.
 

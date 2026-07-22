@@ -34,9 +34,12 @@ Beispiel:
 
 ## Python-Wrapper
 
-`fiat_ai.environment.KotlinWorker` startet Gradle/Java einmal und stellt beliebig
-viele `NdjsonEnvironment`-Objekte bereit. `batch_reset` und `batch_step` reduzieren
-Roundtrips; Kontextmanager beziehungsweise `close()` beendet den Prozess sauber.
+`fiat_ai.environment.KotlinWorker` lässt Gradle einmal die `installDist`-Distribution
+bauen und startet danach die Worker-Mainklasse direkt auf deren JVM-Classpath.
+Dadurch puffert kein Gradle-`JavaExec` den langlebigen NDJSON-Eingang. Der Wrapper
+stellt beliebig viele `NdjsonEnvironment`-Objekte bereit. `batch_reset` und
+`batch_step` reduzieren Roundtrips; Kontextmanager beziehungsweise `close()`
+beendet den Prozess mit begrenztem Terminate-/Kill-Fallback sauber.
 
 ## Training und Export
 
