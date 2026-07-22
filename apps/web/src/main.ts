@@ -8,6 +8,7 @@ const apiFeld = element("api-base");
 const spielIdFeld = element("spiel-id");
 const zustandAusgabe = element("zustand");
 const aktionenAuswahl = element("aktionen");
+const beobachtungAusgabe = element("beobachtung");
 
 const gespeicherteApi = localStorage.getItem("fiat-api-base");
 if (gespeicherteApi) apiFeld.value = gespeicherteApi;
@@ -61,8 +62,12 @@ function zustandZeigen(daten) {
 }
 
 function aktionsName(aktion) {
-  const art = aktion.art || "Aktion";
-  return `${art.split(".").pop()}${aktion.zugId ? ` · Zug ${aktion.zugId}` : ""}`;
+  let details = aktion;
+  if (aktion.kodierung) {
+    try { details = JSON.parse(aktion.kodierung); } catch (_) { details = aktion; }
+  }
+  const art = details.art || aktion.art || "Aktion";
+  return `${art.split(".").pop()}${details.zugId ? ` · Zug ${details.zugId}` : ""}`;
 }
 
 async function aktionenLaden() {
@@ -84,14 +89,28 @@ element("health").addEventListener("click", () => {
 
 element("erstellen").addEventListener("click", () => {
   const namen = element("spieler").value.split(",").map((name) => name.trim()).filter(Boolean);
+  const stil = element("spielstil").value;
   anfragen("/api/v1/games", {
     method: "POST",
-    body: JSON.stringify({ version: 1, spielerNamen: namen }),
+    body: JSON.stringify({ version: 1, spielerNamen: namen, spielstile: namen.map(() => stil) }),
   }).then((daten) => {
     spielIdFeld.value = daten.spielId;
     zustandZeigen(daten);
     return aktionenLaden();
   }).catch(fehlerZeigen);
+});
+
+element("beobachtung-laden").addEventListener("click", () => {
+  anfragen(`/api/v1/games/${spielId()}/observation`)
+    .then((daten) => { beobachtungAusgabe.textContent = JSON.stringify(daten, null, 2); })
+    .catch(fehlerZeigen);
+});
+
+element("agent").addEventListener("change", () => {
+  const agent = element("agent").value;
+  element("agent-status").textContent = agent === "onnx"
+    ? "Agent: ONNX; bei fehlendem/inkompatiblem Modell automatisch Sicherheitsagent"
+    : `Agent: ${agent}`;
 });
 
 element("laden").addEventListener("click", () => {
@@ -114,4 +133,31 @@ element("aktion-senden").addEventListener("click", () => {
     zustandZeigen(daten);
     return aktionenLaden();
   }).catch(fehlerZeigen);
+});
+
+element("simulation-starten").addEventListener("click", () => {
+  const spiele = Number(element("sim-spiele").value);
+  anfragen("/api/v1/simulations", {
+    method: "POST",
+    body: JSON.stringify({
+      spiele, seed: 2000000000, watchdogEntscheidungen: 10000,
+      agenten: [element("agent").value], szenarioId: "kleine-wirtschaft-v2", parallelitaet: 1,
+    }),
+  }).then((daten) => { element("simulation").textContent = JSON.stringify(daten, null, 2); })
+    .catch(fehlerZeigen);
+});
+
+element("liga-starten").addEventListener("click", () => {
+  const spiele = Number(element("sim-spiele").value);
+  anfragen("/api/v1/league", {
+    method: "POST",
+    body: JSON.stringify({ spiele, seed: 2000000000 }),
+  }).then((daten) => { element("simulation").textContent = JSON.stringify(daten, null, 2); })
+    .catch(fehlerZeigen);
+});
+
+element("liga-laden").addEventListener("click", () => {
+  anfragen("/api/v1/league/latest")
+    .then((daten) => { element("simulation").textContent = JSON.stringify(daten, null, 2); })
+    .catch(fehlerZeigen);
 });

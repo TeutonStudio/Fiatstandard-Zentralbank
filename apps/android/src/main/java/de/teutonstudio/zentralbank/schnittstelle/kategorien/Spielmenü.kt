@@ -56,6 +56,7 @@ enum class SpielmenueBereich(
     SCHULDEN("Schulden", R.drawable.debt),
     MARKTPLATZ("Marktplatz", R.drawable.market),
     AUSSENHANDEL("Außenhandel", R.drawable.foreign),
+    KI_ENTWICKLUNG("KI / Konflikt", R.drawable.dice),
 }
 
 internal val verarbeiteteRohstoffe = listOf(

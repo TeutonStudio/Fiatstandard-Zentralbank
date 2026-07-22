@@ -15,6 +15,26 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class SimulationStartAnfrage(
+    val spiele: Int = 1,
+    val seed: Long = 0L,
+    val watchdogEntscheidungen: Int = 10_000,
+    val agenten: List<String> = listOf("sicherheit"),
+    val szenarioId: String = "kleine-wirtschaft-v2",
+    val parallelitaet: Int = 1,
+)
+
+@Serializable
+data class LigaStartAnfrage(
+    val spiele: Int = 6,
+    val seed: Long = 2_000_000_000L,
+    val agenten: List<String> = listOf(
+        "zufall", "sicherheit", "wirtschaft", "aggressiv", "defensiv", "onnx",
+    ),
+)
 
 class SpielHttpServer(
     port: Int,
@@ -83,6 +103,13 @@ class SpielHttpServer(
                         )
                     }
 
+                austausch.requestMethod == "GET" && teile.size == 5 &&
+                    teile.take(3) == listOf("api", "v1", "games") && teile[4] == "observation" ->
+                    runBlocking {
+                        val id = spielId(teile[3])
+                        antworteJson(austausch, 200, json.encodeToString(dienst.beobachten(id)))
+                    }
+
                 austausch.requestMethod == "POST" && teile.size == 5 &&
                     teile.take(3) == listOf("api", "v1", "games") && teile[4] == "actions" ->
                     runBlocking {
@@ -96,6 +123,19 @@ class SpielHttpServer(
                             json.encodeToString(dienst.aktionAusfuehren(id, anfrage)),
                         )
                     }
+
+                austausch.requestMethod == "POST" && teile == listOf("api", "v1", "simulations") -> {
+                    val anfrage = json.decodeFromString<SimulationStartAnfrage>(leseText(austausch))
+                    antworteJson(austausch, 200, json.encodeToString(dienst.simulationStarten(anfrage)))
+                }
+
+                austausch.requestMethod == "POST" && teile == listOf("api", "v1", "league") -> {
+                    val anfrage = json.decodeFromString<LigaStartAnfrage>(leseText(austausch))
+                    antworteJson(austausch, 200, json.encodeToString(dienst.ligaStarten(anfrage)))
+                }
+
+                austausch.requestMethod == "GET" && teile == listOf("api", "v1", "league", "latest") ->
+                    antworteJson(austausch, 200, json.encodeToString(dienst.letzterLigaBericht()))
 
                 else -> antworteFehler(austausch, 404, "ROUTE_NICHT_GEFUNDEN", "Route nicht gefunden.")
             }

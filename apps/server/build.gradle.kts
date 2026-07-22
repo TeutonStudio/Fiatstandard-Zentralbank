@@ -17,6 +17,7 @@ dependencies {
     implementation(project(":core:application"))
     implementation(project(":adapters:persistence-json"))
     implementation(project(":adapters:protocol-json"))
+    implementation(project(":tools:simulation"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)

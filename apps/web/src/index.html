@@ -20,11 +20,39 @@
 
       <section>
         <h2>Spiel</h2>
-        <label>Spielernamen <input id="spieler" value="Anna, Bert" /></label>
+        <label>Spielernamen <input id="spieler" value="Anna, Bert, Carla" /></label>
+        <label>Öffentlicher KI-Spielstil
+          <select id="spielstil">
+            <option>VORSICHTIG</option><option>PRODUKTIONSORIENTIERT</option>
+            <option>SCHULDENFINANZIERT</option><option>HANDELSORIENTIERT</option>
+            <option>AGGRESSIV</option><option>OPPORTUNISTISCH</option>
+            <option>EXPANSIONISTISCH</option><option>DEFENSIVE_DOMINANZ</option>
+          </select>
+        </label>
+        <label>Entwickler-Agent
+          <select id="agent">
+            <option value="sicherheit">Sicherheitsagent</option>
+            <option value="zufall">Zufallsagent</option><option value="wirtschaft">Wirtschaftsagent</option>
+            <option value="aggressiv">Aggressiver Agent</option><option value="defensiv">Defensiver Agent</option>
+            <option value="onnx">ONNX-Modellagent (mit Fallback)</option>
+          </select>
+        </label>
+        <output id="agent-status">Agent: Sicherheitsagent</output>
         <button id="erstellen">Spiel erstellen</button>
         <label>Spiel-ID <input id="spiel-id" inputmode="numeric" /></label>
         <button id="laden">Zustand laden</button>
         <pre id="zustand">Kein Spiel geladen.</pre>
+        <button id="beobachtung-laden">Öffentliche Beobachtung v2 laden</button>
+        <pre id="beobachtung">Keine Beobachtung geladen.</pre>
+      </section>
+
+      <section>
+        <h2>Simulation und Agentenliga</h2>
+        <label>Anzahl <input id="sim-spiele" type="number" min="1" value="2" /></label>
+        <button id="simulation-starten">Simulation starten</button>
+        <button id="liga-starten">Liga starten</button>
+        <button id="liga-laden">Letzte Liga laden</button>
+        <pre id="simulation">Noch kein Lauf.</pre>
       </section>
 
       <section>

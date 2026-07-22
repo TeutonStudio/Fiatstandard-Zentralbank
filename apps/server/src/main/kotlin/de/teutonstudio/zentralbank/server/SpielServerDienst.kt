@@ -5,9 +5,12 @@ import de.teutonstudio.zentralbank.anwendung.SpielAblage
 import de.teutonstudio.zentralbank.anwendung.SpielDienst
 import de.teutonstudio.zentralbank.fachlogik.engine.SpielEngine
 import de.teutonstudio.zentralbank.fachlogik.engine.StandardSpielEngine
+import de.teutonstudio.zentralbank.fachlogik.auswertung.BeobachtungsAuswertung
+import de.teutonstudio.zentralbank.fachlogik.beobachtung.SpielBeobachtung
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
 import de.teutonstudio.zentralbank.protokoll.API_VERSION
 import de.teutonstudio.zentralbank.protokoll.AktionErgebnisDto
 import de.teutonstudio.zentralbank.protokoll.AktionAusfuehrenAnfrageDto
@@ -18,6 +21,12 @@ import de.teutonstudio.zentralbank.protokoll.SpielLadenAntwortDto
 import de.teutonstudio.zentralbank.protokoll.zuDomain
 import de.teutonstudio.zentralbank.protokoll.zuDto
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+import de.teutonstudio.zentralbank.simulation.AgentenLiga
+import de.teutonstudio.zentralbank.simulation.AgentenLigaBericht
+import de.teutonstudio.zentralbank.simulation.SimulationsKonfiguration
+import de.teutonstudio.zentralbank.simulation.SimulationsLaeufer
+import de.teutonstudio.zentralbank.simulation.SimulationsStatistik
 
 class SpielServerDienst(
     private val ablage: SpielAblage,
@@ -26,6 +35,7 @@ class SpielServerDienst(
 ) {
     private val spielDienst = SpielDienst(ablage, engine)
     private val naechsteId = AtomicLong(ersteSpielId)
+    private val letzterLigaBericht = AtomicReference<AgentenLigaBericht?>(null)
 
     suspend fun erstellen(anfrage: SpielErstellenAnfrageDto): SpielErstelltDto {
         pruefeVersion(anfrage.version)
@@ -34,8 +44,18 @@ class SpielServerDienst(
         require(namen.all(String::isNotBlank)) { "Spielernamen dürfen nicht leer sein." }
         require(namen.distinct().size == namen.size) { "Spielernamen müssen eindeutig sein." }
         val id = freieId()
+        require(anfrage.spielstile.isEmpty() || anfrage.spielstile.size == namen.size) {
+            "Spielstile müssen entweder leer sein oder für jeden Spieler angegeben werden."
+        }
+        val stile = if (anfrage.spielstile.isEmpty()) {
+            List(namen.size) { SpielerStil.VORSICHTIG }
+        } else {
+            anfrage.spielstile.map { SpielerStil.valueOf(it) }
+        }
         val startzustand = SpielZustand(
-            spieler = namen.map { name -> Spieler(id = SpielerId(name), name = name) },
+            spieler = namen.mapIndexed { index, name ->
+                Spieler(id = SpielerId(name), name = name, spielstil = stile[index])
+            },
         )
         val gespeichert = spielDienst.spielErstellen(id, startzustand, anfrage.seed)
         return SpielErstelltDto(
@@ -64,6 +84,33 @@ class SpielServerDienst(
             aktionen = spielDienst.erlaubteAktionen(id, spieler).map { it.zuDto() },
         )
     }
+
+    suspend fun beobachten(id: Long): SpielBeobachtung {
+        val zustand = spielDienst.zustandLaden(id) ?: throw SpielNichtGefunden(id)
+        val spieler = zustand.aktiverSpieler ?: zustand.spieler.firstOrNull()?.id
+            ?: error("Der Spielstand enthält keinen Spieler.")
+        return BeobachtungsAuswertung.fuerSpieler(zustand, spieler)
+    }
+
+    fun simulationStarten(anfrage: SimulationStartAnfrage): SimulationsStatistik =
+        SimulationsLaeufer().ausfuehren(
+            SimulationsKonfiguration(
+                spiele = anfrage.spiele,
+                seed = anfrage.seed,
+                maximaleEntscheidungen = anfrage.watchdogEntscheidungen,
+                agenten = anfrage.agenten,
+                szenarioId = anfrage.szenarioId,
+                parallelitaet = anfrage.parallelitaet,
+            ),
+        ).statistik
+
+    fun ligaStarten(anfrage: LigaStartAnfrage): AgentenLigaBericht =
+        AgentenLiga.ausfuehren(anfrage.spiele, anfrage.seed, anfrage.agenten).also {
+            letzterLigaBericht.set(it)
+        }
+
+    fun letzterLigaBericht(): AgentenLigaBericht = letzterLigaBericht.get()
+        ?: error("Es wurde noch keine Agentenliga ausgeführt.")
 
     suspend fun aktionAusfuehren(
         id: Long,

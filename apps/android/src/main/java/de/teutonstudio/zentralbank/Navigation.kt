@@ -45,6 +45,7 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielstaendeVerwalte
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielmenueBereich
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielmenueDialog
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.KiEntwickleroberflaeche
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
 import de.teutonstudio.zentralbank.spielbrett.KartenSpielBildschirm
@@ -284,6 +285,11 @@ fun Navigation(viewModel: GameViewModel) {
                                     geoeffneterBereich = null
                                     handelDialogOffen = true
                                 },
+                            )
+                            SpielmenueBereich.KI_ENTWICKLUNG -> KiEntwickleroberflaeche(
+                                zustand = requireNotNull(spielZustand),
+                                beiAktion = viewModel::aktionAnwenden,
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }

@@ -949,6 +949,13 @@ class LegacySpielKoordinator(
             _spielFehler.tryEmit("Die Friedensparteien konnten nicht zugeordnet werden.")
             return
         }
-        wendeAktionAn(SpielAktion.FriedenSchliessen(spielerAId, spielerBId))
+        val krieg = zustand.konflikte.firstOrNull { it.betrifft(spielerAId, spielerBId) }
+        if (krieg == null) {
+            _spielFehler.tryEmit("Zwischen den gewählten Spielern besteht kein Krieg.")
+            return
+        }
+        wendeAktionAn(
+            SpielAktion.UnabhaengigenFriedenSchliessen(spielerAId, krieg.id, spielerBId),
+        )
     }
 }
