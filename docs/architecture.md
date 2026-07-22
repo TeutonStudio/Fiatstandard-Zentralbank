@@ -75,13 +75,12 @@ ganzzahlig gemittelt; ohne Beobachtung bleibt der bisherige Preis erhalten. Die
 Leitzinsregel arbeitet ausschließlich in ganzzahligen Basispunkten. Replay führt
 daher zu denselben Rundenwerten.
 
-`SpielErgebnis` ist der terminale Fachstatus. Aufgabe ist die ausdrückliche
-`SpielAktion.Aufgeben`. Der letzte spielfähige Spieler gewinnt; scheiden alle aus,
-gibt es keinen Gewinner. Nach `PartieBeendet` existiert kein aktiver Zug und die
-Engine lehnt normale Aktionen ab. Das technische Entscheidungslimit der Simulation
-setzt nur `truncated` und erzeugt kein Fachereignis. Eine darüber hinausgehende
-reguläre Siegbedingung ist im vorhandenen Regelhandbuch nicht definiert; der
-Enumwert `REGULAERER_SIEG` ist deshalb bewusst reserviert und noch nicht ausgelöst.
+`SpielErgebnis` ist der terminale Fachstatus. Eine Aufgabe-Aktion existiert nicht.
+Nach jedem Ausscheiden gewinnt der einzige verbleibende Spieler sofort, noch bevor
+sein nächster Prozug beginnt; scheiden alle aus, gibt es keinen Gewinner. Nach
+`PartieBeendet` existiert kein aktiver Zug und die Engine lehnt normale Aktionen
+ab. Nur die Simulation setzt nach 10.000 aufeinanderfolgenden Entscheidungen ohne
+Marktwertänderung `truncated`; sie erzeugt dabei kein Fachereignis und keinen Sieger.
 
 ## Angebote
 
@@ -93,16 +92,16 @@ Fachzustands. Offene alte Angebote laufen beim Rundenwechsel ab.
 
 ## Beobachtung und Modellkodierung
 
-Eine Beobachtung enthält die eigene Wirtschaft vollständig, vom Gegner jedoch nur
-Identität, Ausscheidensstatus, öffentliche Bauwerkzahl und emittierte Anleihen.
-Geld, Lager und Passwortdaten der Gegner sind verborgen. Gerichtete Angebote sind
-nur für Beteiligte sichtbar. Alle Listen werden stabil sortiert.
+Beobachtung 2 enthält für alle Spieler die vollständige bereits eingetretene
+öffentliche Wirtschaft, Karte, Einheiten, Anleihen, Kriege, Belagerungen und
+Friedensverträge. Nur Passwörter und noch nicht gewählte zukünftige Entscheidungen
+fehlen. Alle Listen werden stabil sortiert.
 
-`BeobachtungsKodierung` Version 1 erzeugt feste, normalisierte Arrays für höchstens
-vier Spieler, 256 Felder, 512 Ecken, 768 Kanten und 512 Aktions-Hashplätze. Padding
-ist Null. Geld bleibt im Fachzustand `Geld` in Cent und wird erst in der
-Modellprojektion in `Float` umgerechnet. Die Hashmaske ist eine Baseline für
-Datensätze, keine kollisionsfreie Policy-Kodierung.
+Aktionsschema 2 ist eine variable, vollständig legale Kandidatenliste. Jede Aktion
+wird kanonisch als strukturiertes JSON serialisiert; Kartenpositionen besitzen
+keine globalen Nummern und es gibt weder Hashmaske noch Kandidatenkappung. Das
+Modell bewertet `policy(state_embedding, action_embedding, style_embedding)` nur
+über diese Liste.
 
 ## Android-Aktion
 
@@ -149,9 +148,10 @@ Der Browser ist niemals autoritativ. Android darf dieselbe Engine lokal betreibe
 6. `PotentialBelohnungsModell` berechnet austauschbare Trainingsbelohnungen
    außerhalb der Engine.
 
-`KleineWirtschaftsBaseline` erzeugt eine kleine JVM-eigene Karte mit drei getrennten
-Startinseln und Hauptbahnhöfen. Sie benötigt keine Android-Ressource. Mehrere
-Umgebungen halten ausschließlich Instanzzustand und können unabhängig laufen.
+`SzenarioKatalog` erzeugt reproduzierbare Wirtschafts-, Schulden-, Land-/Seekrieg-,
+Blockade-, Belagerungs- und Friedenslagen für 3–7 Spieler und lädt alle echten
+Kartenvorlagen aus gemeinsamen Core-Ressourcen. Mehrere Umgebungen halten
+ausschließlich Instanzzustand und können unabhängig laufen.
 
 ## Trainingsdaten
 
@@ -171,7 +171,7 @@ würde. Der Python-Parser prüft dieselbe Eigenschaft erneut.
   Fachspielstandformat 3 akzeptiert Format 2. Format 1 wird wegen eines nicht
   verifizierbaren historischen Prozug-Snapshots ausdrücklich abgelehnt.
 - HTTP-Protokoll: v1; Domain-DTOs und Transport-DTOs bleiben getrennt.
-- Episode 2, Beobachtung 1, Aktion 1 und Modellkodierung 1.
+- Episode 2, Beobachtung 2, Aktion 2 und Modellkodierung 2.
 
 Die normalisierten Room-Tabellen bleiben als Legacy-Kompatibilität erhalten. Für
 neue Fachwahrheit ist `FachSpielstand` mit Startzustand und Ereignissen maßgeblich.

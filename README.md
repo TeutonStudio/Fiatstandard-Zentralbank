@@ -56,21 +56,35 @@ Browser gespeichert.
 
 # separater Massentest mit 1.000 deterministischen Partien
 ./gradlew :tools:simulation:massentest
+
+# vollständige Zielkonfigurationen (je 10.000 Partien)
+./gradlew :tools:simulation:massentestFriedlich10000
+./gradlew :tools:simulation:massentestKrieg10000
+
+# Agentenliga und Kotlin-ONNX-Smoke-Test
+./gradlew :tools:simulation:liga
+./gradlew :tools:simulation:onnxSmoke
 ```
 
 Die CLI schreibt `episoden.jsonl` und `statistik.json` in den Ausgabeordner.
 `--episodes`, `--max-steps` und `--output` bleiben als kompatible englische
 Aliase verfügbar.
 
-Die Ausgabe ist JSONL und kann ohne duplizierte Kotlin-Regeln mit der
-Python-Brücke gelesen werden:
+Die Ausgabe ist Episodenformat 2 als JSONL und kann ohne duplizierte Kotlin-Regeln
+mit der Python-Brücke gelesen und trainiert werden. Für einen dauerhaft laufenden
+Mehrumgebungsworker steht `./gradlew :tools:simulation:worker` bereit.
 
 ```bash
 cd tools/ai-python
-python -m unittest discover -s tests
-python fiat_ai/episode_parser.py ../simulation/build/simulation/episoden.jsonl
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m fiat_ai.train build/data/episoden.jsonl \
+  --checkpoint build/model/model.pt --epochs 1 --seed 42
+.venv/bin/python -m fiat_ai.export_onnx build/model/model.pt \
+  --output build/model/spieler-ki-v1.onnx \
+  --manifest build/model/manifest.json
 ```
 
-Die Architektur und die bewusst noch vorhandenen Übergangsmodelle sind in
-[`docs/architecture.md`](docs/architecture.md) und
-[`docs/legacy-migration.md`](docs/legacy-migration.md) beschrieben.
+Die v1-Architektur ist in [`docs/SPIELER_KI_MODELL_V1.md`](docs/SPIELER_KI_MODELL_V1.md)
+zusammengefasst. Beobachtung, Aktionsraum, Episoden, Worker und Krieg besitzen
+eigene Dokumente unter `docs/`.

@@ -326,7 +326,7 @@ Offene Punkte:
 - Reducer-Logik für `AnleiheGekauft`, `AnleiheVerkauft` und `AnleiheFaellig` ergänzt.
 - Tests verankern summenneutralen Anleihenverkauf und Entfernung fälliger Anleihen aus Portfolios und offenem Bestand.
 - `GameState` um einfache `Konflikt`-Menge erweitert.
-- Reducer-Logik für `Expansion`, `KriegErklaert` und `KriegBeendet` ergänzt.
+- Reducer-Logik für `Expansion` und die damalige einfache Konfliktauflösung ergänzt.
 - Tests verankern Rohstoffverbrauch bei Expansion und Kriegserklärung/-ende.
 
 Offene Punkte:
