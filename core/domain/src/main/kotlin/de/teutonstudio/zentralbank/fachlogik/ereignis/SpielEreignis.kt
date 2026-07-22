@@ -25,7 +25,13 @@ import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebot
 import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotId
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebot
 import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebotId
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegId
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsSeite
+import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
+import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerPaar
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 @Serializable
 sealed interface SpielEreignis {
@@ -176,6 +182,14 @@ sealed interface SpielEreignis {
     ) : SpielEreignis
 
     @Serializable
+    data class AnleiheAufgestockt(
+        val alteAnleihe: AnleiheId,
+        val neueAnleihe: Anleihe,
+        val glaeubiger: KontoId,
+        val liquiditaetsDifferenz: Geld,
+    ) : SpielEreignis
+
+    @Serializable
     data class RohstoffHandel(
         val kaeufer: SpielerId,
         val verkaeufer: SpielerId,
@@ -190,7 +204,7 @@ sealed interface SpielEreignis {
         val rohstoff: Rohstoff,
         val menge: Int,
         val preis: Geld,
-        val art: AussenhandelsArt,
+        @SerialName("handelsart") val art: AussenhandelsArt,
     ) : SpielEreignis
 
     @Serializable
@@ -319,21 +333,103 @@ sealed interface SpielEreignis {
     ) : SpielEreignis
 
     @Serializable
-    data class KriegErklaert(
-        val aggressor: SpielerId,
+    data class KampfAufgeloest(
+        val angreifer: SpielerId,
         val verteidiger: SpielerId,
+        val typ: KriegsEinheitTyp,
+        val kante: KartenKante,
+        val angreiferVorher: Int,
+        val verteidigerVorher: Int,
+        val angreiferNachher: Int,
+        val verteidigerNachher: Int,
     ) : SpielEreignis
 
     @Serializable
-    data class KriegBeendet(
-        val spielerA: SpielerId,
-        val spielerB: SpielerId,
+    data class KriegErklaert(
+        val aggressor: SpielerId,
+        val verteidiger: SpielerId,
+        val krieg: KriegId = KriegId(
+            listOf(aggressor.wert, verteidiger.wert).sorted()
+                .joinToString(prefix = "krieg-", separator = "-"),
+        ),
     ) : SpielEreignis
+
+    @Serializable
+    data class KriegsAllianzBeigetreten(
+        val krieg: KriegId,
+        val spieler: SpielerId,
+        val seite: KriegsSeite,
+    ) : SpielEreignis
+
+    @Serializable
+    data class WaffenstillstandAngeboten(
+        val krieg: KriegId,
+        val von: SpielerId,
+        val an: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class WaffenstillstandGeschlossen(
+        val krieg: KriegId,
+        val paar: SpielerPaar,
+        val angenommenVon: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class KriegKapituliert(
+        val krieg: KriegId,
+        val spieler: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class FriedensvertragVorgeschlagen(val vertrag: Friedensvertrag) : SpielEreignis
+
+    @Serializable
+    data class FriedensvertragAngenommen(
+        val vertrag: FriedensvertragId,
+        val spieler: SpielerId,
+    ) : SpielEreignis
+
+    @Serializable
+    data class FriedensvertragAbgeschlossen(val vertrag: Friedensvertrag) : SpielEreignis
 
     @Serializable
     data class Schuldenstrich(
         val spieler: SpielerId,
         val entfernteBahnwege: Int,
+    ) : SpielEreignis
+
+    @Serializable
+    data class ZentralbankgeldGeschoepft(
+        val spieler: SpielerId,
+        val betrag: Geld,
+        val grund: String,
+    ) : SpielEreignis
+
+    @Serializable
+    data class VerwaltungsruineRepariert(
+        val spieler: SpielerId,
+        val ecke: KartenEcke,
+    ) : SpielEreignis
+
+    @Serializable
+    data class VerwaltungsruineAbgerissen(
+        val spieler: SpielerId,
+        val ecke: KartenEcke,
+    ) : SpielEreignis
+
+    @Serializable
+    data class BelagerungAktualisiert(
+        val standort: KartenEcke,
+        val rundeFortschreiben: Boolean = false,
+    ) : SpielEreignis
+
+    @Serializable
+    data class RessourcenUebertragen(
+        val von: SpielerId,
+        val an: SpielerId,
+        val rohstoffe: Map<Rohstoff, Int>,
+        val geld: Geld,
     ) : SpielEreignis
 
     @Serializable
@@ -368,6 +464,9 @@ enum class TransaktionsGrund {
     ANLEIHENHANDEL,
     ZINS,
     RUECKZAHLUNG,
+    ANLEIHE_AUFSTOCKUNG,
+    KRIEGSSCHULD,
+    ZENTRALBANK_SCHULDENSTRICH,
     SONSTIGES,
 }
 

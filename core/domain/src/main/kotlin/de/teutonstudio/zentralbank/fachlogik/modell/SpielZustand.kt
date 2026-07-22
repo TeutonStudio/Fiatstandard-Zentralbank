@@ -55,6 +55,7 @@ data class Spieler(
     val geldkonto: Geld = Geld.NULL,
     val anleihen: List<AnleiheId> = emptyList(),
     val bauteile: Map<BauteilTyp, Int> = emptyMap(),
+    val spielstil: SpielerStil = SpielerStil.VORSICHTIG,
 )
 
 @JvmInline
@@ -71,12 +72,16 @@ data class Anleihe(
     val zinsbetrag: Geld? = null,
     val emissionsRunde: Int = 0,
     val faelligkeitsRunde: Int = emissionsRunde + laufzeitRunden + 1,
+    val geleisteteZinszahlungen: Int = 0,
 ) {
     init {
         require(laufzeitRunden > 0) { "Laufzeit muss positiv sein." }
         require(emissionsRunde >= 0) { "Emissionsrunde darf nicht negativ sein." }
         require(faelligkeitsRunde > emissionsRunde) {
             "Fälligkeitsrunde muss nach der Emissionsrunde liegen."
+        }
+        require(geleisteteZinszahlungen >= 0) {
+            "Die Zahl geleisteter Zinszahlungen darf nicht negativ sein."
         }
     }
 }
@@ -94,6 +99,9 @@ data class SpielZustand(
     val warenkorb: Map<Rohstoff, Int> = emptyMap(),
     val anleihen: Map<AnleiheId, Anleihe> = emptyMap(),
     val konflikte: Set<Konflikt> = emptySet(),
+    val friedensvertraege: List<Friedensvertrag> = emptyList(),
+    val belagerungen: List<Belagerung> = emptyList(),
+    val zentralbankGeldschoepfungen: List<ZentralbankGeldschoepfung> = emptyList(),
     val schuldenstriche: List<Schuldenstrich> = emptyList(),
     val ueberschuldungen: List<UeberschuldungsStatus> = emptyList(),
     val marktpreise: Map<Rohstoff, Geld> = emptyMap(),
@@ -111,6 +119,8 @@ data class SpielZustand(
     val handelsAngebote: List<HandelsAngebot> = emptyList(),
     val anleihenAngebote: List<AnleihenAngebot> = emptyList(),
     val naechsteAngebotsNummer: Long = 1L,
+    val naechsteKriegNummer: Long = 1L,
+    val naechsteFriedensvertragNummer: Long = 1L,
     val rundenzähler: Int = 0,
     val aktiverSpieler: SpielerId? = spieler.firstOrNull()?.id,
     val zugStatus: ZugStatus? = aktiverSpieler?.let {

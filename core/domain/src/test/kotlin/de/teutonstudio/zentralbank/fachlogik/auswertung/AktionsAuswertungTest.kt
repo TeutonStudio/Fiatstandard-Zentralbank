@@ -54,7 +54,7 @@ class AktionsAuswertungTest {
         )
 
         assertTrue(AktionsAuswertung.erlaubteAktionen(start, bert).aktionen.isEmpty())
-        val nachAufgabe = engine.anwenden(start, SpielAktion.Aufgeben(anna)).getOrThrow().zustand
-        assertTrue(AktionsAuswertung.erlaubteAktionen(nachAufgabe, anna).aktionen.isEmpty())
+        val ausgeschieden = start.copy(ausgeschiedeneSpieler = setOf(anna))
+        assertTrue(AktionsAuswertung.erlaubteAktionen(ausgeschieden, anna).aktionen.isEmpty())
     }
 }

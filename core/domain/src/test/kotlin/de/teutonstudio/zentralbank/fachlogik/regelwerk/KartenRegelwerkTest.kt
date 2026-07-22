@@ -13,6 +13,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
+import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
+import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
@@ -21,6 +23,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.ProzugStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
 import de.teutonstudio.zentralbank.fachlogik.modell.Konflikt
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegId
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KantenBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
@@ -747,6 +750,11 @@ class KartenRegelwerkTest {
         val hafenA = wasserKante.anfang
         val hafenB = wasserKante.ende
         val mitHaefen = start.copy(
+            spieler = start.spieler.map { spieler ->
+                if (spieler.id == anna) spieler.copy(
+                    bauteile = spieler.bauteile + (BauteilTyp.HAFEN to 2),
+                ) else spieler
+            },
             karte = start.karte?.copy(
                 belegung = KartenBelegung(
                     ecken = listOf(
@@ -781,6 +789,25 @@ class KartenRegelwerkTest {
         assertEquals(1, danach.karte?.belegung?.seewege?.size)
         assertTrue(zweites.isFailure)
         assertTrue(zweites.exceptionOrNull()?.message.orEmpty().contains("kapazität", ignoreCase = true))
+
+        val hafenRuine = SpielRegelwerk.wendeAn(
+            danach.copy(
+                konflikte = setOf(Konflikt(bert, anna, KriegId("hafenkrieg"))),
+                aktiverSpieler = bert,
+                zugStatus = danach.zugStatus?.copy(spieler = bert),
+            ),
+            SpielEreignis.KartenBauwerkZustandGeaendert(
+                spieler = bert,
+                ort = KartenOrt.Ecke(hafenA),
+                zustand = BauwerkZustand.ZERSTOERT,
+                grund = KartenAenderungsGrund.BELAGERUNG,
+            ),
+        ).getOrThrow()
+        assertEquals(listOf("schiff-1"), hafenRuine.karte?.belegung?.seewege?.map { it.id })
+        assertEquals(false, KartenAuswertung.kannAussenhandelBetreiben(
+            requireNotNull(hafenRuine.karte),
+            anna,
+        ))
     }
 
     @Test
@@ -906,7 +933,7 @@ class KartenRegelwerkTest {
         ).getOrThrow()
         val nachFrieden = SpielRegelwerk.wendeAn(
             mitPanzer,
-            SpielEreignis.KriegBeendet(anna, bert),
+            unentschiedenerFrieden(anna, bert),
         ).getOrThrow()
 
         assertEquals(1, mitPanzer.karte?.belegung?.kriegseinheiten?.size)
@@ -914,7 +941,7 @@ class KartenRegelwerkTest {
     }
 
     @Test
-    fun kriegsendeWertetPanzerUndKriegsschiffeGetrenntAus() {
+    fun kriegsendeVernichtetKeineEinheitenOhneKonkreteSchlacht() {
         val start = zustand()
         val karte = requireNotNull(start.karte)
         val panzerKanten = karte.gelaendefelder
@@ -947,13 +974,12 @@ class KartenRegelwerkTest {
 
         val danach = SpielRegelwerk.wendeAn(
             imKrieg,
-            SpielEreignis.KriegBeendet(anna, bert),
+            unentschiedenerFrieden(anna, bert),
         ).getOrThrow()
 
         val ueberlebende = danach.karte?.belegung?.kriegseinheiten.orEmpty()
-        assertEquals(3, ueberlebende.count { it.typ == KriegsEinheitTyp.PANZER })
-        assertTrue(ueberlebende.all { it.besitzer == anna })
-        assertEquals(0, ueberlebende.count { it.typ == KriegsEinheitTyp.KRIEGSSCHIFF })
+        assertEquals(8, ueberlebende.count { it.typ == KriegsEinheitTyp.PANZER })
+        assertEquals(6, ueberlebende.count { it.typ == KriegsEinheitTyp.KRIEGSSCHIFF })
     }
 
     @Test
@@ -998,7 +1024,7 @@ class KartenRegelwerkTest {
         ).getOrThrow()
 
         assertEquals(kanten[2], danach.karte?.belegung?.kriegseinheiten?.single()?.position)
-        assertEquals(8, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
+        assertEquals(4, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
     }
 
     @Test
@@ -1039,7 +1065,7 @@ class KartenRegelwerkTest {
         assertTrue(danach.karte?.belegung?.kriegseinheiten.orEmpty().all {
             it.position == kanten[1]
         })
-        assertEquals(8, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
+        assertEquals(3, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.DIESEL])
     }
 
     @Test
@@ -1048,7 +1074,7 @@ class KartenRegelwerkTest {
         val start = zustand().mitKontrollierterHandelslinie(kanten[0], anna).copy(
             spieler = zustand().spieler.map { spieler ->
                 if (spieler.id == anna) {
-                    spieler.copy(rohstoffe = spieler.rohstoffe + (Rohstoff.DIESEL to 1))
+                    spieler.copy(rohstoffe = spieler.rohstoffe + (Rohstoff.DIESEL to 3))
                 } else {
                     spieler
                 }
@@ -1106,7 +1132,7 @@ class KartenRegelwerkTest {
         ).getOrThrow()
 
         assertEquals(kanten[1], danach.karte?.belegung?.kriegseinheiten?.single()?.position)
-        assertEquals(9, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.SCHWEROEL])
+        assertEquals(7, danach.spieler.first { it.id == anna }.rohstoffe[Rohstoff.SCHWEROEL])
     }
 
     @Test
@@ -1323,6 +1349,17 @@ class KartenRegelwerkTest {
         phase = ZugPhase.Epizug,
         prozug = ProzugStatus(begonnen = true, erfolgreichAbgeschlossen = true),
     )
+
+    private fun unentschiedenerFrieden(a: SpielerId, b: SpielerId) =
+        SpielEreignis.FriedensvertragAbgeschlossen(
+            Friedensvertrag(
+                id = FriedensvertragId("frieden-${a.wert}-${b.wert}"),
+                krieg = KriegId(listOf(a.wert, b.wert).sorted().joinToString("-", "krieg-")),
+                beteiligteSpieler = setOf(a, b),
+                unentschiedeneTeilnehmer = setOf(a, b),
+                angenommenVon = setOf(a, b),
+            ),
+        )
 
     private fun SpielZustand.mitSpezialfeld(spezialfeld: Spezialfeld): SpielZustand {
         val karte = requireNotNull(karte)

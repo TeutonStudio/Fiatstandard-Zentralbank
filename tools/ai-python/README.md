@@ -31,6 +31,20 @@ for episode in lade_episoden(Path("../simulation/build/simulation/episoden.jsonl
 Der Parser akzeptiert Episodenformat 2, gleicht Regel-, Beobachtungs- und Aktionsversionen
 der Entscheidungen mit dem Episodenkopf ab und weist Datensätze mit Passwortfeldern zurück.
 
-`NdjsonEnvironment` bereitet die Befehle `reset`, `observe`, `legal_actions`, `step` und `close`
-über zeilengetrenntes JSON auf stdin/stdout vor. Ein späterer Kotlin-Worker kann dieses Protokoll
-implementieren; das Python-Paket wertet Spielregeln nicht selbst aus.
+`KotlinWorker` startet den implementierten dauerhaften Kotlin-Prozess.
+`NdjsonEnvironment` unterstützt `reset`, `observe`, `legal_actions`, `step`,
+`export_episode` und `close`; der Prozess unterstützt zusätzlich Batch-Reset und
+Batch-Step. Das Python-Paket wertet Spielregeln nicht selbst aus.
+
+Technischer Trainingslauf:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m fiat_ai.train build/data/episoden.jsonl \
+  --checkpoint build/model/model.pt --epochs 1 --seed 42
+.venv/bin/python -m fiat_ai.evaluate build/data/episoden.jsonl build/model/model.pt
+.venv/bin/python -m fiat_ai.export_onnx build/model/model.pt \
+  --output build/model/spieler-ki-v1.onnx \
+  --manifest build/model/manifest.json
+```

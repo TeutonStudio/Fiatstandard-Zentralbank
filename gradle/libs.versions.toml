@@ -11,6 +11,7 @@ activityCompose = "1.8.0"
 kotlin = "2.2.10"
 kotlinxCoroutines = "1.10.2"
 kotlinxSerializationJson = "1.9.0"
+onnxruntime = "1.26.0"
 compose = "1.12.0-alpha03"
 composeBom = "2025.12.00"
 pdfViewerFragment = "1.0.0-alpha18"
@@ -70,6 +71,7 @@ sceneview = { group = "io.github.sceneview", name = "sceneview", version.ref = "
 filament-android = { group = "com.google.android.filament", name = "filament-android", version.ref = "filament" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+onnxruntime = { group = "com.microsoft.onnxruntime", name = "onnxruntime", version.ref = "onnxruntime" }
 
 
 [plugins]

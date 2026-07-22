@@ -5,10 +5,16 @@ import de.teutonstudio.zentralbank.fachlogik.beobachtung.SpielBeobachtung
 import de.teutonstudio.zentralbank.fachlogik.engine.StandardSpielEngine
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
+import de.teutonstudio.zentralbank.fachlogik.modell.DreieckHaelfte
+import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenHexagon
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -48,7 +54,7 @@ class BeobachtungsAuswertungTest {
         val json = Json { classDiscriminator = "art" }.encodeToString<SpielBeobachtung>(links)
 
         assertEquals(links, rechts)
-        assertEquals(listOf(Rohstoff.HOLZ, Rohstoff.STAHL), links.eigeneWirtschaft.rohstoffe.map { it.rohstoff })
+        assertEquals(Rohstoff.entries, links.eigeneWirtschaft.rohstoffe.map { it.rohstoff })
         assertFalse(json.contains("NIEMALS_EXPORTIEREN"))
         assertFalse(json.contains("AUCH_GEHEIM"))
         assertFalse(json.contains("passwort", ignoreCase = true))
@@ -56,7 +62,7 @@ class BeobachtungsAuswertungTest {
     }
 
     @Test
-    fun adressiertesAngebotIstNurFuerBeteiligteSichtbar() {
+    fun adressiertesAngebotIstAlsEingetretenerZustandOeffentlichSichtbar() {
         val start = SpielZustand(
             spieler = listOf(
                 Spieler(anna, "Anna", rohstoffe = mapOf(Rohstoff.HOLZ to 1)),
@@ -78,6 +84,31 @@ class BeobachtungsAuswertungTest {
 
         assertEquals(1, BeobachtungsAuswertung.fuerSpieler(zustand, anna).angebote.size)
         assertEquals(1, BeobachtungsAuswertung.fuerSpieler(zustand, bert).angebote.size)
-        assertTrue(BeobachtungsAuswertung.fuerSpieler(zustand, carla).angebote.isEmpty())
+        assertEquals(1, BeobachtungsAuswertung.fuerSpieler(zustand, carla).angebote.size)
+    }
+
+    @Test
+    fun beobachtungEnthaeltExpliziteVollstaendigeKartentopologie() {
+        val hexagon = KartenHexagon(radius = 2)
+        val land = KartenFeld(0, 0, DreieckHaelfte.UNTEN)
+        val zustand = SpielZustand(
+            spieler = listOf(Spieler(anna, "Anna"), Spieler(bert, "Bert")),
+            karte = Spielkarte(
+                id = "beobachtungs-topologie",
+                name = "Beobachtungs-Topologie",
+                hexagon = hexagon,
+                gelaendefelder = listOf(GelaendeFeld(land, GelaendeTyp.EBENE)),
+            ),
+        )
+
+        val karte = requireNotNull(BeobachtungsAuswertung.fuerSpieler(zustand, anna).karte)
+
+        assertEquals(hexagon.anzahlFelder.toInt(), karte.felder.size)
+        assertEquals(karte.knoten.size, karte.knoten.distinct().size)
+        assertEquals(karte.kanten.size, karte.kanten.map { it.position }.distinct().size)
+        assertTrue(karte.felder.any { it.position == land && it.gelaende == GelaendeTyp.EBENE })
+        assertTrue(karte.felder.any { it.wasser })
+        assertTrue(karte.kanten.any { it.landkante })
+        assertTrue(karte.kanten.any { it.seekante })
     }
 }

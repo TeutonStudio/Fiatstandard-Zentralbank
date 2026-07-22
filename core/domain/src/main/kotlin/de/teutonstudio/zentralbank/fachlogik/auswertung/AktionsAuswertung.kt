@@ -7,11 +7,14 @@ import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
+import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
+import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
 import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotStatus
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsSeite
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
@@ -27,11 +30,16 @@ import kotlinx.serialization.json.Json
 data class AktionsRaum(
     val spieler: SpielerId,
     val aktionen: List<SpielAktion>,
+    val aktionsSchemaVersion: Int = AKTUELLE_AKTIONS_SCHEMA_VERSION,
 )
 
+const val AKTUELLE_AKTIONS_SCHEMA_VERSION = 2
+
 object AktionsAuswertung {
-    private const val MAX_KARTENOPTIONEN_PRO_TYP = 128
-    private val sortierJson = Json { encodeDefaults = true }
+    private val sortierJson = Json {
+        classDiscriminator = "art"
+        encodeDefaults = true
+    }
 
     fun erlaubteAktionen(
         zustand: SpielZustand,
@@ -41,24 +49,23 @@ object AktionsAuswertung {
             zustand.ergebnis != null ||
             spieler in zustand.ausgeschiedeneSpieler ||
             zustand.aktiverSpieler != spieler
-        ) return AktionsRaum(spieler, emptyList())
+        ) return AktionsRaum(spieler = spieler, aktionen = emptyList())
 
         val kandidaten = if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
             rundeNullAktionen(zustand, spieler)
         } else {
             regulaereAktionen(zustand, spieler)
-        } + SpielAktion.Aufgeben(spieler)
+        }
         val pruefEngine = StandardSpielEngine()
         val erlaubt = kandidaten
             .distinct()
             .sortedBy(::aktionsSchluessel)
             .filter { aktion -> pruefEngine.pruefe(zustand, aktion).isSuccess }
-        return AktionsRaum(spieler, erlaubt)
+        return AktionsRaum(spieler = spieler, aktionen = erlaubt)
     }
 
     fun aktionsSchluessel(aktion: SpielAktion): String =
-        (aktion::class.qualifiedName ?: aktion::class.simpleName.orEmpty()) + ":" +
-            sortierJson.encodeToString(SpielAktion.serializer(), aktion)
+        sortierJson.encodeToString(SpielAktion.serializer(), aktion)
 
     private fun regulaereAktionen(
         zustand: SpielZustand,
@@ -67,10 +74,12 @@ object AktionsAuswertung {
         val zug = zustand.zugStatus ?: return emptyList()
         if (zug.spieler != spieler) return emptyList()
         if (!zug.prozug.begonnen) return listOf(SpielAktion.ProzugBeginnen(zug.zugId))
-        val gemeinsameAktionen = angebotsAktionen(zustand, spieler)
+        val gemeinsameAktionen = angebotsAktionen(zustand, spieler) +
+            ressourcenTransferAktionen(zustand, spieler)
         return when (zug.phase) {
             ZugPhase.Prozug -> {
                 val plan = ProzugAuswertung.plan(zustand)
+                val zahlungsplan = ZahlungsfaehigkeitsAuswertung.plan(zustand, spieler)
                 buildList {
                     plan?.produktionsStandorte
                         ?.filter { it.verbleibendeLaeufe > 0 && it.mitBestandMoeglicheLaeufe > 0 }
@@ -87,6 +96,20 @@ object AktionsAuswertung {
                         add(SpielAktion.ProzugAbschliessen(zug.zugId))
                     }
                     addAll(gemeinsameAktionen)
+                    addAll(
+                        anleihenAktionen(
+                            zustand,
+                            spieler,
+                            emissionErlaubt = zahlungsplan.anleiheMoeglich,
+                            aufstockungErlaubt = zahlungsplan.aufstockungMoeglich,
+                        ),
+                    )
+                    addAll(aussenhandelsAktionen(zustand, spieler))
+                    addAll(insolvenzAktionen(zustand, spieler))
+                    addAll(konfliktRettungsAktionen(zustand, spieler))
+                    if (zahlungsplan.ausscheidenNoetig) {
+                        add(SpielAktion.ZahlungsunfaehigkeitFeststellen(spieler, zug.zugId))
+                    }
                 }
             }
             ZugPhase.Epizug -> buildList {
@@ -94,6 +117,7 @@ object AktionsAuswertung {
                 addAll(anleihenAktionen(zustand, spieler))
                 addAll(kartenAktionen(zustand, spieler))
                 addAll(konfliktAktionen(zustand, spieler))
+                addAll(insolvenzAktionen(zustand, spieler))
                 add(SpielAktion.ZugBeenden)
             }
         }
@@ -157,16 +181,25 @@ object AktionsAuswertung {
     private fun anleihenAktionen(
         zustand: SpielZustand,
         spieler: SpielerId,
+        emissionErlaubt: Boolean = true,
+        aufstockungErlaubt: Boolean = true,
     ): List<SpielAktion> = buildList {
-        val bereitsInRundeEmittiert = zustand.anleihen.values.any {
-            it.emittent == spieler && it.emissionsRunde == zustand.rundenzähler
-        }
-        if (!bereitsInRundeEmittiert) {
-            listOf(10L, 50L, 100L).forEach { nennwert ->
+        val planFehlbetrag = ProzugAuswertung.plan(zustand)?.fehlendesGeld?.cent ?: 0L
+        val kandidatenCent = buildSet {
+            add(Geld.mark(10).cent)
+            if (planFehlbetrag > 0L) {
+                add(((planFehlbetrag + 99L) / 100L) * 100L)
+            }
+            zustand.anleihen.values.filter { it.emittent == spieler }.forEach { anleihe ->
+                add(anleihe.nennwert.cent + Geld.mark(10).cent)
+            }
+        }.filter { it > 0L }.sorted()
+        if (emissionErlaubt && AnleihenAuswertung.freieGeschaeftsbankPlaetze(zustand, spieler) > 0) {
+            kandidatenCent.forEach { nennwertCent ->
                 add(
                     SpielAktion.AnleiheEmittieren(
                         spieler = spieler,
-                        nennwert = Geld.mark(nennwert),
+                        nennwert = Geld.cent(nennwertCent),
                         zinsBasispunkte = zustand.leitzins.wert,
                         laufzeitRunden = 3,
                     ),
@@ -181,12 +214,85 @@ object AktionsAuswertung {
             andere.forEach { ziel ->
                 add(SpielAktion.AnleihenangebotErstellen(spieler, ziel, anleiheId, nennwert))
             }
-            val anleihe = zustand.anleihen[anleiheId]
-            if (anleihe?.emittent == spieler) {
-                add(SpielAktion.AnleiheFreiwilligZurueckkaufen(spieler, anleiheId, nennwert))
+        }
+        zustand.anleihen.values.filter { it.emittent == spieler }
+            .sortedBy { it.id.wert }
+            .forEach { anleihe ->
+                add(SpielAktion.AnleiheFreiwilligZurueckkaufen(
+                    spieler,
+                    anleihe.id,
+                    anleihe.nennwert,
+                ))
+                if (aufstockungErlaubt) {
+                    add(SpielAktion.AnleiheAufstocken(
+                        spieler = spieler,
+                        alteAnleihe = anleihe.id,
+                        neuerNennwert = anleihe.nennwert + Geld.mark(10),
+                        zinsBasispunkte = maxOf(zustand.leitzins.wert, anleihe.zinsBasispunkte),
+                        laufzeitRunden = maxOf(1, anleihe.laufzeitRunden),
+                    ))
+                }
+            }
+    }
+
+    private fun aussenhandelsAktionen(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+    ): List<SpielAktion> = buildList {
+        val karte = zustand.karte ?: return@buildList
+        if (!de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
+                .kannAussenhandelBetreiben(karte, spieler, zustand.konflikte)
+        ) return@buildList
+        val bestand = zustand.spieler.single { it.id == spieler }
+        Rohstoff.entries.forEach { rohstoff ->
+            val preis = zustand.marktpreise[rohstoff]?.takeIf { it > Geld.NULL } ?: return@forEach
+            if (bestand.rohstoffe.getOrDefault(rohstoff, 0) > 0) {
+                add(
+                    SpielAktion.MitAuslandHandeln(
+                        spieler,
+                        rohstoff,
+                        1,
+                        preis,
+                        de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt.EXPORT,
+                    ),
+                )
+            }
+            if (bestand.geldkonto >= preis) {
+                add(
+                    SpielAktion.MitAuslandHandeln(
+                        spieler,
+                        rohstoff,
+                        1,
+                        preis,
+                        de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt.IMPORT,
+                    ),
+                )
             }
         }
     }
+
+    private fun insolvenzAktionen(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+    ): List<SpielAktion> {
+        val imKrieg = zustand.konflikte.any { spieler in it.teilnehmer }
+        val herabstufbar = zustand.karte?.belegung?.ecken?.any {
+            it.besitzer == spieler && it.typ != EckGebaeudeTyp.HAUPTBAHNHOF
+        } == true
+        return if (!imKrieg && herabstufbar) {
+            listOf(SpielAktion.SchuldenstrichDurchfuehren(spieler))
+        } else {
+            emptyList()
+        }
+    }
+
+    private fun konfliktRettungsAktionen(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+    ): List<SpielAktion> = zustand.konflikte
+        .filter { spieler in it.teilnehmer }
+        .sortedBy { it.id.wert }
+        .map { SpielAktion.KriegKapitulieren(spieler, it.id) }
 
     private fun kartenAktionen(
         zustand: SpielZustand,
@@ -194,9 +300,8 @@ object AktionsAuswertung {
     ): List<SpielAktion> {
         val karte = zustand.karte ?: return emptyList()
         val felder = karte.gelaendefelder.map { it.position }.sortedMitKartenfeldern()
-        val ecken = felder.flatMap { it.ecken() }.distinct().sorted().take(MAX_KARTENOPTIONEN_PRO_TYP)
+        val ecken = felder.flatMap { it.ecken() }.distinct().sorted()
         val kanten = felder.flatMap { it.kanten() }.distinct().sortedMitKanten()
-            .take(MAX_KARTENOPTIONEN_PRO_TYP)
         return buildList {
             ecken.forEach { ecke ->
                 add(SpielAktion.EckGebaeudeBauen(spieler, ecke, EckGebaeudeTyp.BAHNHOF))
@@ -228,8 +333,7 @@ object AktionsAuswertung {
             }
             val wirtschaftstypen = BauteilTyp.entries
                 .filter { it.art == BauteilArt.WIRTSCHAFTSREGION }
-                .take(4)
-            felder.take(MAX_KARTENOPTIONEN_PRO_TYP).forEach { feld ->
+            felder.forEach { feld ->
                 wirtschaftstypen.forEach { typ ->
                     add(SpielAktion.AnlageErrichten(spieler, feld, FeldAnlage.Wirtschaftsregion(typ)))
                 }
@@ -256,11 +360,46 @@ object AktionsAuswertung {
                     add(SpielAktion.KriegsEinheitBauen(spieler, typ, kante))
                 }
             }
-            karte.belegung.kriegseinheiten.filter { it.besitzer == spieler }.forEach { einheit ->
-                kanten.forEach { naechsteKante ->
+            val eigeneEinheiten = karte.belegung.kriegseinheiten
+                .filter { it.besitzer == spieler }
+                .sortedBy { it.id }
+            eigeneEinheiten.forEach { einheit ->
+                kanten.filter { de.teutonstudio.zentralbank.fachlogik.modell.sindBenachbarteKanten(
+                    einheit.position,
+                    it,
+                ) }.forEach { naechsteKante ->
                     add(SpielAktion.KriegsEinheitBewegen(spieler, einheit.id, naechsteKante))
                 }
             }
+            eigeneEinheiten.groupBy { it.typ to it.position }
+                .entries
+                .sortedWith(
+                    compareBy<Map.Entry<Pair<KriegsEinheitTyp, de.teutonstudio.zentralbank.fachlogik.modell.KartenKante>, *>>(
+                        { it.key.first.name },
+                        { it.key.second.anfang },
+                        { it.key.second.ende },
+                    ),
+                )
+                .forEach { (_, gruppe) ->
+                    val ids = gruppe.map { it.id }.sorted()
+                    if (ids.size < 2) return@forEach
+                    val ziele = kanten.filter {
+                        de.teutonstudio.zentralbank.fachlogik.modell.sindBenachbarteKanten(
+                            gruppe.first().position,
+                            it,
+                        )
+                    }
+                    ids.teilmengenAbZwei().forEach { teilnehmer ->
+                        ziele.forEach { ziel ->
+                            add(SpielAktion.KriegsEinheitenBewegen(spieler, teilnehmer, ziel))
+                        }
+                    }
+                }
+            karte.belegung.ecken.filter { it.zustand == de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand.ZERSTOERT }
+                .forEach { ruine ->
+                    add(SpielAktion.VerwaltungsruineReparieren(spieler, ruine.position))
+                    add(SpielAktion.VerwaltungsruineAbreissen(spieler, ruine.position))
+                }
         }
     }
 
@@ -271,11 +410,116 @@ object AktionsAuswertung {
         zustand.spieler.map { it.id }
             .filter { it != spieler && it !in zustand.ausgeschiedeneSpieler }
             .forEach { gegner -> add(SpielAktion.KriegErklaeren(spieler, gegner)) }
-        zustand.konflikte.filter { konflikt ->
-            konflikt.spielerA == spieler || konflikt.spielerB == spieler
-        }.forEach { konflikt ->
-            val gegner = if (konflikt.spielerA == spieler) konflikt.spielerB else konflikt.spielerA
-            add(SpielAktion.FriedenSchliessen(spieler, gegner))
+        zustand.friedensvertraege
+            .filter {
+                it.abgeschlossenInRunde == null && spieler in it.beteiligteSpieler &&
+                    spieler !in it.angenommenVon
+            }
+            .sortedBy { it.id.wert }
+            .forEach { add(SpielAktion.FriedensvertragAnnehmen(spieler, it.id)) }
+        zustand.konflikte.sortedBy { it.id.wert }.forEach { konflikt ->
+            if (spieler !in konflikt.teilnehmer) {
+                KriegsSeite.entries.forEach { seite ->
+                    add(SpielAktion.KriegsAllianzBeitreten(spieler, konflikt.id, seite))
+                }
+                return@forEach
+            }
+            val gegner = konflikt.teilnehmer
+                .filter { konflikt.betrifft(spieler, it) }
+                .sortedBy { it.wert }
+            gegner.forEach { ziel ->
+                add(SpielAktion.WaffenstillstandAnbieten(spieler, konflikt.id, ziel))
+                if (konflikt.waffenstillstandsAngebote.any { it.von == ziel && it.an == spieler }) {
+                    add(SpielAktion.WaffenstillstandAnnehmen(spieler, konflikt.id, ziel))
+                }
+                add(SpielAktion.UnabhaengigenFriedenSchliessen(spieler, konflikt.id, ziel))
+            }
+            add(SpielAktion.KriegKapitulieren(spieler, konflikt.id))
+            val offenerVertrag = zustand.friedensvertraege.any {
+                it.krieg == konflikt.id && it.abgeschlossenInRunde == null
+            }
+            if (!offenerVertrag) {
+                val alle = konflikt.teilnehmer.sortedBy { it.wert }.toCollection(linkedSetOf())
+                val eigeneSeite = when (konflikt.seiteVon(spieler)) {
+                    KriegsSeite.AGGRESSOREN -> konflikt.aggressoren
+                    KriegsSeite.VERTEIDIGER -> konflikt.verteidiger
+                    null -> emptySet()
+                }.sortedBy { it.wert }.toCollection(linkedSetOf())
+                val andereSeite = (alle - eigeneSeite).sortedBy { it.wert }
+                    .toCollection(linkedSetOf())
+                val id = FriedensvertragId("frieden-${zustand.naechsteFriedensvertragNummer}")
+                add(SpielAktion.FriedensvertragVorschlagen(
+                    spieler,
+                    Friedensvertrag(
+                        id = id,
+                        krieg = konflikt.id,
+                        beteiligteSpieler = alle,
+                        unentschiedeneTeilnehmer = alle,
+                        ausscheidendeTeilnehmer = alle,
+                        angenommenVon = setOf(spieler),
+                    ),
+                ))
+                add(SpielAktion.FriedensvertragVorschlagen(
+                    spieler,
+                    Friedensvertrag(
+                        id = id,
+                        krieg = konflikt.id,
+                        beteiligteSpieler = alle,
+                        gewinner = eigeneSeite,
+                        verlierer = andereSeite,
+                        ausscheidendeTeilnehmer = alle,
+                        angenommenVon = setOf(spieler),
+                    ),
+                ))
+                add(SpielAktion.FriedensvertragVorschlagen(
+                    spieler,
+                    Friedensvertrag(
+                        id = id,
+                        krieg = konflikt.id,
+                        beteiligteSpieler = alle,
+                        gewinner = andereSeite,
+                        verlierer = eigeneSeite,
+                        ausscheidendeTeilnehmer = alle,
+                        angenommenVon = setOf(spieler),
+                    ),
+                ))
+            }
+        }
+    }
+
+    private fun ressourcenTransferAktionen(
+        zustand: SpielZustand,
+        spieler: SpielerId,
+    ): List<SpielAktion> {
+        val bestand = zustand.spieler.single { it.id == spieler }
+        val verbuendete = zustand.konflikte.flatMap { konflikt ->
+            when (konflikt.seiteVon(spieler)) {
+                KriegsSeite.AGGRESSOREN -> konflikt.aggressoren - spieler
+                KriegsSeite.VERTEIDIGER -> konflikt.verteidiger - spieler
+                null -> emptySet()
+            }
+        }.filterNot { it in zustand.ausgeschiedeneSpieler }
+            .distinct()
+            .sortedBy { it.wert }
+        return buildList {
+            verbuendete.forEach { empfaenger ->
+                bestand.rohstoffe.entries.sortedBy { it.key.name }
+                    .filter { it.value > 0 }
+                    .forEach { (rohstoff, _) ->
+                        add(SpielAktion.RessourcenUebertragen(
+                            spieler,
+                            empfaenger,
+                            rohstoffe = mapOf(rohstoff to 1),
+                        ))
+                    }
+                if (bestand.geldkonto >= Geld.mark(1)) {
+                    add(SpielAktion.RessourcenUebertragen(
+                        spieler,
+                        empfaenger,
+                        geld = Geld.mark(1),
+                    ))
+                }
+            }
         }
     }
 
@@ -285,9 +529,8 @@ object AktionsAuswertung {
     ): List<SpielAktion> {
         val karte = zustand.karte ?: return emptyList()
         val felder = karte.gelaendefelder.map { it.position }.sortedMitKartenfeldern()
-        val ecken = felder.flatMap { it.ecken() }.distinct().sorted().take(MAX_KARTENOPTIONEN_PRO_TYP)
+        val ecken = felder.flatMap { it.ecken() }.distinct().sorted()
         val kanten = felder.flatMap { it.kanten() }.distinct().sortedMitKanten()
-            .take(MAX_KARTENOPTIONEN_PRO_TYP)
         val rest = zustand.rundeNullRestbestand?.get(spieler).orEmpty()
         return buildList {
             if (rest.getOrDefault(BauteilTyp.HAUPTBAHNHOF, 0) > 0 || rest.isEmpty()) {
@@ -307,7 +550,7 @@ object AktionsAuswertung {
             rest.entries.filter { (typ, menge) ->
                 menge > 0 && typ.art == BauteilArt.WIRTSCHAFTSREGION
             }.forEach { (typ, _) ->
-                felder.take(MAX_KARTENOPTIONEN_PRO_TYP).forEach { feld ->
+                felder.forEach { feld ->
                     add(SpielAktion.AnlageErrichten(spieler, feld, FeldAnlage.Wirtschaftsregion(typ)))
                 }
             }
@@ -319,4 +562,18 @@ object AktionsAuswertung {
 
     private fun List<de.teutonstudio.zentralbank.fachlogik.modell.KartenKante>.sortedMitKanten() =
         sortedWith(compareBy({ it.anfang.y }, { it.anfang.x }, { it.ende.y }, { it.ende.x }))
+
+    private fun List<String>.teilmengenAbZwei(): List<List<String>> = buildList {
+        fun sammeln(index: Int, aktuell: MutableList<String>) {
+            if (index == this@teilmengenAbZwei.size) {
+                if (aktuell.size >= 2) add(aktuell.toList())
+                return
+            }
+            sammeln(index + 1, aktuell)
+            aktuell += this@teilmengenAbZwei[index]
+            sammeln(index + 1, aktuell)
+            aktuell.removeAt(aktuell.lastIndex)
+        }
+        sammeln(0, mutableListOf())
+    }.sortedWith(compareBy<List<String>>({ it.size }, { it.joinToString("\u0000") }))
 }

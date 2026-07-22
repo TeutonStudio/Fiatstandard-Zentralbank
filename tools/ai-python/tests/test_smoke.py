@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from fiat_ai.episode_parser import lade_episoden
+from fiat_ai.encoding import encode_action
 
 
 class EpisodenSmokeTest(unittest.TestCase):
@@ -28,6 +29,12 @@ class EpisodenSmokeTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "Passwortfelder"):
                 list(lade_episoden(pfad))
+
+    def test_lokaler_kandidatenindex_verhindert_string_parameter_kollision(self) -> None:
+        erste = {"art": "HandelsangebotAnnehmen", "angebot": "angebot-a"}
+        zweite = {"art": "HandelsangebotAnnehmen", "angebot": "angebot-b"}
+
+        self.assertFalse(encode_action(erste, 0).equal(encode_action(zweite, 1)))
 
 
 if __name__ == "__main__":

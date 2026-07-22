@@ -8,6 +8,40 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt
 import de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
 
 internal object HandelsRegelwerk {
+    fun ressourcenUebertragen(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.RessourcenUebertragen,
+    ): SpielZustand {
+        require(ereignis.von != ereignis.an) { "Absender und Empfänger müssen verschieden sein." }
+        require(ereignis.rohstoffe.values.all { it >= 0 }) {
+            "Übertragene Rohstoffmengen dürfen nicht negativ sein."
+        }
+        require(ereignis.geld >= Geld.NULL) { "Der übertragene Geldbetrag darf nicht negativ sein." }
+        require(ereignis.rohstoffe.values.any { it > 0 } || ereignis.geld > Geld.NULL) {
+            "Eine Ressourcenübertragung darf nicht leer sein."
+        }
+        require(zustand.konflikte.any { konflikt ->
+            val seiteVon = konflikt.seiteVon(ereignis.von)
+            seiteVon != null && seiteVon == konflikt.seiteVon(ereignis.an)
+        }) {
+            "Direkte Ressourcenübertragung ist nur innerhalb einer Kriegsallianz erlaubt."
+        }
+        var neu = zustand
+        if (ereignis.rohstoffe.isNotEmpty()) {
+            neu = RohstoffRegelwerk.rohstoffeBuchen(neu, ereignis.von, ereignis.rohstoffe, -1)
+            neu = RohstoffRegelwerk.rohstoffeBuchen(neu, ereignis.an, ereignis.rohstoffe, 1)
+        }
+        if (ereignis.geld > Geld.NULL) {
+            neu = FinanzRegelwerk.geldUebertragen(
+                neu,
+                KontoId.Spieler(ereignis.von),
+                KontoId.Spieler(ereignis.an),
+                ereignis.geld,
+            )
+        }
+        return neu
+    }
+
     fun rohstoffHandeln(
         zustand: SpielZustand,
         ereignis: SpielEreignis.RohstoffHandel,

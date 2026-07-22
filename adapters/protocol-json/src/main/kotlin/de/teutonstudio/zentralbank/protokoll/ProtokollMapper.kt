@@ -31,6 +31,7 @@ fun SpielZustand.zuDto(): SpielZustandDto = SpielZustandDto(
             geldCent = eintrag.geldkonto.cent,
             anleihen = eintrag.anleihen.map { it.wert },
             bauteile = eintrag.bauteile.mapKeys { (bauteil, _) -> bauteil.name },
+            spielstil = eintrag.spielstil.name,
         )
     },
     spielabschnitt = spielabschnitt.name,
@@ -54,7 +55,6 @@ fun SpielZustand.zuDto(): SpielZustandDto = SpielZustandDto(
 )
 
 fun SpielAktion.zuDto(): SpielAktionDto = when (this) {
-    is SpielAktion.Aufgeben -> SpielAktionDto.Aufgeben(spieler.wert)
     is SpielAktion.ProzugBeginnen -> SpielAktionDto.ProzugBeginnen(zugId)
     is SpielAktion.VerarbeitungAusfuehren -> SpielAktionDto.VerarbeitungAusfuehren(
         zugId = zugId,
@@ -73,7 +73,6 @@ fun SpielAktion.zuDto(): SpielAktionDto = when (this) {
 }
 
 fun SpielAktionDto.zuDomain(): SpielAktion = when (this) {
-    is SpielAktionDto.Aufgeben -> SpielAktion.Aufgeben(SpielerId(spielerId))
     is SpielAktionDto.ProzugBeginnen -> SpielAktion.ProzugBeginnen(zugId)
     is SpielAktionDto.VerarbeitungAusfuehren -> SpielAktion.VerarbeitungAusfuehren(
         zugId = zugId,

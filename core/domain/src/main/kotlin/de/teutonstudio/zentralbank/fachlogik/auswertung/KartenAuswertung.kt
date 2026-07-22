@@ -376,6 +376,12 @@ object KartenAuswertung {
         blockierteHaefen: Set<KartenEcke>,
     ): Map<KartenEcke, List<TransportSchritt>> {
         val graph = mutableMapOf<KartenEcke, MutableList<TransportSchritt>>()
+        val eigeneIntakteHaefen = karte.belegung.ecken.asSequence()
+            .filter {
+                it.besitzer == spieler && it.zustand == BauwerkZustand.INTAKT &&
+                    it.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN)
+            }
+            .mapTo(mutableSetOf()) { it.position }
         fun verbinden(
             a: KartenEcke,
             b: KartenEcke,
@@ -393,6 +399,9 @@ object KartenAuswertung {
         karte.belegung.seewege
             .asSequence()
             .filter { seeweg -> seeweg.besitzer == spieler }
+            .filter { seeweg ->
+                seeweg.hafenA in eigeneIntakteHaefen && seeweg.hafenB in eigeneIntakteHaefen
+            }
             .filter { seeweg ->
                 seeweg.hafenA !in blockierteHaefen && seeweg.hafenB !in blockierteHaefen
             }

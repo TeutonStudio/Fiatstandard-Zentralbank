@@ -11,6 +11,22 @@ import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitArt
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 
 object AnleihenAuswertung {
+    fun freieGeschaeftsbankPlaetze(zustand: SpielZustand, spieler: SpielerId): Int {
+        val kontrollierteBanken = zustand.karte?.belegung?.felder.orEmpty().count { feld ->
+            KartenAuswertung.kontrolliertGeschaeftsbank(
+                requireNotNull(zustand.karte),
+                feld.position,
+                spieler,
+                zustand.konflikte,
+            )
+        }
+        val kapazitaet = maxOf(1, kontrollierteBanken)
+        val belegt = zustand.anleihen.values.count { anleihe ->
+            anleihe.emittent == spieler && besitzer(zustand, anleihe.id) != KontoId.Spieler(spieler)
+        }
+        return (kapazitaet - belegt).coerceAtLeast(0)
+    }
+
     fun besitzer(
         zustand: SpielZustand,
         anleihe: AnleiheId,

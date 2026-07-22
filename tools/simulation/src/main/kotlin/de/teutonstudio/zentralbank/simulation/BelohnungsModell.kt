@@ -1,13 +1,8 @@
 package de.teutonstudio.zentralbank.simulation
 
 import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
-import de.teutonstudio.zentralbank.fachlogik.auswertung.AnleihenAuswertung
-import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.ProduktionsArt
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielErgebnis
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.auswertung.*
+import de.teutonstudio.zentralbank.fachlogik.modell.*
 import kotlinx.serialization.Serializable
 
 interface BelohnungsModell {
@@ -21,14 +16,19 @@ interface BelohnungsModell {
 
 @Serializable
 data class PotentialGewichte(
-    val version: Int = 1,
+    val version: Int = 2,
     val beta: Float = 0.02f,
     val gamma: Float = 0.99f,
-    val liquiditaet: Float = 0.35f,
-    val nettovermoegen: Float = 0.20f,
-    val produktiveKapazitaet: Float = 0.20f,
-    val aktiveInfrastruktur: Float = 0.15f,
-    val schuldendienstfaehigkeit: Float = 0.10f,
+    val liquiditaet: Float = 0.10f,
+    val marktwert: Float = 0.20f,
+    val produktion: Float = 0.14f,
+    val versorgung: Float = 0.10f,
+    val infrastruktur: Float = 0.12f,
+    val schuldendienst: Float = 0.10f,
+    val handelswege: Float = 0.08f,
+    val militaer: Float = 0.06f,
+    val blockaden: Float = 0.05f,
+    val belagerung: Float = 0.05f,
 )
 
 class PotentialBelohnungsModell(
@@ -42,47 +42,125 @@ class PotentialBelohnungsModell(
     ): Map<SpielerId, Float> = vorher.spieler.associate { spieler ->
         val terminal = when {
             ergebnis == null -> 0f
-            ergebnis.gewinner == null -> 0f
             ergebnis.gewinner == spieler.id -> 1f
             else -> -1f
         }
-        val potentialVorher = potential(vorher, spieler.id)
-        val potentialNachher = potential(nachher, spieler.id)
-        spieler.id to (
-            terminal + gewichte.beta *
-                (gewichte.gamma * potentialNachher - potentialVorher)
-            )
+        val potentialVorher = relativesPotential(vorher, spieler.id)
+        val potentialNachher = relativesPotential(nachher, spieler.id)
+        var shaping = gewichte.beta * (gewichte.gamma * potentialNachher - potentialVorher)
+        if (aktion is SpielAktion.AnleiheEmittieren || aktion is SpielAktion.AnleiheAufstocken) {
+            val strategischVorher = produktiverZustand(vorher, spieler.id)
+            val strategischNachher = produktiverZustand(nachher, spieler.id)
+            if (strategischNachher <= strategischVorher) shaping = minOf(0f, shaping)
+        }
+        if (nachher.zentralbankGeldschoepfungen.size > vorher.zentralbankGeldschoepfungen.size) {
+            shaping = minOf(0f, shaping)
+        }
+        if (aktion is SpielAktion.SchuldenstrichDurchfuehren) shaping = minOf(0f, shaping)
+        if (aktion is SpielAktion.KriegKapitulieren && !kapitulationBegruendet(vorher, spieler.id)) {
+            shaping -= 0.01f
+        }
+        spieler.id to terminal + shaping
     }
 
-    private fun potential(zustand: SpielZustand, spielerId: SpielerId): Float {
-        val spieler = zustand.spieler.first { it.id == spielerId }
-        val schulden = zustand.anleihen.values
-            .filter { it.emittent == spielerId }
+    internal fun relativesPotential(zustand: SpielZustand, spieler: SpielerId): Float {
+        val eigen = absolutesPotential(zustand, spieler)
+        val gegner = zustand.spieler.map { it.id }
+            .filter { it != spieler && it !in zustand.ausgeschiedeneSpieler }
+            .map { absolutesPotential(zustand, it) }
+        return eigen - (gegner.average().takeUnless(Double::isNaN)?.toFloat() ?: 0f)
+    }
+
+    private fun absolutesPotential(zustand: SpielZustand, spielerId: SpielerId): Float {
+        val spieler = zustand.spieler.single { it.id == spielerId }
+        val karte = zustand.karte
+        val schulden = zustand.anleihen.values.filter { it.emittent == spielerId }
             .sumOf { it.nennwert.cent }
-        val liquiditaet = spieler.geldkonto.cent / 100_000f
-        val nettovermoegen = (spieler.geldkonto.cent - schulden) / 100_000f
-        val produktiv = spieler.bauteile.entries.sumOf { (typ, anzahl) ->
-            if (typ.produktionsArt != ProduktionsArt.KEINE) anzahl else 0
-        }.toFloat() / 20f
-        val aktiv = zustand.karte?.let { karte ->
-            val ecken = karte.belegung.ecken.count {
-                it.besitzer == spielerId && it.zustand == BauwerkZustand.INTAKT
-            }
-            val felder = karte.belegung.felder.count { it.zustand == AnlagenZustand.AKTIV }
-            (ecken + felder).toFloat() / 50f
+        val liquiditaet = ((spieler.geldkonto.cent - schulden) / 100_000f).coerceIn(-5f, 5f)
+        val marktwert = (MarktAuswertung.spielerMarktwert(zustand, spielerId).cent / 100_000f)
+            .coerceIn(0f, 10f)
+        val produktion = karte?.let {
+            KartenAuswertung.abbauErtrag(it, spielerId, zustand.konflikte).values.sum() / 30f
         } ?: 0f
-        val faelligeSchuld = AnleihenAuswertung.faelligeVerbindlichkeiten(
+        val versorgung = if (zustand.aktiverSpieler == spielerId &&
+            zustand.zugStatus?.phase == ZugPhase.Prozug
+        ) {
+            val plan = ZahlungsfaehigkeitsAuswertung.plan(zustand, spielerId)
+            if (plan.direktVersorgbar || plan.nachMarkthandelVersorgbar) 1f else 0f
+        } else 1f
+        val erreichbareFelder = karte?.let {
+            ErreichbarkeitsAuswertung.erreichbareWirtschaftsstandorte(
+                it,
+                spielerId,
+                zustand.konflikte,
+            ).size
+        } ?: 0
+        val verwaltung = karte?.belegung?.ecken?.count {
+            it.besitzer == spielerId && it.zustand == BauwerkZustand.INTAKT
+        } ?: 0
+        val infrastruktur = ((verwaltung + erreichbareFelder) / 30f).coerceIn(0f, 2f)
+        val faellig = AnleihenAuswertung.faelligeVerbindlichkeiten(
             zustand,
             spielerId,
             zustand.zugStatus?.zugId ?: 0L,
         ).sumOf { it.betrag.cent }
-        val schuldendienst = if (faelligeSchuld <= 0L) 1f else {
-            (spieler.geldkonto.cent.toFloat() / faelligeSchuld.toFloat()).coerceIn(0f, 1f)
+        val schuldendienst = if (faellig <= 0L) 1f else {
+            (spieler.geldkonto.cent.toFloat() / faellig).coerceIn(0f, 1f)
         }
-        return gewichte.liquiditaet * liquiditaet.coerceIn(-1f, 1f) +
-            gewichte.nettovermoegen * nettovermoegen.coerceIn(-1f, 1f) +
-            gewichte.produktiveKapazitaet * produktiv.coerceIn(0f, 1f) +
-            gewichte.aktiveInfrastruktur * aktiv.coerceIn(0f, 1f) +
-            gewichte.schuldendienstfaehigkeit * schuldendienst
+        val handelswege = karte?.let {
+            val land = it.belegung.kanten.count { kante ->
+                KartenAuswertung.gewalthaber(it, kante.position) == spielerId
+            }
+            val see = it.belegung.seewege.count { seeweg -> seeweg.besitzer == spielerId }
+            (land + see) / 30f
+        } ?: 0f
+        val militaer = karte?.belegung?.kriegseinheiten?.count { it.besitzer == spielerId }
+            ?.div(20f) ?: 0f
+        val blockaden = karte?.belegung?.kriegseinheiten?.count { einheit ->
+            einheit.besitzer == spielerId && zustand.konflikte.any { krieg ->
+                krieg.teilnehmer.any { gegner -> gegner != spielerId && krieg.betrifft(spielerId, gegner) }
+            }
+        }?.div(20f) ?: 0f
+        val belagerung = zustand.belagerungen.sumOf { belagerung ->
+            when {
+                belagerung.fuehrenderBelagerer == spielerId -> belagerung.fortschrittRunden
+                belagerung.verteidiger == spielerId -> -belagerung.fortschrittRunden
+                else -> 0
+            }
+        } / 10f
+        return gewichte.liquiditaet * liquiditaet +
+            gewichte.marktwert * marktwert +
+            gewichte.produktion * produktion.coerceIn(0f, 2f) +
+            gewichte.versorgung * versorgung +
+            gewichte.infrastruktur * infrastruktur +
+            gewichte.schuldendienst * schuldendienst +
+            gewichte.handelswege * handelswege.coerceIn(0f, 2f) +
+            gewichte.militaer * militaer.coerceIn(0f, 2f) +
+            gewichte.blockaden * blockaden.coerceIn(0f, 2f) +
+            gewichte.belagerung * belagerung.coerceIn(-2f, 2f)
+    }
+
+    private fun produktiverZustand(zustand: SpielZustand, spieler: SpielerId): Float {
+        val karte = zustand.karte ?: return 0f
+        val produktion = KartenAuswertung.abbauErtrag(karte, spieler, zustand.konflikte)
+            .values.sum()
+        val infrastruktur = karte.belegung.ecken.count { it.besitzer == spieler } +
+            ErreichbarkeitsAuswertung.erreichbareWirtschaftsstandorte(
+                karte,
+                spieler,
+                zustand.konflikte,
+            ).size
+        return produktion + infrastruktur / 10f
+    }
+
+    private fun kapitulationBegruendet(zustand: SpielZustand, spieler: SpielerId): Boolean {
+        val eigene = zustand.karte?.belegung?.kriegseinheiten?.count { it.besitzer == spieler } ?: 0
+        val gegner = zustand.karte?.belegung?.kriegseinheiten?.count { einheit ->
+            einheit.besitzer != spieler && zustand.konflikte.any { it.betrifft(spieler, einheit.besitzer) }
+        } ?: 0
+        val zahlung = if (zustand.aktiverSpieler == spieler &&
+            zustand.zugStatus?.phase == ZugPhase.Prozug
+        ) ZahlungsfaehigkeitsAuswertung.plan(zustand, spieler).kapitulationNoetig else false
+        return gegner > eigene || zahlung
     }
 }

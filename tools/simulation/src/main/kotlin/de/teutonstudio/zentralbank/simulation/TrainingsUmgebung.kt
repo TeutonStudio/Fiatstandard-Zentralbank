@@ -11,6 +11,9 @@ import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielErgebnis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.auswertung.MarktAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ZahlungsfaehigkeitsAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ZahlungsfaehigkeitsPlan
 
 interface TrainingsUmgebung {
     fun reset(szenario: TrainingsSzenario, seed: Long): Entscheidungspunkt
@@ -22,6 +25,7 @@ data class Entscheidungspunkt(
     val spieler: SpielerId,
     val beobachtung: SpielBeobachtung,
     val aktionsRaum: de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsRaum,
+    val zahlungsfaehigkeitsPlan: ZahlungsfaehigkeitsPlan? = null,
 )
 
 data class TrainingsUebergang(
@@ -36,7 +40,7 @@ data class TrainingsUebergang(
 class StandardTrainingsUmgebung(
     private val engine: SpielEngine = StandardSpielEngine(),
     private val belohnungsModell: BelohnungsModell = PotentialBelohnungsModell(),
-    private val maximaleEntscheidungen: Int = 1_000,
+    private val maximaleEntscheidungen: Int = 10_000,
 ) : TrainingsUmgebung {
     init {
         require(maximaleEntscheidungen > 0) { "Das Entscheidungslimit muss positiv sein." }
@@ -48,6 +52,8 @@ class StandardTrainingsUmgebung(
     private var szenarioId: String? = null
     private var startSeed: Long? = null
     private var aktuellerPunkt: Entscheidungspunkt? = null
+    private var stagnierendeEntscheidungen: Int = 0
+    private val letzteAktionenPuffer = ArrayDeque<SpielAktion>()
 
     val startzustand: SpielZustand
         get() = requireNotNull(ablauf).startzustand
@@ -59,6 +65,8 @@ class StandardTrainingsUmgebung(
         get() = requireNotNull(szenarioId)
     val seed: Long
         get() = requireNotNull(startSeed)
+    val entscheidungenOhneMarktwertAenderung: Int get() = stagnierendeEntscheidungen
+    val letzteAktionen: List<SpielAktion> get() = letzteAktionenPuffer.toList()
 
     override fun reset(szenario: TrainingsSzenario, seed: Long): Entscheidungspunkt {
         val neuerAblauf = SpielAblauf(szenario.startzustand(seed))
@@ -79,6 +87,8 @@ class StandardTrainingsUmgebung(
             "Das Szenario besitzt beim Reset keinen Entscheidungspunkt."
         }
         aktuellerPunkt = punkt
+        stagnierendeEntscheidungen = 0
+        letzteAktionenPuffer.clear()
         return punkt
     }
 
@@ -100,8 +110,21 @@ class StandardTrainingsUmgebung(
             "Engine-Schritt und Ereignis-Replay sind auseinander gelaufen."
         }
         entscheidungen += 1
+        val marktwerteVorher = vorher.spieler.associate { spieler ->
+            spieler.id to MarktAuswertung.spielerMarktwert(vorher, spieler.id)
+        }
+        val marktwerteNachher = spielAblauf.zustand.spieler.associate { spieler ->
+            spieler.id to MarktAuswertung.spielerMarktwert(spielAblauf.zustand, spieler.id)
+        }
+        stagnierendeEntscheidungen = if (marktwerteVorher == marktwerteNachher) {
+            stagnierendeEntscheidungen + 1
+        } else {
+            0
+        }
+        letzteAktionenPuffer.addLast(aktion)
+        while (letzteAktionenPuffer.size > 100) letzteAktionenPuffer.removeFirst()
         val terminated = spielAblauf.zustand.ergebnis != null
-        val truncated = !terminated && entscheidungen >= maximaleEntscheidungen
+        val truncated = !terminated && stagnierendeEntscheidungen >= maximaleEntscheidungen
         technischBeendet = truncated
         val naechsterPunkt = if (terminated || truncated) {
             null
@@ -137,6 +160,9 @@ class StandardTrainingsUmgebung(
             spieler = spieler,
             beobachtung = BeobachtungsAuswertung.fuerSpieler(zustand, spieler),
             aktionsRaum = raum,
+            zahlungsfaehigkeitsPlan = zustand.zugStatus
+                ?.takeIf { it.phase == de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase.Prozug }
+                ?.let { ZahlungsfaehigkeitsAuswertung.plan(zustand, spieler) },
         )
     }
 }

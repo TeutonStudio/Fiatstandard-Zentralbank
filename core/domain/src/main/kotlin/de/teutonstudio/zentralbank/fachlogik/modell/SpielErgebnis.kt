@@ -13,7 +13,6 @@ data class SpielErgebnis(
 
 @Serializable
 enum class SpielEndeGrund {
-    /** Für eine künftig fachlich definierte reguläre Siegbedingung reserviert. */
     REGULAERER_SIEG,
     LETZTER_SPIELFAEHIGER_SPIELER,
     ALLE_AUSGESCHIEDEN,
@@ -22,7 +21,8 @@ enum class SpielEndeGrund {
 
 @Serializable
 enum class AusscheidensGrund {
-    AUFGABE,
     INSOLVENZ,
+    HAUPTBAHNHOF_UNVERSORGT,
+    HAUPTBAHNHOF_ZERSTOERT,
     KRIEGSFOLGE,
 }

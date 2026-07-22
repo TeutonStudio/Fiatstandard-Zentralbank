@@ -10,6 +10,8 @@ import de.teutonstudio.zentralbank.fachlogik.modell.EckBelegung
 import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
 import de.teutonstudio.zentralbank.fachlogik.modell.FeldBelegung
+import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
+import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Geld
@@ -392,7 +394,19 @@ class SpielRegelwerkTest {
         )
 
         val imKrieg = anwenden(epizug, SpielEreignis.KriegErklaert(anna, bert))
-        val imFrieden = anwenden(imKrieg, SpielEreignis.KriegBeendet(anna, bert))
+        val krieg = imKrieg.konflikte.single()
+        val imFrieden = anwenden(
+            imKrieg,
+            SpielEreignis.FriedensvertragAbgeschlossen(
+                Friedensvertrag(
+                    id = FriedensvertragId("frieden-test"),
+                    krieg = krieg.id,
+                    beteiligteSpieler = setOf(anna, bert),
+                    unentschiedeneTeilnehmer = setOf(anna, bert),
+                    angenommenVon = setOf(anna, bert),
+                ),
+            ),
+        )
 
         assertTrue(imKrieg.konflikte.single().betrifft(anna, bert))
         assertTrue(imFrieden.konflikte.isEmpty())

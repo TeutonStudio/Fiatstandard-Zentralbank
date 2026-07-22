@@ -57,6 +57,8 @@ object SpielRegelwerk {
                 AnleihenRegelwerk.anleiheEmittieren(zustand, ereignis)
             is SpielEreignis.AnleiheFreiwilligZurueckgekauft ->
                 AnleihenRegelwerk.freiwilligZurueckkaufen(zustand, ereignis)
+            is SpielEreignis.AnleiheAufgestockt ->
+                AnleihenRegelwerk.anleiheAufstocken(zustand, ereignis)
             is SpielEreignis.AnleiheGekauft ->
                 AnleihenRegelwerk.anleiheKaufen(zustand, ereignis)
             is SpielEreignis.AnleiheVerkauft ->
@@ -97,12 +99,36 @@ object SpielRegelwerk {
                 KartenRegelwerk.kriegsEinheitenBewegen(zustand, ereignis)
             is SpielEreignis.KriegsEinheitEntfernt ->
                 KartenRegelwerk.kriegsEinheitEntfernen(zustand, ereignis)
+            is SpielEreignis.KampfAufgeloest ->
+                KonfliktRegelwerk.kampfAufloesen(zustand, ereignis)
             is SpielEreignis.KriegErklaert ->
                 KonfliktRegelwerk.kriegErklaeren(zustand, ereignis)
-            is SpielEreignis.KriegBeendet ->
-                KonfliktRegelwerk.kriegBeenden(zustand, ereignis)
+            is SpielEreignis.KriegsAllianzBeigetreten ->
+                KonfliktRegelwerk.allianzBeitreten(zustand, ereignis)
+            is SpielEreignis.WaffenstillstandAngeboten ->
+                KonfliktRegelwerk.waffenstillstandAnbieten(zustand, ereignis)
+            is SpielEreignis.WaffenstillstandGeschlossen ->
+                KonfliktRegelwerk.waffenstillstandSchliessen(zustand, ereignis)
+            is SpielEreignis.KriegKapituliert ->
+                KonfliktRegelwerk.kapitulieren(zustand, ereignis)
+            is SpielEreignis.FriedensvertragVorgeschlagen ->
+                KonfliktRegelwerk.friedenVorschlagen(zustand, ereignis)
+            is SpielEreignis.FriedensvertragAngenommen ->
+                KonfliktRegelwerk.friedenAnnehmen(zustand, ereignis)
+            is SpielEreignis.FriedensvertragAbgeschlossen ->
+                KonfliktRegelwerk.friedenAbschliessen(zustand, ereignis)
             is SpielEreignis.Schuldenstrich ->
                 InsolvenzRegelwerk.schuldenstrichBuchen(zustand, ereignis)
+            is SpielEreignis.ZentralbankgeldGeschoepft ->
+                InsolvenzRegelwerk.zentralbankgeldProtokollieren(zustand, ereignis)
+            is SpielEreignis.VerwaltungsruineRepariert ->
+                KartenRegelwerk.verwaltungsruineReparieren(zustand, ereignis)
+            is SpielEreignis.VerwaltungsruineAbgerissen ->
+                KartenRegelwerk.verwaltungsruineAbreissen(zustand, ereignis)
+            is SpielEreignis.BelagerungAktualisiert ->
+                BelagerungsRegelwerk.aktualisieren(zustand, ereignis)
+            is SpielEreignis.RessourcenUebertragen ->
+                HandelsRegelwerk.ressourcenUebertragen(zustand, ereignis)
             is SpielEreignis.RundenwerteAktualisiert -> zustand.copy(
                 marktpreise = ereignis.marktpreise,
                 leitzins = ereignis.leitzins,

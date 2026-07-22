@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.fachlogik.regelwerk
 import de.teutonstudio.zentralbank.fachlogik.ereignis.KartenAenderungsGrund
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.auswertung.KartenAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.ErreichbarkeitsAuswertung
 import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
@@ -34,6 +35,9 @@ import de.teutonstudio.zentralbank.fachlogik.modell.istTeichfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.kantenAbstand
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import de.teutonstudio.zentralbank.fachlogik.modell.sindBenachbarteKanten
+import de.teutonstudio.zentralbank.fachlogik.modell.gruppenBewegungsKosten
+import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 
 internal object KartenRegelwerk {
     fun hauptbahnhofPlatzieren(
@@ -297,29 +301,14 @@ internal object KartenRegelwerk {
                     "Ein Bahnhof mit mehr als zwei Schienenrichtungen muss vor dem Abbau " +
                         "zurückgebaut werden."
                 }
-                var nachBestand = bisher.besitzer?.let { besitzer ->
+                val nachBestand = bisher.besitzer?.let { besitzer ->
                     bisher.typ.bauteilTyp()?.let { typ ->
                         bucheBauteil(zustand, besitzer, typ, -1, kostenBuchen = false)
                     }
                 } ?: zustand
-                val entfernteSeewege = karte.belegung.seewege.count {
-                    it.hafenA == ort.position || it.hafenB == ort.position
-                }
-                if (entfernteSeewege > 0 && bisher.besitzer != null) {
-                    nachBestand = bucheBauteil(
-                        nachBestand,
-                        bisher.besitzer,
-                        BauteilTyp.FRACHTSCHIFF,
-                        -entfernteSeewege,
-                        kostenBuchen = false,
-                    )
-                }
                 nachBestand.mitBelegung { belegung ->
                     belegung.copy(
                         ecken = belegung.ecken.filterNot { it.position == ort.position },
-                        seewege = belegung.seewege.filterNot {
-                            it.hafenA == ort.position || it.hafenB == ort.position
-                        },
                     )
                 }.entferneUnverbundeneSchienen()
             }
@@ -370,14 +359,7 @@ internal object KartenRegelwerk {
                         "Zerstörte Gebäude müssen vor einem Neubau entfernt werden."
                     }
                 }
-                val entfernteSeewege = if (ereignis.zustand == BauwerkZustand.ZERSTOERT) {
-                    zustand.karte.belegung.seewege.count {
-                        it.hafenA == ort.position || it.hafenB == ort.position
-                    }
-                } else {
-                    0
-                }
-                var danach = zustand.mitBelegung { belegung ->
+                val danach = zustand.mitBelegung { belegung ->
                     belegung.copy(
                         ecken = belegung.ecken.map { eintrag ->
                             if (eintrag.position == ort.position) {
@@ -388,13 +370,6 @@ internal object KartenRegelwerk {
                                 )
                             } else eintrag
                         },
-                        seewege = if (ereignis.zustand == BauwerkZustand.ZERSTOERT) {
-                            belegung.seewege.filterNot {
-                                it.hafenA == ort.position || it.hafenB == ort.position
-                            }
-                        } else {
-                            belegung.seewege
-                        },
                     )
                 }.passeBestandAnZustand(
                     besitzer = bisher.besitzer,
@@ -402,15 +377,6 @@ internal object KartenRegelwerk {
                     vorher = bisher.zustand,
                     nachher = ereignis.zustand,
                 )
-                if (entfernteSeewege > 0 && bisher.besitzer != null) {
-                    danach = bucheBauteil(
-                        danach,
-                        bisher.besitzer,
-                        BauteilTyp.FRACHTSCHIFF,
-                        -entfernteSeewege,
-                        kostenBuchen = false,
-                    )
-                }
                 if (ereignis.zustand == BauwerkZustand.ZERSTOERT) {
                     danach.entferneUnverbundeneSchienen()
                 } else {
@@ -577,10 +543,22 @@ internal object KartenRegelwerk {
             KriegsEinheitTyp.PANZER -> require(
                 karte.belegung.kantenNachPosition[ereignis.kante]
                     ?.takeIf { handelslinie -> handelslinie.zustand == BauwerkZustand.INTAKT }
-                    ?.let { KartenAuswertung.gewalthaber(karte, ereignis.kante) } ==
-                    ereignis.spieler,
+                    ?.let {
+                        listOf(ereignis.kante.anfang, ereignis.kante.ende).any { ecke ->
+                            karte.belegung.eckenNachPosition[ecke]?.let { bahnhof ->
+                                bahnhof.besitzer == ereignis.spieler &&
+                                    bahnhof.zustand == BauwerkZustand.INTAKT &&
+                                    bahnhof.typ in setOf(
+                                        EckGebaeudeTyp.HAUPTBAHNHOF,
+                                        EckGebaeudeTyp.BAHNHOF,
+                                        EckGebaeudeTyp.GROSSBAHNHOF,
+                                    )
+                            } == true
+                        }
+                    } == true,
             ) {
-                "Ein Panzer kann nur auf einer eigenen, intakten Handelslinie gebaut werden."
+                "Ein Panzer kann nur an einem eigenen Bahnhof auf einer angrenzenden, " +
+                    "intakten Handelslinie gebaut werden."
             }
             KriegsEinheitTyp.KRIEGSSCHIFF -> require(
                 listOf(ereignis.kante.anfang, ereignis.kante.ende).any { ecke ->
@@ -595,7 +573,12 @@ internal object KartenRegelwerk {
                     "gebaut werden."
             }
         }
-        return zustand.mitBelegung { belegung ->
+        val kosten = when (ereignis.typ) {
+            KriegsEinheitTyp.PANZER -> mapOf(Rohstoff.STAHL to 3, Rohstoff.DIESEL to 2)
+            KriegsEinheitTyp.KRIEGSSCHIFF -> mapOf(Rohstoff.STAHL to 3, Rohstoff.SCHWEROEL to 2)
+        }
+        return RohstoffRegelwerk.rohstoffeBuchen(zustand, ereignis.spieler, kosten, -1)
+            .mitBelegung { belegung ->
             belegung.copy(
                 kriegseinheiten = (belegung.kriegseinheiten + KriegsEinheitBelegung(
                     id = ereignis.id,
@@ -604,7 +587,8 @@ internal object KartenRegelwerk {
                     ort = KartenOrt.Kante(ereignis.kante),
                 )).sortedBy(KriegsEinheitBelegung::id),
             )
-        }.copy(naechsteEinheitenNummer = zustand.naechsteEinheitenNummer + 1L)
+            }
+            .copy(naechsteEinheitenNummer = zustand.naechsteEinheitenNummer + 1L)
     }
 
     fun kriegsEinheitBewegen(
@@ -655,12 +639,16 @@ internal object KartenRegelwerk {
             }
             pruefeBefahrbareKante(karte, typ, ziel)
             pruefeFremdeHandelslinie(zustand, karte, spieler, ziel)
+            pruefeFeindlicheEinheiten(zustand, karte, spieler, typ, ziel)
             vorher = ziel
+        }
+        val treibstoff = weg.sumOf { ziel ->
+            gruppenBewegungsKosten(einheiten.size, bewegungsGrundkosten(karte, typ, ziel))
         }
         val nachTreibstoff = RohstoffRegelwerk.rohstoffeBuchen(
             zustand = zustand,
             spieler = spieler,
-            mengen = typ.bewegungsKosten(weg.size * einheiten.size),
+            mengen = mapOf(typ.bewegungsRohstoff to treibstoff),
             faktor = -1,
         )
         val ziel = weg.last()
@@ -695,6 +683,67 @@ internal object KartenRegelwerk {
         }
     }
 
+    fun verwaltungsruineReparieren(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.VerwaltungsruineRepariert,
+    ): SpielZustand {
+        val karte = regulaereKarte(zustand)
+        val ruine = karte.belegung.eckenNachPosition[ereignis.ecke]
+            ?: error("An der gewählten Ecke steht keine Verwaltungsruine.")
+        require(ruine.zustand == BauwerkZustand.ZERSTOERT && ruine.besitzer == null) {
+            "Nur eine beschädigte, neutrale Verwaltungsruine kann repariert werden."
+        }
+        require(ErreichbarkeitsAuswertung.istErreichbar(
+            karte,
+            ereignis.ecke,
+            ereignis.spieler,
+            zustand.konflikte,
+        )) { "Die Ruine ist über keine eigene gültige Handelsroute erreichbar." }
+        require(!ErreichbarkeitsAuswertung.istVollstaendigFeindlichBlockiert(
+            karte,
+            ereignis.ecke,
+            ereignis.spieler,
+            zustand.konflikte,
+        )) { "Eine vollständig feindlich blockierte Ruine kann nicht repariert werden." }
+        val nachKosten = RohstoffRegelwerk.rohstoffeBuchen(
+            zustand,
+            ereignis.spieler,
+            mapOf(Rohstoff.ZIEGEL to 3, Rohstoff.KOHLE to 2),
+            -1,
+        )
+        return nachKosten.mitBelegung { belegung ->
+            belegung.copy(
+                ecken = belegung.ecken.map {
+                    if (it.position == ereignis.ecke) it.copy(
+                        besitzer = ereignis.spieler,
+                        zustand = BauwerkZustand.INTAKT,
+                    ) else it
+                },
+            )
+        }
+    }
+
+    fun verwaltungsruineAbreissen(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.VerwaltungsruineAbgerissen,
+    ): SpielZustand {
+        val karte = regulaereKarte(zustand)
+        val ruine = karte.belegung.eckenNachPosition[ereignis.ecke]
+            ?: error("An der gewählten Ecke steht keine Verwaltungsruine.")
+        require(ruine.zustand == BauwerkZustand.ZERSTOERT) {
+            "Nur eine beschädigte Verwaltungsruine kann so abgerissen werden."
+        }
+        require(ErreichbarkeitsAuswertung.istErreichbar(
+            karte,
+            ereignis.ecke,
+            ereignis.spieler,
+            zustand.konflikte,
+        )) { "Die Ruine ist nicht erreichbar." }
+        return zustand.mitBelegung { belegung ->
+            belegung.copy(ecken = belegung.ecken.filterNot { it.position == ereignis.ecke })
+        }
+    }
+
     private fun pruefeBefahrbareKante(
         karte: Spielkarte,
         typ: KriegsEinheitTyp,
@@ -723,6 +772,39 @@ internal object KartenRegelwerk {
         require(zustand.konflikte.any { konflikt -> konflikt.betrifft(spieler, fremderSpieler) }) {
             "Eine fremde Handelslinie darf nur während eines Krieges mit ihrem Besitzer " +
                 "befahren werden."
+        }
+    }
+
+    private fun pruefeFeindlicheEinheiten(
+        zustand: SpielZustand,
+        karte: Spielkarte,
+        spieler: SpielerId,
+        typ: KriegsEinheitTyp,
+        kante: KartenKante,
+    ) {
+        karte.belegung.kriegseinheiten.asSequence()
+            .filter { it.position == kante && it.typ == typ && it.besitzer != spieler }
+            .map { it.besitzer }
+            .distinct()
+            .forEach { gegner ->
+                val krieg = zustand.konflikte.firstOrNull { it.betrifft(spieler, gegner) }
+                    ?: error("Eine Kante mit fremden Einheiten kann nur im Krieg betreten werden.")
+                require(!krieg.hatWaffenstillstand(spieler, gegner)) {
+                    "Eine Kante mit Waffenstillstandsgegnern kann nicht betreten werden."
+                }
+            }
+    }
+
+    private fun bewegungsGrundkosten(
+        karte: Spielkarte,
+        typ: KriegsEinheitTyp,
+        kante: KartenKante,
+    ): Int = when (typ) {
+        KriegsEinheitTyp.KRIEGSSCHIFF -> 1
+        KriegsEinheitTyp.PANZER -> when {
+            karte.belegung.kantenNachPosition[kante]?.zustand == BauwerkZustand.INTAKT -> 1
+            angrenzendeFelder(kante).any { karte.landNachPosition[it] == GelaendeTyp.GEBIRGE } -> 5
+            else -> 2
         }
     }
 

@@ -19,7 +19,12 @@ import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebotId
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegId
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsSeite
+import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
+import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 
 /**
  * Eine Absicht des Benutzers oder eines Agenten. Erst die [SpielEngine] entscheidet, ob daraus
@@ -28,10 +33,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 sealed interface SpielAktion {
-    /** Aufgabe ist eine ausdrückliche Spielerentscheidung und keine Zeitstrafe. */
-    @Serializable
-    data class Aufgeben(val spieler: SpielerId) : SpielAktion
-
     @Serializable
     data class HauptbahnhofPlatzieren(
         val spieler: SpielerId,
@@ -110,6 +111,25 @@ sealed interface SpielAktion {
         val naechsteKante: KartenKante,
     ) : SpielAktion
 
+    @Serializable
+    data class KriegsEinheitenBewegen(
+        val spieler: SpielerId,
+        val ids: List<String>,
+        val naechsteKante: KartenKante,
+    ) : SpielAktion
+
+    @Serializable
+    data class VerwaltungsruineReparieren(
+        val spieler: SpielerId,
+        val ecke: KartenEcke,
+    ) : SpielAktion
+
+    @Serializable
+    data class VerwaltungsruineAbreissen(
+        val spieler: SpielerId,
+        val ecke: KartenEcke,
+    ) : SpielAktion
+
     /** Die Anleihe-ID und die Emissionsrunde bestimmt ausschließlich der Spielkern. */
     @Serializable
     data class AnleiheEmittieren(
@@ -129,10 +149,20 @@ sealed interface SpielAktion {
         val preis: Geld,
     ) : SpielAktion
 
+    /** Ersetzt [alteAnleihe] vollständig; nur die Nennwertdifferenz wird ausgezahlt. */
+    @Serializable
+    data class AnleiheAufstocken(
+        val spieler: SpielerId,
+        val alteAnleihe: AnleiheId,
+        val neuerNennwert: Geld,
+        val zinsBasispunkte: Int,
+        val laufzeitRunden: Int,
+    ) : SpielAktion
+
     @Serializable
     data class SchuldenstrichDurchfuehren(
         val spieler: SpielerId,
-        val entfernteBahnwege: Int,
+        val entfernteBahnwege: Int = 0,
     ) : SpielAktion
 
     /** Erstellt nur ein Angebot; Bestände werden dabei nicht reserviert oder übertragen. */
@@ -215,6 +245,13 @@ sealed interface SpielAktion {
     @Serializable
     data class ProzugAbschliessen(val zugId: Long) : SpielAktion
 
+    /** Autoritative letzte Prüfung, nachdem sämtliche normalen Rettungswege ausgeschöpft sind. */
+    @Serializable
+    data class ZahlungsunfaehigkeitFeststellen(
+        val spieler: SpielerId,
+        val zugId: Long,
+    ) : SpielAktion
+
     @Serializable
     data object ZugBeenden : SpielAktion
 
@@ -236,7 +273,7 @@ sealed interface SpielAktion {
         val rohstoff: Rohstoff,
         val menge: Int,
         val preis: Geld,
-        val art: AussenhandelsArt,
+        @SerialName("handelsart") val art: AussenhandelsArt,
     ) : SpielAktion
 
     @Serializable
@@ -246,8 +283,57 @@ sealed interface SpielAktion {
     ) : SpielAktion
 
     @Serializable
-    data class FriedenSchliessen(
-        val spielerA: SpielerId,
-        val spielerB: SpielerId,
+    data class KriegsAllianzBeitreten(
+        val spieler: SpielerId,
+        val krieg: KriegId,
+        val seite: KriegsSeite,
     ) : SpielAktion
+
+    @Serializable
+    data class WaffenstillstandAnbieten(
+        val spieler: SpielerId,
+        val krieg: KriegId,
+        val gegner: SpielerId,
+    ) : SpielAktion
+
+    @Serializable
+    data class WaffenstillstandAnnehmen(
+        val spieler: SpielerId,
+        val krieg: KriegId,
+        val von: SpielerId,
+    ) : SpielAktion
+
+    @Serializable
+    data class KriegKapitulieren(
+        val spieler: SpielerId,
+        val krieg: KriegId,
+    ) : SpielAktion
+
+    @Serializable
+    data class FriedensvertragVorschlagen(
+        val spieler: SpielerId,
+        val vertrag: Friedensvertrag,
+    ) : SpielAktion
+
+    @Serializable
+    data class FriedensvertragAnnehmen(
+        val spieler: SpielerId,
+        val vertrag: FriedensvertragId,
+    ) : SpielAktion
+
+    @Serializable
+    data class UnabhaengigenFriedenSchliessen(
+        val spieler: SpielerId,
+        val krieg: KriegId,
+        val gegner: SpielerId,
+    ) : SpielAktion
+
+    @Serializable
+    data class RessourcenUebertragen(
+        val spieler: SpielerId,
+        val empfaenger: SpielerId,
+        val rohstoffe: Map<Rohstoff, Int> = emptyMap(),
+        val geld: Geld = Geld.NULL,
+    ) : SpielAktion
+
 }

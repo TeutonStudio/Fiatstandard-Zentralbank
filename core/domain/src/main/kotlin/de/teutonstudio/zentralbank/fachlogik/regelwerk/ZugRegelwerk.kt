@@ -19,11 +19,12 @@ internal object ZugRegelwerk {
         if (ereignis is SpielEreignis.PartieBeendet) return
         if (ereignis is SpielEreignis.AngeboteAbgelaufen) return
         if (ereignis is SpielEreignis.SpielerAusgeschieden) {
-            require(ereignis.spieler == zustand.aktiverSpieler) {
-                "Nur der aktive Spieler kann ausscheiden."
-            }
             return
         }
+        if (ereignis is SpielEreignis.BelagerungAktualisiert ||
+            ereignis is SpielEreignis.KampfAufgeloest ||
+            ereignis is SpielEreignis.FriedensvertragAbgeschlossen
+        ) return
         if (ereignis is SpielEreignis.WarenkorbGeaendert) return
         if (zustand.spielabschnitt == Spielabschnitt.RUNDE_NULL) {
             require(ereignis.istRundeNullPlatzierung()) {
@@ -46,6 +47,9 @@ internal object ZugRegelwerk {
         }
 
         when (ereignis) {
+            is SpielEreignis.BelagerungAktualisiert,
+            is SpielEreignis.FriedensvertragAbgeschlossen,
+            is SpielEreignis.KampfAufgeloest -> Unit
             is SpielEreignis.HandelsangebotErstellt -> {
                 pruefeHandelsphase(zug)
                 require(ereignis.angebot.anbieter == zug.spieler) {
@@ -130,6 +134,13 @@ internal object ZugRegelwerk {
                 }
                 pruefeNichtFaellig(zug, ereignis.anleihe)
             }
+            is SpielEreignis.AnleiheAufgestockt -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.neueAnleihe.emittent == zug.spieler) {
+                    "Nur der aktive Spieler darf seine Anleihe aufstocken."
+                }
+                pruefeNichtFaellig(zug, ereignis.alteAnleihe)
+            }
             is SpielEreignis.AnleiheGekauft -> {
                 pruefeHandelsphase(zug)
                 require(
@@ -163,16 +174,41 @@ internal object ZugRegelwerk {
                     "Nur der aktive Spieler darf bauen oder die Karte ändern."
                 }
             }
+            is SpielEreignis.VerwaltungsruineRepariert,
+            is SpielEreignis.VerwaltungsruineAbgerissen -> {
+                pruefeEpizug(zug)
+                require(ereignis.primaererSpieler() == zug.spieler) {
+                    "Nur der aktive Spieler darf eine Verwaltungsruine bearbeiten."
+                }
+            }
             is SpielEreignis.KriegsEinheitEingesetzt,
             is SpielEreignis.KriegsEinheitGebaut,
             is SpielEreignis.KriegsEinheitBewegt,
             is SpielEreignis.KriegsEinheitenBewegt,
             is SpielEreignis.KriegsEinheitEntfernt,
             is SpielEreignis.KriegErklaert,
-            is SpielEreignis.KriegBeendet -> {
+            is SpielEreignis.KriegsAllianzBeigetreten,
+            is SpielEreignis.WaffenstillstandAngeboten,
+            is SpielEreignis.WaffenstillstandGeschlossen,
+            is SpielEreignis.FriedensvertragVorgeschlagen,
+            is SpielEreignis.FriedensvertragAngenommen -> {
                 pruefeEpizug(zug)
                 require(ereignis.primaererSpieler() == zug.spieler) {
                     "Nur der aktive Spieler darf eine Konfliktaktion ausführen."
+                }
+            }
+            is SpielEreignis.KriegKapituliert -> {
+                require(ereignis.spieler == zug.spieler) {
+                    "Nur der aktive Spieler darf kapitulieren."
+                }
+                require(
+                    zug.phase == ZugPhase.Epizug ||
+                        (zug.phase == ZugPhase.Prozug &&
+                            de.teutonstudio.zentralbank.fachlogik.auswertung
+                                .ZahlungsfaehigkeitsAuswertung.plan(zustand, zug.spieler)
+                                .kapitulationNoetig),
+                ) {
+                    "Im Prozug ist Kapitulation nur als Zahlungsunfähigkeitsrettung zulässig."
                 }
             }
             SpielEreignis.ZugBeendet -> pruefeEpizug(zug)
@@ -189,6 +225,13 @@ internal object ZugRegelwerk {
                 ) { "Eine neue Runde wird genau vor dem ersten Prozug begonnen." }
             }
             is SpielEreignis.Schuldenstrich -> Unit
+            is SpielEreignis.ZentralbankgeldGeschoepft -> Unit
+            is SpielEreignis.RessourcenUebertragen -> {
+                pruefeHandelsphase(zug)
+                require(ereignis.von == zug.spieler) {
+                    "Nur der aktive Spieler darf Ressourcen übertragen."
+                }
+            }
             is SpielEreignis.HauptbahnhofPlatziert ->
                 error("Ein Hauptbahnhof kann nur in Runde 0 platziert werden.")
             is SpielEreignis.RohstoffEinnahme,
@@ -294,7 +337,15 @@ internal object ZugRegelwerk {
         is SpielEreignis.KriegsEinheitenBewegt -> spieler
         is SpielEreignis.KriegsEinheitEntfernt -> spieler
         is SpielEreignis.KriegErklaert -> aggressor
-        is SpielEreignis.KriegBeendet -> spielerA
+        is SpielEreignis.KriegsAllianzBeigetreten -> spieler
+        is SpielEreignis.WaffenstillstandAngeboten -> von
+        is SpielEreignis.WaffenstillstandGeschlossen -> angenommenVon
+        is SpielEreignis.KriegKapituliert -> spieler
+        is SpielEreignis.FriedensvertragVorgeschlagen -> vertrag.angenommenVon.firstOrNull()
+        is SpielEreignis.FriedensvertragAngenommen -> spieler
+        is SpielEreignis.VerwaltungsruineRepariert -> spieler
+        is SpielEreignis.VerwaltungsruineAbgerissen -> spieler
+        is SpielEreignis.RessourcenUebertragen -> von
         is SpielEreignis.SpielerAusgeschieden -> spieler
         is SpielEreignis.HandelsangebotErstellt -> angebot.anbieter
         is SpielEreignis.HandelsangebotAngenommen -> angenommenVon

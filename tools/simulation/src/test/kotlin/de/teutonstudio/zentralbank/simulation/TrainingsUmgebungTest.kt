@@ -2,6 +2,8 @@ package de.teutonstudio.zentralbank.simulation
 
 import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
+import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -36,8 +38,8 @@ class TrainingsUmgebungTest {
         rechts.reset(szenario, 7)
         val rechtsVorher = rechts.zustand
 
-        val fremdeAufgabe = SpielAktion.Aufgeben(SpielerId("nicht-aktiv"))
-        assertTrue(runCatching { links.step(fremdeAufgabe) }.isFailure)
+        val fremderProzug = SpielAktion.ProzugBeginnen(Long.MAX_VALUE)
+        assertTrue(runCatching { links.step(fremderProzug) }.isFailure)
         links.step(punkt.aktionsRaum.aktionen.first())
 
         assertEquals(rechtsVorher, rechts.zustand)
@@ -60,15 +62,15 @@ class TrainingsUmgebungTest {
 
     @Test
     fun nachFachlichemPartieendeIstKeinStepMehrMoeglich() {
-        val umgebung = StandardTrainingsUmgebung(maximaleEntscheidungen = 20)
+        val umgebung = StandardTrainingsUmgebung(maximaleEntscheidungen = 2_000)
+        val agent = SicherheitsAgent()
+        val zufall = de.teutonstudio.zentralbank.fachlogik.engine.SeedZufallsquelle(1)
         var punkt = umgebung.reset(szenario, 1)
-        var uebergang = umgebung.step(
-            punkt.aktionsRaum.aktionen.first { it is SpielAktion.Aufgeben },
-        )
-        punkt = requireNotNull(uebergang.naechsterPunkt)
-        uebergang = umgebung.step(
-            punkt.aktionsRaum.aktionen.first { it is SpielAktion.Aufgeben },
-        )
+        var uebergang: TrainingsUebergang
+        do {
+            uebergang = umgebung.step(agent.waehleAktion(punkt, zufall))
+            punkt = uebergang.naechsterPunkt ?: break
+        } while (true)
 
         assertTrue(uebergang.terminated)
         assertFalse(uebergang.truncated)
@@ -87,5 +89,40 @@ class TrainingsUmgebungTest {
         assertTrue(links.karte?.belegung?.ecken?.all {
             it.typ == de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp.HAUPTBAHNHOF
         } == true)
+    }
+
+    @Test
+    fun szenariokatalogEnthaeltSchuldenLandkriegSeekriegBlockadeBelagerungUndFrieden() {
+        val schulden = SzenarioKatalog.szenario("generiert-schulden-3").startzustand(1)
+        assertTrue(schulden.anleihen.isNotEmpty())
+
+        val land = SzenarioKatalog.szenario("generiert-landkrieg-4").startzustand(2)
+        assertEquals(4, land.spieler.size)
+        assertTrue(land.karte!!.belegung.kriegseinheiten.any { it.typ == KriegsEinheitTyp.PANZER })
+
+        val see = SzenarioKatalog.szenario("generiert-seekrieg-5").startzustand(3)
+        val seekarte = requireNotNull(see.karte)
+        assertTrue(seekarte.belegung.seewege.isNotEmpty())
+        assertTrue(seekarte.belegung.kriegseinheiten.any { it.typ == KriegsEinheitTyp.KRIEGSSCHIFF })
+
+        val blockade = SzenarioKatalog.szenario("generiert-blockade-6").startzustand(4)
+        assertTrue(blockade.karte!!.belegung.seewege.isNotEmpty())
+
+        val belagerung = SzenarioKatalog.szenario("generiert-belagerung-7").startzustand(5)
+        assertEquals(7, belagerung.spieler.size)
+        assertTrue(belagerung.belagerungen.isNotEmpty())
+        assertTrue(belagerung.karte!!.belegung.ecken.any { it.zustand == BauwerkZustand.BELAGERT })
+
+        val frieden = SzenarioKatalog.szenario("generiert-frieden-3").startzustand(6)
+        assertTrue(frieden.friedensvertraege.isNotEmpty())
+    }
+
+    @Test
+    fun echteKartenvorlagenUnterstuetzenDreiBisSiebenSpieler() {
+        SzenarioKatalog.echteKarten.forEach { datei ->
+            val basis = "vorlage-${datei.substringBeforeLast('.')}"
+            assertEquals(3, SzenarioKatalog.szenario(basis).startzustand(10).spieler.size)
+            assertEquals(7, SzenarioKatalog.szenario("$basis-7").startzustand(11).spieler.size)
+        }
     }
 }

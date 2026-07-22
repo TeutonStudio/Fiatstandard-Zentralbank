@@ -9,4 +9,7 @@ data class Schuldenstrich(
     val ausgezahlterBetrag: Geld,
     val geloeschteAnleihen: List<AnleiheId>,
     val entfernteBahnwege: Int,
+    val entfernteEinheiten: List<String> = emptyList(),
+    val herabgestufteStandorte: Int = 0,
+    val geldschoepfung: Geld = ausgezahlterBetrag,
 )

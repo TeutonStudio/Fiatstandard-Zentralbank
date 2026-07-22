@@ -27,7 +27,7 @@ class ProzugAuswertungTest {
     )
 
     @Test
-    fun offeneStandorteErzeugenDefizitUndSperrenAbschluss() {
+    fun offenerNebenstandortErzeugtKeinPflichtdefizitUndSperrtAbschlussNicht() {
         val zustand = zustand(
             rohstoffe = mapOf(Rohstoff.NAHRUNG to 1),
             prozug = ProzugStatus(
@@ -38,9 +38,9 @@ class ProzugAuswertungTest {
 
         val plan = requireNotNull(ProzugAuswertung.plan(zustand))
 
-        assertEquals(mapOf(Rohstoff.NAHRUNG to 1, Rohstoff.KOHLE to 1), plan.fehlendeRohstoffe)
-        assertFalse(plan.kannErfolgreichAbschliessen)
-        assertTrue(plan.sperrgruende.single().contains("Verwaltungsstandort"))
+        assertEquals(emptyMap<Rohstoff, Int>(), plan.fehlendeRohstoffe)
+        assertTrue(plan.kannErfolgreichAbschliessen)
+        assertTrue(plan.sperrgruende.isEmpty())
     }
 
     @Test

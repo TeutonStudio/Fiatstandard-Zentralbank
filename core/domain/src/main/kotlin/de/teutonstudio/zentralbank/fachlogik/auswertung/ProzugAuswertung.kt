@@ -45,7 +45,8 @@ object ProzugAuswertung {
         val spieler = zustand.spieler.firstOrNull { it.id == zug.spieler } ?: return null
         val prozug = zug.prozug
         val offeneVerwaltung = prozug.verwaltungsVerpflichtungen.filter {
-            it.id !in prozug.versorgteStandorte
+            it.typ == de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp.HAUPTBAHNHOF &&
+                it.id !in prozug.versorgteStandorte
         }
         val offeneVerbindlichkeiten = prozug.verbindlichkeiten.filter {
             it.id !in prozug.beglicheneVerbindlichkeiten
@@ -110,7 +111,7 @@ object ProzugAuswertung {
         val sperrgruende = buildList {
             if (!prozug.begonnen) add("Der Prozug wurde noch nicht begonnen.")
             if (offeneVerwaltung.isNotEmpty()) {
-                add("${offeneVerwaltung.size} Verwaltungsstandort(e) sind noch offen.")
+                add("Der Hauptbahnhof ist noch nicht versorgt.")
             }
             if (offeneVerbindlichkeiten.isNotEmpty()) {
                 add("${offeneVerbindlichkeiten.size} Verbindlichkeit(en) sind noch offen.")

@@ -196,7 +196,14 @@ internal object ProzugRegelwerk {
         val nachEinloesung = if (verbindlichkeit.id.art == VerbindlichkeitArt.RUECKKAUF) {
             AnleihenRegelwerk.anleiheAusloesen(nachZahlung, verbindlichkeit.id.anleihe)
         } else {
-            nachZahlung
+            nachZahlung.copy(
+                anleihen = nachZahlung.anleihen + (
+                    verbindlichkeit.id.anleihe to
+                        requireNotNull(nachZahlung.anleihen[verbindlichkeit.id.anleihe]).let {
+                            it.copy(geleisteteZinszahlungen = it.geleisteteZinszahlungen + 1)
+                        }
+                    ),
+            )
         }
         return nachEinloesung.copy(
             zugStatus = zug.copy(

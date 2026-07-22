@@ -9,6 +9,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.modell.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
@@ -18,6 +19,7 @@ class StandardSpielEngineTest {
     private val anna = SpielerId("Anna")
     private val start = SpielZustand(
         spieler = listOf(Spieler(anna, "Anna", geldkonto = Geld.mark(10))),
+        bankkonto = Geld.mark(100),
     )
     private val engine = StandardSpielEngine()
 
@@ -162,19 +164,36 @@ class StandardSpielEngineTest {
     }
 
     @Test
-    fun aufgabeFuehrtZumLetztenSpielerUndBeendeterZustandLehntAktionenAb() {
+    fun reguläresAusscheidenFuehrtSofortZumLetztenSpielerUndBeendeterZustandLehntAktionenAb() {
         val bert = SpielerId("Bert")
         val carla = SpielerId("Carla")
+        val hexagon = KartenHexagon(radius = 2)
+        val felder = hexagon.felder()
+        val ecken = felder.flatMap { it.ecken() }.distinct().sorted().take(3)
         val startMitDrei = SpielZustand(
             spieler = listOf(
                 Spieler(anna, "Anna"),
                 Spieler(bert, "Bert"),
                 Spieler(carla, "Carla"),
             ),
+            karte = Spielkarte(
+                id = "ausscheiden",
+                name = "Ausscheiden",
+                hexagon = hexagon,
+                gelaendefelder = felder.map { GelaendeFeld(it, GelaendeTyp.EBENE) },
+                belegung = KartenBelegung(
+                    ecken = listOf(anna, bert, carla).mapIndexed { index, spieler ->
+                        EckBelegung(ecken[index], EckGebaeudeTyp.HAUPTBAHNHOF, spieler)
+                    },
+                ),
+            ),
+            marktpreise = Rohstoff.entries.associateWith { Geld.mark(1) },
         )
+        val begonnenAnna = engine.anwenden(startMitDrei, SpielAktion.ProzugBeginnen(1L))
+            .getOrThrow().zustand
         val ersterSchritt = engine.anwenden(
-            startMitDrei,
-            SpielAktion.Aufgeben(anna),
+            begonnenAnna,
+            SpielAktion.ZahlungsunfaehigkeitFeststellen(anna, 1L),
         ).getOrThrow()
 
         assertNull(ersterSchritt.zustand.ergebnis)
@@ -183,7 +202,7 @@ class StandardSpielEngineTest {
 
         val letzterSchritt = engine.anwenden(
             ersterSchritt.zustand,
-            SpielAktion.Aufgeben(bert),
+            SpielAktion.ZahlungsunfaehigkeitFeststellen(bert, 2L),
         ).getOrThrow()
         val ergebnis = requireNotNull(letzterSchritt.zustand.ergebnis)
 
@@ -192,11 +211,12 @@ class StandardSpielEngineTest {
         assertNull(letzterSchritt.zustand.aktiverSpieler)
         assertTrue(engine.erlaubteAktionen(letzterSchritt.zustand, carla).isEmpty())
         assertTrue(
-            engine.anwenden(letzterSchritt.zustand, SpielAktion.Aufgeben(carla)).isFailure,
+            engine.anwenden(letzterSchritt.zustand, SpielAktion.ProzugBeginnen(3L)).isFailure,
         )
         val replay = SpielAblauf(
             startMitDrei,
-            ersterSchritt.ereignisse + letzterSchritt.ereignisse,
+            listOf(SpielEreignis.ProzugBegonnen(1L)) + ersterSchritt.ereignisse +
+                letzterSchritt.ereignisse,
         ).zustand
         assertEquals(letzterSchritt.zustand, replay)
     }
@@ -213,23 +233,24 @@ class StandardSpielEngineTest {
                 laufzeitRunden = 2,
             ),
         ).getOrThrow()
-        val zweite = engine.anwenden(
+        val aufgestockt = engine.anwenden(
             erste.zustand,
-            SpielAktion.AnleiheEmittieren(
+            SpielAktion.AnleiheAufstocken(
                 spieler = anna,
-                nennwert = Geld.mark(20),
+                alteAnleihe = AnleiheId("anleihe-1"),
+                neuerNennwert = Geld.mark(20),
                 zinsBasispunkte = 300,
                 laufzeitRunden = 3,
             ),
         ).getOrThrow()
 
-        assertEquals(setOf("anleihe-1", "anleihe-2"), zweite.zustand.anleihen.keys.map { it.wert }.toSet())
-        assertEquals(3L, zweite.zustand.naechsteAnleiheNummer)
+        assertEquals(setOf("anleihe-2"), aufgestockt.zustand.anleihen.keys.map { it.wert }.toSet())
+        assertEquals(3L, aufgestockt.zustand.naechsteAnleiheNummer)
         assertEquals(
-            zweite.zustand,
+            aufgestockt.zustand,
             SpielAblauf(
                 start,
-                begonnen.ereignisse + erste.ereignisse + zweite.ereignisse,
+                begonnen.ereignisse + erste.ereignisse + aufgestockt.ereignisse,
             ).zustand,
         )
     }

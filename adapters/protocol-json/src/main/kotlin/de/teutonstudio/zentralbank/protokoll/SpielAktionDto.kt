@@ -5,9 +5,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 sealed interface SpielAktionDto {
     @Serializable
-    data class Aufgeben(val spielerId: String) : SpielAktionDto
-
-    @Serializable
     data class ProzugBeginnen(val zugId: Long) : SpielAktionDto
 
     @Serializable

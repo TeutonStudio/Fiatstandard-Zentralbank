@@ -173,6 +173,13 @@ fun KriegsEinheitTyp.bewegungsKosten(kanten: Int): Map<Rohstoff, Int> {
     return if (kanten == 0) emptyMap() else mapOf(bewegungsRohstoff to kanten)
 }
 
+/** Die Gruppenermäßigung wird je gemeinsamem Kantenschritt angewandt. */
+fun gruppenBewegungsKosten(anzahl: Int, grundkosten: Int): Int {
+    require(anzahl > 0) { "Eine Bewegungsgruppe braucht mindestens eine Einheit." }
+    require(grundkosten > 0) { "Bewegungsgrundkosten müssen positiv sein." }
+    return Math.subtractExact(Math.multiplyExact(anzahl, grundkosten), anzahl - 1)
+}
+
 @Serializable
 data class KriegsEinheitBelegung(
     val id: String,
@@ -236,17 +243,14 @@ data class KartenBelegung(
             val hafenA = eckenNachPosition[seeweg.hafenA]
             val hafenB = eckenNachPosition[seeweg.hafenB]
             require(
-                hafenA?.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN) &&
-                    hafenB?.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN),
+                hafenA == null || hafenA.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN),
             ) {
-                "Ein Seeweg muss zwei Häfen verbinden."
+                "Am ersten Frachtschiff-Endpunkt steht ein Verwaltungsstandort, aber kein Hafen."
             }
             require(
-                hafenA?.besitzer == seeweg.besitzer && hafenB?.besitzer == seeweg.besitzer &&
-                    hafenA.zustand == BauwerkZustand.INTAKT &&
-                    hafenB.zustand == BauwerkZustand.INTAKT,
+                hafenB == null || hafenB.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN),
             ) {
-                "Ein Frachtschiff verbindet zwei eigene, intakte Häfen."
+                "Am zweiten Frachtschiff-Endpunkt steht ein Verwaltungsstandort, aber kein Hafen."
             }
             require(karte.kuerzesterWasserweg(seeweg.hafenA, seeweg.hafenB) != null) {
                 "Zwischen den Häfen existiert keine Route aus Wasser-Wasser-Kanten."
@@ -254,7 +258,12 @@ data class KartenBelegung(
         }
         ecken.filter { it.typ in setOf(EckGebaeudeTyp.HAFEN, EckGebaeudeTyp.GROSSHAFEN) }
             .forEach { hafen ->
-                val belegt = seewege.count { it.hafenA == hafen.position || it.hafenB == hafen.position }
+                // Ein nach Zerstörung, Abriss oder Ausscheiden zurückbleibendes fremdes
+                // Frachtschiff ist inaktiv und belegt nicht die Kapazität des neuen Besitzers.
+                val belegt = seewege.count {
+                    it.besitzer == hafen.besitzer &&
+                        (it.hafenA == hafen.position || it.hafenB == hafen.position)
+                }
                 val kapazitaet = if (hafen.typ == EckGebaeudeTyp.GROSSHAFEN) 2 else 1
                 require(belegt <= kapazitaet) {
                     "Die Frachtschiffkapazität des Hafens ${hafen.position} ist überschritten."

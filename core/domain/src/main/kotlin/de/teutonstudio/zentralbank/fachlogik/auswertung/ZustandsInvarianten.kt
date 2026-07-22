@@ -35,7 +35,9 @@ object ZustandsInvarianten {
             zustand.naechsteAnleiheNummer > 0L &&
                 zustand.naechsteSeewegNummer > 0L &&
                 zustand.naechsteEinheitenNummer > 0L &&
-                zustand.naechsteAngebotsNummer > 0L,
+                zustand.naechsteAngebotsNummer > 0L &&
+                zustand.naechsteKriegNummer > 0L &&
+                zustand.naechsteFriedensvertragNummer > 0L,
         ) {
             "Deterministische Objektzähler müssen positiv sein."
         }
@@ -46,8 +48,22 @@ object ZustandsInvarianten {
         pruefeAngebote(zustand, bekannteSpieler)
         pruefeKartenReferenzen(zustand, bekannteSpieler)
         require(zustand.konflikte.all { konflikt ->
-            konflikt.spielerA in bekannteSpieler && konflikt.spielerB in bekannteSpieler
-        }) { "Ein Konflikt verweist auf einen unbekannten Spieler." }
+            konflikt.teilnehmer.all { it in bekannteSpieler } &&
+                konflikt.teilnehmer.none { it in zustand.ausgeschiedeneSpieler } &&
+                konflikt.waffenstillstaende.all { paar ->
+                    paar.erster in konflikt.teilnehmer && paar.zweiter in konflikt.teilnehmer &&
+                        konflikt.aufVerschiedenenSeiten(paar.erster, paar.zweiter)
+                }
+        }) { "Ein Krieg enthält unbekannte, ausgeschiedene oder widersprüchliche Teilnehmer." }
+        require(zustand.konflikte.map { it.id }.distinct().size == zustand.konflikte.size) {
+            "Krieg-IDs müssen eindeutig sein."
+        }
+        require(zustand.friedensvertraege.map { it.id }.distinct().size ==
+            zustand.friedensvertraege.size
+        ) { "Friedensvertrag-IDs müssen eindeutig sein." }
+        require(zustand.belagerungen.map { it.standort }.distinct().size ==
+            zustand.belagerungen.size
+        ) { "Je Verwaltungsstandort darf höchstens eine Belagerung laufen." }
     }
 
     private fun pruefeAktivenZug(zustand: SpielZustand, bekannteSpieler: Set<SpielerId>) {

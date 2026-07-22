@@ -1,28 +1,9 @@
 package de.teutonstudio.zentralbank.fachlogik.beobachtung
 
-import de.teutonstudio.zentralbank.fachlogik.modell.AnlagenZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
-import de.teutonstudio.zentralbank.fachlogik.modell.AnleihenAngebotId
-import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
-import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
-import de.teutonstudio.zentralbank.fachlogik.modell.EckGebaeudeTyp
-import de.teutonstudio.zentralbank.fachlogik.modell.FeldAnlage
-import de.teutonstudio.zentralbank.fachlogik.modell.FrachtRichtung
-import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
-import de.teutonstudio.zentralbank.fachlogik.modell.Geld
-import de.teutonstudio.zentralbank.fachlogik.modell.HandelsAngebotId
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
-import de.teutonstudio.zentralbank.fachlogik.modell.KartenOrt
-import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
-import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielErgebnis
-import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
-import de.teutonstudio.zentralbank.fachlogik.modell.ZugPhase
+import de.teutonstudio.zentralbank.fachlogik.modell.*
 import kotlinx.serialization.Serializable
 
-const val AKTUELLE_BEOBACHTUNGS_VERSION = 1
+const val AKTUELLE_BEOBACHTUNGS_VERSION = 2
 
 @Serializable
 data class SpielBeobachtung(
@@ -30,13 +11,23 @@ data class SpielBeobachtung(
     val betrachtenderSpieler: SpielerId,
     val runde: Int,
     val zug: ZugBeobachtung?,
-    val eigeneWirtschaft: SpielerBeobachtung,
-    val gegner: List<GegnerBeobachtung>,
+    /** Vollständige öffentliche Daten aller Spieler in Sitzreihenfolge. */
+    val spieler: List<SpielerBeobachtung>,
     val markt: MarktBeobachtung,
     val karte: KartenBeobachtung?,
     val angebote: List<AngebotBeobachtung>,
+    val kriege: List<Konflikt>,
+    val friedensvertraege: List<Friedensvertrag>,
+    val belagerungen: List<Belagerung>,
+    val schuldenstriche: List<Schuldenstrich>,
+    val zentralbankGeldschoepfungen: List<ZentralbankGeldschoepfung>,
     val ergebnis: SpielErgebnis?,
-)
+) {
+    val eigeneWirtschaft: SpielerBeobachtung
+        get() = spieler.single { it.id == betrachtenderSpieler }
+    val gegner: List<SpielerBeobachtung>
+        get() = spieler.filter { it.id != betrachtenderSpieler }
+}
 
 @Serializable
 data class ZugBeobachtung(
@@ -54,28 +45,54 @@ data class RohstoffBestandBeobachtung(val rohstoff: Rohstoff, val menge: Int)
 data class BauteilBestandBeobachtung(val bauteil: BauteilTyp, val menge: Int)
 
 @Serializable
-data class SpielerBeobachtung(
-    val id: SpielerId,
-    val name: String,
-    val rohstoffe: List<RohstoffBestandBeobachtung>,
-    val geld: Geld,
-    val anleihen: List<AnleiheId>,
-    val bauteile: List<BauteilBestandBeobachtung>,
-    val ausgeschieden: Boolean,
+data class AnleiheBeobachtung(
+    val id: AnleiheId,
+    val emittent: SpielerId,
+    val glaeubiger: KontoId,
+    val nennwert: Geld,
+    val rueckkaufsbetrag: Geld,
+    val zinsBasispunkte: Int,
+    val laufzeitRunden: Int,
+    val emissionsRunde: Int,
+    val faelligkeitsRunde: Int,
+    val geleisteteZinszahlungen: Int,
 )
 
-/**
- * Gegnerische Lagerbestände, Geldkonten und Passwortdaten sind nicht sichtbar.
- * Sichtbar bleiben nur Identität, Zugfähigkeit und auf der öffentlichen Karte
- * beziehungsweise im Anleihenregister ohnehin erkennbare Summen.
- */
 @Serializable
-data class GegnerBeobachtung(
+data class AbgeschlossenesHandelsgeschaeftBeobachtung(
+    val id: String,
+    val art: String,
+    val gegenpartei: SpielerId?,
+    val status: String,
+)
+
+@Serializable
+data class SpielerBeobachtung(
+    val sitzPosition: Int,
     val id: SpielerId,
     val name: String,
+    val spielstil: SpielerStil,
+    val aktiv: Boolean,
     val ausgeschieden: Boolean,
-    val oeffentlicheBauwerke: Int,
-    val emittierteAnleihen: Int,
+    val amZug: Boolean,
+    val marktwert: Geld,
+    val rohstoffe: List<RohstoffBestandBeobachtung>,
+    val geld: Geld,
+    val anleihenImBesitz: List<AnleiheId>,
+    val offeneEigeneAnleihen: List<AnleiheBeobachtung>,
+    val bauteile: List<BauteilBestandBeobachtung>,
+    val gesamtertragJeRunde: List<RohstoffBestandBeobachtung>,
+    val produktionsmengenJeRohstoff: List<RohstoffBestandBeobachtung>,
+    val gesamteVersorgungskosten: List<RohstoffBestandBeobachtung>,
+    val abgeschlosseneHandelsgeschaefte: List<AbgeschlossenesHandelsgeschaeftBeobachtung>,
+    val kontrollierteVerwaltungsstandorte: List<KartenEcke>,
+    val erreichbareWirtschaftsstandorte: List<KartenFeld>,
+    val einheiten: List<KriegsEinheitBeobachtung>,
+    val kriege: List<KriegId>,
+    val allianzen: List<KriegId>,
+    val waffenstillstaende: List<SpielerPaar>,
+    val kapitulationen: List<FriedensvertragId>,
+    val friedensvertraege: List<FriedensvertragId>,
 )
 
 @Serializable
@@ -85,6 +102,8 @@ data class RohstoffPreisBeobachtung(val rohstoff: Rohstoff, val preis: Geld)
 data class MarktBeobachtung(
     val preise: List<RohstoffPreisBeobachtung>,
     val leitzinsBasispunkte: Int,
+    val bankkonto: Geld,
+    val auslandskonto: Geld,
 )
 
 @Serializable
@@ -115,15 +134,55 @@ sealed interface AngebotBeobachtung {
 }
 
 @Serializable
+data class ErreichbarkeitBeobachtung(
+    val spieler: SpielerId,
+    val ecken: List<KartenEcke>,
+    val wirtschaftsstandorte: List<KartenFeld>,
+)
+
+@Serializable
+data class BlockadeBeobachtung(
+    val blockierterSpieler: SpielerId,
+    val kante: KartenKante,
+    val durchSpieler: List<SpielerId>,
+    val art: String,
+)
+
+@Serializable
 data class KartenBeobachtung(
     val id: String,
     val name: String,
+    val hexagon: KartenHexagon,
+    /** Sämtliche Felder einschließlich Wasser in kanonischer Reihenfolge. */
+    val felder: List<TopologieFeldBeobachtung>,
+    /** Vollständige Gitterknoten, ohne dass ein Client Topologieregeln nachbilden muss. */
+    val knoten: List<KartenEcke>,
+    /** Vollständige Gitterkanten einschließlich Land- und Seekanten. */
+    val kanten: List<TopologieKanteBeobachtung>,
     val gelaendefelder: List<GelaendeFeld>,
+    val spezialfelder: List<Spezialfeld>,
     val eckBauwerke: List<EckBauwerkBeobachtung>,
     val handelslinien: List<HandelslinieBeobachtung>,
     val feldAnlagen: List<FeldAnlageBeobachtung>,
     val seewege: List<SeewegBeobachtung>,
     val kriegseinheiten: List<KriegsEinheitBeobachtung>,
+    val erreichbarkeit: List<ErreichbarkeitBeobachtung>,
+    val blockaden: List<BlockadeBeobachtung>,
+)
+
+@Serializable
+data class TopologieFeldBeobachtung(
+    val position: KartenFeld,
+    val gelaende: GelaendeTyp?,
+    val wasser: Boolean,
+    val spezialfeld: SpezialfeldTyp?,
+)
+
+@Serializable
+data class TopologieKanteBeobachtung(
+    val position: KartenKante,
+    val landkante: Boolean,
+    val seekante: Boolean,
 )
 
 @Serializable
@@ -146,6 +205,7 @@ data class FeldAnlageBeobachtung(
     val position: KartenFeld,
     val anlage: FeldAnlage,
     val zustand: AnlagenZustand,
+    val kontrolliertVon: List<SpielerId>,
 )
 
 @Serializable
@@ -155,6 +215,8 @@ data class SeewegBeobachtung(
     val hafenB: KartenEcke,
     val besitzer: SpielerId,
     val richtung: FrachtRichtung,
+    val frachtschiffVorhanden: Boolean = true,
+    val aktiv: Boolean,
 )
 
 @Serializable

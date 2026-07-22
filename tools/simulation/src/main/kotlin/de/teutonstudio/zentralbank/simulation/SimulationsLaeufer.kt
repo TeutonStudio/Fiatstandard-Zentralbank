@@ -2,9 +2,12 @@ package de.teutonstudio.zentralbank.simulation
 
 import de.teutonstudio.zentralbank.fachlogik.engine.SeedZufallsquelle
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
+import de.teutonstudio.zentralbank.fachlogik.auswertung.MarktAuswertung
+import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import kotlinx.serialization.Serializable
+import java.nio.file.Path
 
 data class SimulationsKonfiguration(
     val spiele: Int,
@@ -40,7 +43,7 @@ data class SimulationsErgebnis(
 
 class SimulationsLaeufer(
     private val szenarioFabrik: (String) -> TrainingsSzenario = { id ->
-        KleineWirtschaftsBaseline(id = id)
+        SzenarioKatalog.szenario(id)
     },
     private val agentenFabrik: (String) -> SpielAgent = ::agentErzeugen,
 ) {
@@ -123,15 +126,32 @@ class SimulationsLaeufer(
         while (punkt != null) {
             val agent = requireNotNull(agentNachSpieler[punkt.spieler])
             val aktion = agent.waehleAktion(punkt, zufall)
+            val vorher = umgebung.zustand
+            val marktwerteVorher = vorher.spieler.associate { spieler ->
+                spieler.id to MarktAuswertung.spielerMarktwert(vorher, spieler.id)
+            }
             val uebergang = umgebung.step(aktion)
+            val nachher = umgebung.zustand
+            val marktwerteNachher = nachher.spieler.associate { spieler ->
+                spieler.id to MarktAuswertung.spielerMarktwert(nachher, spieler.id)
+            }
             entscheidungen += EntscheidungsDatensatz(
                 spielId = "spiel-$spielIndex",
                 entscheidungsNummer = entscheidungen.size.toLong(),
                 spieler = punkt.spieler,
+                spielstil = punkt.beobachtung.eigeneWirtschaft.spielstil,
                 beobachtung = punkt.beobachtung,
                 erlaubteAktionen = punkt.aktionsRaum,
                 gewaehlteAktion = aktion,
-                belohnung = uebergang.belohnungen.getOrDefault(punkt.spieler, 0f),
+                belohnungen = uebergang.belohnungen,
+                terminated = uebergang.terminated,
+                truncated = uebergang.truncated,
+                ausscheidensGruende = uebergang.ereignisse.filterIsInstance<SpielEreignis.SpielerAusgeschieden>()
+                    .associate { it.spieler to it.grund },
+                naechsterAktiverSpieler = uebergang.naechsterPunkt?.spieler,
+                ereignisse = uebergang.ereignisse,
+                marktwerteVorher = marktwerteVorher,
+                marktwerteNachher = marktwerteNachher,
                 ergebnis = uebergang.ergebnis,
             )
             letzterUebergang = uebergang
@@ -143,9 +163,19 @@ class SimulationsLaeufer(
             szenarioId = szenario.id,
             startzustand = umgebung.startzustand.ohnePasswoerter(),
             entscheidungen = entscheidungen,
+            spielerUebergaenge = SpielEpisode.spielerUebergaenge(entscheidungen),
             ereignisse = umgebung.ereignisse,
             ergebnis = letzterUebergang?.ergebnis,
             truncated = letzterUebergang?.truncated == true,
+            abbruchDiagnose = if (letzterUebergang?.truncated == true) {
+                TechnischeAbbruchDiagnose(
+                    grund = "MARKTWERT_UEBER_WATCHDOG_FENSTER_UNVERAENDERT",
+                    entscheidungenOhneMarktwertAenderung =
+                        umgebung.entscheidungenOhneMarktwertAenderung,
+                    letzteAktionen = umgebung.letzteAktionen,
+                    letzterZustand = umgebung.zustand.ohnePasswoerter(),
+                )
+            } else null,
         )
         check(episode.replay() == umgebung.zustand.ohnePasswoerter()) {
             "Episoden-Replay stimmt nicht mit dem Endzustand überein."
@@ -164,5 +194,11 @@ fun agentErzeugen(name: String): SpielAgent = when (name.lowercase()) {
     "zufall" -> ZufallsAgent()
     "sicherheit" -> SicherheitsAgent()
     "wirtschaft" -> WirtschaftsAgent()
+    "aggressiv" -> AggressiverHeuristikAgent()
+    "defensiv" -> DefensiverHeuristikAgent()
+    "onnx" -> OnnxModellAgent(
+        Path.of(System.getProperty("fiat.onnx.model", "tools/ai-python/build/model/spieler-ki-v1.onnx")),
+        Path.of(System.getProperty("fiat.onnx.manifest", "tools/ai-python/build/model/manifest.json")),
+    )
     else -> error("Unbekannter Agent: $name")
 }

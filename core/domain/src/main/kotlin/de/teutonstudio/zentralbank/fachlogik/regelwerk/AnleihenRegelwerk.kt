@@ -13,6 +13,10 @@ internal object AnleihenRegelwerk {
         ereignis: SpielEreignis.AnleiheEmittiert,
     ): SpielZustand {
         val anleihe = ereignis.anleihe
+        pruefeNeueAnleihe(zustand, anleihe)
+        require(AnleihenAuswertung.freieGeschaeftsbankPlaetze(zustand, anleihe.emittent) > 0) {
+            "Für eine weitere Anleihe ist kein Geschäftsbankplatz frei."
+        }
         require(anleihe.id !in zustand.anleihen) { "Die Anleihe-ID ist bereits vergeben." }
         require(anleihe.emissionsRunde == zustand.rundenzähler) {
             "Die Emissionsrunde muss der laufenden Runde entsprechen."
@@ -38,6 +42,43 @@ internal object AnleihenRegelwerk {
             )
         }
         return anleiheZuKontoHinzufuegen(mitErloes, anleihe.id, ereignis.erwerber)
+    }
+
+    fun anleiheAufstocken(
+        zustand: SpielZustand,
+        ereignis: SpielEreignis.AnleiheAufgestockt,
+    ): SpielZustand {
+        val alt = zustand.anleihen[ereignis.alteAnleihe]
+            ?: error("Unbekannte alte Anleihe: ${ereignis.alteAnleihe.wert}")
+        val neu = ereignis.neueAnleihe
+        require(neu.emittent == alt.emittent) {
+            "Eine Aufstockung darf den Emittenten nicht wechseln."
+        }
+        require(neu.nennwert > alt.nennwert) {
+            "Der neue Nennwert muss höher als der bisherige Nennwert sein."
+        }
+        require(ereignis.liquiditaetsDifferenz == neu.nennwert - alt.nennwert) {
+            "Bei der Aufstockung wird ausschließlich die Nennwertdifferenz ausgezahlt."
+        }
+        require(AnleihenAuswertung.besitzer(zustand, alt.id) == ereignis.glaeubiger) {
+            "Der angegebene Gläubiger besitzt die alte Anleihe nicht."
+        }
+        require(ereignis.glaeubiger != KontoId.Spieler(alt.emittent)) {
+            "Eine eigene Anleihe kann nicht aufgestockt werden."
+        }
+        pruefeNeueAnleihe(zustand, neu)
+        val ohneAlt = anleiheAusloesen(zustand, alt.id)
+        val mitNeu = ohneAlt.copy(
+            anleihen = ohneAlt.anleihen + (neu.id to neu),
+            naechsteAnleiheNummer = ohneAlt.naechsteAnleiheNummer + 1L,
+        )
+        val mitBesitz = anleiheZuKontoHinzufuegen(mitNeu, neu.id, ereignis.glaeubiger)
+        return FinanzRegelwerk.geldUebertragen(
+            zustand = mitBesitz,
+            von = ereignis.glaeubiger,
+            an = KontoId.Spieler(neu.emittent),
+            betrag = ereignis.liquiditaetsDifferenz,
+        )
     }
 
     fun freiwilligZurueckkaufen(
@@ -194,5 +235,14 @@ internal object AnleihenRegelwerk {
     ): SpielZustand {
         val ohneBesitzer = anleiheEntfernen(zustand, anleihe)
         return ohneBesitzer.copy(anleihen = ohneBesitzer.anleihen - anleihe)
+    }
+
+    private fun pruefeNeueAnleihe(zustand: SpielZustand, anleihe: de.teutonstudio.zentralbank.fachlogik.modell.Anleihe) {
+        require(anleihe.nennwert > Geld.NULL) { "Der Anleihennennwert muss positiv sein." }
+        require(anleihe.zinsBasispunkte >= zustand.leitzins.wert) {
+            "Der Anleihezins darf den Leitzins nicht unterschreiten."
+        }
+        require(anleihe.laufzeitRunden > 0) { "Die Anleihelaufzeit muss positiv sein." }
+        require(anleihe.id !in zustand.anleihen) { "Die Anleihe-ID ist bereits vergeben." }
     }
 }

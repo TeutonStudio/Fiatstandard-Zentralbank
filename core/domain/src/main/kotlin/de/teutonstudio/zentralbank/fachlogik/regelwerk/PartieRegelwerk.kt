@@ -18,26 +18,62 @@ internal object PartieRegelwerk {
         require(ereignis.spieler !in zustand.ausgeschiedeneSpieler) {
             "Der Spieler ist bereits ausgeschieden."
         }
-        require(ereignis.spieler == zustand.aktiverSpieler) {
-            "Nur der aktive Spieler kann diese Aufgabe erklären."
-        }
         val ausgeschieden = zustand.ausgeschiedeneSpieler + ereignis.spieler
-        val naechster = naechsterAktiverSpieler(zustand, ereignis.spieler, ausgeschieden)
+        val warAktiv = zustand.aktiverSpieler == ereignis.spieler
+        val naechster = if (warAktiv) {
+            naechsterAktiverSpieler(zustand, ereignis.spieler, ausgeschieden)
+        } else {
+            zustand.aktiverSpieler
+        }
         val aktuellerIndex = zustand.spieler.indexOfFirst { it.id == ereignis.spieler }
         val naechsterIndex = naechster?.let { id -> zustand.spieler.indexOfFirst { it.id == id } }
-        val neueRunde = if (naechsterIndex != null && naechsterIndex <= aktuellerIndex) {
+        val neueRunde = if (warAktiv && naechsterIndex != null && naechsterIndex <= aktuellerIndex) {
             zustand.rundenzähler + 1
         } else {
             zustand.rundenzähler
         }
-        val neueZugId = (zustand.zugStatus?.zugId ?: 0L) + 1L
+        val neueZugId = (zustand.zugStatus?.zugId ?: 0L) + if (warAktiv) 1L else 0L
+        val neueKarte = zustand.karte?.let { karte ->
+            karte.copy(
+                belegung = karte.belegung.copy(
+                    ecken = karte.belegung.ecken.filterNot { it.besitzer == ereignis.spieler },
+                    kanten = karte.belegung.kanten.map { handelslinie ->
+                        if (handelslinie.erbautVon == ereignis.spieler) {
+                            handelslinie.copy(erbautVon = null)
+                        } else {
+                            handelslinie
+                        }
+                    },
+                    kriegseinheiten = karte.belegung.kriegseinheiten.filterNot {
+                        it.besitzer == ereignis.spieler
+                    },
+                ),
+            )
+        }
+        val neueKonflikte = zustand.konflikte.mapNotNull { krieg ->
+            if (ereignis.spieler !in krieg.teilnehmer) return@mapNotNull krieg
+            val aggressoren = krieg.aggressoren - ereignis.spieler
+            val verteidiger = krieg.verteidiger - ereignis.spieler
+            if (aggressoren.isEmpty() || verteidiger.isEmpty()) null else krieg.copy(
+                aggressoren = aggressoren,
+                verteidiger = verteidiger,
+                kapitulationen = krieg.kapitulationen + ereignis.spieler,
+            )
+        }.toSet()
         return zustand.copy(
+            karte = neueKarte,
+            konflikte = neueKonflikte,
+            belagerungen = zustand.belagerungen.filterNot {
+                it.verteidiger == ereignis.spieler || ereignis.spieler in it.beteiligteBelagerer
+            },
             ausgeschiedeneSpieler = ausgeschieden,
             ausscheidensReihenfolge = zustand.ausscheidensReihenfolge + ereignis.spieler,
             aktiverSpieler = naechster,
             rundenzähler = neueRunde,
-            zugStatus = naechster?.let { spieler ->
-                ZugStatus(neueZugId, spieler, ZugPhase.Prozug)
+            zugStatus = if (warAktiv) {
+                naechster?.let { spieler -> ZugStatus(neueZugId, spieler, ZugPhase.Prozug) }
+            } else {
+                zustand.zugStatus
             },
         )
     }

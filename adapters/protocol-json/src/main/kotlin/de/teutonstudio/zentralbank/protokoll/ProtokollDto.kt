@@ -11,6 +11,7 @@ data class SpielErstellenAnfrageDto(
     val version: Int = API_VERSION,
     val spielerNamen: List<String>,
     val seed: Long? = null,
+    val spielstile: List<String> = emptyList(),
 )
 
 @Serializable
@@ -36,6 +37,7 @@ data class SpielerDto(
     val geldCent: Long,
     val anleihen: List<String>,
     val bauteile: Map<String, Int>,
+    val spielstil: String,
 )
 
 @Serializable
