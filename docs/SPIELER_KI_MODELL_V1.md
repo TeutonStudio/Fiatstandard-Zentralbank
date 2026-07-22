@@ -23,6 +23,23 @@ Die Implementierung verteilt sich auf:
 - `tools/ai-python`: Dataset, Encoder, PyTorch-Modell, Training, Evaluation, Export,
 - `apps/android`, `apps/server`, `apps/web`: nicht autoritative Entwickleroberflächen.
 
+## Zahlungsfähigkeit und reguläres Spielende
+
+Im Prozug ist ausschließlich die Versorgung des Hauptbahnhofs zwingend;
+unversorgte Nebenstandorte liefern in dieser Runde keinen Ertrag. Die zentrale
+`ZahlungsfaehigkeitsAuswertung` prüft offene Rückkäufe, Zinsen, weitere
+Verbindlichkeiten und den Rohstoffbedarf des Hauptbahnhofs. Reguläre Aktionen
+bleiben in der Reihenfolge Eigenmittel/Rohstoffe, Verkauf, Einkauf, Emission und
+Aufstockung verfügbar. Im Krieg folgt bei ausgeschöpften Mitteln zuerst
+Kapitulation und Friedensabwicklung.
+
+`ZahlungsunfaehigkeitFeststellen` ist die explizite, replaybare automatische
+Abwicklung: Ohne verbleibenden regulären Rettungsweg löst die Engine zunächst
+einen möglichen Schuldenstrich aus; nur wenn kein Verwaltungsstandort mehr
+herabstufbar ist, scheidet der Spieler aus. Der Schuldenstrich beendet den Zug,
+ist wiederholbar, aber im Krieg verboten. Bei nur noch einem aktiven Spieler
+wird unmittelbar vor dem nächsten Prozug der Sieg gebucht.
+
 ## Gemeinsame Policy und Stile
 
 Die öffentliche Konditionierung unterstützt
@@ -103,7 +120,7 @@ cd ../..
 
 ## Ausgefuehrte Abnahme am 22. Juli 2026
 
-- `./gradlew test`: erfolgreich, 313 Tests in 59 Suites; 68 Gradle-Tasks ohne
+- `./gradlew test`: erfolgreich, 314 Tests in 59 Suites; 68 Gradle-Tasks ohne
   fehlgeschlagenen Test.
 - konfliktfrei: 10.000/10.000 Episoden beendet, 0 Truncations, 0 Fehler,
   336,74 Schritte/s, Seed `2_000_000_000`.

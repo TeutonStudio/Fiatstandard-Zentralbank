@@ -71,8 +71,20 @@ class StandardSpielEngine : SpielEngine {
         if (aktion is SpielAktion.ZahlungsunfaehigkeitFeststellen) {
             val plan = de.teutonstudio.zentralbank.fachlogik.auswertung
                 .ZahlungsfaehigkeitsAuswertung.plan(zustand, aktion.spieler)
-            require(aktion.zugId == zustand.zugStatus?.zugId && plan.ausscheidenNoetig) {
+            require(
+                aktion.zugId == zustand.zugStatus?.zugId &&
+                    plan.automatischeAbwicklungNoetig
+            ) {
                 "Der Spieler besitzt noch einen regulären Rettungsweg."
+            }
+            if (plan.schuldenstrichMoeglich) {
+                return schuldenstrichEreignisse(
+                    zustand,
+                    SpielAktion.SchuldenstrichDurchfuehren(aktion.spieler),
+                )
+            }
+            require(plan.ausscheidenNoetig) {
+                "Die automatische Insolvenzabwicklung ist noch nicht entscheidbar."
             }
             return ausscheidenEreignisse(
                 zustand,

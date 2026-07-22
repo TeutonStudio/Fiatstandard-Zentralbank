@@ -17,6 +17,8 @@ data class ZahlungsfaehigkeitsPlan(
     val aufstockungMoeglich: Boolean,
     val schuldenstrichMoeglich: Boolean,
     val kapitulationNoetig: Boolean,
+    /** Keine reguläre wirtschaftliche oder kriegerische Rettung ist mehr offen. */
+    val automatischeAbwicklungNoetig: Boolean,
     val ausscheidenNoetig: Boolean,
 )
 
@@ -67,9 +69,15 @@ object ZahlungsfaehigkeitsAuswertung {
         val anleihe = finanzierungHilft &&
             AnleihenAuswertung.freieGeschaeftsbankPlaetze(zustand, spielerId) > 0 &&
             zustand.bankkonto > Geld.NULL
+        val kleinsteAufstockung = Geld.mark(10)
         val aufstockung = finanzierungHilft && zustand.anleihen.values.any { anleihe ->
-            anleihe.emittent == spielerId &&
-                AnleihenAuswertung.besitzer(zustand, anleihe.id) != KontoId.Spieler(spielerId)
+            if (anleihe.emittent != spielerId) return@any false
+            when (val glaeubiger = AnleihenAuswertung.besitzer(zustand, anleihe.id)) {
+                KontoId.Bank -> zustand.bankkonto >= kleinsteAufstockung
+                is KontoId.Spieler -> zustand.spieler.single { it.id == glaeubiger.id }.geldkonto >=
+                    kleinsteAufstockung
+                KontoId.Ausland, null -> false
+            }
         }
         val imKrieg = zustand.konflikte.any { spielerId in it.teilnehmer }
         val herabstufbar = karte?.belegung?.ecken?.any {
@@ -79,7 +87,8 @@ object ZahlungsfaehigkeitsAuswertung {
         val verpflichtungenOffen = hauptbahnhof != null ||
             offeneVerbindlichkeiten.isNotEmpty() ||
             prozugPlan?.kannErfolgreichAbschliessen == false
-        val rettbar = direkt || nachMarkt || anleihe || aufstockung || schuldenstrich || imKrieg
+        val wirtschaftlichRettbar = directOrFinancial(direkt, nachMarkt, anleihe, aufstockung)
+        val automatischeAbwicklung = verpflichtungenOffen && !wirtschaftlichRettbar && !imKrieg
         return ZahlungsfaehigkeitsPlan(
             spieler = spielerId,
             hauptbahnhof = hauptbahnhof,
@@ -88,8 +97,9 @@ object ZahlungsfaehigkeitsAuswertung {
             anleiheMoeglich = anleihe,
             aufstockungMoeglich = aufstockung,
             schuldenstrichMoeglich = schuldenstrich,
-            kapitulationNoetig = imKrieg && !directOrFinancial(direkt, nachMarkt, anleihe, aufstockung),
-            ausscheidenNoetig = verpflichtungenOffen && !rettbar,
+            kapitulationNoetig = imKrieg && !wirtschaftlichRettbar,
+            automatischeAbwicklungNoetig = automatischeAbwicklung,
+            ausscheidenNoetig = automatischeAbwicklung && !schuldenstrich,
         )
     }
 

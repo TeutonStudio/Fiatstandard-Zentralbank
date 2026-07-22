@@ -61,6 +61,31 @@ class InsolvenzV2Test {
         assertTrue(schritt.zustand.zentralbankGeldschoepfungen.isEmpty())
     }
 
+    @Test
+    fun zahlungsunfaehigkeitsPruefungLoestSchuldenstrichAutomatischVorAusscheidenAus() {
+        val basis = zustandMitStandortenUndSchuld()
+        val ohneSchuld = basis.copy(
+            anleihen = emptyMap(),
+            spieler = basis.spieler.map {
+                it.copy(geldkonto = Geld.NULL, anleihen = emptyList())
+            },
+            zugStatus = ZugStatus(1L, anna, ZugPhase.Prozug),
+        )
+        val begonnen = StandardSpielEngine().anwenden(
+            ohneSchuld,
+            SpielAktion.ProzugBeginnen(1L),
+        ).getOrThrow().zustand
+        val aktion = SpielAktion.ZahlungsunfaehigkeitFeststellen(anna, 1L)
+
+        assertTrue(aktion in StandardSpielEngine().erlaubteAktionen(begonnen, anna))
+        val schritt = StandardSpielEngine().anwenden(begonnen, aktion).getOrThrow()
+
+        assertTrue(schritt.ereignisse.any { it is SpielEreignis.Schuldenstrich })
+        assertTrue(schritt.ereignisse.none { it is SpielEreignis.SpielerAusgeschieden })
+        assertFalse(anna in schritt.zustand.ausgeschiedeneSpieler)
+        assertEquals(bert, schritt.zustand.aktiverSpieler)
+    }
+
     private fun zustandMitStandortenUndSchuld(): SpielZustand {
         val hexagon = KartenHexagon(radius = 3)
         val felder = hexagon.felder()

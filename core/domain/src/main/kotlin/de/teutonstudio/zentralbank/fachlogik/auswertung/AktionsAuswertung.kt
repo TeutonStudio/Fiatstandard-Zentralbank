@@ -107,7 +107,7 @@ object AktionsAuswertung {
                     addAll(aussenhandelsAktionen(zustand, spieler))
                     addAll(insolvenzAktionen(zustand, spieler))
                     addAll(konfliktRettungsAktionen(zustand, spieler))
-                    if (zahlungsplan.ausscheidenNoetig) {
+                    if (zahlungsplan.automatischeAbwicklungNoetig) {
                         add(SpielAktion.ZahlungsunfaehigkeitFeststellen(spieler, zug.zugId))
                     }
                 }
