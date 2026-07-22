@@ -76,7 +76,11 @@ class StandardTrainingsUmgebung(
         szenarioId = szenario.id
         startSeed = seed
         val zug = neuerAblauf.zustand.zugStatus
-        if (zug != null && !zug.prozug.begonnen) {
+        if (
+            neuerAblauf.zustand.spielabschnitt !=
+                de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt.RUNDE_NULL &&
+            zug != null && !zug.prozug.begonnen
+        ) {
             val automatisch = engine.anwenden(
                 neuerAblauf.zustand,
                 SpielAktion.ProzugBeginnen(zug.zugId),

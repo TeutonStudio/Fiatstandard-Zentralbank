@@ -76,6 +76,8 @@ wählt ausschließlich aus `AktionsRaum.aktionen`.
 `SzenarioKatalog` unterstützt sechs echte Kartenvorlagen und generierte Karten,
 3–7 Spieler sowie die Kategorien Wirtschaft, Handel/Schulden, Schuldenkrise,
 Landkrieg, Seekrieg, Blockade, Belagerung, Friedensverhandlung und vollständig.
+`generiert-startaufstellung-{3..7}` beginnt ausdrücklich in Runde 0; die Policy
+wählt dort Hauptbahnhofspositionen über den normalen Engine-Aktionsraum.
 Die Bereiche für Training, Validierung und Test beginnen bei `0`, `1_000_000_000`
 und `2_000_000_000`. Empfohlene Curriculum-Reihenfolge:
 
@@ -120,7 +122,7 @@ cd ../..
 
 ## Ausgefuehrte Abnahme am 22. Juli 2026
 
-- `./gradlew test`: erfolgreich, 316 Tests in 59 Suites; 68 Gradle-Tasks ohne
+- `./gradlew test`: erfolgreich, 317 Tests in 59 Suites; 68 Gradle-Tasks ohne
   fehlgeschlagenen Test.
 - konfliktfrei: 10.000/10.000 Episoden beendet, 0 Truncations, 0 Fehler,
   336,74 Schritte/s, Seed `2_000_000_000`.

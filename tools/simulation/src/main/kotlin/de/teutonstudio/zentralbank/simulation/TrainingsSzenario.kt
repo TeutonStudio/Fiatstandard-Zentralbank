@@ -225,7 +225,11 @@ object SzenarioKatalog {
             return KleineWirtschaftsBaseline(
                 id = id,
                 spielerNamen = (1..anzahl).map { "Agent-$it" },
-                optionen = SzenarioOptionen(anzahl, kategorie),
+                optionen = SzenarioOptionen(
+                    spielerAnzahl = anzahl,
+                    kategorie = kategorie,
+                    startInRundeNull = "startaufstellung" in id || "runde-null" in id,
+                ),
             )
         }
         val datei = echteKarten.firstOrNull { datei ->

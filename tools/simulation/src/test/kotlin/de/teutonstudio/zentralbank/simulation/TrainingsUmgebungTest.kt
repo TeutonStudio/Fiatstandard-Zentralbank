@@ -4,6 +4,7 @@ import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.BauwerkZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.Spielabschnitt
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -115,6 +116,33 @@ class TrainingsUmgebungTest {
 
         val frieden = SzenarioKatalog.szenario("generiert-frieden-3").startzustand(6)
         assertTrue(frieden.friedensvertraege.isNotEmpty())
+    }
+
+    @Test
+    fun kiSpieltRundeNullUeberDenAutoritativenAktionsraum() {
+        val szenario = SzenarioKatalog.szenario("generiert-startaufstellung-3")
+        val umgebung = StandardTrainingsUmgebung()
+
+        val ersterPunkt = umgebung.reset(szenario, 77L)
+
+        assertEquals(Spielabschnitt.RUNDE_NULL, umgebung.zustand.spielabschnitt)
+        assertTrue(ersterPunkt.aktionsRaum.aktionen.all {
+            it is SpielAktion.HauptbahnhofPlatzieren
+        })
+        val lauf = SimulationsLaeufer().ausfuehren(
+            SimulationsKonfiguration(
+                spiele = 1,
+                seed = 77L,
+                maximaleEntscheidungen = 10_000,
+                agenten = listOf("sicherheit"),
+                szenarioId = "generiert-startaufstellung-3",
+            ),
+        )
+        assertTrue(lauf.statistik.fehler.isEmpty())
+        assertEquals(1, lauf.statistik.beendet)
+        assertTrue(lauf.episoden.single().entscheidungen.any {
+            it.gewaehlteAktion is SpielAktion.HauptbahnhofPlatzieren
+        })
     }
 
     @Test
