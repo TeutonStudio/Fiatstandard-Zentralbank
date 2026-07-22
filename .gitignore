@@ -1,11 +1,12 @@
 .gradle/
 .idea/
 .kotlin/
-local.properties
-build/
+.data/
+.idea.backup-20260722-171709/
 */build/
 /opencode.json
-.data/
+local.properties
+build/
 apps/web/dist/
 apps/web/node_modules/
 tools/ai-python/**/__pycache__/
