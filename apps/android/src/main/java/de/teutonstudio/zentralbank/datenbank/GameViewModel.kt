@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
+import de.teutonstudio.zentralbank.anwendung.Historie
+import de.teutonstudio.zentralbank.anwendung.SpielHistorie
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenEcke
@@ -16,6 +18,9 @@ import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 import de.teutonstudio.zentralbank.schnittstelle.domain.SpielUebersichtZustand
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import de.teutonstudio.zentralbank.anwendung.SpielStandPosition
+import de.teutonstudio.zentralbank.anwendung.HistorischerSpielstand
+import de.teutonstudio.zentralbank.anwendung.SpielZugMarker
 
 /**
  * Android-Lifecycle-Fassade. Fachaktionen und Sitzungszustand liegen im Application-Layer;
