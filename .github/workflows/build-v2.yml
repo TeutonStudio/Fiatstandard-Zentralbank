@@ -29,7 +29,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Verify shared engine and build clients
+      - name: Verify shared engine and release artifacts
         id: build
         shell: bash
         run: |
@@ -39,8 +39,7 @@ jobs:
             :core:domain:jvmTest \
             :core:application:jvmTest \
             :apps:web:jsBrowserTest \
-            :apps:web:jsBrowserProductionWebpack \
-            :apps:android:assembleDebug \
+            releaseArtifacts \
             > build.log 2>&1
           status=$?
           cat build.log
@@ -59,16 +58,9 @@ jobs:
         if: steps.build.outputs.status != '0'
         run: exit 1
 
-      - name: Upload web distribution
+      - name: Upload v2 release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: fiatstandard-web-production
-          path: apps/web/build/dist/js/productionExecutable
-          if-no-files-found: error
-
-      - name: Upload Android APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: fiatstandard-android-debug
-          path: apps/android/build/outputs/apk/debug/*.apk
+          name: fiatstandard-v2.0.0
+          path: build/releases/*
           if-no-files-found: error
