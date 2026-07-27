@@ -1,0 +1,27 @@
+name: Apply agent commit bundle
+
+on:
+  push:
+    branches:
+      - agent/itch-v2.0.0
+    paths:
+      - .github/agent/commit.bundle.b64
+      - .github/workflows/apply-agent-bundle.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact local commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .github/agent/commit.bundle.b64 > /tmp/agent.bundle
+          git fetch /tmp/agent.bundle agent/itch-v2.0.0
+          git push --force origin FETCH_HEAD:refs/heads/agent/itch-v2.0.0
