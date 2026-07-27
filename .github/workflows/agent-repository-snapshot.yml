@@ -25,17 +25,10 @@ jobs:
             set -ex
             rm -rf /tmp/agent-change
             mkdir -p /tmp/agent-change
-            head -c 6000 .github/agent/changes/05/part-00 | sha256sum
-            head -c 6000 .github/agent/changes/05/part-01 | sha256sum
-            head -c 6000 .github/agent/changes/05/part-02 | sha256sum
-            head -c 6000 .github/agent/changes/05/part-03 | sha256sum
-            head -c 6000 .github/agent/changes/05/part-04 | sha256sum
-            head -c 6000 .github/agent/changes/05/part-05 | sha256sum
-            head -c 546 .github/agent/changes/05/part-06a | sha256sum
-            head -c 546 .github/agent/changes/05/part-06b | sha256sum
             {
               head -c 6000 .github/agent/changes/05/part-00
-              head -c 6000 .github/agent/changes/05/part-01
+              head -c 3000 .github/agent/changes/05/part-01a
+              head -c 3000 .github/agent/changes/05/part-01b
               head -c 6000 .github/agent/changes/05/part-02
               head -c 6000 .github/agent/changes/05/part-03
               head -c 6000 .github/agent/changes/05/part-04
