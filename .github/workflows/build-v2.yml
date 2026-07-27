@@ -18,7 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       CHROME_BIN: /usr/bin/google-chrome
     steps:
@@ -33,12 +33,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Diagnose browser parity test
+      - name: Verify v2 shared engine and release artifacts
         id: build
         shell: bash
         run: |
           set +e
-          ./gradlew --stacktrace :apps:web:jsBrowserTest > build.log 2>&1
+          ./gradlew --stacktrace \
+            architekturPruefen \
+            :core:domain:jvmTest \
+            :core:application:jvmTest \
+            :apps:web:jsBrowserTest \
+            releaseArtifacts \
+            > build.log 2>&1
           status=$?
           cat build.log
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -65,3 +71,10 @@ jobs:
       - name: Fail when build failed
         if: steps.build.outputs.status != '0'
         run: exit 1
+
+      - name: Upload v2 release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fiatstandard-v2.0.0
+          path: build/releases/*
+          if-no-files-found: error
