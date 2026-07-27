@@ -22,7 +22,7 @@ jobs:
           set -euo pipefail
           rm -rf /tmp/agent-change
           mkdir -p /tmp/agent-change
-          base64 --decode .github/agent/commit.bundle.b64 > /tmp/agent-change.tar.gz
+          cat .github/agent/chunks/part-* | base64 --decode > /tmp/agent-change.tar.gz
           tar -xzf /tmp/agent-change.tar.gz -C /tmp/agent-change
           cp -a /tmp/agent-change/tree/. .
           while IFS= read -r path; do
