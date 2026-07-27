@@ -25,9 +25,9 @@ jobs:
             set -ex
             rm -rf /tmp/agent-change
             mkdir -p /tmp/agent-change
-            cat .github/agent/changes/04/part-* | base64 --decode > /tmp/agent-change.tar.gz
+            cat .github/agent/changes/05/part-* | base64 --decode > /tmp/agent-change.tar.gz
             actual_hash="$(sha256sum /tmp/agent-change.tar.gz | cut -d' ' -f1)"
-            test "$actual_hash" = "ca161b4d872dc23bb8ecec0642ad44ea7a0f00f755bed4bfe482df55716d4eb1"
+            test "$actual_hash" = "9a2027c343a4c1460bf1f499b3c34132d7fb42a3bee004c8682eaf203b7b6e72"
             tar -xzf /tmp/agent-change.tar.gz -C /tmp/agent-change
             cp -a /tmp/agent-change/tree/. .
             while IFS= read -r path; do
