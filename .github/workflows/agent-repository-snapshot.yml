@@ -16,43 +16,24 @@ jobs:
         with:
           ref: agent/itch-v2.0.0
           fetch-depth: 0
-      - name: Apply staged source archive
+      - name: Apply staged source patch
         id: apply
         shell: bash
         run: |
           set +e
           (
             set -ex
-            rm -rf /tmp/agent-change
-            mkdir -p /tmp/agent-change
-            {
-              head -c 6000 .github/agent/changes/05/part-00
-              head -c 3000 .github/agent/changes/05/part-01a
-              head -c 3000 .github/agent/changes/05/part-01b
-              head -c 6000 .github/agent/changes/05/part-02
-              head -c 6000 .github/agent/changes/05/part-03
-              head -c 6000 .github/agent/changes/05/part-04
-              head -c 6000 .github/agent/changes/05/part-05
-              head -c 546 .github/agent/changes/05/part-06a
-              head -c 546 .github/agent/changes/05/part-06b
-            } | base64 --decode > /tmp/agent-change.tar.gz
-            actual_hash="$(sha256sum /tmp/agent-change.tar.gz | cut -d' ' -f1)"
-            test "$actual_hash" = "9a2027c343a4c1460bf1f499b3c34132d7fb42a3bee004c8682eaf203b7b6e72"
-            tar -xzf /tmp/agent-change.tar.gz -C /tmp/agent-change
-            cp -a /tmp/agent-change/tree/. .
-            while IFS= read -r path; do
-              [ -z "$path" ] || git add -A -- "$path"
-            done < /tmp/agent-change/meta/files
-            while IFS= read -r path; do
-              [ -z "$path" ] || { rm -rf -- "$path"; git add -A -- "$path"; }
-            done < /tmp/agent-change/meta/deletions
+            head -c 3856 .github/agent/changes/06/patch.b64 | base64 --decode > /tmp/change.patch
+            actual_hash="$(sha256sum /tmp/change.patch | cut -d' ' -f1)"
+            test "$actual_hash" = "c486bbe650ffada827e8dd86e0582a08bd7dc37354d418ea15778d596f153ccd"
+            git apply --index /tmp/change.patch
             if git diff --cached --quiet; then
               echo "Keine neuen Quelländerungen anzuwenden."
               exit 0
             fi
             git config user.name "OpenAI Codex"
             git config user.email "codex@openai.com"
-            git commit -F /tmp/agent-change/meta/message
+            git commit -m "fix(multiplatform): JvmInline explizit importieren"
             git push origin HEAD:refs/heads/agent/itch-v2.0.0
           ) > apply.log 2>&1
           status=$?
