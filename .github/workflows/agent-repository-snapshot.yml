@@ -25,15 +25,8 @@ jobs:
             set -ex
             rm -rf /tmp/agent-change
             mkdir -p /tmp/agent-change
-            wc -c .github/agent/chunks/part-*
-            sha256sum .github/agent/chunks/part-*
-            {
-              head -c 6000 .github/agent/chunks/part-00
-              cat .github/agent/chunks/part-01 .github/agent/chunks/part-02 \
-                .github/agent/chunks/part-03 .github/agent/chunks/part-04 \
-                .github/agent/chunks/part-05
-            } | base64 --decode > /tmp/agent-change.tar.gz
-            sha256sum /tmp/agent-change.tar.gz
+            cat .github/agent/changes/02/part-* | base64 --decode > /tmp/agent-change.tar.gz
+            echo "91f4b2c97232d7be313e0df45d44d152387bdc3d59eda551d5cdc0c63bbb86e  /tmp/agent-change.tar.gz" | sha256sum --check
             tar -xzf /tmp/agent-change.tar.gz -C /tmp/agent-change
             cp -a /tmp/agent-change/tree/. .
             while IFS= read -r path; do
@@ -42,7 +35,6 @@ jobs:
             while IFS= read -r path; do
               [ -z "$path" ] || { rm -rf -- "$path"; git add -A -- "$path"; }
             done < /tmp/agent-change/meta/deletions
-            git status --short
             if git diff --cached --quiet; then
               echo "Keine neuen Quelländerungen anzuwenden."
               exit 0
