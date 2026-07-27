@@ -3,6 +3,8 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.android.kotlin.multiplatform.library) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.kotlin.serialization) apply false
 }
@@ -20,9 +22,11 @@ val architekturPruefen by tasks.registering {
                     val import = zeile.trim()
                     if (
                         import.startsWith("import android.") ||
-                        import.startsWith("import androidx.")
+                        import.startsWith("import androidx.") ||
+                        import.startsWith("import java.") ||
+                        import.startsWith("import javax.")
                     ) {
-                        fehler += "${datei.relativeTo(projectDir)}:${index + 1}: Android-/Room-/Compose-Import in core"
+                        fehler += "${datei.relativeTo(projectDir)}:${index + 1}: Plattformimport in gemeinsamem Core"
                     }
                 }
             }

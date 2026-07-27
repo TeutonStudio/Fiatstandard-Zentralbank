@@ -22,7 +22,6 @@ import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
-import java.util.ArrayDeque
 
 data class VerarbeitungsStandort(
     val feld: KartenFeld,

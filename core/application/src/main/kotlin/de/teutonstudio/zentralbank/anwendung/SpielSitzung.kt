@@ -44,11 +44,9 @@ class SpielSitzung(
     val fachEreignisse: List<SpielEreignis>
         get() = ablauf.ereignisVerlauf.angewandteEreignisse
 
-    @Synchronized
     fun aktionAnwenden(aktion: SpielAktion): Result<SpielSchrittErgebnis> =
         aktionenAtomarAnwenden(listOf(aktion))
 
-    @Synchronized
     fun aktionenAtomarAnwenden(
         aktionen: List<SpielAktion>,
     ): Result<SpielSchrittErgebnis> = runCatching {
@@ -78,7 +76,6 @@ class SpielSitzung(
     }
 
     /** Übergangsbrücke für Android-Abläufe, für die noch keine [SpielAktion] existiert. */
-    @Synchronized
     fun legacyEreignisseAtomarAnwenden(
         ereignisse: List<SpielEreignis>,
     ): Result<SpielSchrittErgebnis> = runCatching {
@@ -91,14 +88,11 @@ class SpielSitzung(
     }
 
     /** Einzelereignis-Brücke für noch nicht auf [SpielAktion] umgestellte Android-Aufrufer. */
-    @Synchronized
     fun ereignisAnwenden(ereignis: SpielEreignis): Result<SpielZustand> =
         legacyEreignisseAtomarAnwenden(listOf(ereignis)).map { it.zustand }
 
-    @Synchronized
     fun rueckgaengig(): SpielZustand = ablauf.rueckgaengig().also { _zustand.value = it }
 
-    @Synchronized
     fun wiederholen(): Result<SpielZustand> = ablauf.wiederholen().onSuccess {
         _zustand.value = it
     }

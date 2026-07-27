@@ -6,6 +6,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.Rundenwerte
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import kotlin.math.abs
+import de.teutonstudio.zentralbank.fachlogik.technik.multipliziereExakt
 
 object RundenAuswertung {
     fun naechsteRundenwerte(zustand: SpielZustand): Rundenwerte {
@@ -44,7 +45,7 @@ object RundenAuswertung {
         val vorher = warenkorbPreis(zustand.warenkorb, zustand.marktpreise)
         if (vorher.cent == 0L) return null
         val nachher = warenkorbPreis(zustand.warenkorb, neuePreise)
-        val basispunkte = Math.multiplyExact(nachher.cent - vorher.cent, 10_000L) / vorher.cent
+        val basispunkte = multipliziereExakt(nachher.cent - vorher.cent, 10_000L) / vorher.cent
         return Basispunkte(basispunkte.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt())
     }
 

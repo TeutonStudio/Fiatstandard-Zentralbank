@@ -31,3 +31,5 @@ include(":adapters:protocol-json")
 include(":apps:server")
 include(":tools:simulation")
 include(":adapters:persistence-room")
+
+include(":apps:web")

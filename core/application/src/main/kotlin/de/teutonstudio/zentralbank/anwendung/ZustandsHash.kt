@@ -1,7 +1,8 @@
 package de.teutonstudio.zentralbank.anwendung
 
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
-import java.security.MessageDigest
+import de.teutonstudio.zentralbank.fachlogik.technik.alsHex
+import de.teutonstudio.zentralbank.fachlogik.technik.sha256
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -9,10 +10,7 @@ import kotlinx.serialization.json.JsonObject
 
 fun SpielZustand.stabilerHash(): String {
     val element = Json.encodeToJsonElement(SpielZustand.serializer(), this)
-    val kanonisch = element.kanonisch().toString().encodeToByteArray()
-    return MessageDigest.getInstance("SHA-256")
-        .digest(kanonisch)
-        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    return sha256(element.kanonisch().toString().encodeToByteArray()).alsHex()
 }
 
 private fun JsonElement.kanonisch(): JsonElement = when (this) {
