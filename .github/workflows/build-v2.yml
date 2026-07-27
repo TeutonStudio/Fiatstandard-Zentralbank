@@ -33,7 +33,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Verify shared engine and release artifacts
+      - name: Verify v2 shared engine and release artifacts
         id: build
         shell: bash
         run: |
