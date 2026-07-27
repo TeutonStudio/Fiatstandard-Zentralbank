@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          {
+          (
             set -ex
             rm -rf /tmp/agent-change
             mkdir -p /tmp/agent-change
@@ -46,7 +46,7 @@ jobs:
             git config user.email "codex@openai.com"
             git commit -F /tmp/agent-change/meta/message
             git push origin HEAD:refs/heads/agent/itch-v2.0.0
-          } > apply.log 2>&1
+          ) > apply.log 2>&1
           status=$?
           cat apply.log
           echo "status=$status" >> "$GITHUB_OUTPUT"
