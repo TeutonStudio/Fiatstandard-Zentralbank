@@ -1,9 +1,6 @@
 name: Agent repository snapshot
 
 on:
-  push:
-    branches:
-      - agent/itch-v2.0.0
   pull_request:
     branches:
       - master
@@ -13,7 +10,6 @@ permissions:
 
 jobs:
   apply-agent-bundle:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,28 +22,3 @@ jobs:
           base64 --decode .github/agent/commit.bundle.b64 > /tmp/agent.bundle
           git fetch /tmp/agent.bundle agent/itch-v2.0.0
           git push --force origin FETCH_HEAD:refs/heads/agent/itch-v2.0.0
-
-  snapshot:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Create source archive and Git bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          git bundle create repository.bundle --all
-          git archive --format=tar.gz --output=repository-source.tar.gz HEAD
-          git rev-parse HEAD > snapshot-head.txt
-      - name: Upload snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: repository-snapshot
-          path: |
-            repository.bundle
-            repository-source.tar.gz
-            snapshot-head.txt
-          if-no-files-found: error
-          retention-days: 1
