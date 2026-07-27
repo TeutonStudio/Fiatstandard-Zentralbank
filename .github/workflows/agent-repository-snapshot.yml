@@ -14,11 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: agent/itch-v2.0.0
           fetch-depth: 0
       - name: Apply exact local commits
         shell: bash
         run: |
           set -euo pipefail
           base64 --decode .github/agent/commit.bundle.b64 > /tmp/agent.bundle
-          git fetch /tmp/agent.bundle agent/itch-v2.0.0
+          git bundle verify /tmp/agent.bundle
+          git fetch /tmp/agent.bundle refs/heads/agent/itch-v2.0.0
           git push --force origin FETCH_HEAD:refs/heads/agent/itch-v2.0.0
