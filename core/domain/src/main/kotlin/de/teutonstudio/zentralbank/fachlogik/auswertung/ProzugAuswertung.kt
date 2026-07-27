@@ -56,7 +56,7 @@ object ProzugAuswertung {
             .groupBy(Map.Entry<Rohstoff, Int>::key, Map.Entry<Rohstoff, Int>::value)
             .mapValues { (_, mengen) -> mengen.sum() }
         val fehlendeRohstoffe = gesamtBedarf.mapNotNull { (rohstoff, bedarf) ->
-            val fehlt = bedarf - spieler.rohstoffe.getOrDefault(rohstoff, 0)
+            val fehlt = bedarf - (spieler.rohstoffe[rohstoff] ?: 0)
             if (fehlt > 0) rohstoff to fehlt else null
         }.toMap()
         val offenesGeld = offeneVerbindlichkeiten.fold(Geld.NULL) { summe, posten ->
@@ -88,7 +88,7 @@ object ProzugAuswertung {
                 ) in prozug.versorgteStandorte
                 val mitBestand = if (verwaltungsstandortVersorgt) {
                     standort.einsatzJeLauf.entries.minOfOrNull { (rohstoff, menge) ->
-                        spieler.rohstoffe.getOrDefault(rohstoff, 0) / menge
+                        (spieler.rohstoffe[rohstoff] ?: 0) / menge
                     } ?: verbleibend
                 } else {
                     0

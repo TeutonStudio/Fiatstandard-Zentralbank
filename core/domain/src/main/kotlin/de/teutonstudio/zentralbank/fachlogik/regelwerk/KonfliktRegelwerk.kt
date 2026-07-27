@@ -398,7 +398,7 @@ internal object KonfliktRegelwerk {
             .groupingBy { it.first.emittent }
             .eachCount()
         val schuldenstrichDanach = vertrag.verlierer.filterTo(mutableSetOf()) { verlierer ->
-            externeNeueJeVerlierer.getOrDefault(verlierer, 0) >
+            (externeNeueJeVerlierer[verlierer] ?: 0) >
                 AnleihenAuswertung.freieGeschaeftsbankPlaetze(zustand, verlierer)
         }
         return neuZustand to vertrag.copy(

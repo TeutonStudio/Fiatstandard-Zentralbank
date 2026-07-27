@@ -60,8 +60,8 @@ internal object BelagerungsRegelwerk {
             emptySet(),
         )[standort.position].orEmpty()
         val gespeichert = (bisher?.gespeicherterErtrag.orEmpty().keys + ertrag.keys).associateWith {
-            bisher?.gespeicherterErtrag.orEmpty().getOrDefault(it, 0) +
-                if (ereignis.rundeFortschreiben) ertrag.getOrDefault(it, 0) else 0
+            (bisher?.gespeicherterErtrag.orEmpty()[it] ?: 0) +
+                if (ereignis.rundeFortschreiben) (ertrag[it] ?: 0) else 0
         }.filterValues { it > 0 }
         val fortschritt = (bisher?.fortschrittRunden ?: 0) +
             if (ereignis.rundeFortschreiben) 1 else 0

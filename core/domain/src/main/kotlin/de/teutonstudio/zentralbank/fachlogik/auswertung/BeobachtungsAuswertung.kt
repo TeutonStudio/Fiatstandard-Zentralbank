@@ -70,7 +70,7 @@ object BeobachtungsAuswertung {
                 .mapValues { it.value.sum() }
         }.orEmpty()
         val gesamtErtrag = (abbauErtrag.keys + produktionsErtrag.keys).associateWith { rohstoff ->
-            abbauErtrag.getOrDefault(rohstoff, 0) + produktionsErtrag.getOrDefault(rohstoff, 0)
+            (abbauErtrag[rohstoff] ?: 0) + (produktionsErtrag[rohstoff] ?: 0)
         }
         val versorgung = karte?.let {
             KartenAuswertung.verwaltungsStandorte(it, spieler.id)
@@ -133,13 +133,13 @@ object BeobachtungsAuswertung {
             amZug = zustand.aktiverSpieler == spieler.id,
             marktwert = MarktAuswertung.spielerMarktwert(zustand, spieler.id),
             rohstoffe = Rohstoff.entries.map {
-                RohstoffBestandBeobachtung(it, spieler.rohstoffe.getOrDefault(it, 0))
+                RohstoffBestandBeobachtung(it, (spieler.rohstoffe[it] ?: 0))
             },
             geld = spieler.geldkonto,
             anleihenImBesitz = spieler.anleihen.sortedBy { it.wert },
             offeneEigeneAnleihen = offeneAnleihen,
             bauteile = BauteilTyp.entries.map {
-                BauteilBestandBeobachtung(it, spieler.bauteile.getOrDefault(it, 0))
+                BauteilBestandBeobachtung(it, (spieler.bauteile[it] ?: 0))
             },
             gesamtertragJeRunde = rohstoffListe(gesamtErtrag),
             produktionsmengenJeRohstoff = rohstoffListe(produktionsErtrag),
@@ -302,7 +302,7 @@ object BeobachtungsAuswertung {
     } }
 
     private fun rohstoffListe(mengen: Map<Rohstoff, Int>): List<RohstoffBestandBeobachtung> =
-        Rohstoff.entries.map { RohstoffBestandBeobachtung(it, mengen.getOrDefault(it, 0)) }
+        Rohstoff.entries.map { RohstoffBestandBeobachtung(it, (mengen[it] ?: 0)) }
 
     private fun Collection<KartenFeld>.sortedMitKartenfeldern(): List<KartenFeld> = sortedWith(
         compareBy({ it.zeile }, { it.spalte }, { it.haelfte.name }),
