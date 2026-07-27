@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.fachlogik.modell
 
+import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
 
 @JvmInline
