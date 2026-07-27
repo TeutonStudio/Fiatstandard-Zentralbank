@@ -22,9 +22,11 @@ jobs:
         run: |
           set +e
           {
-            set -x
+            set -ex
             rm -rf /tmp/agent-change
             mkdir -p /tmp/agent-change
+            wc -c .github/agent/chunks/part-*
+            sha256sum .github/agent/chunks/part-*
             cat .github/agent/chunks/part-* | base64 --decode > /tmp/agent-change.tar.gz
             sha256sum /tmp/agent-change.tar.gz
             tar -xzf /tmp/agent-change.tar.gz -C /tmp/agent-change
