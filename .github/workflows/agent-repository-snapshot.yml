@@ -17,10 +17,27 @@ jobs:
           ref: agent/itch-v2.0.0
           fetch-depth: 0
       - name: Apply exact local commits
+        id: apply
         shell: bash
         run: |
-          set -euo pipefail
-          base64 --decode .github/agent/commit.bundle.b64 > /tmp/agent.bundle
-          git bundle verify /tmp/agent.bundle
-          git fetch /tmp/agent.bundle refs/heads/agent/itch-v2.0.0
-          git push --force origin FETCH_HEAD:refs/heads/agent/itch-v2.0.0
+          set +e
+          {
+            base64 --decode .github/agent/commit.bundle.b64 > /tmp/agent.bundle
+            git bundle verify /tmp/agent.bundle
+            git fetch /tmp/agent.bundle refs/heads/agent/itch-v2.0.0
+            git push --force origin FETCH_HEAD:refs/heads/agent/itch-v2.0.0
+          } > apply.log 2>&1
+          status=$?
+          cat apply.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload apply log
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-apply-log
+          path: apply.log
+          if-no-files-found: error
+          retention-days: 1
+      - name: Fail when apply failed
+        if: steps.apply.outputs.status != '0'
+        run: exit 1
