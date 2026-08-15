@@ -8,9 +8,20 @@ einen Status. Allianzen leben ausschließlich in diesem Krieg. Ein Spieler kann
 gleichzeitig mehreren Kriegen angehören; Einheiten, Befehle, Ressourcen und
 Schlachten bleiben immer spielerspezifisch.
 
-Eine Kriegserklärung ist im Epizug kostenlos, unmittelbar wirksam und braucht
-keine Verbindung. `KriegsAllianzBeitreten` ergänzt genau eine Seite.
-`RessourcenUebertragen` überträgt Mark/Rohstoffe, niemals Einheiten oder Kontrolle.
+Eine Kriegserklärung ist ausschließlich im Epizug des erklärenden Spielers
+möglich. Der Aggressor ist immer der aktuell zugaktive Spieler und kann nicht
+stellvertretend gewählt oder durch einen anderen Spieler gesetzt werden. Der
+Verteidiger muss ein anderer, noch nicht ausgeschiedener Spieler sein. Die
+Kriegserklärung ist kostenlos, unmittelbar wirksam und braucht keine Verbindung.
+`KriegsAllianzBeitreten` ergänzt genau eine Seite. `RessourcenUebertragen`
+überträgt Mark/Rohstoffe, niemals Einheiten oder Kontrolle.
+
+Laufende Kriege sind aktueller Spielerstatus und werden deshalb im Spielerablauf
+zusätzlich zu den historischen Finanzvorgängen angezeigt. Rohstoff- und
+Mindest-Rundenfilter dürfen einen laufenden Krieg nicht ausblenden; ein
+Geschäftspartnerfilter darf ihn nach der gegnerischen Kriegsseite einschränken.
+Kriegsstatuszeilen sind keine Buchungen und verändern weder Runden- noch
+kumulative Finanzsalden.
 
 ## Kampf und Bewegung
 
