@@ -13,16 +13,33 @@ import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Sehr kleiner HTTP/1.1-Transport für einen Spielhost direkt auf Android. */
-class WlanSpielHost(
-    dienst: SpielNetzwerkDienst,
-    freigegebenesSpielId: Long,
+/** Sehr kleiner HTTP/1.1-Transport für einen Spiel- oder Lobbyhost direkt auf Android. */
+class WlanSpielHost private constructor(
+    private val bearbeiter: (NetzwerkAnfrage) -> NetzwerkAntwort,
 ) : AutoCloseable {
-    private val router = SpielNetzwerkRouter(
-        dienst = dienst,
-        freigegebenesSpielId = freigegebenesSpielId,
-        spielErstellenErlaubt = false,
+    constructor(
+        dienst: SpielNetzwerkDienst,
+        freigegebenesSpielId: Long,
+    ) : this(
+        SpielNetzwerkRouter(
+            dienst = dienst,
+            freigegebenesSpielId = freigegebenesSpielId,
+            spielErstellenErlaubt = false,
+        )::bearbeiten,
     )
+
+    constructor(
+        lobbyDienst: MehrspielerLobbyDienst,
+        spielDienst: SpielNetzwerkDienst,
+        freigegebeneLobbyId: String,
+    ) : this(
+        MehrspielerLobbyRouter(
+            lobbyDienst = lobbyDienst,
+            spielDienst = spielDienst,
+            freigegebeneLobbyId = freigegebeneLobbyId,
+        )::bearbeiten,
+    )
+
     private val aktiv = AtomicBoolean(false)
     private val akzeptor = Executors.newSingleThreadExecutor { aufgabe ->
         Thread(aufgabe, "fiatstandard-wlan-accept").apply { isDaemon = true }
@@ -94,7 +111,7 @@ class WlanSpielHost(
             }
             bytes.toString(StandardCharsets.UTF_8)
         }
-        val antwort = router.bearbeiten(
+        val antwort = bearbeiter(
             NetzwerkAnfrage(
                 methode = teile[0],
                 pfad = teile[1],
