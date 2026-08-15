@@ -64,53 +64,68 @@ class WlanSpielEntdeckung(context: Context) : AutoCloseable {
         nsd.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener)
     }
 
-    @Suppress("DEPRECATION")
-    fun spieleSuchen(
-        beiFund: (WlanEndpunkt) -> Unit,
+    fun angeboteSuchen(
+        beiLobbyFund: (WlanLobbyEndpunkt) -> Unit,
+        beiSpielFund: (WlanEndpunkt) -> Unit,
         beiEntfernt: (String) -> Unit = {},
         beiFehler: (String) -> Unit = {},
     ) = suchen(
         beiAufgeloest = { aufgeloest ->
             val art = aufgeloest.attributes["art"]?.toString(StandardCharsets.UTF_8)
-            if (art == "lobby") return@suchen
             val host = aufgeloest.host?.hostAddress ?: return@suchen
-            val id = aufgeloest.attributes["spielId"]
-                ?.toString(StandardCharsets.UTF_8)
-                ?.toLongOrNull()
-                ?: return@suchen
-            beiFund(
-                WlanEndpunkt(
-                    host = host,
-                    port = aufgeloest.port,
-                    spielId = id,
-                    name = aufgeloest.serviceName,
-                ),
-            )
+            when (art) {
+                "lobby" -> {
+                    val lobbyId = aufgeloest.attributes["lobbyId"]
+                        ?.toString(StandardCharsets.UTF_8)
+                        ?.takeIf(String::isNotBlank)
+                        ?: return@suchen
+                    beiLobbyFund(
+                        WlanLobbyEndpunkt(
+                            host = host,
+                            port = aufgeloest.port,
+                            lobbyId = lobbyId,
+                            name = aufgeloest.serviceName,
+                        ),
+                    )
+                }
+                "spiel", null -> {
+                    val spielId = aufgeloest.attributes["spielId"]
+                        ?.toString(StandardCharsets.UTF_8)
+                        ?.toLongOrNull()
+                        ?: return@suchen
+                    beiSpielFund(
+                        WlanEndpunkt(
+                            host = host,
+                            port = aufgeloest.port,
+                            spielId = spielId,
+                            name = aufgeloest.serviceName,
+                        ),
+                    )
+                }
+            }
         },
         beiEntfernt = beiEntfernt,
         beiFehler = beiFehler,
     )
 
-    @Suppress("DEPRECATION")
+    fun spieleSuchen(
+        beiFund: (WlanEndpunkt) -> Unit,
+        beiEntfernt: (String) -> Unit = {},
+        beiFehler: (String) -> Unit = {},
+    ) = angeboteSuchen(
+        beiLobbyFund = {},
+        beiSpielFund = beiFund,
+        beiEntfernt = beiEntfernt,
+        beiFehler = beiFehler,
+    )
+
     fun lobbysSuchen(
         beiFund: (WlanLobbyEndpunkt) -> Unit,
         beiEntfernt: (String) -> Unit = {},
         beiFehler: (String) -> Unit = {},
-    ) = suchen(
-        beiAufgeloest = { aufgeloest ->
-            val art = aufgeloest.attributes["art"]?.toString(StandardCharsets.UTF_8)
-            val lobbyId = aufgeloest.attributes["lobbyId"]?.toString(StandardCharsets.UTF_8)
-            if (art != "lobby" || lobbyId.isNullOrBlank()) return@suchen
-            val host = aufgeloest.host?.hostAddress ?: return@suchen
-            beiFund(
-                WlanLobbyEndpunkt(
-                    host = host,
-                    port = aufgeloest.port,
-                    lobbyId = lobbyId,
-                    name = aufgeloest.serviceName,
-                ),
-            )
-        },
+    ) = angeboteSuchen(
+        beiLobbyFund = beiFund,
+        beiSpielFund = {},
         beiEntfernt = beiEntfernt,
         beiFehler = beiFehler,
     )
