@@ -1,11 +1,96 @@
 package de.teutonstudio.zentralbank.protokoll
 
 import de.teutonstudio.zentralbank.fachlogik.beobachtung.SpielBeobachtung
+import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 const val API_VERSION = 1
+
+@Serializable
+data class LobbyKonfigurationDto(
+    val name: String = "Fiatstandard WLAN-Spiel",
+    val maximaleSpieler: Int = 7,
+    val karte: KartenVorlage,
+    val leitzinsBasispunkte: Int = 1_500,
+    val inflationszielBasispunkte: Int = 200,
+    val normaleAbweichungBasispunkte: Int = 50,
+    val starkeAbweichungBasispunkte: Int = 200,
+    val leitzinsSchrittBasispunkte: Int = 100,
+    val warenkorb: Map<String, Int> = emptyMap(),
+    val startGuthabenCent: Long = 10_000,
+    val startRohstoffe: Map<String, Int> = emptyMap(),
+    val startBauteile: Map<String, Int> = mapOf("HAUPTBAHNHOF" to 1),
+    val seed: Long? = null,
+)
+
+@Serializable
+data class LobbyErstellenAnfrageDto(
+    val version: Int = API_VERSION,
+    val konfiguration: LobbyKonfigurationDto,
+)
+
+@Serializable
+data class LobbyErstelltDto(
+    val version: Int = API_VERSION,
+    val lobbyId: String,
+    val hostToken: String,
+    val lobby: LobbyDto,
+)
+
+@Serializable
+data class LobbySpielerRegistrierenDto(
+    val version: Int = API_VERSION,
+    val name: String,
+    val passwort: String,
+    val farbe: String,
+)
+
+@Serializable
+data class LobbySpielerAendernDto(
+    val version: Int = API_VERSION,
+    val name: String? = null,
+    val farbe: String? = null,
+    val bereit: Boolean? = null,
+)
+
+@Serializable
+data class LobbySpielerDto(
+    val id: String,
+    val name: String,
+    val farbe: String,
+    val bereit: Boolean,
+    val verbunden: Boolean,
+)
+
+@Serializable
+data class LobbyDto(
+    val version: Int = API_VERSION,
+    val lobbyId: String,
+    val revision: Long,
+    val status: String,
+    val konfiguration: LobbyKonfigurationDto,
+    val spieler: List<LobbySpielerDto>,
+    val spielId: String? = null,
+)
+
+@Serializable
+data class LobbySitzungDto(
+    val version: Int = API_VERSION,
+    val lobbyId: String,
+    val spielerId: String,
+    val sessionToken: String,
+    val lobby: LobbyDto,
+)
+
+@Serializable
+data class LobbyGestartetDto(
+    val version: Int = API_VERSION,
+    val lobbyId: String,
+    val spielId: String,
+    val lobby: LobbyDto,
+)
 
 @Serializable
 data class SpielErstellenAnfrageDto(
