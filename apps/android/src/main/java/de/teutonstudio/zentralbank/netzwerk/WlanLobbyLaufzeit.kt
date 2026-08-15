@@ -239,11 +239,12 @@ object WlanLobbyLaufzeit {
                 requireNotNull(client).lesen()
             }
             _zustand.value = _zustand.value.copy(lobby = lobby, fehler = null)
-            if (lobby.spielId != null && _zustand.value.spielEndpunkt == null) {
+            val spielId = lobby.spielId
+            if (spielId != null && _zustand.value.spielEndpunkt == null) {
                 val spielEndpunkt = WlanEndpunkt(
                     host = lobbyEndpunkt.host,
                     port = lobbyEndpunkt.port,
-                    spielId = lobby.spielId.toLong(),
+                    spielId = spielId.toLong(),
                     name = lobby.konfiguration.name,
                 )
                 _zustand.value = _zustand.value.copy(spielEndpunkt = spielEndpunkt)
