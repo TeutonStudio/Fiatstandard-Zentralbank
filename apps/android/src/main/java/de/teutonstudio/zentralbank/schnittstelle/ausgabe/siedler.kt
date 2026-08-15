@@ -271,10 +271,13 @@ fun zeigeSpieler(
         }
     } else if (isWarExpanded) {
         Card(modifier = Modifier.padding(25.dp)) {
-            val inputVerteidiger = remember(moeglicheVerteidiger) {
-                mutableStateOf(moeglicheVerteidiger.firstOrNull()?.name ?: "Spieler wählen")
+            val dialogAggressor = remember { aktiverAggressor }
+            val dialogVerteidiger = remember { moeglicheVerteidiger }
+            val inputVerteidiger = remember {
+                mutableStateOf(dialogVerteidiger.firstOrNull()?.name ?: "Spieler wählen")
             }
-            val verteidigerGueltig = moeglicheVerteidiger.any { it.name == inputVerteidiger.value }
+            val verteidigerGueltig = dialogVerteidiger.any { it.name == inputVerteidiger.value }
+            val dialogNochAktuell = dialogAggressor != null && dialogAggressor == aktiverAggressor
 
             Column {
                 Text(
@@ -291,31 +294,32 @@ fun zeigeSpieler(
                     item { Text(text = "Aggressor: ", fontSize = 25.sp) }
                     item {
                         Text(
-                            text = aktiverAggressor ?: "Kein aktiver Spieler",
+                            text = dialogAggressor ?: "Kein aktiver Spieler",
                             fontSize = 25.sp,
                             modifier = ModiPad15,
                         )
                     }
 
                     item { Text(text = "Verteidiger: ", fontSize = 25.sp) }
-                    item { spielerAuswahl(moeglicheVerteidiger, inputVerteidiger) }
+                    item { spielerAuswahl(dialogVerteidiger, inputVerteidiger) }
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 ) {
                     Button(
-                        enabled = konfliktAktionenAktiv &&
-                            aktiverAggressor != null &&
-                            verteidigerGueltig,
+                        enabled = konfliktAktionenAktiv && dialogNochAktuell && verteidigerGueltig,
                         onClick = {
-                            val aggressor = requireNotNull(aktiverAggressor)
+                            val aggressor = requireNotNull(dialogAggressor)
                             onDeclareWar(aggressor to inputVerteidiger.value)
                             isWarExpanded = false
                         },
                     ) {
                         Text("Krieg erklären", fontSize = 24.sp)
+                    }
+                    Button(onClick = { isWarExpanded = false }) {
+                        Text("Abbrechen", fontSize = 24.sp)
                     }
                 }
             }
