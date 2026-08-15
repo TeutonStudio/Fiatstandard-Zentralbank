@@ -99,15 +99,14 @@ private fun WlanMehrspielerBildschirm(
         }
     }
 
-    fun mitLokalerNetzwerkBerechtigung(aktion: () -> Unit) {
-        val bereitsErlaubt = Build.VERSION.SDK_INT < 37 ||
-            ContextCompat.checkSelfPermission(context, LOKALES_NETZWERK_BERECHTIGUNG) ==
+    fun mitWlanBerechtigung(aktion: () -> Unit) {
+        val bereitsErlaubt = ContextCompat.checkSelfPermission(context, WLAN_BERECHTIGUNG) ==
             PackageManager.PERMISSION_GRANTED
         if (bereitsErlaubt) {
             aktion()
         } else {
             nachBerechtigung = aktion
-            permissionLauncher.launch(LOKALES_NETZWERK_BERECHTIGUNG)
+            permissionLauncher.launch(WLAN_BERECHTIGUNG)
         }
     }
 
@@ -164,7 +163,7 @@ private fun WlanMehrspielerBildschirm(
                         Text("Runde ${spiel.runde} · ${spiel.spielerNamen.joinToString()}")
                     }
                     Button(onClick = {
-                        mitLokalerNetzwerkBerechtigung {
+                        mitWlanBerechtigung {
                             scope.launch { WlanMehrspielerLaufzeit.hosten(spiel.id) }
                         }
                     }) { Text("Hosten") }
@@ -218,7 +217,7 @@ private fun WlanMehrspielerBildschirm(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
-                mitLokalerNetzwerkBerechtigung(WlanMehrspielerLaufzeit::sucheStarten)
+                mitWlanBerechtigung(WlanMehrspielerLaufzeit::sucheStarten)
             }) { Text(if (zustand.sucheAktiv) "Erneut suchen" else "Spiele im WLAN suchen") }
             if (zustand.sucheAktiv) {
                 TextButton(onClick = WlanMehrspielerLaufzeit::sucheBeenden) { Text("Suche stoppen") }
@@ -235,7 +234,7 @@ private fun WlanMehrspielerBildschirm(
                         Text("Spiel ${fund.spielId} · ${fund.host}:${fund.port}")
                     }
                     Button(onClick = {
-                        mitLokalerNetzwerkBerechtigung {
+                        mitWlanBerechtigung {
                             scope.launch { WlanMehrspielerLaufzeit.beitreten(fund, spielerName, passwort) }
                         }
                     }) { Text("Beitreten") }
@@ -271,7 +270,7 @@ private fun WlanMehrspielerBildschirm(
         Button(
             enabled = manuellerHost.isNotBlank() && portGueltig && manuelleSpielId.toLongOrNull() != null,
             onClick = {
-                mitLokalerNetzwerkBerechtigung {
+                mitWlanBerechtigung {
                     scope.launch {
                         WlanMehrspielerLaufzeit.manuellBeitreten(
                             host = manuellerHost,
@@ -318,5 +317,5 @@ private fun WlanMehrspielerBildschirm(
 private fun SpielAktionDto.bezeichnung(): String = javaClass.simpleName
     .replace(Regex("([a-z])([A-Z])"), "$1 $2")
 
-private const val LOKALES_NETZWERK_BERECHTIGUNG = "android.permission.ACCESS_LOCAL_NETWORK"
+private const val WLAN_BERECHTIGUNG = "android.permission.NEARBY_WIFI_DEVICES"
 private const val AKTUALISIERUNGSINTERVALL_MS = 1_500L

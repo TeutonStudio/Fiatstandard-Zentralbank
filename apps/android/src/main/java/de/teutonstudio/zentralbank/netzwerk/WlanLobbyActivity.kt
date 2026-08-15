@@ -500,11 +500,10 @@ private fun lokaleNetzwerkBerechtigung(): ((() -> Unit) -> Unit) {
         if (erlaubt) aktion?.invoke()
     }
     return { aktion ->
-        val erlaubt = Build.VERSION.SDK_INT < 37 ||
-            ContextCompat.checkSelfPermission(context, LOKALES_NETZWERK_BERECHTIGUNG) == PackageManager.PERMISSION_GRANTED
+        val erlaubt = ContextCompat.checkSelfPermission(context, WLAN_BERECHTIGUNG) == PackageManager.PERMISSION_GRANTED
         if (erlaubt) aktion() else {
             ausstehend = aktion
-            launcher.launch(LOKALES_NETZWERK_BERECHTIGUNG)
+            launcher.launch(WLAN_BERECHTIGUNG)
         }
     }
 }
@@ -525,5 +524,5 @@ private fun <K : Enum<K>> Map<K, String>.positiveWerte(): Map<String, Int> = ent
 private fun basispunkteText(wert: Int): String =
     "${wert / 100},${kotlin.math.abs(wert % 100).toString().padStart(2, '0')} %"
 
-private const val LOKALES_NETZWERK_BERECHTIGUNG = "android.permission.ACCESS_LOCAL_NETWORK"
+private const val WLAN_BERECHTIGUNG = "android.permission.NEARBY_WIFI_DEVICES"
 private const val AKTUALISIERUNGSINTERVALL_MS = 1_500L
