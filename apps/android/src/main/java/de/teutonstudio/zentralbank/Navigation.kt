@@ -267,6 +267,7 @@ fun Navigation(viewModel: GameViewModel) {
                         when (bereich) {
                             SpielmenueBereich.SALDO -> zeigeSpieler(
                                 spiel = spiel,
+                                spielZustand = spielZustand,
                                 konfliktAktionenAktiv = spielZustand?.zugStatus?.phase == ZugPhase.Epizug,
                                 onDeclareWar = { (aggressor, verteidiger) ->
                                     viewModel.kriegErklaeren(aggressor, verteidiger)
@@ -473,11 +474,12 @@ fun Navigation(viewModel: GameViewModel) {
 
         composable(route = Screen.PlayerSaldo.route) { // TODO
             MitAktuellemSpiel(viewModel, navController) { spiel ->
-                val zugPhase = viewModel.spielZustand.collectAsState().value?.zugStatus?.phase
+                val spielZustand = viewModel.spielZustand.collectAsState().value
                 Titel(Screen.Game.navigiere(navController)) {
                     zeigeSpieler(
                         spiel = spiel,
-                        konfliktAktionenAktiv = zugPhase == ZugPhase.Epizug,
+                        spielZustand = spielZustand,
+                        konfliktAktionenAktiv = spielZustand?.zugStatus?.phase == ZugPhase.Epizug,
                         onDeclareWar = { (aggressor, verteidiger) ->
                             viewModel.kriegErklaeren(aggressor, verteidiger)
                         },
