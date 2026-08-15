@@ -341,7 +341,7 @@ class MehrspielerLobbyDienst(
     }
 
     companion object {
-        const val MINDEST_SPIELER = 3
+        const val MINDEST_SPIELER = 2
         const val MAXIMALE_SPIELER = 7
     }
 }

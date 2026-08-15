@@ -19,6 +19,35 @@ import org.junit.Test
 
 class MehrspielerLobbyDienstTest {
     @Test
+    fun zweiBereiteSpielerKoennenDieLobbyStarten() = runBlocking {
+        val ablage = ArbeitsspeicherSpielAblage()
+        val dienst = MehrspielerLobbyDienst(ablage)
+        val erstellt = dienst.erstellen(LobbyErstellenAnfrageDto(konfiguration = konfiguration()))
+        val sitzungen = listOf(
+            dienst.spielerRegistrieren(
+                erstellt.lobbyId,
+                LobbySpielerRegistrierenDto(name = "Anna", passwort = "anna-pass", farbe = "ORANGE"),
+            ),
+            dienst.spielerRegistrieren(
+                erstellt.lobbyId,
+                LobbySpielerRegistrierenDto(name = "Bernd", passwort = "bernd-pass", farbe = "BLAU"),
+            ),
+        )
+
+        sitzungen.forEach { sitzung ->
+            dienst.spielerAendern(
+                erstellt.lobbyId,
+                sitzung.sessionToken,
+                LobbySpielerAendernDto(bereit = true),
+            )
+        }
+
+        val gestartet = dienst.starten(erstellt.lobbyId, erstellt.hostToken)
+
+        assertNotNull(ablage.spielLaden(gestartet.spielId.toLong()))
+    }
+
+    @Test
     fun spielstandEntstehtErstNachBereitemLobbyStart() = runBlocking {
         val ablage = ArbeitsspeicherSpielAblage()
         val dienst = MehrspielerLobbyDienst(ablage)
@@ -81,20 +110,22 @@ class MehrspielerLobbyDienstTest {
     }
 
     @Test
-    fun falschesPasswortKannBestehendenLobbySpielerNichtUebernehmen() = runBlocking {
-        val dienst = MehrspielerLobbyDienst(ArbeitsspeicherSpielAblage())
-        val erstellt = dienst.erstellen(LobbyErstellenAnfrageDto(konfiguration = konfiguration()))
-        dienst.spielerRegistrieren(
-            erstellt.lobbyId,
-            LobbySpielerRegistrierenDto(name = "Anna", passwort = "richtig", farbe = "ORANGE"),
-        )
+    fun falschesPasswortKannBestehendenLobbySpielerNichtUebernehmen() {
+        runBlocking {
+            val dienst = MehrspielerLobbyDienst(ArbeitsspeicherSpielAblage())
+            val erstellt = dienst.erstellen(LobbyErstellenAnfrageDto(konfiguration = konfiguration()))
+            dienst.spielerRegistrieren(
+                erstellt.lobbyId,
+                LobbySpielerRegistrierenDto(name = "Anna", passwort = "richtig", farbe = "ORANGE"),
+            )
 
-        assertThrows(UngueltigeSpielerAnmeldung::class.java) {
-            runBlocking {
-                dienst.spielerRegistrieren(
-                    erstellt.lobbyId,
-                    LobbySpielerRegistrierenDto(name = "Anna", passwort = "falsch", farbe = "ORANGE"),
-                )
+            assertThrows(UngueltigeSpielerAnmeldung::class.java) {
+                runBlocking {
+                    dienst.spielerRegistrieren(
+                        erstellt.lobbyId,
+                        LobbySpielerRegistrierenDto(name = "Anna", passwort = "falsch", farbe = "ORANGE"),
+                    )
+                }
             }
         }
     }
@@ -125,20 +156,22 @@ class MehrspielerLobbyDienstTest {
     }
 
     @Test
-    fun spielerfarbenSindInnerhalbEinerLobbyEindeutig() = runBlocking {
-        val dienst = MehrspielerLobbyDienst(ArbeitsspeicherSpielAblage())
-        val erstellt = dienst.erstellen(LobbyErstellenAnfrageDto(konfiguration = konfiguration()))
-        dienst.spielerRegistrieren(
-            erstellt.lobbyId,
-            LobbySpielerRegistrierenDto(name = "Anna", passwort = "anna-pass", farbe = "ORANGE"),
-        )
+    fun spielerfarbenSindInnerhalbEinerLobbyEindeutig() {
+        runBlocking {
+            val dienst = MehrspielerLobbyDienst(ArbeitsspeicherSpielAblage())
+            val erstellt = dienst.erstellen(LobbyErstellenAnfrageDto(konfiguration = konfiguration()))
+            dienst.spielerRegistrieren(
+                erstellt.lobbyId,
+                LobbySpielerRegistrierenDto(name = "Anna", passwort = "anna-pass", farbe = "ORANGE"),
+            )
 
-        assertThrows(IllegalArgumentException::class.java) {
-            runBlocking {
-                dienst.spielerRegistrieren(
-                    erstellt.lobbyId,
-                    LobbySpielerRegistrierenDto(name = "Bernd", passwort = "bernd-pass", farbe = "ORANGE"),
-                )
+            assertThrows(IllegalArgumentException::class.java) {
+                runBlocking {
+                    dienst.spielerRegistrieren(
+                        erstellt.lobbyId,
+                        LobbySpielerRegistrierenDto(name = "Bernd", passwort = "bernd-pass", farbe = "ORANGE"),
+                    )
+                }
             }
         }
     }

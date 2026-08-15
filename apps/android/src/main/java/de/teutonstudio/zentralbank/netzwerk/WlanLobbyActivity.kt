@@ -39,12 +39,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoff
+import de.teutonstudio.zentralbank.datenbank.Rohstoffe as WarenkorbRohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.BauteilTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerFarbe
 import de.teutonstudio.zentralbank.protokoll.LobbyKonfigurationDto
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.KartenAuswahl
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereWarenkorb
 import de.teutonstudio.zentralbank.schnittstelle.theme.CZBOracleRechnerTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -102,7 +105,7 @@ private fun WlanSpielErstellenBildschirm(
     var leitzinsSchritt by remember { mutableStateOf("1") }
     var startGuthaben by remember { mutableStateOf("100") }
     var karte by remember { mutableStateOf<KartenVorlage?>(null) }
-    val warenkorb = remember { mutableStateMapOf<Rohstoff, String>() }
+    val warenkorb = remember { mutableStateMapOf<WarenkorbRohstoff, Int>() }
     val startRohstoffe = remember { mutableStateMapOf<Rohstoff, String>() }
     val startBauteile = remember {
         mutableStateMapOf<BauteilTyp, String>().apply { put(BauteilTyp.HAUPTBAHNHOF, "1") }
@@ -137,7 +140,7 @@ private fun WlanSpielErstellenBildschirm(
                 item { Text("Lobby und eigener Spieler", style = MaterialTheme.typography.titleLarge) }
                 item { Text("Der Host legt die Partie fest; jeder Spieler legt sein eigenes Profil und Passwort fest.") }
                 item { Eingabe("Lobbyname", lobbyName) { lobbyName = it } }
-                item { Eingabe("Maximale Spieler (3–7)", maximaleSpieler) { maximaleSpieler = it } }
+                item { Eingabe("Maximale Spieler (2–7)", maximaleSpieler) { maximaleSpieler = it } }
                 item { Eingabe("Dein Spielername", hostName) { hostName = it } }
                 item {
                     OutlinedTextField(
@@ -168,10 +171,7 @@ private fun WlanSpielErstellenBildschirm(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item { Text("Warenkorb", style = MaterialTheme.typography.titleLarge) }
-                items(Rohstoff.entries) { rohstoff ->
-                    MengenEingabe(rohstoff.name, warenkorb[rohstoff].orEmpty()) { warenkorb[rohstoff] = it }
-                }
+                item { definiereWarenkorb(inhalt = warenkorb) }
                 item { Text("Gemeinsame Startrohstoffe je Spieler", style = MaterialTheme.typography.titleLarge) }
                 items(Rohstoff.entries) { rohstoff ->
                     MengenEingabe(rohstoff.name, startRohstoffe[rohstoff].orEmpty()) { startRohstoffe[rohstoff] = it }
@@ -218,7 +218,7 @@ private fun WlanSpielErstellenBildschirm(
                                     normaleAbweichungBasispunkte = prozentZuBasispunkte(normaleAbweichung),
                                     starkeAbweichungBasispunkte = prozentZuBasispunkte(starkeAbweichung),
                                     leitzinsSchrittBasispunkte = prozentZuBasispunkte(leitzinsSchritt),
-                                    warenkorb = warenkorb.positiveWerte(),
+                                    warenkorb = warenkorb.alsLobbyWarenkorb(),
                                     startGuthabenCent = markZuCent(startGuthaben),
                                     startRohstoffe = startRohstoffe.positiveWerte(),
                                     startBauteile = startBauteile.positiveWerte(),
@@ -411,7 +411,8 @@ private fun LobbyBildschirm(
                 if (istHost) {
                     Button(
                         onClick = { scope.launch { WlanLobbyLaufzeit.spielStarten() } },
-                        enabled = lobby.spieler.size >= 3 && lobby.spieler.all { it.bereit },
+                        enabled = lobby.spieler.size >= MehrspielerLobbyDienst.MINDEST_SPIELER &&
+                            lobby.spieler.all { it.bereit },
                         modifier = Modifier.weight(1f),
                     ) { Text("Spiel starten") }
                 }
@@ -518,6 +519,12 @@ private fun <K : Enum<K>> Map<K, String>.positiveWerte(): Map<String, Int> = ent
     .mapNotNull { (schluessel, text) ->
         val menge = text.toIntOrNull() ?: 0
         if (menge > 0) schluessel.name to menge else null
+    }
+    .toMap()
+
+private fun Map<WarenkorbRohstoff, Int>.alsLobbyWarenkorb(): Map<String, Int> = entries
+    .mapNotNull { (rohstoff, menge) ->
+        menge.takeIf { it > 0 }?.let { rohstoff.zuRohstoff().name to it }
     }
     .toMap()
 
