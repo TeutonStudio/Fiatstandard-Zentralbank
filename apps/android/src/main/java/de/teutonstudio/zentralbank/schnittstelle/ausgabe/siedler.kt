@@ -75,6 +75,7 @@ import de.teutonstudio.zentralbank.datenbank.SpielerAblaufEintrag
 import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.entries
 import de.teutonstudio.zentralbank.datenbank.zuMark
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.schnittstelle.AblaufDialog
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad10
@@ -94,6 +95,8 @@ import de.teutonstudio.zentralbank.schnittstelle.rememberLinienMitGepunkteterAkt
 import de.teutonstudio.zentralbank.schnittstelle.rememberRundenachse
 import de.teutonstudio.zentralbank.schnittstelle.rundenDiagrammMaxX
 import de.teutonstudio.zentralbank.schnittstelle.seriesMitGepunkteterAktuellerRunde
+import de.teutonstudio.zentralbank.schnittstelle.domain.LaufenderKriegAnzeige
+import de.teutonstudio.zentralbank.schnittstelle.domain.laufendeKriegeFuer
 import java.util.Locale
 import kotlin.math.abs
 
@@ -198,6 +201,7 @@ fun SpielerBilanz(
 @Composable
 fun zeigeSpieler(
     spiel: Spiel,
+    spielZustand: SpielZustand? = null,
     konfliktAktionenAktiv: Boolean,
     onDeclareWar: (Pair<String, String>) -> Unit,
     onDeclarePeace: (Pair<String, String>) -> Unit,
@@ -205,6 +209,22 @@ fun zeigeSpieler(
     val siedlerFarben = erhalteSpielerFarben(spiel.spielerListe)
     var isWarExpanded by remember { mutableStateOf(false) }
     var isPeaceExpanded by remember { mutableStateOf(false) }
+    val aktiverAggressor = spielZustand?.aktiverSpieler?.let { aktiverSpieler ->
+        spielZustand.spieler.firstOrNull { it.id == aktiverSpieler }?.name
+    }
+    val moeglicheVerteidigerNamen = remember(spielZustand) {
+        val zustand = spielZustand ?: return@remember emptySet<String>()
+        val aggressor = zustand.aktiverSpieler ?: return@remember emptySet<String>()
+        zustand.spieler
+            .filter { kandidat ->
+                kandidat.id != aggressor &&
+                    kandidat.id !in zustand.ausgeschiedeneSpieler &&
+                    zustand.konflikte.none { konflikt -> konflikt.betrifft(aggressor, kandidat.id) }
+            }
+            .map { it.name }
+            .toSet()
+    }
+    val moeglicheVerteidiger = spiel.spielerListe.filter { it.name in moeglicheVerteidigerNamen }
 
     if (!isWarExpanded && !isPeaceExpanded) {
         Column(
@@ -226,6 +246,7 @@ fun zeigeSpieler(
                         siedlerFarbe = farbe,
                         siedlerBauteile = spieler.erhalteBauSaldoZurRunde(),
                         ablauf = spiel.erhalteSpielerAblauf(spieler),
+                        laufendeKriege = spielZustand?.laufendeKriegeFuer(spieler.name).orEmpty(),
                         istBearbeitbar = false,
                         onManipulateData = { _, _, _ -> },
                     )
@@ -234,7 +255,9 @@ fun zeigeSpieler(
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Button(
                     onClick = { isWarExpanded = true },
-                    enabled = konfliktAktionenAktiv,
+                    enabled = konfliktAktionenAktiv &&
+                        aktiverAggressor != null &&
+                        moeglicheVerteidiger.isNotEmpty(),
                 ) {
                     Text("Krieg erklären")
                 }
@@ -248,8 +271,10 @@ fun zeigeSpieler(
         }
     } else if (isWarExpanded) {
         Card(modifier = Modifier.padding(25.dp)) {
-            val inputAggressor = remember { mutableStateOf("spieler wählen") }
-            val inputVerteidiger = remember { mutableStateOf("spieler wählen") }
+            val inputVerteidiger = remember(moeglicheVerteidiger) {
+                mutableStateOf(moeglicheVerteidiger.firstOrNull()?.name ?: "Spieler wählen")
+            }
+            val verteidigerGueltig = moeglicheVerteidiger.any { it.name == inputVerteidiger.value }
 
             Column {
                 Text(
@@ -264,24 +289,34 @@ fun zeigeSpieler(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     item { Text(text = "Aggressor: ", fontSize = 25.sp) }
-                    item { spielerAuswahl(spiel.spielerListe,inputAggressor) }
+                    item {
+                        Text(
+                            text = aktiverAggressor ?: "Kein aktiver Spieler",
+                            fontSize = 25.sp,
+                            modifier = ModiPad15,
+                        )
+                    }
 
                     item { Text(text = "Verteidiger: ", fontSize = 25.sp) }
-                    item { spielerAuswahl(spiel.spielerListe,inputVerteidiger) }
+                    item { spielerAuswahl(moeglicheVerteidiger, inputVerteidiger) }
                 }
 
-                Column(
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        onDeclareWar(inputAggressor.value to inputVerteidiger.value)
-                        isWarExpanded = false
-                    },
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
                 ) {
-                    Text(
-                        text = "Krieg erklären",
-                        fontSize = 30.sp,
-                        modifier = ModiPad10
-                    )
+                    Button(
+                        enabled = konfliktAktionenAktiv &&
+                            aktiverAggressor != null &&
+                            verteidigerGueltig,
+                        onClick = {
+                            val aggressor = requireNotNull(aktiverAggressor)
+                            onDeclareWar(aggressor to inputVerteidiger.value)
+                            isWarExpanded = false
+                        },
+                    ) {
+                        Text("Krieg erklären", fontSize = 24.sp)
+                    }
                 }
             }
         }
@@ -354,6 +389,7 @@ fun zeigeSpielerDaten(
     siedlerFarbe: Color,
     siedlerBauteile: Map<out Bauteil, Int> = Bauteil.entries.associateWith { 0 },
     ablauf: List<SpielerAblaufEintrag> = emptyList(),
+    laufendeKriege: List<LaufenderKriegAnzeige> = emptyList(),
     istBearbeitbar: Boolean = true,
     onManipulateData: (String, Bauteil, Boolean) -> Unit
 ) {
@@ -454,7 +490,7 @@ fun zeigeSpielerDaten(
             breitenAnteil = 0.78f,
             onDismiss = { zeigeAblaufDialog = false },
         ) {
-            SpielerAblauf(ablauf)
+            SpielerAblauf(ablauf, laufendeKriege)
         }
     }
 }
@@ -491,9 +527,12 @@ private fun BauteilMengenZeile(
 }
 
 @Composable
-private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
+private fun SpielerAblauf(
+    ablauf: List<SpielerAblaufEintrag>,
+    laufendeKriege: List<LaufenderKriegAnzeige>,
+) {
     var eingeklappteRunden by remember(ablauf) { mutableStateOf(emptySet<Int>()) }
-    var geschaeftspartnerFilter by remember(ablauf) { mutableStateOf<String?>(null) }
+    var geschaeftspartnerFilter by remember(ablauf, laufendeKriege) { mutableStateOf<String?>(null) }
     var rohstoffFilter by remember(ablauf) { mutableStateOf<String?>(null) }
     var minRundeEingabe by remember(ablauf) {
         mutableStateOf("0")
@@ -501,13 +540,19 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
     var geschaeftspartnerMenueOffen by remember { mutableStateOf(false) }
     var rohstoffMenueOffen by remember { mutableStateOf(false) }
     val tabellenScrollState = rememberScrollState()
-    val geschaeftspartnerOptionen = remember(ablauf) {
-        ablauf.map { eintrag -> eintrag.geschaeftspartner }.distinct().sorted()
+    val geschaeftspartnerOptionen = remember(ablauf, laufendeKriege) {
+        (ablauf.map { eintrag -> eintrag.geschaeftspartner } + laufendeKriege.flatMap { it.gegnerNamen })
+            .distinct()
+            .sorted()
     }
     val rohstoffOptionen = remember(ablauf) {
         ablauf.map { eintrag -> eintrag.rohstoffOderVorgang }.distinct().sorted()
     }
     val minRunde = minRundeEingabe.toIntOrNull() ?: 0
+    val sichtbareKriege = laufendeKriege.filter { krieg ->
+        geschaeftspartnerFilter == null ||
+            krieg.betrifftGeschaeftspartner(requireNotNull(geschaeftspartnerFilter))
+    }
     val nachSachfilter = ablauf.filter { eintrag ->
         (geschaeftspartnerFilter == null ||
             eintrag.geschaeftspartner == geschaeftspartnerFilter) &&
@@ -533,7 +578,8 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
         runde = maxOf(
             rememberAblaufSpaltenbreite(listOf("Runde"), 12.sp),
             rememberAblaufSpaltenbreite(
-                gefilterterAblauf.map { eintrag -> eintrag.runde.toString() },
+                gefilterterAblauf.map { eintrag -> eintrag.runde.toString() } +
+                    sichtbareKriege.map { krieg -> "seit R${krieg.begonnenInRunde}" },
                 13.sp,
             ),
         ),
@@ -544,6 +590,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
             ),
             rememberAblaufSpaltenbreite(
                 gefilterterAblauf.map { eintrag -> eintrag.geschaeftspartner } +
+                    sichtbareKriege.map { krieg -> krieg.geschaeftspartnerText } +
                     rundenGruppen.values.map { zeilen -> "${zeilen.size} Zeilen" } +
                     "kumulativ",
                 13.sp,
@@ -558,6 +605,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                 gefilterterAblauf
                     .filter { eintrag -> eintrag.ablaufRohstoff() == null }
                     .map(SpielerAblaufEintrag::ablaufVorgangstext) +
+                    sichtbareKriege.map { krieg -> krieg.vorgangText } +
                     listOf("eingeklappt", "Saldo zum Rundenende"),
                 13.sp,
             ),
@@ -575,7 +623,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                 gefilterterAblauf.map { eintrag -> eintrag.preis.zuMark() } +
                     rundenGruppen.values.map { zeilen ->
                         "Saldo: ${zeilen.fold(Zahlungsmittel()) { summe, zeile -> summe + zeile.preis }.zuMark()}"
-                    } + listOf(minRundenSaldo.zuMark(), "Saldo: ${minRundenSaldo.zuMark()}"),
+                    } + listOf(minRundenSaldo.zuMark(), "Saldo: ${minRundenSaldo.zuMark()}", "–"),
                 13.sp,
             ),
         ),
@@ -599,7 +647,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (ablauf.isEmpty()) {
+        if (ablauf.isEmpty() && laufendeKriege.isEmpty()) {
             Text(
                 text = "Noch keine Abläufe",
                 modifier = Modifier.padding(8.dp),
@@ -639,6 +687,18 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                         rohstoffMenueOffen = false
                     },
                 )
+                sichtbareKriege.forEachIndexed { index, krieg ->
+                    SpielerAblaufTabellenzeile(
+                        runde = "seit R${krieg.begonnenInRunde}",
+                        geschaeftspartner = krieg.geschaeftspartnerText,
+                        rohstoffOderVorgang = krieg.vorgangText,
+                        preis = "–",
+                        hintergrund = MaterialTheme.colorScheme.errorContainer,
+                        spaltenbreiten = spaltenbreiten,
+                        vorgangsfarbe = MaterialTheme.colorScheme.onErrorContainer,
+                        obereRundentrennung = index > 0,
+                    )
+                }
                 rundenGruppen.entries.forEachIndexed { rundenIndex, (runde, zeilen) ->
                     val istEingeklappt = runde in eingeklappteRunden
                     val hatKumulativeZeile = minRunde > 0 && runde == minRunde
@@ -664,7 +724,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                             spaltenbreiten = spaltenbreiten,
                             beiRundenKlick = beiRundenKlick,
                             istKompakt = true,
-                            obereRundentrennung = rundenIndex > 0,
+                            obereRundentrennung = rundenIndex > 0 || sichtbareKriege.isNotEmpty(),
                         )
                     } else {
                         if (hatKumulativeZeile) {
@@ -677,7 +737,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                                 spaltenbreiten = spaltenbreiten,
                                 beiRundenKlick = beiRundenKlick,
                                 istKompakt = true,
-                                obereRundentrennung = rundenIndex > 0,
+                                obereRundentrennung = rundenIndex > 0 || sichtbareKriege.isNotEmpty(),
                             )
                         }
                         zeilen.forEachIndexed { zeilenIndex, eintrag ->
@@ -697,7 +757,7 @@ private fun SpielerAblauf(ablauf: List<SpielerAblaufEintrag>) {
                                 rohstoff = rohstoff,
                                 vorgangsfarbe = rohstoff?.farbe ?: rendite?.renditeFarbe(),
                                 beiRundenKlick = beiRundenKlick,
-                                obereRundentrennung = rundenIndex > 0 &&
+                                obereRundentrennung = (rundenIndex > 0 || sichtbareKriege.isNotEmpty()) &&
                                     !hatKumulativeZeile && zeilenIndex == 0,
                             )
                         }
