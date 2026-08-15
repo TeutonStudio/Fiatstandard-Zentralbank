@@ -106,10 +106,21 @@ class MehrspielerLobbyDienst(
         val lobby = lobby(lobbyId)
         return lobby.sperre.withLock {
             check(lobby.status == Status.OFFEN) { "Die Lobby wurde bereits gestartet." }
-            require(lobby.spieler.size < lobby.konfiguration.maximaleSpieler) { "Die Lobby ist voll." }
-            require(lobby.spieler.none { it.name.equals(name, ignoreCase = true) }) {
-                "Der Spielername '$name' ist bereits vergeben."
+
+            val vorhandenerSpieler = lobby.spieler.firstOrNull {
+                it.name.equals(name, ignoreCase = true)
             }
+            if (vorhandenerSpieler != null) {
+                val eingabeHash = hasheSpielerPasswort(anfrage.passwort)
+                if (!MessageDigestHelper.gleich(vorhandenerSpieler.passwortHash, eingabeHash)) {
+                    throw UngueltigeSpielerAnmeldung()
+                }
+                vorhandenerSpieler.verbunden = true
+                lobby.revision++
+                return@withLock neueSitzung(lobby, vorhandenerSpieler)
+            }
+
+            require(lobby.spieler.size < lobby.konfiguration.maximaleSpieler) { "Die Lobby ist voll." }
             require(lobby.spieler.none { it.farbe == farbe }) {
                 "Die Farbe ${farbe.name} ist bereits vergeben."
             }
@@ -121,14 +132,7 @@ class MehrspielerLobbyDienst(
             )
             lobby.spieler += spieler
             lobby.revision++
-            val token = neuesToken()
-            sitzungen[token] = LobbySitzung(lobby.id, spieler.id)
-            LobbySitzungDto(
-                lobbyId = lobby.id,
-                spielerId = spieler.id.wert,
-                sessionToken = token,
-                lobby = lobby.zuDto(),
-            )
+            neueSitzung(lobby, spieler)
         }
     }
 
@@ -237,6 +241,17 @@ class MehrspielerLobbyDienst(
                 lobby = lobby.zuDto(),
             )
         }
+    }
+
+    private fun neueSitzung(lobby: Lobby, spieler: LobbySpieler): LobbySitzungDto {
+        val token = neuesToken()
+        sitzungen[token] = LobbySitzung(lobby.id, spieler.id)
+        return LobbySitzungDto(
+            lobbyId = lobby.id,
+            spielerId = spieler.id.wert,
+            sessionToken = token,
+            lobby = lobby.zuDto(),
+        )
     }
 
     private fun pruefeKonfiguration(konfiguration: LobbyKonfigurationDto) {
