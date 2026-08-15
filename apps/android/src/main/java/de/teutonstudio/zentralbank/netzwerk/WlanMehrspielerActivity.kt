@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +37,8 @@ import androidx.core.content.ContextCompat
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
 import de.teutonstudio.zentralbank.protokoll.SpielAktionDto
 import de.teutonstudio.zentralbank.schnittstelle.theme.CZBOracleRechnerTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class WlanMehrspielerActivity : AppCompatActivity() {
@@ -74,6 +77,14 @@ private fun WlanMehrspielerBildschirm(
     var manuelleSpielId by remember { mutableStateOf("") }
     var berechtigungsFehler by remember { mutableStateOf<String?>(null) }
     var nachBerechtigung by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    LaunchedEffect(zustand.sitzung?.sessionToken) {
+        if (zustand.sitzung == null) return@LaunchedEffect
+        while (isActive) {
+            delay(AKTUALISIERUNGSINTERVALL_MS)
+            WlanMehrspielerLaufzeit.aktualisieren()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -283,3 +294,4 @@ private fun SpielAktionDto.bezeichnung(): String = javaClass.simpleName
     .replace(Regex("([a-z])([A-Z])"), "$1 $2")
 
 private const val LOKALES_NETZWERK_BERECHTIGUNG = "android.permission.ACCESS_LOCAL_NETWORK"
+private const val AKTUALISIERUNGSINTERVALL_MS = 1_500L
