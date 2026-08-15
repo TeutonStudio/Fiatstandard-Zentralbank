@@ -13,7 +13,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.R
-import de.teutonstudio.zentralbank.netzwerk.WlanMehrspielerActivity
+import de.teutonstudio.zentralbank.netzwerk.WlanSpielBeitretenActivity
+import de.teutonstudio.zentralbank.netzwerk.WlanSpielErstellenActivity
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.ImageCard
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 
@@ -37,31 +38,16 @@ fun Hauptmenü(
                 ImageCard(
                     bild_index = R.drawable.newgameicon,
                     modifier = Modifier.weight(1f),
-                    bild_label = "Neues Spiel",
+                    bild_label = "Neues Spiel (Lokal)",
                     beiKlick = beiNeu,
                 )
                 ImageCard(
-                    bild_index = R.drawable.loadgameicon,
+                    bild_index = R.drawable.newgameicon,
                     modifier = Modifier.weight(1f),
-                    bild_label = "Spiel laden",
-                    beiKlick = beiLade,
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                ImageCard(
-                    bild_index = R.drawable.lebensraeume,
-                    modifier = Modifier.weight(1f),
-                    bild_label = "Lebensräume verwalten",
-                    beiKlick = beiLebensraeume,
-                )
-                ImageCard(
-                    bild_index = R.drawable.loadgameicon,
-                    modifier = Modifier.weight(1f),
-                    bild_label = "Spielstände verwalten",
-                    beiKlick = beiSpielstaende,
+                    bild_label = "Neues Spiel (WLAN)",
+                    beiKlick = {
+                        context.startActivity(Intent(context, WlanSpielErstellenActivity::class.java))
+                    },
                 )
             }
             Row(
@@ -71,10 +57,45 @@ fun Hauptmenü(
                 ImageCard(
                     bild_index = R.drawable.newgameicon,
                     modifier = Modifier.weight(1f),
-                    bild_label = "WLAN-Mehrspieler",
+                    bild_label = "Neues Spiel (Online)",
+                    enabled = false,
+                    beiKlick = {},
+                )
+                ImageCard(
+                    bild_index = R.drawable.loadgameicon,
+                    modifier = Modifier.weight(1f),
+                    bild_label = "Spiel beitreten",
                     beiKlick = {
-                        context.startActivity(Intent(context, WlanMehrspielerActivity::class.java))
+                        context.startActivity(Intent(context, WlanSpielBeitretenActivity::class.java))
                     },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ImageCard(
+                    bild_index = R.drawable.loadgameicon,
+                    modifier = Modifier.weight(1f),
+                    bild_label = "Spiel laden",
+                    beiKlick = beiLade,
+                )
+                ImageCard(
+                    bild_index = R.drawable.lebensraeume,
+                    modifier = Modifier.weight(1f),
+                    bild_label = "Lebensräume verwalten",
+                    beiKlick = beiLebensraeume,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ImageCard(
+                    bild_index = R.drawable.loadgameicon,
+                    modifier = Modifier.weight(1f),
+                    bild_label = "Spielstände verwalten",
+                    beiKlick = beiSpielstaende,
                 )
                 Spacer(modifier = Modifier.weight(1f))
             }
