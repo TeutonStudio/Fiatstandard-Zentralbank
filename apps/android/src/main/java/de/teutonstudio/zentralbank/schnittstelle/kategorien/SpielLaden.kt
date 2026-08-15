@@ -1,9 +1,11 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -16,9 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
+import de.teutonstudio.zentralbank.netzwerk.WlanMehrspielerActivity
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 
@@ -29,6 +33,7 @@ fun SpielLaden(
     nachLaden: () -> Unit,
     spielstaende: List<SpielstandUebersicht>,
 ) {
+    val context = LocalContext.current
     var spielstand by remember { mutableStateOf<SpielstandUebersicht?>(null) }
     Titel(
         beiZurück = beiAbbruch,
@@ -51,6 +56,18 @@ fun SpielLaden(
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        spielstand
+            ?.takeIf { it.id >= 0 && it.istLadbar }
+            ?.let {
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(context, WlanMehrspielerActivity::class.java))
+                    },
+                    modifier = ModiPad5,
+                ) {
+                    Text("Bestehendes Spiel im WLAN fortsetzen")
+                }
+            }
     }
 }
 
