@@ -62,14 +62,14 @@ data class Spieler(
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val passwortHash: String = "",
-    @OptIn(ExperimentalSerializationApi::class)
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val farbe: SpielerFarbe? = null,
     val rohstoffe: Map<Rohstoff, Int> = emptyMap(),
     val geldkonto: Geld = Geld.NULL,
     val anleihen: List<AnleiheId> = emptyList(),
     val bauteile: Map<BauteilTyp, Int> = emptyMap(),
     val spielstil: SpielerStil = SpielerStil.VORSICHTIG,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val farbe: SpielerFarbe? = null,
 )
 
 @JvmInline
