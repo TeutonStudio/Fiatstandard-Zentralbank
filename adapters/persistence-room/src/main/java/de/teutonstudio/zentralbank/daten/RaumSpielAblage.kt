@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import de.teutonstudio.zentralbank.anwendung.GespeichertesSpiel
 import de.teutonstudio.zentralbank.anwendung.SpielAblage
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
+import de.teutonstudio.zentralbank.daten.raumdatenbank.entitaet.SpielstandEntitaet
 import de.teutonstudio.zentralbank.daten.zuordnung.zuEntitaet
 import de.teutonstudio.zentralbank.daten.zuordnung.zuGespeichertemSpiel
 import de.teutonstudio.zentralbank.datenbank.AppDatabase
@@ -18,26 +19,7 @@ class RaumSpielAblage(
     override fun spielstaendeBeobachten(): Flow<List<SpielstandUebersicht>> =
         spielstandDao.spielstaendeBeobachten().map { fachSpielstaende ->
             fachSpielstaende
-                .map { entitaet ->
-                    val gespeichert = runCatching { entitaet.zuGespeichertemSpiel() }
-                        .getOrElse { fehler ->
-                            return@map SpielstandUebersicht(
-                                id = entitaet.spielId,
-                                spielerNamen = emptyList(),
-                                runde = 0,
-                                ladeFehler = fehler.kompakteLadeFehlerMeldung(),
-                            )
-                        }
-                    runCatching { gespeichert.zuUebersicht() }
-                        .getOrElse { fehler ->
-                            SpielstandUebersicht(
-                                id = gespeichert.id,
-                                spielerNamen = gespeichert.startzustand.spieler.map { it.name },
-                                runde = gespeichert.startzustand.rundenzähler,
-                                ladeFehler = fehler.kompakteLadeFehlerMeldung(),
-                            )
-                        }
-                }
+                .map(SpielstandEntitaet::zuSichereUebersicht)
                 .sortedBy { uebersicht -> uebersicht.id }
         }
 
@@ -65,6 +47,27 @@ class RaumSpielAblage(
             }
         }
     }
+}
+
+private fun SpielstandEntitaet.zuSichereUebersicht(): SpielstandUebersicht {
+    val gespeichert = runCatching { zuGespeichertemSpiel() }
+        .getOrElse { fehler ->
+            return SpielstandUebersicht(
+                id = spielId,
+                spielerNamen = emptyList(),
+                runde = 0,
+                ladeFehler = fehler.kompakteLadeFehlerMeldung(),
+            )
+        }
+    return runCatching { gespeichert.zuUebersicht() }
+        .getOrElse { fehler ->
+            SpielstandUebersicht(
+                id = gespeichert.id,
+                spielerNamen = gespeichert.startzustand.spieler.map { it.name },
+                runde = gespeichert.startzustand.rundenzähler,
+                ladeFehler = fehler.kompakteLadeFehlerMeldung(),
+            )
+        }
 }
 
 private fun Throwable.kompakteLadeFehlerMeldung(): String =
