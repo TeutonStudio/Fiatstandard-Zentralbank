@@ -70,6 +70,12 @@ object WlanMehrspielerLaufzeit {
             val gespeichert = withContext(Dispatchers.IO) {
                 speicher.spielLaden(spielId) ?: error("Spielstand $spielId wurde nicht gefunden.")
             }
+            // Erst vollständig rekonstruieren, bevor ein Socket geöffnet oder per NSD veröffentlicht wird.
+            // Ein historisch inkompatibler Spielstand darf niemals als scheinbar funktionsfähiger Host laufen.
+            val aktuellerZustand = withContext(Dispatchers.Default) {
+                gespeichert.aktuellerZustand()
+            }
+
             stoppeHost()
             val neuerHost = WlanSpielHost(SpielNetzwerkDienst(speicher), spielId)
             withContext(Dispatchers.IO) { neuerHost.starten() }
@@ -79,7 +85,7 @@ object WlanMehrspielerLaufzeit {
                 spielId = spielId,
                 adresse = adresse,
                 port = neuerHost.port,
-                spieler = gespeichert.aktuellerZustand().spieler.map { it.name },
+                spieler = aktuellerZustand.spieler.map { it.name },
             )
             _zustand.value = _zustand.value.copy(
                 host = status,
