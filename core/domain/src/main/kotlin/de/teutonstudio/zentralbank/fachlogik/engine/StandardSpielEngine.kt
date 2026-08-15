@@ -257,7 +257,7 @@ class StandardSpielEngine : SpielEngine {
             is SpielAktion.VerarbeitungAusfuehren -> SpielEreignis.VerarbeitungAusgefuehrt(
                 zugId = aktion.zugId,
                 feld = aktion.feld,
-                laeufe = aktion.laeufe,
+                laeufe = aktion.laeeufe,
             )
             is SpielAktion.VerwaltungsstandortVersorgen ->
                 SpielEreignis.VerwaltungsstandortVersorgt(aktion.zugId, aktion.ecke)
@@ -284,13 +284,24 @@ class StandardSpielEngine : SpielEngine {
                 preis = aktion.preis,
                 art = aktion.art,
             )
-            is SpielAktion.KriegErklaeren -> SpielEreignis.KriegErklaert(
-                krieg = de.teutonstudio.zentralbank.fachlogik.modell.KriegId(
-                    "krieg-${zustand.naechsteKriegNummer}",
-                ),
-                aggressor = aktion.aggressor,
-                verteidiger = aktion.verteidiger,
-            )
+            is SpielAktion.KriegErklaeren -> {
+                val zug = requireNotNull(zustand.zugStatus) {
+                    "Eine Kriegserklärung setzt einen aktiven Zug voraus."
+                }
+                require(zustand.aktiverSpieler == aktion.aggressor && zug.spieler == aktion.aggressor) {
+                    "Nur der aktuell am Zug befindliche Spieler darf als Aggressor Krieg erklären."
+                }
+                require(zug.phase == ZugPhase.Epizug) {
+                    "Kriegserklärungen sind nur im Epizug zulässig."
+                }
+                SpielEreignis.KriegErklaert(
+                    krieg = de.teutonstudio.zentralbank.fachlogik.modell.KriegId(
+                        "krieg-${zustand.naechsteKriegNummer}",
+                    ),
+                    aggressor = aktion.aggressor,
+                    verteidiger = aktion.verteidiger,
+                )
+            }
             is SpielAktion.KriegsAllianzBeitreten -> SpielEreignis.KriegsAllianzBeigetreten(
                 aktion.krieg,
                 aktion.spieler,
