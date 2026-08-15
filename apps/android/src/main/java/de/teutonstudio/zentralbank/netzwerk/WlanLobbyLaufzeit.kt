@@ -25,6 +25,7 @@ data class WlanLobbyHostStatus(
 data class WlanLobbyZustand(
     val host: WlanLobbyHostStatus? = null,
     val gefundeneLobbys: List<WlanLobbyEndpunkt> = emptyList(),
+    val gefundeneSpiele: List<WlanEndpunkt> = emptyList(),
     val sucheAktiv: Boolean = false,
     val verbundenMit: WlanLobbyEndpunkt? = null,
     val sitzung: LobbySitzungDto? = null,
@@ -34,10 +35,7 @@ data class WlanLobbyZustand(
     val fehler: String? = null,
 )
 
-/**
- * Prozessweite Android-Laufzeit für die Vor-Spiel-Lobby. Ein Host bleibt damit erreichbar,
- * während Compose neu aufgebaut wird; der eigentliche Spielzustand liegt weiterhin in Room.
- */
+/** Prozessweite Android-Laufzeit für die Vor-Spiel-Lobby und gemeinsame WLAN-Suche. */
 object WlanLobbyLaufzeit {
     private val _zustand = MutableStateFlow(WlanLobbyZustand())
     val zustand: StateFlow<WlanLobbyZustand> = _zustand.asStateFlow()
@@ -153,6 +151,23 @@ object WlanLobbyLaufzeit {
         }.onFailure { meldeFehler(it.message ?: "Beitritt zur WLAN-Lobby fehlgeschlagen.") }
     }
 
+    suspend fun laufendemSpielBeitreten(
+        endpunkt: WlanEndpunkt,
+        spielerName: String,
+        passwort: String,
+    ) {
+        runCatching {
+            require(spielerName.isNotBlank()) { "Bitte einen Spielernamen angeben." }
+            require(passwort.isNotBlank()) { "Bitte das Spielerpasswort angeben." }
+            WlanMehrspielerLaufzeit.beitreten(endpunkt, spielerName.trim(), passwort)
+            _zustand.value = _zustand.value.copy(
+                spielEndpunkt = endpunkt,
+                meldung = "Verbindung zu '${endpunkt.name}' wird als $spielerName hergestellt.",
+                fehler = null,
+            )
+        }.onFailure { meldeFehler(it.message ?: "Beitritt zum WLAN-Spiel fehlgeschlagen.") }
+    }
+
     suspend fun bereitSetzen(bereit: Boolean) {
         val sitzung = _zustand.value.sitzung ?: return
         runCatching {
@@ -242,12 +257,13 @@ object WlanLobbyLaufzeit {
         suchEntdeckung?.close()
         _zustand.value = _zustand.value.copy(
             gefundeneLobbys = emptyList(),
+            gefundeneSpiele = emptyList(),
             sucheAktiv = true,
             fehler = null,
         )
         suchEntdeckung = WlanSpielEntdeckung(app).also { entdeckung ->
-            entdeckung.lobbysSuchen(
-                beiFund = { fund ->
+            entdeckung.angeboteSuchen(
+                beiLobbyFund = { fund ->
                     val bisher = _zustand.value.gefundeneLobbys.filterNot {
                         it.host == fund.host && it.port == fund.port && it.lobbyId == fund.lobbyId
                     }
@@ -255,9 +271,18 @@ object WlanLobbyLaufzeit {
                         gefundeneLobbys = (bisher + fund).sortedBy(WlanLobbyEndpunkt::name),
                     )
                 },
+                beiSpielFund = { fund ->
+                    val bisher = _zustand.value.gefundeneSpiele.filterNot {
+                        it.host == fund.host && it.port == fund.port && it.spielId == fund.spielId
+                    }
+                    _zustand.value = _zustand.value.copy(
+                        gefundeneSpiele = (bisher + fund).sortedBy(WlanEndpunkt::name),
+                    )
+                },
                 beiEntfernt = { name ->
                     _zustand.value = _zustand.value.copy(
                         gefundeneLobbys = _zustand.value.gefundeneLobbys.filterNot { it.name == name },
+                        gefundeneSpiele = _zustand.value.gefundeneSpiele.filterNot { it.name == name },
                     )
                 },
                 beiFehler = ::meldeFehler,
