@@ -1,5 +1,6 @@
 package de.teutonstudio.zentralbank.protokoll
 
+import de.teutonstudio.zentralbank.fachlogik.beobachtung.SpielBeobachtung
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -19,6 +20,31 @@ data class SpielErstelltDto(
     val version: Int = API_VERSION,
     val spielId: String,
     val zustand: SpielZustandDto,
+    val revision: Long = 0,
+)
+
+@Serializable
+data class SpielBeitretenAnfrageDto(
+    val version: Int = API_VERSION,
+    val spielerName: String,
+)
+
+@Serializable
+data class SpielSitzungDto(
+    val version: Int = API_VERSION,
+    val spielId: String,
+    val spielerId: String,
+    val sessionToken: String,
+    val revision: Long,
+)
+
+@Serializable
+data class SpielBeobachtungAntwortDto(
+    val version: Int = API_VERSION,
+    val spielId: String,
+    val spieler: String,
+    val revision: Long,
+    val beobachtung: SpielBeobachtung,
 )
 
 @Serializable
@@ -67,12 +93,15 @@ data class ErlaubteAktionenDto(
     val spielId: String,
     val spieler: String,
     val aktionen: List<SpielAktionDto>,
+    val revision: Long = 0,
 )
 
 @Serializable
 data class AktionAusfuehrenAnfrageDto(
     val version: Int = API_VERSION,
     val aktion: SpielAktionDto,
+    val commandId: String = "",
+    val expectedRevision: Long? = null,
 )
 
 @Serializable
@@ -81,6 +110,8 @@ data class AktionErgebnisDto(
     val spielId: String,
     val zustand: SpielZustandDto,
     val ereignisse: List<SpielEreignisDto>,
+    val revision: Long = 0,
+    val commandId: String? = null,
 )
 
 @Serializable
