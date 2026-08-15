@@ -244,6 +244,7 @@ private fun WlanSpielBeitretenBildschirm(
     zustand: WlanLobbyZustand,
     beiZurueck: () -> Unit,
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val berechtigung = lokaleNetzwerkBerechtigung()
     var name by remember { mutableStateOf("") }
@@ -270,16 +271,14 @@ private fun WlanSpielBeitretenBildschirm(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            item {
-                Text("Eigenes Spielerprofil", style = MaterialTheme.typography.titleLarge)
-            }
+            item { Text("Eigenes Spielerprofil", style = MaterialTheme.typography.titleLarge) }
             item { Eingabe("Spielername", name) { name = it } }
             item {
                 OutlinedTextField(
                     value = passwort,
                     onValueChange = { passwort = it },
                     label = { Text("Passwort") },
-                    supportingText = { Text("Dieses Passwort identifiziert deinen Spieler auch nach Verbindungsabbruch.") },
+                    supportingText = { Text("Identifiziert deinen Spieler bei Wiederverbindung und späterer Fortsetzung.") },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -289,14 +288,19 @@ private fun WlanSpielBeitretenBildschirm(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         berechtigung { WlanLobbyLaufzeit.sucheStarten() }
-                    }) { Text(if (zustand.sucheAktiv) "Erneut suchen" else "WLAN-Lobbys suchen") }
+                    }) { Text(if (zustand.sucheAktiv) "Erneut suchen" else "WLAN-Spiele suchen") }
                     if (zustand.sucheAktiv) {
                         OutlinedButton(onClick = WlanLobbyLaufzeit::sucheBeenden) { Text("Suche stoppen") }
                     }
                 }
             }
-            if (zustand.gefundeneLobbys.isEmpty()) {
-                item { Text("Keine offene WLAN-Lobby gefunden.") }
+
+            if (zustand.gefundeneLobbys.isEmpty() && zustand.gefundeneSpiele.isEmpty()) {
+                item { Text("Keine offene Lobby und kein fortgesetztes WLAN-Spiel gefunden.") }
+            }
+
+            if (zustand.gefundeneLobbys.isNotEmpty()) {
+                item { Text("Neue Spiele", style = MaterialTheme.typography.titleLarge) }
             }
             items(zustand.gefundeneLobbys) { lobby ->
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -306,7 +310,7 @@ private fun WlanSpielBeitretenBildschirm(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(lobby.name, style = MaterialTheme.typography.titleMedium)
-                            Text("${lobby.host}:${lobby.port}")
+                            Text("Offene Lobby · ${lobby.host}:${lobby.port}")
                         }
                         Button(
                             onClick = {
@@ -316,6 +320,34 @@ private fun WlanSpielBeitretenBildschirm(
                             },
                             enabled = name.isNotBlank() && passwort.isNotBlank(),
                         ) { Text("Beitreten") }
+                    }
+                }
+            }
+
+            if (zustand.gefundeneSpiele.isNotEmpty()) {
+                item { Text("Fortgesetzte Spiele", style = MaterialTheme.typography.titleLarge) }
+            }
+            items(zustand.gefundeneSpiele) { spiel ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(spiel.name, style = MaterialTheme.typography.titleMedium)
+                            Text("Spiel ${spiel.spielId} · ${spiel.host}:${spiel.port}")
+                        }
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    WlanLobbyLaufzeit.laufendemSpielBeitreten(spiel, name, passwort)
+                                    if (WlanMehrspielerLaufzeit.zustand.value.sitzung != null) {
+                                        context.startActivity(Intent(context, WlanMehrspielerActivity::class.java))
+                                    }
+                                }
+                            },
+                            enabled = name.isNotBlank(),
+                        ) { Text("Fortsetzen") }
                     }
                 }
             }
@@ -490,7 +522,8 @@ private fun <K : Enum<K>> Map<K, String>.positiveWerte(): Map<String, Int> = ent
     }
     .toMap()
 
-private fun basispunkteText(wert: Int): String = "${wert / 100},${kotlin.math.abs(wert % 100).toString().padStart(2, '0')} %"
+private fun basispunkteText(wert: Int): String =
+    "${wert / 100},${kotlin.math.abs(wert % 100).toString().padStart(2, '0')} %"
 
 private const val LOKALES_NETZWERK_BERECHTIGUNG = "android.permission.ACCESS_LOCAL_NETWORK"
 private const val AKTUALISIERUNGSINTERVALL_MS = 1_500L
