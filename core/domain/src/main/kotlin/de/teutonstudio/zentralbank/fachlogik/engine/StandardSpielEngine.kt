@@ -257,7 +257,7 @@ class StandardSpielEngine : SpielEngine {
             is SpielAktion.VerarbeitungAusfuehren -> SpielEreignis.VerarbeitungAusgefuehrt(
                 zugId = aktion.zugId,
                 feld = aktion.feld,
-                laeufe = aktion.laeeufe,
+                laeufe = aktion.laeufe,
             )
             is SpielAktion.VerwaltungsstandortVersorgen ->
                 SpielEreignis.VerwaltungsstandortVersorgt(aktion.zugId, aktion.ecke)
