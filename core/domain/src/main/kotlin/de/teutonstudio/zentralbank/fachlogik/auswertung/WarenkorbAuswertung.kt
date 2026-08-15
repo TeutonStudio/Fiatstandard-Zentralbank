@@ -56,7 +56,7 @@ object WarenkorbAuswertung {
         if (feldzahlen.isEmpty()) return emptyMap()
 
         val teiler = feldzahlen
-            .map(Pair<Rohstoff, Int>::second)
+            .map { (_, anzahl) -> anzahl }
             .reduce(::ggT)
             .coerceAtLeast(1)
         return linkedMapOf<Rohstoff, Int>().apply {
