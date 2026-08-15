@@ -46,12 +46,19 @@ import de.teutonstudio.zentralbank.daten.karten.KartenReferenz
 import de.teutonstudio.zentralbank.daten.karten.KartenReferenzMetadaten
 import de.teutonstudio.zentralbank.daten.karten.MAX_REFERENZ_BREITE
 import de.teutonstudio.zentralbank.daten.karten.MIN_REFERENZ_BREITE
+import de.teutonstudio.zentralbank.fachlogik.generierung.KartenGenerator
+import de.teutonstudio.zentralbank.fachlogik.generierung.KartenGeneratorKonfiguration
+import de.teutonstudio.zentralbank.fachlogik.generierung.KartenGeneratorProfil
+import de.teutonstudio.zentralbank.fachlogik.generierung.VorkommensDichte
+import de.teutonstudio.zentralbank.fachlogik.modell.AKTUELLE_KARTEN_FORMAT_VERSION
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenFeld
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.RohstoffVorkommen
 import de.teutonstudio.zentralbank.fachlogik.modell.Spezialfeld
 import de.teutonstudio.zentralbank.fachlogik.modell.SpezialfeldTyp
+import de.teutonstudio.zentralbank.fachlogik.modell.VorkommensArt
 import de.teutonstudio.zentralbank.fachlogik.modell.angrenzendeFelder
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import kotlinx.coroutines.launch
@@ -71,6 +78,11 @@ internal enum class KartenWerkzeug(val beschriftung: String) {
     GEBIRGE("Gebirge"),
     WUESTE("Wüste"),
     SUMPF("Sumpf"),
+    ROHOEL("Öl"),
+    EISENERZ("Eisen"),
+    KOHLE("Kohle"),
+    LEHM("Lehm"),
+    VORKOMMEN_ENTFERNEN("Vorkommen entfernen"),
     TEICH("Teich"),
     SPEZIAL_ENTFERNEN("Spezialfeld entfernen"),
 }
@@ -199,6 +211,7 @@ fun KartenEditorDialog(
                             karte = entwurf,
                             werkzeug = werkzeug,
                             beiWerkzeug = { werkzeug = it },
+                            beiKarteGeneriert = ::uebernehme,
                             beiAnsichtZuruecksetzen = draufsichtStatus::zuruecksetzen,
                             referenz = referenzStatus.referenz,
                             referenzWirdGeladen = referenzWirdGeladen,
@@ -304,7 +317,6 @@ fun KartenEditorDialog(
             }
         }
     }
-
 }
 
 @Composable
@@ -315,6 +327,7 @@ private fun KartenWerkzeugleiste(
     karte: KartenVorlage,
     werkzeug: KartenWerkzeug,
     beiWerkzeug: (KartenWerkzeug) -> Unit,
+    beiKarteGeneriert: (KartenVorlage) -> Unit,
     beiAnsichtZuruecksetzen: () -> Unit,
     referenz: KartenReferenz?,
     referenzWirdGeladen: Boolean,
@@ -328,6 +341,11 @@ private fun KartenWerkzeugleiste(
     beiRueckgaengig: () -> Unit,
     beiWiederholen: () -> Unit,
 ) {
+    var generatorSeed by remember { mutableStateOf("1") }
+    var generatorProfil by remember { mutableStateOf(KartenGeneratorProfil.AUSGEWOGEN) }
+    var generatorDichte by remember { mutableStateOf(VorkommensDichte.NORMAL) }
+    val generator = remember { KartenGenerator() }
+
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -397,12 +415,26 @@ private fun KartenWerkzeugleiste(
                 )
             }
         }
+        Text("Vorkommen", style = MaterialTheme.typography.titleSmall)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            KartenWerkzeug.entries.filter(KartenWerkzeug::istVorkommensWerkzeug).forEach { eintrag ->
+                FilterChip(
+                    selected = werkzeug == eintrag,
+                    onClick = { beiWerkzeug(eintrag) },
+                    label = { Text(eintrag.beschriftung) },
+                )
+            }
+        }
         Text("Spezialfelder", style = MaterialTheme.typography.titleSmall)
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            KartenWerkzeug.entries.filterNot(KartenWerkzeug::istGelaendeWerkzeug)
+            KartenWerkzeug.entries
+                .filter { eintrag -> !eintrag.istGelaendeWerkzeug() && !eintrag.istVorkommensWerkzeug() }
                 .forEach { eintrag ->
                     FilterChip(
                         selected = werkzeug == eintrag,
@@ -411,15 +443,88 @@ private fun KartenWerkzeugleiste(
                     )
                 }
         }
+        Text("Kartengenerator", style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(
+            value = generatorSeed,
+            onValueChange = { generatorSeed = it },
+            label = { Text("Seed") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            KartenGeneratorProfil.entries.forEach { profil ->
+                FilterChip(
+                    selected = generatorProfil == profil,
+                    onClick = { generatorProfil = profil },
+                    label = { Text(profil.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                )
+            }
+        }
+        Text("Vorkommensdichte", style = MaterialTheme.typography.labelMedium)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            VorkommensDichte.entries.forEach { dichte ->
+                FilterChip(
+                    selected = generatorDichte == dichte,
+                    onClick = { generatorDichte = dichte },
+                    label = { Text(dichte.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(
+                enabled = generatorSeed.toLongOrNull() != null,
+                onClick = {
+                    val seed = generatorSeed.toLongOrNull() ?: return@OutlinedButton
+                    val ergebnis = generator.generiere(
+                        seed = seed,
+                        konfiguration = KartenGeneratorKonfiguration(
+                            radius = karte.hexagon.radius.coerceAtLeast(4),
+                            profil = generatorProfil,
+                            vorkommensDichte = generatorDichte,
+                            maximaleVersuche = 16,
+                        ),
+                    )
+                    beiKarteGeneriert(
+                        ergebnis.vorlage.copy(
+                            id = karte.id,
+                            name = karte.name,
+                        ),
+                    )
+                },
+            ) {
+                Text("Karte generieren")
+            }
+            OutlinedButton(
+                enabled = generatorSeed.toLongOrNull() != null && karte.gelaendefelder.isNotEmpty(),
+                onClick = {
+                    val seed = generatorSeed.toLongOrNull() ?: return@OutlinedButton
+                    beiKarteGeneriert(
+                        generator.verteileVorkommenNeu(
+                            vorlage = karte,
+                            seed = seed,
+                            dichte = generatorDichte,
+                        ),
+                    )
+                },
+            ) {
+                Text("Vorkommen neu")
+            }
+        }
         Text(
             "Beim Setzen außerhalb wächst der Radius automatisch. Wasser wird nicht als Fläche " +
-                "gespeichert oder dargestellt. Ein Teich belegt die sechs Dreiecke um die " +
-                "nächstgelegene Ecke und ergänzt fehlendes Gelände als Ebene.",
+                "gespeichert oder dargestellt. Bergbauvorkommen liegen nur im Gebirge; Öl darf " +
+                "auf jedem Landgelände liegen. Ein Teich entfernt dort vorhandene Vorkommen.",
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
             "${karte.gelaendefelder.size} Geländedreiecke · " +
-                "${karte.spezialfelder.size} Spezialfelder",
+                "${karte.spezialfelder.size} Spezialfelder · ${karte.vorkommen.size} Vorkommen",
             style = MaterialTheme.typography.labelMedium,
         )
     }
@@ -440,6 +545,27 @@ internal fun KartenVorlage.wendeWerkzeugAn(
             spezialfelder = spezialfelder.filterNot { spezialfeld ->
                 position in spezialfeld.positionen
             },
+            vorkommen = vorkommen.filterNot { eintrag -> eintrag.position == position },
+        )
+    }
+
+    werkzeug.vorkommenOderNull()?.let { art ->
+        val gelaende = landNachPosition[position] ?: return this
+        if (spezialfelder.any { position in it.positionen }) return this
+        if (art != VorkommensArt.ROHOEL && gelaende != GelaendeTyp.GEBIRGE) return this
+        return copy(
+            formatVersion = AKTUELLE_KARTEN_FORMAT_VERSION,
+            vorkommen = vorkommen
+                .filterNot { eintrag -> eintrag.position == position }
+                .plus(RohstoffVorkommen(position, art))
+                .zuSortiertenVorkommen(),
+        )
+    }
+
+    if (werkzeug == KartenWerkzeug.VORKOMMEN_ENTFERNEN) {
+        return copy(
+            formatVersion = AKTUELLE_KARTEN_FORMAT_VERSION,
+            vorkommen = vorkommen.filterNot { eintrag -> eintrag.position == position },
         )
     }
 
@@ -473,10 +599,18 @@ internal fun KartenVorlage.wendeWerkzeugAn(
             hexagon = hexagon.mitMindestradiusFuer(neueFelder.map(GelaendeFeld::position)),
             gelaendefelder = neueFelder,
             spezialfelder = neueSpezialfelder,
+            vorkommen = vorkommen.filterNot { eintrag -> eintrag.position in positionen },
         )
     }
 
     val gelaende = requireNotNull(werkzeug.gelaendeOderNull())
+    val vorhandenesVorkommen = vorkommenAn(position)
+    if (
+        vorhandenesVorkommen in setOf(VorkommensArt.EISENERZ, VorkommensArt.KOHLE, VorkommensArt.LEHM) &&
+        gelaende != GelaendeTyp.GEBIRGE
+    ) {
+        return this
+    }
     val land = landNachPosition.toMutableMap().apply { put(position, gelaende) }
     val neueFelder = land.zuSortiertenGelaendefeldern()
     return copy(
@@ -492,8 +626,21 @@ private fun KartenWerkzeug.gelaendeOderNull(): GelaendeTyp? = when (this) {
     KartenWerkzeug.GEBIRGE -> GelaendeTyp.GEBIRGE
     KartenWerkzeug.WUESTE -> GelaendeTyp.WUESTE
     KartenWerkzeug.SUMPF -> GelaendeTyp.SUMPF
+    KartenWerkzeug.ROHOEL,
+    KartenWerkzeug.EISENERZ,
+    KartenWerkzeug.KOHLE,
+    KartenWerkzeug.LEHM,
+    KartenWerkzeug.VORKOMMEN_ENTFERNEN,
     KartenWerkzeug.TEICH,
     KartenWerkzeug.SPEZIAL_ENTFERNEN -> null
+}
+
+private fun KartenWerkzeug.vorkommenOderNull(): VorkommensArt? = when (this) {
+    KartenWerkzeug.ROHOEL -> VorkommensArt.ROHOEL
+    KartenWerkzeug.EISENERZ -> VorkommensArt.EISENERZ
+    KartenWerkzeug.KOHLE -> VorkommensArt.KOHLE
+    KartenWerkzeug.LEHM -> VorkommensArt.LEHM
+    else -> null
 }
 
 private fun KartenWerkzeug.istGelaendeWerkzeug(): Boolean = when (this) {
@@ -503,8 +650,16 @@ private fun KartenWerkzeug.istGelaendeWerkzeug(): Boolean = when (this) {
     KartenWerkzeug.GEBIRGE,
     KartenWerkzeug.WUESTE,
     KartenWerkzeug.SUMPF -> true
-    KartenWerkzeug.TEICH,
-    KartenWerkzeug.SPEZIAL_ENTFERNEN -> false
+    else -> false
+}
+
+private fun KartenWerkzeug.istVorkommensWerkzeug(): Boolean = when (this) {
+    KartenWerkzeug.ROHOEL,
+    KartenWerkzeug.EISENERZ,
+    KartenWerkzeug.KOHLE,
+    KartenWerkzeug.LEHM,
+    KartenWerkzeug.VORKOMMEN_ENTFERNEN -> true
+    else -> false
 }
 
 @Composable
@@ -628,3 +783,11 @@ private fun Map<KartenFeld, GelaendeTyp>.zuSortiertenGelaendefeldern(): List<Gel
                 .thenBy { it.key.haelfte.ordinal },
         )
         .map { (position, gelaende) -> GelaendeFeld(position, gelaende) }
+
+private fun List<RohstoffVorkommen>.zuSortiertenVorkommen(): List<RohstoffVorkommen> =
+    sortedWith(
+        compareBy<RohstoffVorkommen> { it.position.zeile }
+            .thenBy { it.position.spalte }
+            .thenBy { it.position.haelfte.ordinal }
+            .thenBy { it.art.ordinal },
+    )

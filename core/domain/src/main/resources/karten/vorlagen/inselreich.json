@@ -1,5 +1,5 @@
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "id": "vorlage-inselreich",
   "name": "Inselreich",
   "hexagon": {
@@ -21,12 +21,18 @@
     { "position": { "zeile": 0, "spalte": 0, "haelfte": "UNTEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 0, "spalte": 0, "haelfte": "OBEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 0, "spalte": 1, "haelfte": "UNTEN" }, "gelaende": "WUESTE" },
-    { "position": { "zeile": 0, "spalte": 1, "haelfte": "OBEN" }, "gelaende": "WUESTE" },
+    { "position": { "zeile": 0, "spalte": 1, "haelfte": "OBEN" }, "gelaende": "GEBIRGE" },
     { "position": { "zeile": 1, "spalte": -2, "haelfte": "OBEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 1, "spalte": -1, "haelfte": "OBEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 1, "spalte": -1, "haelfte": "UNTEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 2, "spalte": -2, "haelfte": "OBEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 2, "spalte": -2, "haelfte": "UNTEN" }, "gelaende": "EBENE" },
     { "position": { "zeile": 2, "spalte": -1, "haelfte": "UNTEN" }, "gelaende": "EBENE" }
+  ],
+  "vorkommen": [
+    { "position": { "zeile": -1, "spalte": 1, "haelfte": "OBEN" }, "art": "EISENERZ" },
+    { "position": { "zeile": -1, "spalte": 2, "haelfte": "UNTEN" }, "art": "KOHLE" },
+    { "position": { "zeile": 0, "spalte": 1, "haelfte": "OBEN" }, "art": "LEHM" },
+    { "position": { "zeile": 0, "spalte": 1, "haelfte": "UNTEN" }, "art": "ROHOEL" }
   ]
 }

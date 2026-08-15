@@ -3,6 +3,9 @@ package de.teutonstudio.zentralbank.daten.karten
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import de.teutonstudio.zentralbank.fachlogik.generierung.KartenGenerator
+import de.teutonstudio.zentralbank.fachlogik.generierung.stabilerKartenSeed
+import de.teutonstudio.zentralbank.fachlogik.modell.AELTESTE_UNTERSTUETZTE_KARTEN_FORMAT_VERSION
 import de.teutonstudio.zentralbank.fachlogik.modell.AKTUELLE_KARTEN_FORMAT_VERSION
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
 import java.io.File
@@ -36,6 +39,7 @@ class KartenAblage(context: Context) {
     private val referenzenVerzeichnis = File(anwendungskontext.filesDir, "karten/referenzen")
     private val referenzEntwuerfeVerzeichnis =
         File(anwendungskontext.cacheDir, "karten/referenz-entwuerfe")
+    private val kartenGenerator = KartenGenerator()
     private val json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
@@ -63,9 +67,12 @@ class KartenAblage(context: Context) {
             .sortedBy { datei -> datei.name }
             .mapNotNull { datei ->
                 val text = datei.readText()
-                text.takeIf { it.kartenFormatVersion() == AKTUELLE_KARTEN_FORMAT_VERSION }
-                    ?.zuKartenEintrag(KartenQuelle.EIGENE_KARTE)
-                    ?.let { eintrag ->
+                val version = text.kartenFormatVersion()
+                if (version == null || version !in unterstuetzteKartenVersionen()) {
+                    return@mapNotNull null
+                }
+                text.zuKartenEintrag(KartenQuelle.EIGENE_KARTE)
+                    .let { eintrag ->
                         eintrag.copy(hatReferenzbild = referenzMetadatenDatei(eintrag.vorlage.id).isFile)
                     }
             }
@@ -235,11 +242,29 @@ class KartenAblage(context: Context) {
 
     private fun String.zuKartenEintrag(quelle: KartenQuelle): KartenEintrag {
         val version = kartenFormatVersion()
-        require(version == AKTUELLE_KARTEN_FORMAT_VERSION) {
+        require(version != null && version in unterstuetzteKartenVersionen()) {
             "Nicht unterstützte Kartenformatversion: ${version ?: "nicht angegeben"}."
         }
+        val geladen = json.decodeFromString<KartenVorlage>(this)
+        val vorlage = if (geladen.formatVersion < AKTUELLE_KARTEN_FORMAT_VERSION) {
+            kartenGenerator.verteileVorkommenNeu(
+                vorlage = geladen,
+                seed = stabilerKartenSeed(
+                    buildString {
+                        append(geladen.id)
+                        append('|')
+                        append(geladen.name)
+                        append('|')
+                        geladen.gelaendefelder.forEach { feld -> append(feld) }
+                        geladen.spezialfelder.forEach { feld -> append(feld) }
+                    },
+                ),
+            )
+        } else {
+            geladen
+        }
         return KartenEintrag(
-            vorlage = json.decodeFromString<KartenVorlage>(this),
+            vorlage = vorlage,
             quelle = quelle,
         )
     }
@@ -250,6 +275,9 @@ class KartenAblage(context: Context) {
             ?.jsonPrimitive
             ?.content
             ?.toIntOrNull()
+
+    private fun unterstuetzteKartenVersionen(): IntRange =
+        AELTESTE_UNTERSTUETZTE_KARTEN_FORMAT_VERSION..AKTUELLE_KARTEN_FORMAT_VERSION
 
     companion object {
         private const val VORLAGEN_PFAD = "karten/vorlagen"

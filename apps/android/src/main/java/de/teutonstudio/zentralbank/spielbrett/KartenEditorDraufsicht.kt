@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.fachlogik.modell.GelaendeTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenKante
 import de.teutonstudio.zentralbank.fachlogik.modell.KartenVorlage
+import de.teutonstudio.zentralbank.fachlogik.modell.VorkommensArt
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import kotlin.math.atan2
@@ -48,13 +49,21 @@ private val GelaendeUmrissFarbe = Color(0xB3000000)
 private val SpezialfeldUmrissFarbe = Color(0xE6E0F2F1)
 private val TeichFarbe = Color(0xFF1976B9)
 private val TeichRandFarbe = Color(0xFF0A4F7A)
+private val VorkommensRandFarbe = Color(0xE6FFFFFF)
 private const val TEICH_RADIUS = 0.58f
+private const val VORKOMMENS_RADIUS = 0.22f
 private val DraufsichtGelaendeFarben = mapOf(
     GelaendeTyp.EBENE to Color(0xFF8DBB61),
     GelaendeTyp.WALD to Color(0xFF2E7D32),
     GelaendeTyp.GEBIRGE to Color(0xFF757575),
     GelaendeTyp.WUESTE to Color(0xFFD8B56A),
     GelaendeTyp.SUMPF to Color(0xFF607D3B),
+)
+private val DraufsichtVorkommensFarben = mapOf(
+    VorkommensArt.ROHOEL to Color(0xFF151515),
+    VorkommensArt.EISENERZ to Color(0xFFB65D3A),
+    VorkommensArt.KOHLE to Color(0xFF4C4C4C),
+    VorkommensArt.LEHM to Color(0xFFC98554),
 )
 
 @Immutable
@@ -155,7 +164,8 @@ internal fun KartenEditorDraufsicht(
             .semantics {
                 contentDescription =
                     "Draufsicht der bearbeitbaren Karte mit ${karte.gelaendefelder.size} " +
-                    "Geländedreiecken und ${karte.spezialfelder.size} Spezialfeldern" +
+                    "Geländedreiecken, ${karte.spezialfelder.size} Spezialfeldern und " +
+                    "${karte.vorkommen.size} Rohstoffvorkommen" +
                     if (referenzBild == null) "" else " und Referenzbild"
             }
             .pointerInput(status, referenzStatus, basisMassstab, referenzAusrichten) {
@@ -229,6 +239,15 @@ internal fun KartenEditorDraufsicht(
                         .filterNot(gebirgsBinnenkanten::contains)
                         .forEach { kante -> gelaendeUmriss.fuegeHinzu(kante, geometrie) }
                 }
+                val vorkommensMarker = karte.vorkommen.map { vorkommen ->
+                    val dreieck = grundDreieck(
+                        position = vorkommen.position.zu3DPosition(),
+                        ursprung = geometrie.ursprung,
+                    )
+                    val x = dreieck.ecken.sumOf { punkt -> punkt.x.toDouble() }.toFloat() / 3f
+                    val z = dreieck.ecken.sumOf { punkt -> punkt.z.toDouble() }.toFloat() / 3f
+                    vorkommen.art to Offset(x, z)
+                }
                 val spezialfeldUmriss = Path()
                 val teichMittelpunkte = karte.spezialfelder.mapNotNull { spezialfeld ->
                     val mitte = geometrie.punkt(spezialfeld.mittelpunkt) ?: return@mapNotNull null
@@ -256,6 +275,7 @@ internal fun KartenEditorDraufsicht(
                 val gelaendeStrichBreite = 1.5.dp.toPx()
                 val spezialfeldStrichBreite = 2.5.dp.toPx()
                 val teichRandBreite = 2.dp.toPx()
+                val vorkommensRandBreite = 1.5.dp.toPx()
                 val referenzRahmenBreite = 2.dp.toPx()
 
                 onDrawBehind {
@@ -345,6 +365,19 @@ internal fun KartenEditorDraufsicht(
                                         radius = TEICH_RADIUS,
                                         center = zentrum,
                                         style = Stroke(width = teichRandBreite / massstab),
+                                    )
+                                }
+                                vorkommensMarker.forEach { (art, zentrum) ->
+                                    drawCircle(
+                                        color = DraufsichtVorkommensFarben.getValue(art),
+                                        radius = VORKOMMENS_RADIUS,
+                                        center = zentrum,
+                                    )
+                                    drawCircle(
+                                        color = VorkommensRandFarbe,
+                                        radius = VORKOMMENS_RADIUS,
+                                        center = zentrum,
+                                        style = Stroke(width = vorkommensRandBreite / massstab),
                                     )
                                 }
                             }

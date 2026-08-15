@@ -3,7 +3,8 @@ package de.teutonstudio.zentralbank.fachlogik.modell
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-const val AKTUELLE_KARTEN_FORMAT_VERSION = 3
+const val AKTUELLE_KARTEN_FORMAT_VERSION = 4
+const val AELTESTE_UNTERSTUETZTE_KARTEN_FORMAT_VERSION = 3
 
 /**
  * Hexagonaler Kartenausschnitt eines unbegrenzten Dreiecksgitters.
@@ -41,6 +42,7 @@ data class KartenVorlage(
     @SerialName("landfelder")
     val gelaendefelder: List<GelaendeFeld> = emptyList(),
     val spezialfelder: List<Spezialfeld> = emptyList(),
+    val vorkommen: List<RohstoffVorkommen> = emptyList(),
 ) {
     init {
         pruefeKartenGrundlage(
@@ -50,19 +52,26 @@ data class KartenVorlage(
             hexagon,
             gelaendefelder,
             spezialfelder,
+            vorkommen,
         )
     }
 
     val landfelder: List<GelaendeFeld> get() = gelaendefelder
     val landNachPosition: Map<KartenFeld, GelaendeTyp>
         get() = gelaendefelder.associate { feld -> feld.position to feld.gelaende }
+    val vorkommenNachPosition: Map<KartenFeld, VorkommensArt>
+        get() = vorkommen.associate { eintrag -> eintrag.position to eintrag.art }
+
+    fun vorkommenAn(position: KartenFeld): VorkommensArt? = vorkommenNachPosition[position]
 
     fun alsSpielkarte(spielId: String = id): Spielkarte = Spielkarte(
+        formatVersion = formatVersion,
         id = spielId,
         name = name,
         hexagon = hexagon,
         gelaendefelder = gelaendefelder,
         spezialfelder = spezialfelder,
+        vorkommen = vorkommen,
     )
 }
 
@@ -76,6 +85,7 @@ data class Spielkarte(
     @SerialName("landfelder")
     val gelaendefelder: List<GelaendeFeld> = emptyList(),
     val spezialfelder: List<Spezialfeld> = emptyList(),
+    val vorkommen: List<RohstoffVorkommen> = emptyList(),
     val belegung: KartenBelegung = KartenBelegung(),
 ) {
     init {
@@ -86,21 +96,72 @@ data class Spielkarte(
             hexagon,
             gelaendefelder,
             spezialfelder,
+            vorkommen,
         )
         belegung.pruefeFuer(this)
+        pruefeVorkommensBelegung()
     }
 
     val landfelder: List<GelaendeFeld> get() = gelaendefelder
     val landNachPosition: Map<KartenFeld, GelaendeTyp>
         get() = gelaendefelder.associate { feld -> feld.position to feld.gelaende }
+    val vorkommenNachPosition: Map<KartenFeld, VorkommensArt>
+        get() = vorkommen.associate { eintrag -> eintrag.position to eintrag.art }
+
+    fun vorkommenAn(position: KartenFeld): VorkommensArt? = vorkommenNachPosition[position]
 
     fun alsVorlage(vorlagenId: String = id): KartenVorlage = KartenVorlage(
+        formatVersion = formatVersion,
         id = vorlagenId,
         name = name,
         hexagon = hexagon,
         gelaendefelder = gelaendefelder,
         spezialfelder = spezialfelder,
+        vorkommen = vorkommen,
     )
+
+    private fun pruefeVorkommensBelegung() {
+        if (formatVersion < 4) return
+        belegung.felder.forEach { feldBelegung ->
+            val wirtschaftsregion = feldBelegung.anlage as? FeldAnlage.Wirtschaftsregion
+                ?: return@forEach
+            val position = feldBelegung.position
+            when (wirtschaftsregion.bauteil) {
+                BauteilTyp.EISENMINE -> pruefeBergbauStandort(
+                    position = position,
+                    erwartet = VorkommensArt.EISENERZ,
+                    bezeichnung = "Eisenmine",
+                )
+                BauteilTyp.KOHLEMINE -> pruefeBergbauStandort(
+                    position = position,
+                    erwartet = VorkommensArt.KOHLE,
+                    bezeichnung = "Kohlemine",
+                )
+                BauteilTyp.LEHMINE -> pruefeBergbauStandort(
+                    position = position,
+                    erwartet = VorkommensArt.LEHM,
+                    bezeichnung = "Lehmmine",
+                )
+                BauteilTyp.BOHRTURM -> require(vorkommenAn(position) == VorkommensArt.ROHOEL) {
+                    "Ein Bohrturm braucht ein Rohölvorkommen: $position."
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    private fun pruefeBergbauStandort(
+        position: KartenFeld,
+        erwartet: VorkommensArt,
+        bezeichnung: String,
+    ) {
+        require(landNachPosition[position] == GelaendeTyp.GEBIRGE) {
+            "Eine $bezeichnung darf nur im Gebirge gebaut werden: $position."
+        }
+        require(vorkommenAn(position) == erwartet) {
+            "Eine $bezeichnung braucht ein passendes ${erwartet.anzeigeName}-Vorkommen: $position."
+        }
+    }
 }
 
 @Serializable
@@ -135,6 +196,20 @@ enum class GelaendeTyp {
     SUMPF,
 }
 
+@Serializable
+enum class VorkommensArt(val anzeigeName: String) {
+    ROHOEL("Rohöl"),
+    EISENERZ("Eisenerz"),
+    KOHLE("Kohle"),
+    LEHM("Lehm"),
+}
+
+@Serializable
+data class RohstoffVorkommen(
+    val position: KartenFeld,
+    val art: VorkommensArt,
+)
+
 /** Ein aus den sechs Geländedreiecken um [mittelpunkt] gebildetes Sonderfeld. */
 @Serializable
 data class Spezialfeld(
@@ -156,9 +231,13 @@ private fun pruefeKartenGrundlage(
     hexagon: KartenHexagon,
     gelaendefelder: List<GelaendeFeld>,
     spezialfelder: List<Spezialfeld>,
+    vorkommen: List<RohstoffVorkommen>,
 ) {
-    require(formatVersion == AKTUELLE_KARTEN_FORMAT_VERSION) {
+    require(formatVersion in AELTESTE_UNTERSTUETZTE_KARTEN_FORMAT_VERSION..AKTUELLE_KARTEN_FORMAT_VERSION) {
         "Nicht unterstützte Kartenformatversion: $formatVersion."
+    }
+    require(formatVersion >= 4 || vorkommen.isEmpty()) {
+        "Rohstoffvorkommen benötigen Kartenformatversion 4 oder neuer."
     }
     require(id.isNotBlank()) { "Karten-ID darf nicht leer sein." }
     require(name.isNotBlank()) { "Kartenname darf nicht leer sein." }
@@ -174,6 +253,7 @@ private fun pruefeKartenGrundlage(
     }
 
     val landPositionen = positionen.toSet()
+    val landNachPosition = gelaendefelder.associate { feld -> feld.position to feld.gelaende }
     val vonSpezialfeldernBelegt = mutableSetOf<KartenFeld>()
     spezialfelder.forEach { spezialfeld ->
         val spezialPositionen = spezialfeld.positionen
@@ -189,6 +269,24 @@ private fun pruefeKartenGrundlage(
             }
             require(vonSpezialfeldernBelegt.add(position)) {
                 "Spezialfelder dürfen sich nicht überlagern: $position."
+            }
+        }
+    }
+
+    val vorkommensPositionen = vorkommen.map(RohstoffVorkommen::position)
+    require(vorkommensPositionen.size == vorkommensPositionen.toSet().size) {
+        "Jedes Feld darf höchstens ein Rohstoffvorkommen tragen."
+    }
+    vorkommen.forEach { eintrag ->
+        require(eintrag.position in landPositionen) {
+            "Ein Rohstoffvorkommen darf nur auf Land liegen: ${eintrag.position}."
+        }
+        require(eintrag.position !in vonSpezialfeldernBelegt) {
+            "Auf einem Spezialfeld darf kein Rohstoffvorkommen liegen: ${eintrag.position}."
+        }
+        if (eintrag.art in setOf(VorkommensArt.EISENERZ, VorkommensArt.KOHLE, VorkommensArt.LEHM)) {
+            require(landNachPosition[eintrag.position] == GelaendeTyp.GEBIRGE) {
+                "${eintrag.art.anzeigeName} darf nur im Gebirge vorkommen: ${eintrag.position}."
             }
         }
     }

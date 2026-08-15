@@ -20,6 +20,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Spielkarte
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsEinheitTyp
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.VorkommensArt
 import de.teutonstudio.zentralbank.fachlogik.modell.ecken
 import de.teutonstudio.zentralbank.fachlogik.modell.kanten
 import de.teutonstudio.zentralbank.fachlogik.modell.kuerzesterWasserweg
@@ -36,6 +37,13 @@ private val GelaendeDarstellung = mapOf(
     ),
     GelaendeTyp.WUESTE to DreieckTyp("Wüste", Color(0xFFD8B56A), rauheit = 0.96f),
     GelaendeTyp.SUMPF to DreieckTyp("Sumpf", Color(0xFF607D3B), rauheit = 0.72f),
+)
+
+private val VorkommensDarstellung = mapOf(
+    VorkommensArt.ROHOEL to Color(0xFF151515),
+    VorkommensArt.EISENERZ to Color(0xFFB65D3A),
+    VorkommensArt.KOHLE to Color(0xFF4C4C4C),
+    VorkommensArt.LEHM to Color(0xFFC98554),
 )
 
 private val SpielerPalette = listOf(
@@ -267,7 +275,16 @@ fun Spielkarte.zu3DModell(
                 ),
             )
         },
-        feldObjekte = belegung.felder.map { eintrag ->
+        feldObjekte = vorkommen.map { eintrag ->
+            FeldObjektAuflage(
+                position = eintrag.position.zu3DPosition(),
+                typ = SpielObjektTyp(
+                    name = "${eintrag.art.anzeigeName}-Vorkommen",
+                    farbe = VorkommensDarstellung.getValue(eintrag.art),
+                    form = SpielObjektForm.MARKIERUNG,
+                ),
+            )
+        } + belegung.felder.map { eintrag ->
             val effektiv = KartenAuswertung.effektiverZustand(this, eintrag, konflikte)
             val anschlussStaerken = KartenAuswertung.anschlussStaerke(
                 this,
