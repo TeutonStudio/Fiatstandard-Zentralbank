@@ -51,6 +51,7 @@ fun LebensraeumeVerwalten(modifier: Modifier = Modifier) {
     var eintraege by remember { mutableStateOf<List<KartenEintrag>>(emptyList()) }
     var ausgewaehlt by remember { mutableStateOf<KartenEintrag?>(null) }
     var editorEintrag by remember { mutableStateOf<KartenEintrag?>(null) }
+    var vorschauEintrag by remember { mutableStateOf<KartenEintrag?>(null) }
     var zuLoeschen by remember { mutableStateOf<KartenEintrag?>(null) }
     var wirdGeladen by remember { mutableStateOf(true) }
     var fehlermeldung by remember { mutableStateOf<String?>(null) }
@@ -138,6 +139,7 @@ fun LebensraeumeVerwalten(modifier: Modifier = Modifier) {
                 LebensraumVorschau(
                     eintrag = ausgewaehlt,
                     beiBearbeiten = { eintrag -> editorEintrag = eintrag },
+                    beiVorschau = { eintrag -> vorschauEintrag = eintrag },
                     beiLoeschen = { eintrag -> zuLoeschen = eintrag },
                     modifier = vorschauModifier,
                 )
@@ -174,6 +176,18 @@ fun LebensraeumeVerwalten(modifier: Modifier = Modifier) {
                 neuladen++
             },
         )
+    }
+
+    vorschauEintrag?.let { eintrag ->
+        SpielmenueDialog(
+            titel = "3D-Vorschau – ${eintrag.vorlage.name}",
+            beiSchliessen = { vorschauEintrag = null },
+        ) {
+            Spielbrett3D(
+                modell = eintrag.vorlage.zu3DModell(),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 
     zuLoeschen?.let { eintrag ->
@@ -267,6 +281,7 @@ private fun LebensraumListe(
 private fun LebensraumVorschau(
     eintrag: KartenEintrag?,
     beiBearbeiten: (KartenEintrag) -> Unit,
+    beiVorschau: (KartenEintrag) -> Unit,
     beiLoeschen: (KartenEintrag) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -295,6 +310,9 @@ private fun LebensraumVorschau(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    OutlinedButton(onClick = { beiVorschau(eintrag) }) {
+                        Text("Vorschau")
+                    }
                     OutlinedButton(onClick = { beiBearbeiten(eintrag) }) {
                         Text(
                             if (eintrag.quelle == KartenQuelle.VORLAGE) {
