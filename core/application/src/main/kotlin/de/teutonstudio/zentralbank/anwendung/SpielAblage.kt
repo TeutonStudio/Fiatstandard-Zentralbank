@@ -1,11 +1,11 @@
 package de.teutonstudio.zentralbank.anwendung
 
 import de.teutonstudio.zentralbank.fachlogik.ablauf.SpielAblauf
+import de.teutonstudio.zentralbank.fachlogik.engine.AKTUELLE_REGEL_VERSION
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
-import de.teutonstudio.zentralbank.fachlogik.engine.AKTUELLE_REGEL_VERSION
 
 const val AKTUELLE_ENGINE_VERSION = AKTUELLE_REGEL_VERSION
 const val AKTUELLE_SPIELSTAND_SCHEMA_VERSION = 2
@@ -15,7 +15,18 @@ data class SpielstandUebersicht(
     val id: Long,
     val spielerNamen: List<String>,
     val runde: Int,
-)
+    /**
+     * Gesetzt, wenn der persistierte Spielstand zwar gelistet werden kann, seine Ereignisfolge
+     * unter dem aktuellen Regelwerk aber nicht mehr rekonstruiert werden kann.
+     *
+     * Solche Einträge bleiben absichtlich sichtbar und löschbar, dürfen jedoch nicht geladen
+     * oder als WLAN-Spiel gehostet werden.
+     */
+    val ladeFehler: String? = null,
+) {
+    val istLadbar: Boolean
+        get() = ladeFehler == null
+}
 
 @Serializable
 data class GespeichertesSpiel(
