@@ -50,6 +50,7 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLa
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
+import de.teutonstudio.zentralbank.daten.zuordnung.zuRohstoffe
 import de.teutonstudio.zentralbank.datenbank.Bauteil
 import de.teutonstudio.zentralbank.datenbank.Ausland
 import de.teutonstudio.zentralbank.datenbank.Rohstoffe
@@ -64,6 +65,8 @@ import de.teutonstudio.zentralbank.datenbank.TestSpiel
 import de.teutonstudio.zentralbank.datenbank.Verwaltungsstandort
 import de.teutonstudio.zentralbank.datenbank.Wirtschaftsregionen
 import de.teutonstudio.zentralbank.datenbank.entries
+import de.teutonstudio.zentralbank.fachlogik.auswertung.WarenkorbAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.WarenkorbPreset
 import de.teutonstudio.zentralbank.schnittstelle.farbe
 import de.teutonstudio.zentralbank.datenbank.summeGeld
 import de.teutonstudio.zentralbank.schnittstelle.DiagrammLegendenEintrag
@@ -74,6 +77,7 @@ import de.teutonstudio.zentralbank.schnittstelle.bilanzDiagrammYBereich
 import de.teutonstudio.zentralbank.schnittstelle.ausgabe.zeigeBauteilPreis
 import de.teutonstudio.zentralbank.schnittstelle.auslandFarbe
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbVorlage
 import de.teutonstudio.zentralbank.schnittstelle.erhalteSpielerFarben
 import de.teutonstudio.zentralbank.schnittstelle.ganzzahligerStueckAchsenItemPlacer
 import de.teutonstudio.zentralbank.schnittstelle.leererDiagrammEintrag
@@ -680,8 +684,28 @@ fun zeigeMarktplatz(
     }
 
     if (warenkorbDialogOffen) {
+        val warenkorbVorlagen = remember(spiel.karte) {
+            val karte = spiel.karte ?: return@remember emptyList<WarenkorbVorlage>()
+            listOf(
+                WarenkorbVorlage(
+                    bezeichnung = "Unverarbeitete Rohstoffe",
+                    warenkorb = WarenkorbAuswertung.vordefinierterWarenkorb(
+                        karte,
+                        WarenkorbPreset.UNVERARBEITETE_ROHSTOFFE,
+                    ).mapKeys { (rohstoff, _) -> rohstoff.zuRohstoffe() },
+                ),
+                WarenkorbVorlage(
+                    bezeichnung = "Verarbeitete Rohstoffe",
+                    warenkorb = WarenkorbAuswertung.vordefinierterWarenkorb(
+                        karte,
+                        WarenkorbPreset.VERARBEITETE_ROHSTOFFE,
+                    ).mapKeys { (rohstoff, _) -> rohstoff.zuRohstoffe() },
+                ),
+            )
+        }
         WarenkorbBearbeitenDialog(
             warenkorb = spiel.warenkorb,
+            vorlagen = warenkorbVorlagen,
             beiAbbruch = { warenkorbDialogOffen = false },
             beiSpeichern = { neuerWarenkorb ->
                 onWarenkorbAendern(neuerWarenkorb)
