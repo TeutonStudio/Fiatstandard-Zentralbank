@@ -125,6 +125,7 @@ object BeobachtungsKodierung {
     }
 
     private fun aktionsTypIndex(aktion: SpielAktion): Int = when (aktion) {
+        is SpielAktion.SpielerStilSetzen -> 45
         is SpielAktion.HauptbahnhofPlatzieren -> 0
         is SpielAktion.EckGebaeudeBauen -> 1
         is SpielAktion.EckGebaeudeAufwerten -> 2

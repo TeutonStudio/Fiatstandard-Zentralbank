@@ -45,9 +45,11 @@ import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielstaendeVerwalte
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.Spielmenü
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielmenueBereich
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.SpielmenueDialog
-import de.teutonstudio.zentralbank.schnittstelle.kategorien.KiEntwickleroberflaeche
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.KiDebugOberflaeche
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeAussenhandel
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.zeigeMarktplatz
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueZustand
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenue
 import de.teutonstudio.zentralbank.spielbrett.KartenSpielBildschirm
 import de.teutonstudio.zentralbank.spielbrett.RundenwechselNacht
 import de.teutonstudio.zentralbank.spielbrett.spielzugZeitfenster
@@ -106,6 +108,8 @@ fun Navigation(viewModel: GameViewModel) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val rundenwechselZustand by viewModel.rundenwechselAnzeige.collectAsState()
+    val aktionsMenueZustand by viewModel.aktionsMenueZustand.collectAsState()
+    val aktionsMenueNavigation by viewModel.aktionsMenueNavigation.collectAsState()
 
     LaunchedEffect(viewModel) {
         viewModel.spielFehler.collect { meldung ->
@@ -175,7 +179,22 @@ fun Navigation(viewModel: GameViewModel) {
                     mutableStateOf<HandelsVorauswahl?>(null)
                 }
                 var anleiheDialogOffen by remember(spiel) { mutableStateOf(false) }
+                var kiDebugOffen by remember(spiel) { mutableStateOf(false) }
                 var passwortAnfrage by remember(spiel) { mutableStateOf<PasswortAnfrage?>(null) }
+                LaunchedEffect(aktionsMenueNavigation) {
+                    when (aktionsMenueNavigation) {
+                        de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueNavigationZiel.HANDEL -> {
+                            handelsVorauswahl = null
+                            handelDialogOffen = true
+                            viewModel.aktionsMenueNavigationVerbrauchen()
+                        }
+                        de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueNavigationZiel.ANLEIHEN -> {
+                            anleiheDialogOffen = true
+                            viewModel.aktionsMenueNavigationVerbrauchen()
+                        }
+                        null -> Unit
+                    }
+                }
                 fun nachPasswort(spielerNamen: Collection<String>, aktion: () -> Unit) {
                     val geschuetzteSpieler = viewModel.passwortGeschuetzteSpieler(spielerNamen)
                     if (geschuetzteSpieler.isEmpty()) {
@@ -201,7 +220,14 @@ fun Navigation(viewModel: GameViewModel) {
                         zustand = spielZustand,
                         zugText = spielUebersicht?.zug?.text ?: "Kein Zug aktiv",
                         zugZeitText = zugZeitText,
-                        beiBereich = { bereich -> geoeffneterBereich = bereich },
+                        beiBereich = { bereich ->
+                            if (bereich == SpielmenueBereich.AKTIONEN) {
+                                viewModel.aktionsMenueOeffnen()
+                                geoeffneterBereich = null
+                            } else {
+                                geoeffneterBereich = bereich
+                            }
+                        },
                         beiZugBeenden = {
                             spielZustand.aktiverSpieler?.wert?.let { name ->
                                 nachPasswort(listOf(name), viewModel::beendeZug)
@@ -286,14 +312,45 @@ fun Navigation(viewModel: GameViewModel) {
                                     handelDialogOffen = true
                                 },
                             )
-                            SpielmenueBereich.KI_ENTWICKLUNG -> KiEntwickleroberflaeche(
-                                zustand = requireNotNull(spielZustand),
-                                beiAktion = viewModel::aktionAnwenden,
-                                modifier = Modifier.fillMaxSize(),
-                            )
+                            SpielmenueBereich.AKTIONEN -> {
+                                // Wird über den StateFlow für das Aktionsmenü verwaltet
+                            }
                         }
                     }
                 }
+                                // Aktionsmenü-Dialog anzeigen, wenn der Zustand nicht null ist
+                                aktionsMenueZustand?.let { zustand ->
+                                    SpielmenueDialog(
+                                        titel = "Aktionen",
+                                        beiSchliessen = { viewModel.aktionsMenueSchliessen() },
+                                    ) {
+                                        AktionsMenue(
+                                            zustand = zustand,
+                                            beiBereichAuswaehlen = viewModel::aktionsBereichAuswaehlen,
+                                            beiEintragAuswaehlen = viewModel::aktionsEintragAuswaehlen,
+                                            beiBestaetigen = viewModel::aktionsMenueBestaetigen,
+                                            beiAbbrechen = viewModel::aktionsMenueAbbrechen,
+                                            beiErneutVersuchen = viewModel::aktionsMenueErneutVersuchen,
+                                            beiKiStil = viewModel::aktionsMenueKiStilSetzen,
+                                            beiSchliessen = viewModel::aktionsMenueSchliessen,
+                                            debugZugaenglich = BuildConfig.DEBUG,
+                                            beiDebugOeffnen = { kiDebugOffen = true },
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                }
+                                if (BuildConfig.DEBUG && kiDebugOffen && spielZustand != null) {
+                                    SpielmenueDialog(
+                                        titel = "KI-Debug",
+                                        beiSchliessen = { kiDebugOffen = false },
+                                    ) {
+                                        KiDebugOberflaeche(
+                                            zustand = spielZustand,
+                                            beiAktion = viewModel::aktionAnwenden,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                }
                 val prozugAnzeige = spielZustand
                     ?.takeIf { rundenwechselZustand == null }
                     ?.zuProzugAnzeigeZustand()

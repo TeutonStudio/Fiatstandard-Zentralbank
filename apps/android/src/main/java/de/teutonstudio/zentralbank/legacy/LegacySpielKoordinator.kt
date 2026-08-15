@@ -2,6 +2,8 @@
 package de.teutonstudio.zentralbank.datenbank
 
 import android.app.Application
+import android.util.Log
+import de.teutonstudio.zentralbank.BuildConfig
 
 import de.teutonstudio.zentralbank.daten.RoomSpielPersistenz
 import de.teutonstudio.zentralbank.daten.zuordnung.zuSpiel
@@ -21,6 +23,11 @@ import de.teutonstudio.zentralbank.fachlogik.modell.AnleiheId
 import de.teutonstudio.zentralbank.fachlogik.modell.KontoId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
+import de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsMenueAuswertung
+import de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsMenueBereich as DomainAktionsBereich
+import de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsMenueEintrag as DomainAktionsEintrag
+import de.teutonstudio.zentralbank.fachlogik.auswertung.AktionsMenueAktion
 import de.teutonstudio.zentralbank.fachlogik.modell.pruefePasswort
 import de.teutonstudio.zentralbank.fachlogik.ereignis.AussenhandelsArt
 import de.teutonstudio.zentralbank.anwendung.GespeichertesSpiel
@@ -28,9 +35,16 @@ import de.teutonstudio.zentralbank.anwendung.SpielAblage
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
 import de.teutonstudio.zentralbank.schnittstelle.domain.SpielUebersichtZustand
 import de.teutonstudio.zentralbank.schnittstelle.domain.zuSpielUebersichtZustand
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsBestaetigung
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsBereich
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsBereichEintrag
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueNavigationZiel
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueZustand
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AngezeigteAktion
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -71,6 +85,13 @@ class LegacySpielKoordinator(
     private val _spielUebersicht = MutableStateFlow<SpielUebersichtZustand?>(null)
     private val _rundenwechselAnzeige = MutableStateFlow<SpielZustand?>(null)
     private val _spielFehler = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val _aktionsMenueZustand = MutableStateFlow<AktionsMenueZustand?>(null)
+    private val _aktionsMenueNavigation = MutableStateFlow<AktionsMenueNavigationZiel?>(null)
+    private var aktionsMenueJob: Job? = null
+    private var aktionsMenueGeneration = 0L
+    private var aktionsMenueEintraege: Map<String, DomainAktionsEintrag> = emptyMap()
+    private var aktionsMenueBewegungsZiele = emptyMap<String, de.teutonstudio.zentralbank.fachlogik.modell.KartenKante>()
+    private var ausstehendeAktionsMenueAktion: String? = null
     private var spielAblauf: SpielSitzung? = null
 
     val spielstaende: StateFlow<List<SpielstandUebersicht>> = _spielstaende.asStateFlow()
@@ -78,6 +99,8 @@ class LegacySpielKoordinator(
     val spielUebersicht: StateFlow<SpielUebersichtZustand?> = _spielUebersicht.asStateFlow()
     val rundenwechselAnzeige: StateFlow<SpielZustand?> = _rundenwechselAnzeige.asStateFlow()
     val spielFehler: SharedFlow<String> = _spielFehler.asSharedFlow()
+    val aktionsMenueZustand: StateFlow<AktionsMenueZustand?> = _aktionsMenueZustand.asStateFlow()
+    val aktionsMenueNavigation: StateFlow<AktionsMenueNavigationZiel?> = _aktionsMenueNavigation.asStateFlow()
 
     lateinit var aktuelleDaten: Pair<SpielDaten,List<SpeicherDaten>>
     lateinit var aktuellesSpiel: Spiel
@@ -321,18 +344,23 @@ class LegacySpielKoordinator(
         wendeAktionAn(SpielAktion.ZugBeenden)
     }
 
-    private fun wendeAktionAn(aktion: SpielAktion) {
+    private fun wendeAktionAn(aktion: SpielAktion): Boolean {
         val sitzung = spielAblauf
         if (sitzung == null) {
             _spielFehler.tryEmit("Kein Spiel geladen.")
-            return
+            return false
         }
         val vorher = sitzung.zustand
-        sitzung.aktionAnwenden(aktion)
-            .onSuccess { ergebnis -> uebernehmeEreignisErgebnis(vorher, ergebnis.zustand) }
-            .onFailure { fehler ->
+        return sitzung.aktionAnwenden(aktion).fold(
+            onSuccess = { ergebnis ->
+                uebernehmeEreignisErgebnis(vorher, ergebnis.zustand)
+                true
+            },
+            onFailure = { fehler ->
                 _spielFehler.tryEmit(fehler.message ?: "Spielaktion wurde abgelehnt.")
-            }
+                false
+            },
+        )
     }
 
     private fun uebernehmeEreignisErgebnis(vorher: SpielZustand, nachher: SpielZustand) {
@@ -704,6 +732,9 @@ class LegacySpielKoordinator(
         aktuellesSpielOderNull?.aktualisiereAktivenSpieler(zustand.zugStatus?.spieler?.wert)
         _spielZustand.value = zustand
         _spielUebersicht.value = zustand.zuSpielUebersichtZustand()
+        if (_aktionsMenueZustand.value != null) {
+            aktionsMenueOeffnen()
+        }
     }
 
     private fun SpielEreignis.alsSpielerAktion(): SpielAktion = when (this) {
@@ -957,5 +988,200 @@ class LegacySpielKoordinator(
         wendeAktionAn(
             SpielAktion.UnabhaengigenFriedenSchliessen(spielerAId, krieg.id, spielerBId),
         )
+    }
+
+    fun aktionsMenueOeffnen() {
+        aktionsMenueJob?.cancel()
+        val zustand = spielAblauf?.zustand ?: return
+        val beginn = System.nanoTime()
+        val uebersicht = AktionsMenueAuswertung.uebersicht(zustand) ?: return
+        val spieler = zustand.spieler.firstOrNull { it.id == uebersicht.spieler } ?: return
+        aktionsMenueGeneration++
+        aktionsMenueEintraege = emptyMap()
+        aktionsMenueBewegungsZiele = emptyMap()
+        ausstehendeAktionsMenueAktion = null
+        _aktionsMenueZustand.value = AktionsMenueZustand(
+            aktiverSpieler = spieler.name,
+            bereiche = uebersicht.bereiche.map { status ->
+                AktionsBereichEintrag(
+                    bereich = status.bereich.zuUiBereich(),
+                    beschriftung = status.bereich.anzeigeName(),
+                    verfuegbar = status.verfuegbar,
+                    anzahl = status.anzahl,
+                )
+            },
+            kiStil = spieler.spielstil,
+        )
+        protokolliereAktionsMenue("Übersicht", beginn, uebersicht.bereiche.size, 0)
+    }
+
+    fun aktionsMenueSchliessen() {
+        aktionsMenueGeneration++
+        aktionsMenueJob?.cancel()
+        aktionsMenueJob = null
+        aktionsMenueEintraege = emptyMap()
+        aktionsMenueBewegungsZiele = emptyMap()
+        ausstehendeAktionsMenueAktion = null
+        _aktionsMenueZustand.value = null
+    }
+
+    fun aktionsMenueNavigationVerbrauchen() { _aktionsMenueNavigation.value = null }
+
+    fun aktionsBereichAuswaehlen(bereich: AktionsBereich) {
+        when (bereich) {
+            AktionsBereich.HANDEL -> {
+                aktionsMenueSchliessen()
+                _aktionsMenueNavigation.value = AktionsMenueNavigationZiel.HANDEL
+                return
+            }
+            AktionsBereich.ANLEIHEN -> {
+                aktionsMenueSchliessen()
+                _aktionsMenueNavigation.value = AktionsMenueNavigationZiel.ANLEIHEN
+                return
+            }
+            AktionsBereich.KI -> {
+                _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(ausgewaehlterBereich = bereich)
+                return
+            }
+            else -> ladeAktionsBereich(bereich)
+        }
+    }
+
+    fun aktionsEintragAuswaehlen(id: String) {
+        val eintrag = aktionsMenueEintraege[id] ?: return
+        if (eintrag.aktion == AktionsMenueAktion.TRUPPENSTAPEL_AUSWAEHLEN) {
+            ladeBewegungsZiele(eintrag)
+            return
+        }
+        ausstehendeAktionsMenueAktion = id
+        _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+            bestaetigung = AktionsBestaetigung("Aktion bestätigen", eintrag.titel),
+        )
+    }
+
+    fun aktionsMenueBestaetigen() {
+        val id = ausstehendeAktionsMenueAktion ?: return
+        val eintrag = aktionsMenueEintraege[id] ?: return
+        val aktion = AktionsMenueAuswertung.konkreteAktion(
+            spielAblauf?.zustand ?: return,
+            eintrag,
+            aktionsMenueBewegungsZiele[id],
+        ) ?: return
+        ausstehendeAktionsMenueAktion = null
+        if (!wendeAktionAn(aktion)) {
+            _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+                bestaetigung = null,
+                fehler = "Die Aktion wurde vom aktuellen Spielzustand abgelehnt.",
+            )
+        }
+    }
+
+    fun aktionsMenueAbbrechen() {
+        ausstehendeAktionsMenueAktion = null
+        _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(bestaetigung = null)
+    }
+
+    fun aktionsMenueErneutVersuchen() {
+        _aktionsMenueZustand.value?.ausgewaehlterBereich?.let(::ladeAktionsBereich)
+    }
+
+    fun aktionsMenueKiStilSetzen(stil: SpielerStil) {
+        val spieler = spielAblauf?.zustand?.aktiverSpieler ?: return
+        if (!wendeAktionAn(SpielAktion.SpielerStilSetzen(spieler, stil))) {
+            _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+                fehler = "Der KI-Stil konnte nicht gespeichert werden.",
+            )
+        }
+    }
+
+    private fun ladeAktionsBereich(bereich: AktionsBereich) {
+        val zustand = spielAblauf?.zustand ?: return
+        val generation = ++aktionsMenueGeneration
+        val beginn = System.nanoTime()
+        aktionsMenueJob?.cancel()
+        _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+            ausgewaehlterBereich = bereich,
+            eintraege = emptyList(),
+            wirdGeladen = true,
+            fehler = null,
+            bestaetigung = null,
+        )
+        aktionsMenueJob = scope.launch(Dispatchers.Default) {
+            runCatching { AktionsMenueAuswertung.eintraege(zustand, bereich.zuDomainBereich()) }
+                .onSuccess { eintraege ->
+                    if (generation == aktionsMenueGeneration && spielAblauf?.zustand === zustand) {
+                        aktionsMenueEintraege = eintraege.associateBy { it.id }
+                        _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+                            eintraege = eintraege.map { AngezeigteAktion(it.id, it.titel) },
+                            wirdGeladen = false,
+                        )
+                        protokolliereAktionsMenue("Bereich ${bereich.name}", beginn, eintraege.size, 0)
+                    }
+                }.onFailure { fehler ->
+                    if (generation == aktionsMenueGeneration) _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+                        wirdGeladen = false,
+                        fehler = fehler.message ?: "Der Aktionsbereich konnte nicht geladen werden.",
+                    )
+                }
+        }
+    }
+
+    private fun ladeBewegungsZiele(stapel: DomainAktionsEintrag) {
+        val zustand = spielAblauf?.zustand ?: return
+        val generation = ++aktionsMenueGeneration
+        val beginn = System.nanoTime()
+        aktionsMenueJob?.cancel()
+        _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(wirdGeladen = true, fehler = null)
+        aktionsMenueJob = scope.launch(Dispatchers.Default) {
+            runCatching { AktionsMenueAuswertung.bewegungsZiele(zustand, stapel.einheitenIds.toSet()) }
+                .onSuccess { ziele ->
+                    if (generation == aktionsMenueGeneration && spielAblauf?.zustand === zustand) {
+                        val eintraege = ziele.mapIndexed { index, ziel ->
+                            val id = "bewegung:${stapel.id}:$index"
+                            id to stapel.copy(id = id, aktion = AktionsMenueAktion.TRUPPEN_BEWEGEN, titel = "Nach $ziel bewegen")
+                        }
+                        aktionsMenueEintraege = eintraege.toMap()
+                        aktionsMenueBewegungsZiele = eintraege.mapIndexed { index, (id, _) -> id to ziele[index] }.toMap()
+                        _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+                            eintraege = eintraege.map { (id, eintrag) -> AngezeigteAktion(id, eintrag.titel) },
+                            wirdGeladen = false,
+                        )
+                        protokolliereAktionsMenue("Truppenziele", beginn, ziele.size, 0)
+                    }
+                }.onFailure { fehler ->
+                    if (generation == aktionsMenueGeneration) _aktionsMenueZustand.value = _aktionsMenueZustand.value?.copy(
+                        wirdGeladen = false,
+                        fehler = fehler.message ?: "Die Bewegungsziele konnten nicht geladen werden.",
+                    )
+                }
+        }
+    }
+
+    private fun DomainAktionsBereich.zuUiBereich(): AktionsBereich = AktionsBereich.valueOf(name)
+    private fun AktionsBereich.zuDomainBereich(): DomainAktionsBereich = DomainAktionsBereich.valueOf(name)
+    private fun DomainAktionsBereich.anzeigeName(): String = when (this) {
+        DomainAktionsBereich.KONFLIKT -> "Konflikt"
+        DomainAktionsBereich.DIPLOMATIE -> "Diplomatie"
+        DomainAktionsBereich.TRUPPEN -> "Truppen"
+        DomainAktionsBereich.HANDEL -> "Handel"
+        DomainAktionsBereich.ANLEIHEN -> "Anleihen"
+        DomainAktionsBereich.ZUG -> "Zug"
+        DomainAktionsBereich.KI -> "KI"
+    }
+
+    private fun protokolliereAktionsMenue(
+        abschnitt: String,
+        beginnNanos: Long,
+        kandidaten: Int,
+        vollstaendigGeprueft: Int,
+    ) {
+        if (BuildConfig.DEBUG) {
+            val dauerMs = (System.nanoTime() - beginnNanos) / 1_000_000.0
+            Log.d(
+                "AktionsMenue",
+                "$abschnitt: ${"%.2f".format(java.util.Locale.ROOT, dauerMs)} ms, " +
+                    "Kandidaten=$kandidaten, vollständigGeprüft=$vollstaendigGeprueft",
+            )
+        }
     }
 }

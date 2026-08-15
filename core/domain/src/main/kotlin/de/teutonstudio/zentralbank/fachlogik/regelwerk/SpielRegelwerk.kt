@@ -10,6 +10,14 @@ object SpielRegelwerk {
     ): Result<SpielZustand> = runCatching {
         ZugRegelwerk.pruefeFreigabe(zustand, ereignis)
         when (ereignis) {
+            is SpielEreignis.SpielerStilGesetzt -> {
+                require(zustand.spieler.any { it.id == ereignis.spieler }) {
+                    "Der Spieler für den KI-Stil existiert nicht."
+                }
+                zustand.copy(spieler = zustand.spieler.map { spieler ->
+                    if (spieler.id == ereignis.spieler) spieler.copy(spielstil = ereignis.stil) else spieler
+                })
+            }
             is SpielEreignis.HandelsangebotErstellt ->
                 AngebotsRegelwerk.handelsangebotErstellen(zustand, ereignis)
             is SpielEreignis.HandelsangebotAngenommen ->

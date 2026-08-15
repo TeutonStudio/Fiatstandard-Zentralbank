@@ -538,14 +538,28 @@ fun KartenSpielBildschirm(
                 } else {
                     emptySet()
                 }
+                // Dialogzustand liegt oberhalb dieses Composables. Das Modell wird deshalb nur
+                // bei fachlich relevanten Karten-/Hervorhebungsänderungen neu aufgebaut.
+                val brettModell = remember(
+                    angezeigteKarte,
+                    zustand.spieler.map { it.id },
+                    ausgewaehltesZiel,
+                    seewegStart,
+                    truppenStart,
+                    hervorgehobeneRoute,
+                    zustand.konflikte,
+                ) {
+                    Spielbrett3DInstrumentierung.modellErzeugt()
+                    angezeigteKarte.zu3DModell(
+                        spielerReihenfolge = zustand.spieler.map { it.id },
+                        hervorhebung = ausgewaehltesZiel ?: seewegStart ?: truppenStart,
+                        routenHervorhebung = hervorgehobeneRoute,
+                        konflikte = zustand.konflikte,
+                    )
+                }
                 Box(modifier = brettModifier) {
                     Spielbrett3D(
-                        modell = angezeigteKarte.zu3DModell(
-                            spielerReihenfolge = zustand.spieler.map { it.id },
-                            hervorhebung = ausgewaehltesZiel ?: seewegStart ?: truppenStart,
-                            routenHervorhebung = hervorgehobeneRoute,
-                            konflikte = zustand.konflikte,
-                        ),
+                        modell = brettModell,
                         modifier = Modifier.fillMaxSize(),
                         betrachtungsStatus = betrachtungsStatus,
                         himmel = himmel,

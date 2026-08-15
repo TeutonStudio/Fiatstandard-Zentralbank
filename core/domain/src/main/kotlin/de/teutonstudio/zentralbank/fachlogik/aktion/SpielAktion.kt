@@ -23,6 +23,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KriegId
 import de.teutonstudio.zentralbank.fachlogik.modell.KriegsSeite
 import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
 import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -33,6 +34,13 @@ import kotlinx.serialization.SerialName
  */
 @Serializable
 sealed interface SpielAktion {
+    /** Persistente Spielerkonfiguration; kein lokaler UI-Schalter. */
+    @Serializable
+    data class SpielerStilSetzen(
+        val spieler: SpielerId,
+        val stil: SpielerStil,
+    ) : SpielAktion
+
     @Serializable
     data class HauptbahnhofPlatzieren(
         val spieler: SpielerId,

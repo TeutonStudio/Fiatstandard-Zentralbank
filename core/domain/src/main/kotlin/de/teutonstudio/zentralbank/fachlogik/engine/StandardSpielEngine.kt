@@ -98,6 +98,10 @@ class StandardSpielEngine : SpielEngine {
             )
         }
         return listOf(when (aktion) {
+            is SpielAktion.SpielerStilSetzen -> SpielEreignis.SpielerStilGesetzt(
+                aktion.spieler,
+                aktion.stil,
+            )
             is SpielAktion.HauptbahnhofPlatzieren -> SpielEreignis.HauptbahnhofPlatziert(
                 aktion.spieler,
                 aktion.ecke,

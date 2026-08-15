@@ -14,6 +14,10 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.VerbindlichkeitId
 import de.teutonstudio.zentralbank.schnittstelle.domain.SpielUebersichtZustand
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueZustand
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsBereich
+import de.teutonstudio.zentralbank.schnittstelle.kategorien.AktionsMenueNavigationZiel
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -30,6 +34,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val rundenwechselAnzeige: StateFlow<SpielZustand?> = koordinator.rundenwechselAnzeige
     val spielFehler: SharedFlow<String> = koordinator.spielFehler
 
+    val aktionsMenueZustand: StateFlow<AktionsMenueZustand?> = koordinator.aktionsMenueZustand
+    val aktionsMenueNavigation: StateFlow<AktionsMenueNavigationZiel?> = koordinator.aktionsMenueNavigation
+
     val aktuellesSpielOderNull: Spiel?
         get() = koordinator.aktuellesSpielOderNull
 
@@ -42,6 +49,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun pruefeSpielerPasswoerter(passwoerter: Map<String, String>): Boolean =
         koordinator.pruefeSpielerPasswoerter(passwoerter)
     fun spielstandBeenden(nachBeenden: () -> Unit) = koordinator.spielstandBeenden(nachBeenden)
+
+    fun aktionsMenueOeffnen() = koordinator.aktionsMenueOeffnen()
+    fun aktionsMenueSchliessen() = koordinator.aktionsMenueSchliessen()
+    fun aktionsBereichAuswaehlen(bereich: AktionsBereich) = koordinator.aktionsBereichAuswaehlen(bereich)
+    fun aktionsEintragAuswaehlen(id: String) = koordinator.aktionsEintragAuswaehlen(id)
+    fun aktionsMenueBestaetigen() = koordinator.aktionsMenueBestaetigen()
+    fun aktionsMenueAbbrechen() = koordinator.aktionsMenueAbbrechen()
+    fun aktionsMenueErneutVersuchen() = koordinator.aktionsMenueErneutVersuchen()
+    fun aktionsMenueKiStilSetzen(stil: SpielerStil) = koordinator.aktionsMenueKiStilSetzen(stil)
+    fun aktionsMenueNavigationVerbrauchen() = koordinator.aktionsMenueNavigationVerbrauchen()
 
     fun baueMitAuslandseinkauf(
         bauEreignis: SpielEreignis,

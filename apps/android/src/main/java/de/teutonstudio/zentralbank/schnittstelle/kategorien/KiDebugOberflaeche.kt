@@ -31,7 +31,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
  * Regelprüfung aus: Jeder sichtbare Knopf stammt unmittelbar aus [AktionsAuswertung].
  */
 @Composable
-fun KiEntwickleroberflaeche(
+fun KiDebugOberflaeche(
     zustand: SpielZustand,
     beiAktion: (SpielAktion) -> Unit,
     modifier: Modifier = Modifier,
