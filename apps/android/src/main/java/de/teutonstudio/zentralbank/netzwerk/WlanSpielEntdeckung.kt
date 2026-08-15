@@ -46,7 +46,9 @@ class WlanSpielEntdeckung(context: Context) : AutoCloseable {
             serviceName = name
             serviceType = DIENST_TYP
             this.port = port
-            attribute.forEach(::setAttribute)
+            attribute.forEach { (schluessel, wert) ->
+                setAttribute(schluessel, wert)
+            }
         }
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(serviceInfo: NsdServiceInfo) = Unit
