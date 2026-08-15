@@ -179,6 +179,7 @@ class SpielNetzwerkDienst(
 
     private fun pruefeAkteur(zustand: SpielZustand, aktion: SpielAktion, sitzungsSpieler: SpielerId) {
         val akteur = when (aktion) {
+            is SpielAktion.SpielerStilSetzen -> aktion.spieler
             is SpielAktion.HauptbahnhofPlatzieren -> aktion.spieler
             is SpielAktion.EckGebaeudeBauen -> aktion.spieler
             is SpielAktion.EckGebaeudeAufwerten -> aktion.spieler

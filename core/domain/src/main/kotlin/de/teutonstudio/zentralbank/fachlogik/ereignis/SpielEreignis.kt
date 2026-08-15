@@ -30,11 +30,18 @@ import de.teutonstudio.zentralbank.fachlogik.modell.KriegsSeite
 import de.teutonstudio.zentralbank.fachlogik.modell.Friedensvertrag
 import de.teutonstudio.zentralbank.fachlogik.modell.FriedensvertragId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerPaar
+import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
 @Serializable
 sealed interface SpielEreignis {
+    @Serializable
+    data class SpielerStilGesetzt(
+        val spieler: SpielerId,
+        val stil: SpielerStil,
+    ) : SpielEreignis
+
     @Serializable
     data class HandelsangebotErstellt(val angebot: HandelsAngebot) : SpielEreignis
 

@@ -35,6 +35,11 @@ internal object ZugRegelwerk {
 
         val zug = requireNotNull(zustand.zugStatus) { "Es ist kein Zug aktiv." }
         when (ereignis) {
+            is SpielEreignis.SpielerStilGesetzt -> {
+                require(ereignis.spieler == zug.spieler) {
+                    "Nur der aktive Spieler darf seinen KI-Stil ändern."
+                }
+            }
             is SpielEreignis.BelagerungAktualisiert,
             is SpielEreignis.FriedensvertragAbgeschlossen,
             is SpielEreignis.KampfAufgeloest -> Unit

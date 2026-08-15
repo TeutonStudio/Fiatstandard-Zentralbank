@@ -88,10 +88,12 @@ und `2_000_000_000`. Empfohlene Curriculum-Reihenfolge:
 
 ## Entwickleroberflächen
 
-Androids Bereich `KI_ENTWICKLUNG` zeigt die öffentlichen Wirtschafts- und
-Kriegsdaten, Stil/Agent/Fallback und erzeugt seine Schaltflächen aus dem zentralen
-Aktionsraum. Der Web-Client bietet dieselben generischen Aktions-, Stil-,
-Simulations- und Ligawerkzeuge. Der Server stellt zusätzlich bereit:
+Das normale Android-Aktionsmenü verwaltet ausschließlich den persistierten
+`SpielerStil`; es erzeugt weder eine vollständige Beobachtung noch einen zentralen
+Aktionsraum. Die vollständige Anzeige der öffentlichen Wirtschafts- und Kriegsdaten
+liegt in `KiDebugOberflaeche` und ist nur über den Debug-Build ausdrücklich erreichbar.
+Der Web-Client bietet weiterhin die generischen Aktions-, Stil-, Simulations- und
+Ligawerkzeuge. Der Server stellt zusätzlich bereit:
 
 - `GET /api/v1/games/{id}/observation`,
 - `POST /api/v1/simulations`,
