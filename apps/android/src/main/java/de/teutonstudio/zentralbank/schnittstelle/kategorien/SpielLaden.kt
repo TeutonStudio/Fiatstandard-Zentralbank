@@ -3,9 +3,9 @@ package de.teutonstudio.zentralbank.schnittstelle.kategorien
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,21 +31,30 @@ fun SpielLaden(
     spielstaende: List<SpielstandUebersicht>,
 ) {
     var spielstand by remember { mutableStateOf<SpielstandUebersicht?>(null) }
-    val valideAuswahl = remember { derivedStateOf { spielstand != null } }
+    val valideAuswahl = remember {
+        derivedStateOf { spielstand?.istLadbar == true }
+    }
     Titel(
         beiZurück = beiAbbruch,
         beiWeiter = {
-            if (valideAuswahl.value) {
-                spielstand?.let { beiLaden(it.id, nachLaden) }
-            }
+            spielstand
+                ?.takeIf { it.istLadbar }
+                ?.let { beiLaden(it.id, nachLaden) }
         },
-        anleitung = remember { mutableStateOf(false) }
+        anleitung = remember { mutableStateOf(false) },
     ) {
         SpielstandListe(
             spielstaende = spielstaende,
             auswahl = spielstand,
             beiAuswahl = { spielstand = it },
         )
+        if (spielstand?.ladeFehler != null) {
+            Text(
+                text = "Dieser Spielstand kann mit dem aktuellen Regelwerk nicht geladen werden. " +
+                    "Er bleibt unter Spielstände verwalten löschbar.",
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 
@@ -127,13 +136,18 @@ private fun SpielstandListe(
                         )
                         Text(text = "Die Siedler: ${daten.spielerNamen.joinToString(", ")}")
                         Text(text = "Siedeln seit: ${daten.runde} Runden")
+                        daten.ladeFehler?.let { fehler ->
+                            Text(
+                                text = "Nicht ladbar: $fehler",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable
