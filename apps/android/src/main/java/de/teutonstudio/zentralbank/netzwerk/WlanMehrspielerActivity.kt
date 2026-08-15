@@ -142,9 +142,16 @@ private fun WlanMehrspielerBildschirm(
 
         Text("Spiel hosten", style = MaterialTheme.typography.titleLarge)
         Text("Der Host verwendet einen gespeicherten Spielstand und läuft weiter, wenn diese Lobby geschlossen wird.")
-        val hostbareSpiele = spielstaende.filter { it.id >= 0 }
+        val hostbareSpiele = spielstaende.filter { it.id >= 0 && it.istLadbar }
+        val defekteSpiele = spielstaende.filter { it.id >= 0 && !it.istLadbar }
         if (hostbareSpiele.isEmpty()) {
-            Text("Noch kein gespeicherter Spielstand vorhanden.")
+            Text(
+                if (defekteSpiele.isEmpty()) {
+                    "Noch kein gespeicherter Spielstand vorhanden."
+                } else {
+                    "Kein rekonstruierbarer Spielstand kann derzeit gehostet werden."
+                },
+            )
         }
         hostbareSpiele.forEach { spiel ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -161,6 +168,24 @@ private fun WlanMehrspielerBildschirm(
                             scope.launch { WlanMehrspielerLaufzeit.hosten(spiel.id) }
                         }
                     }) { Text("Hosten") }
+                }
+            }
+        }
+        defekteSpiele.forEach { spiel ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("Spiel ${spiel.id} · nicht ladbar")
+                    if (spiel.spielerNamen.isNotEmpty()) {
+                        Text(spiel.spielerNamen.joinToString(prefix = "Spieler: "))
+                    }
+                    Text(
+                        spiel.ladeFehler ?: "Der Spielstand kann nicht rekonstruiert werden.",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Text("Der Spielstand kann unter „Spielstände verwalten“ gelöscht werden.")
                 }
             }
         }
