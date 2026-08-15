@@ -47,7 +47,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.Rohstoff
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerFarbe
 import de.teutonstudio.zentralbank.protokoll.LobbyKonfigurationDto
 import de.teutonstudio.zentralbank.schnittstelle.kategorien.KartenAuswahl
-import de.teutonstudio.zentralbank.schnittstelle.eingabe.definiereWarenkorb
+import de.teutonstudio.zentralbank.schnittstelle.eingabe.WarenkorbBearbeitenDialog
 import de.teutonstudio.zentralbank.schnittstelle.theme.CZBOracleRechnerTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -106,6 +106,7 @@ private fun WlanSpielErstellenBildschirm(
     var startGuthaben by remember { mutableStateOf("100") }
     var karte by remember { mutableStateOf<KartenVorlage?>(null) }
     val warenkorb = remember { mutableStateMapOf<WarenkorbRohstoff, Int>() }
+    var warenkorbDialogOffen by remember { mutableStateOf(false) }
     val startRohstoffe = remember { mutableStateMapOf<Rohstoff, String>() }
     val startBauteile = remember {
         mutableStateMapOf<BauteilTyp, String>().apply { put(BauteilTyp.HAUPTBAHNHOF, "1") }
@@ -171,7 +172,22 @@ private fun WlanSpielErstellenBildschirm(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item { definiereWarenkorb(inhalt = warenkorb) }
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column {
+                                Text("Warenkorb", style = MaterialTheme.typography.titleMedium)
+                                Text("${warenkorb.count { it.value > 0 }} Rohstoffe ausgewählt")
+                            }
+                            OutlinedButton(onClick = { warenkorbDialogOffen = true }) {
+                                Text("Bearbeiten")
+                            }
+                        }
+                    }
+                }
                 item { Text("Gemeinsame Startrohstoffe je Spieler", style = MaterialTheme.typography.titleLarge) }
                 items(Rohstoff.entries) { rohstoff ->
                     MengenEingabe(rohstoff.name, startRohstoffe[rohstoff].orEmpty()) { startRohstoffe[rohstoff] = it }
@@ -236,6 +252,18 @@ private fun WlanSpielErstellenBildschirm(
                 }) { Text("Lobby öffnen") }
             }
         }
+    }
+
+    if (warenkorbDialogOffen) {
+        WarenkorbBearbeitenDialog(
+            warenkorb = warenkorb,
+            beiAbbruch = { warenkorbDialogOffen = false },
+            beiSpeichern = { neuerWarenkorb ->
+                warenkorb.clear()
+                warenkorb.putAll(neuerWarenkorb)
+                warenkorbDialogOffen = false
+            },
+        )
     }
 }
 
