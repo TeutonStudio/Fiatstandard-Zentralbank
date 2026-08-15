@@ -9,6 +9,17 @@ import kotlinx.serialization.ExperimentalSerializationApi
 value class SpielerId(val wert: String)
 
 @Serializable
+enum class SpielerFarbe {
+    ORANGE,
+    OCKER,
+    GRUEN,
+    TUERKIS,
+    BLAU,
+    VIOLETT,
+    MAGENTA,
+}
+
+@Serializable
 sealed interface KontoId {
     @Serializable
     data class Spieler(val id: SpielerId) : KontoId
@@ -51,6 +62,9 @@ data class Spieler(
     @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val passwortHash: String = "",
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val farbe: SpielerFarbe? = null,
     val rohstoffe: Map<Rohstoff, Int> = emptyMap(),
     val geldkonto: Geld = Geld.NULL,
     val anleihen: List<AnleiheId> = emptyList(),
