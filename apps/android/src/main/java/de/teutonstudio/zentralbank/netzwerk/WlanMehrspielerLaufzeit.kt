@@ -70,8 +70,6 @@ object WlanMehrspielerLaufzeit {
             val gespeichert = withContext(Dispatchers.IO) {
                 speicher.spielLaden(spielId) ?: error("Spielstand $spielId wurde nicht gefunden.")
             }
-            // Erst vollständig rekonstruieren, bevor ein Socket geöffnet oder per NSD veröffentlicht wird.
-            // Ein historisch inkompatibler Spielstand darf niemals als scheinbar funktionsfähiger Host laufen.
             val aktuellerZustand = withContext(Dispatchers.Default) {
                 gespeichert.aktuellerZustand()
             }
@@ -143,8 +141,17 @@ object WlanMehrspielerLaufzeit {
         _zustand.value = _zustand.value.copy(sucheAktiv = false)
     }
 
-    suspend fun beitreten(endpunkt: WlanEndpunkt, spielerName: String, passwort: String = "") {
-        runCatching {
+    suspend fun beitreten(endpunkt: WlanEndpunkt, spielerName: String, passwort: String = ""): Boolean {
+        client = null
+        _zustand.value = _zustand.value.copy(
+            verbundenMit = null,
+            sitzung = null,
+            beobachtung = null,
+            erlaubteAktionen = null,
+            meldung = null,
+            fehler = null,
+        )
+        return runCatching {
             require(spielerName.isNotBlank()) { "Bitte den eigenen Spielernamen eingeben." }
             val neuerClient = WlanSpielClient(endpunkt)
             val neueSitzung = neuerClient.beitreten(spielerName.trim(), passwort)
@@ -156,7 +163,11 @@ object WlanMehrspielerLaufzeit {
                 fehler = null,
             )
             aktualisieren()
-        }.onFailure { meldeFehler(it.message ?: "Beitritt zum WLAN-Spiel fehlgeschlagen.") }
+            true
+        }.getOrElse {
+            meldeFehler(it.message ?: "Beitritt zum WLAN-Spiel fehlgeschlagen.")
+            false
+        }
     }
 
     suspend fun manuellBeitreten(
@@ -165,7 +176,7 @@ object WlanMehrspielerLaufzeit {
         spielId: Long,
         spielerName: String,
         passwort: String = "",
-    ) = beitreten(
+    ): Boolean = beitreten(
         WlanEndpunkt(host = host.trim(), port = port, spielId = spielId, name = "Manuell $host:$port"),
         spielerName,
         passwort,
