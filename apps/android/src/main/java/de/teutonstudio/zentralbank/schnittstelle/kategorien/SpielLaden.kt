@@ -1,25 +1,28 @@
 package de.teutonstudio.zentralbank.schnittstelle.kategorien
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
+import de.teutonstudio.zentralbank.netzwerk.WlanMehrspielerActivity
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 import de.teutonstudio.zentralbank.schnittstelle.eingabe.Titel
 
@@ -30,22 +33,41 @@ fun SpielLaden(
     nachLaden: () -> Unit,
     spielstaende: List<SpielstandUebersicht>,
 ) {
+    val context = LocalContext.current
     var spielstand by remember { mutableStateOf<SpielstandUebersicht?>(null) }
-    val valideAuswahl = remember { derivedStateOf { spielstand != null } }
     Titel(
         beiZurück = beiAbbruch,
         beiWeiter = {
-            if (valideAuswahl.value) {
-                spielstand?.let { beiLaden(it.id, nachLaden) }
-            }
+            spielstand
+                ?.takeIf { it.istLadbar }
+                ?.let { beiLaden(it.id, nachLaden) }
         },
-        anleitung = remember { mutableStateOf(false) }
+        anleitung = remember { mutableStateOf(false) },
     ) {
         SpielstandListe(
             spielstaende = spielstaende,
             auswahl = spielstand,
             beiAuswahl = { spielstand = it },
         )
+        if (spielstand?.ladeFehler != null) {
+            Text(
+                text = "Dieser Spielstand kann mit dem aktuellen Regelwerk nicht geladen werden. " +
+                    "Er bleibt unter Spielstände verwalten löschbar.",
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        spielstand
+            ?.takeIf { it.id >= 0 && it.istLadbar }
+            ?.let {
+                Button(
+                    onClick = {
+                        context.startActivity(Intent(context, WlanMehrspielerActivity::class.java))
+                    },
+                    modifier = ModiPad5,
+                ) {
+                    Text("Bestehendes Spiel im WLAN fortsetzen")
+                }
+            }
     }
 }
 
@@ -127,13 +149,18 @@ private fun SpielstandListe(
                         )
                         Text(text = "Die Siedler: ${daten.spielerNamen.joinToString(", ")}")
                         Text(text = "Siedeln seit: ${daten.runde} Runden")
+                        daten.ladeFehler?.let { fehler ->
+                            Text(
+                                text = "Nicht ladbar: $fehler",
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

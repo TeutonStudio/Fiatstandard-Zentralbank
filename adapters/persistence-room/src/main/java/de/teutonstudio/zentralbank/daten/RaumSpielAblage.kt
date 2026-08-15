@@ -1,12 +1,13 @@
 package de.teutonstudio.zentralbank.daten
 
 import androidx.room.withTransaction
-import de.teutonstudio.zentralbank.daten.zuordnung.zuEntitaet
-import de.teutonstudio.zentralbank.daten.zuordnung.zuGespeichertemSpiel
-import de.teutonstudio.zentralbank.datenbank.AppDatabase
 import de.teutonstudio.zentralbank.anwendung.GespeichertesSpiel
 import de.teutonstudio.zentralbank.anwendung.SpielAblage
 import de.teutonstudio.zentralbank.anwendung.SpielstandUebersicht
+import de.teutonstudio.zentralbank.daten.raumdatenbank.entitaet.SpielstandEntitaet
+import de.teutonstudio.zentralbank.daten.zuordnung.zuEntitaet
+import de.teutonstudio.zentralbank.daten.zuordnung.zuGespeichertemSpiel
+import de.teutonstudio.zentralbank.datenbank.AppDatabase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -18,8 +19,8 @@ class RaumSpielAblage(
     override fun spielstaendeBeobachten(): Flow<List<SpielstandUebersicht>> =
         spielstandDao.spielstaendeBeobachten().map { fachSpielstaende ->
             fachSpielstaende
-            .map { entitaet -> entitaet.zuGespeichertemSpiel().zuUebersicht() }
-            .sortedBy { uebersicht -> uebersicht.id }
+                .map(SpielstandEntitaet::zuSichereUebersicht)
+                .sortedBy { uebersicht -> uebersicht.id }
         }
 
     override suspend fun spielLaden(id: Long): GespeichertesSpiel? =
@@ -47,6 +48,32 @@ class RaumSpielAblage(
         }
     }
 }
+
+private fun SpielstandEntitaet.zuSichereUebersicht(): SpielstandUebersicht {
+    val gespeichert = runCatching { zuGespeichertemSpiel() }
+        .getOrElse { fehler ->
+            return SpielstandUebersicht(
+                id = spielId,
+                spielerNamen = emptyList(),
+                runde = 0,
+                ladeFehler = fehler.kompakteLadeFehlerMeldung(),
+            )
+        }
+    return runCatching { gespeichert.zuUebersicht() }
+        .getOrElse { fehler ->
+            SpielstandUebersicht(
+                id = gespeichert.id,
+                spielerNamen = gespeichert.startzustand.spieler.map { it.name },
+                runde = gespeichert.startzustand.rundenzähler,
+                ladeFehler = fehler.kompakteLadeFehlerMeldung(),
+            )
+        }
+}
+
+private fun Throwable.kompakteLadeFehlerMeldung(): String =
+    message?.takeIf { it.isNotBlank() }
+        ?: this::class.simpleName
+        ?: "Spielstand kann mit dem aktuellen Regelwerk nicht rekonstruiert werden."
 
 private fun Long.alsTabellenIdOderNull(): Int? =
     takeIf { id -> id in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }?.toInt()

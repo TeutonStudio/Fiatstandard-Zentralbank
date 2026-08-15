@@ -14,15 +14,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import de.teutonstudio.zentralbank.schnittstelle.ModiPad5
 
-
 @Composable
 fun ImageCard(
     bild_index: Int,
     modifier: Modifier = ModiPad5.wrapContentSize(),
     bild_label: String? = null,
+    enabled: Boolean = true,
     beiKlick: () -> Unit,
 ) {
-    Card(modifier = modifier, onClick = beiKlick) {
+    Card(
+        modifier = modifier,
+        onClick = beiKlick,
+        enabled = enabled,
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
