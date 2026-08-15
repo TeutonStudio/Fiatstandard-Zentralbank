@@ -42,6 +42,8 @@ dependencies {
     implementation(project(":core:domain"))
     implementation(project(":core:application"))
     implementation(project(":adapters:persistence-room"))
+    implementation(project(":adapters:protocol-json"))
+    implementation(project(":adapters:network-game"))
     implementation(libs.material)
     implementation(libs.sceneview)
     implementation(libs.filament.android)

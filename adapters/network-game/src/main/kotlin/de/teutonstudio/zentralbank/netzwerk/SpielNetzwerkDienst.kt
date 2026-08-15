@@ -3,6 +3,7 @@ package de.teutonstudio.zentralbank.netzwerk
 import de.teutonstudio.zentralbank.anwendung.AKTUELLE_ENGINE_VERSION
 import de.teutonstudio.zentralbank.anwendung.SpielAblage
 import de.teutonstudio.zentralbank.anwendung.SpielDienst
+import de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion
 import de.teutonstudio.zentralbank.fachlogik.auswertung.BeobachtungsAuswertung
 import de.teutonstudio.zentralbank.fachlogik.engine.SpielEngine
 import de.teutonstudio.zentralbank.fachlogik.engine.StandardSpielEngine
@@ -10,6 +11,7 @@ import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.Spieler
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerStil
+import de.teutonstudio.zentralbank.fachlogik.modell.pruefePasswort
 import de.teutonstudio.zentralbank.protokoll.API_VERSION
 import de.teutonstudio.zentralbank.protokoll.AktionAusfuehrenAnfrageDto
 import de.teutonstudio.zentralbank.protokoll.AktionErgebnisDto
@@ -33,8 +35,7 @@ import kotlinx.coroutines.sync.withLock
  * Transportneutrale, serverautoritative Mehrspieler-Fassade.
  *
  * Eine Sitzung bindet genau einen Spieler an ein Spiel. Netzwerkclients senden nur
- * [de.teutonstudio.zentralbank.fachlogik.aktion.SpielAktion]-Absichten; die gemeinsame
- * Engine auf dem Host validiert und verändert den Zustand.
+ * [SpielAktion]-Absichten; die gemeinsame Engine auf dem Host validiert und verändert den Zustand.
  */
 class SpielNetzwerkDienst(
     private val ablage: SpielAblage,
@@ -95,6 +96,9 @@ class SpielNetzwerkDienst(
         val spieler = gespeichert.aktuellerZustand().spieler.singleOrNull {
             it.name == name || it.id.wert == name
         } ?: throw IllegalArgumentException("Spieler '$name' gehört nicht zu Spiel $id.")
+        if (spieler.passwortHash.isNotBlank() && !spieler.pruefePasswort(anfrage.passwort)) {
+            throw UngueltigeSpielerAnmeldung()
+        }
         val token = neuesToken()
         sitzungen[token] = Sitzung(id, spieler.id)
         return SpielSitzungDto(
@@ -152,12 +156,9 @@ class SpielNetzwerkDienst(
                 if (erwartet != revision) throw RevisionKonflikt(erwartet, revision)
             }
 
+            val zustand = gespeichert.aktuellerZustand()
             val aktion = anfrage.aktion.zuDomain()
-            val erlaubt = spielDienst.erlaubteAktionen(id, sitzung.spieler)
-            require(aktion in erlaubt) {
-                "Aktion ist für Spieler ${sitzung.spieler.wert} im aktuellen Zustand nicht erlaubt."
-            }
-
+            pruefeAkteur(zustand, aktion, sitzung.spieler)
             val schritt = spielDienst.aktionAusfuehren(id, aktion).getOrThrow()
             val neueRevision = spielDienst.spielLaden(id)
                 ?.ereignisse
@@ -173,6 +174,63 @@ class SpielNetzwerkDienst(
             )
             kommandoSchluessel?.let { beantworteteKommandos[it] = antwort }
             antwort
+        }
+    }
+
+    private fun pruefeAkteur(zustand: SpielZustand, aktion: SpielAktion, sitzungsSpieler: SpielerId) {
+        val akteur = when (aktion) {
+            is SpielAktion.HauptbahnhofPlatzieren -> aktion.spieler
+            is SpielAktion.EckGebaeudeBauen -> aktion.spieler
+            is SpielAktion.EckGebaeudeAufwerten -> aktion.spieler
+            is SpielAktion.SchieneBauen -> aktion.spieler
+            is SpielAktion.AnlageErrichten -> aktion.spieler
+            is SpielAktion.BelegungAbreissen -> aktion.spieler
+            is SpielAktion.SeewegEinrichten -> aktion.spieler
+            is SpielAktion.SeewegEntfernen -> aktion.spieler
+            is SpielAktion.KriegsEinheitBauen -> aktion.spieler
+            is SpielAktion.KriegsEinheitEinsetzen -> aktion.spieler
+            is SpielAktion.KriegsEinheitBewegen -> aktion.spieler
+            is SpielAktion.KriegsEinheitenBewegen -> aktion.spieler
+            is SpielAktion.VerwaltungsruineReparieren -> aktion.spieler
+            is SpielAktion.VerwaltungsruineAbreissen -> aktion.spieler
+            is SpielAktion.AnleiheEmittieren -> aktion.spieler
+            is SpielAktion.AnleiheFreiwilligZurueckkaufen -> aktion.spieler
+            is SpielAktion.AnleiheAufstocken -> aktion.spieler
+            is SpielAktion.SchuldenstrichDurchfuehren -> aktion.spieler
+            is SpielAktion.HandelsangebotErstellen -> aktion.spieler
+            is SpielAktion.HandelsangebotAnnehmen -> aktion.spieler
+            is SpielAktion.HandelsangebotAblehnen -> aktion.spieler
+            is SpielAktion.HandelsangebotZurueckziehen -> aktion.spieler
+            is SpielAktion.AnleihenangebotErstellen -> aktion.spieler
+            is SpielAktion.AnleihenangebotAnnehmen -> aktion.spieler
+            is SpielAktion.AnleihenangebotAblehnen -> aktion.spieler
+            is SpielAktion.AnleihenangebotZurueckziehen -> aktion.spieler
+            is SpielAktion.ZahlungsunfaehigkeitFeststellen -> aktion.spieler
+            is SpielAktion.MitAuslandHandeln -> aktion.spieler
+            is SpielAktion.KriegErklaeren -> aktion.aggressor
+            is SpielAktion.KriegsAllianzBeitreten -> aktion.spieler
+            is SpielAktion.WaffenstillstandAnbieten -> aktion.spieler
+            is SpielAktion.WaffenstillstandAnnehmen -> aktion.spieler
+            is SpielAktion.KriegKapitulieren -> aktion.spieler
+            is SpielAktion.FriedensvertragVorschlagen -> aktion.spieler
+            is SpielAktion.FriedensvertragAnnehmen -> aktion.spieler
+            is SpielAktion.UnabhaengigenFriedenSchliessen -> aktion.spieler
+            is SpielAktion.RessourcenUebertragen -> aktion.spieler
+            is SpielAktion.RohstoffHandeln -> throw IllegalArgumentException(
+                "Direkter bilateraler Rohstoffhandel ist über WLAN nicht zulässig; " +
+                    "Handelsangebot erstellen und von der Gegenpartei annehmen lassen.",
+            )
+            is SpielAktion.ProzugBeginnen,
+            is SpielAktion.VerarbeitungAusfuehren,
+            is SpielAktion.VerwaltungsstandortVersorgen,
+            is SpielAktion.VerbindlichkeitBegleichen,
+            is SpielAktion.ProzugAbschliessen,
+            SpielAktion.ZugBeenden,
+            is SpielAktion.WarenkorbAendern -> zustand.aktiverSpieler
+                ?: throw IllegalStateException("Es ist kein Spieler aktiv.")
+        }
+        require(akteur == sitzungsSpieler) {
+            "Die Aktion gehört zu Spieler ${akteur.wert}, die Sitzung aber zu ${sitzungsSpieler.wert}."
         }
     }
 
@@ -209,6 +267,8 @@ class NetzwerkSpielNichtGefunden(val spielId: Long) : NoSuchElementException(
 )
 
 class UngueltigeSpielSitzung : SecurityException("Ungültige oder abgelaufene Spielsitzung.")
+
+class UngueltigeSpielerAnmeldung : SecurityException("Spielername oder Passwort ist ungültig.")
 
 class RevisionKonflikt(
     val erwartet: Long,

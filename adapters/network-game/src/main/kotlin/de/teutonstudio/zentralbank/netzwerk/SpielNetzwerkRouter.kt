@@ -28,6 +28,8 @@ data class NetzwerkAntwort(
 /** Gemeinsamer HTTP-unabhängiger Router für JVM-Server und Android-WLAN-Host. */
 class SpielNetzwerkRouter(
     private val dienst: SpielNetzwerkDienst,
+    private val freigegebenesSpielId: Long? = null,
+    private val spielErstellenErlaubt: Boolean = true,
 ) {
     private val json = Json {
         classDiscriminator = "art"
@@ -48,38 +50,33 @@ class SpielNetzwerkRouter(
                     }.toString(),
                 )
 
-            methode == "POST" && teile == listOf("api", "v1", "games") -> runBlocking {
+            methode == "POST" && teile == listOf("api", "v1", "games") && spielErstellenErlaubt -> runBlocking {
                 val dto = json.decodeFromString<SpielErstellenAnfrageDto>(anfrage.inhalt)
                 jsonAntwort(201, json.encodeToString(dienst.erstellen(dto)))
             }
 
             methode == "POST" && teile.size == 5 &&
                 teile.take(3) == listOf("api", "v1", "games") && teile[4] == "join" -> runBlocking {
-                val id = spielId(teile[3])
+                val id = freigegebeneSpielId(teile[3])
                 val dto = json.decodeFromString<SpielBeitretenAnfrageDto>(anfrage.inhalt)
                 jsonAntwort(200, json.encodeToString(dienst.beitreten(id, dto)))
             }
 
-            methode == "GET" && teile.size == 4 &&
-                teile.take(3) == listOf("api", "v1", "games") -> runBlocking {
-                jsonAntwort(200, json.encodeToString(dienst.laden(spielId(teile[3]))))
-            }
-
             methode == "GET" && teile.size == 5 &&
                 teile.take(3) == listOf("api", "v1", "games") && teile[4] == "actions" -> runBlocking {
-                val id = spielId(teile[3])
+                val id = freigegebeneSpielId(teile[3])
                 jsonAntwort(200, json.encodeToString(dienst.erlaubteAktionen(id, bearer(anfrage))))
             }
 
             methode == "GET" && teile.size == 5 &&
                 teile.take(3) == listOf("api", "v1", "games") && teile[4] == "observation" -> runBlocking {
-                val id = spielId(teile[3])
+                val id = freigegebeneSpielId(teile[3])
                 jsonAntwort(200, json.encodeToString(dienst.beobachten(id, bearer(anfrage))))
             }
 
             methode == "POST" && teile.size == 5 &&
                 teile.take(3) == listOf("api", "v1", "games") && teile[4] == "actions" -> runBlocking {
-                val id = spielId(teile[3])
+                val id = freigegebeneSpielId(teile[3])
                 val dto = json.decodeFromString<AktionAusfuehrenAnfrageDto>(anfrage.inhalt)
                 jsonAntwort(200, json.encodeToString(dienst.aktionAusfuehren(id, bearer(anfrage), dto)))
             }
@@ -90,6 +87,8 @@ class SpielNetzwerkRouter(
         fehlerAntwort(404, "SPIEL_NICHT_GEFUNDEN", ursache.message ?: "Spiel nicht gefunden.")
     } catch (ursache: UngueltigeSpielSitzung) {
         fehlerAntwort(401, "UNGUELTIGE_SITZUNG", ursache.message ?: "Ungültige Spielsitzung.")
+    } catch (ursache: UngueltigeSpielerAnmeldung) {
+        fehlerAntwort(401, "ANMELDUNG_ABGELEHNT", ursache.message ?: "Spieleranmeldung abgelehnt.")
     } catch (ursache: RevisionKonflikt) {
         NetzwerkAntwort(
             status = 409,
@@ -125,9 +124,15 @@ class SpielNetzwerkRouter(
             ?: throw UngueltigeSpielSitzung()
     }
 
-    private fun spielId(text: String): Long = text.toLongOrNull()
-        ?.takeIf { it >= 0 }
-        ?: throw IllegalArgumentException("Ungültige Spiel-ID '$text'.")
+    private fun freigegebeneSpielId(text: String): Long {
+        val id = text.toLongOrNull()
+            ?.takeIf { it >= 0 }
+            ?: throw IllegalArgumentException("Ungültige Spiel-ID '$text'.")
+        if (freigegebenesSpielId != null && id != freigegebenesSpielId) {
+            throw NetzwerkSpielNichtGefunden(id)
+        }
+        return id
+    }
 
     private fun jsonAntwort(status: Int, text: String) = NetzwerkAntwort(status, text)
 

@@ -27,6 +27,7 @@ data class SpielErstelltDto(
 data class SpielBeitretenAnfrageDto(
     val version: Int = API_VERSION,
     val spielerName: String,
+    val passwort: String = "",
 )
 
 @Serializable
