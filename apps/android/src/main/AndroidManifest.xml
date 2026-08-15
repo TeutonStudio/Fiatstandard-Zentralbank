@@ -17,6 +17,14 @@
         android:theme="@style/Theme.Fiatreich"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".netzwerk.WlanSpielErstellenActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Fiatreich" />
+        <activity
+            android:name=".netzwerk.WlanSpielBeitretenActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Fiatreich" />
+        <activity
             android:name=".netzwerk.WlanMehrspielerActivity"
             android:exported="false"
             android:theme="@style/Theme.Fiatreich" />
