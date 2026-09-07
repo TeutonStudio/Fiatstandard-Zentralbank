@@ -1,0 +1,80 @@
+name: Build v2 clients
+
+on:
+  push:
+    branches:
+      - agent/itch-v2.0.0
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CHROME_BIN: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Verify v2 shared engine and release artifacts
+        id: build
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --stacktrace \
+            architekturPruefen \
+            :core:domain:jvmTest \
+            :core:application:jvmTest \
+            :apps:web:jsBrowserTest \
+            releaseArtifacts \
+            > build.log 2>&1
+          status=$?
+          cat build.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-build-log
+          path: build.log
+          if-no-files-found: error
+
+      - name: Upload browser test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-reports
+          path: |
+            apps/web/build/test-results/jsBrowserTest/**
+            apps/web/build/reports/tests/jsBrowserTest/**
+          if-no-files-found: warn
+
+      - name: Fail when build failed
+        if: steps.build.outputs.status != '0'
+        run: exit 1
+
+      - name: Upload v2 release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fiatstandard-v2.0.0
+          path: build/releases/*
+          if-no-files-found: error

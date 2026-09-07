@@ -1,0 +1,52 @@
+name: Agent repository snapshot
+
+on:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  apply-agent-change:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/itch-v2.0.0
+          fetch-depth: 0
+      - name: Apply staged source patch
+        id: apply
+        shell: bash
+        run: |
+          set +e
+          (
+            set -ex
+            head -c 3856 .github/agent/changes/06/patch.b64 | base64 --decode > /tmp/change.patch
+            actual_hash="$(sha256sum /tmp/change.patch | cut -d' ' -f1)"
+            test "$actual_hash" = "c486bbe650ffada827e8dd86e0582a08bd7dc37354d418ea15778d596f153ccd"
+            git apply --index /tmp/change.patch
+            if git diff --cached --quiet; then
+              echo "Keine neuen Quelländerungen anzuwenden."
+              exit 0
+            fi
+            git config user.name "OpenAI Codex"
+            git config user.email "codex@openai.com"
+            git commit -m "fix(multiplatform): JvmInline explizit importieren"
+            git push origin HEAD:refs/heads/agent/itch-v2.0.0
+          ) > apply.log 2>&1
+          status=$?
+          cat apply.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload apply log
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-apply-log
+          path: apply.log
+          if-no-files-found: error
+          retention-days: 1
+      - name: Fail when apply failed
+        if: steps.apply.outputs.status != '0'
+        run: exit 1

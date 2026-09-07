@@ -6,7 +6,7 @@ Fachtypen liegen in `core/domain`; Android-, HTTP- und Persistenzdetails liegen
 außerhalb des Kerns.
 
 Voraussetzungen sind JDK 17 und für den Android-Build ein eingerichtetes Android
-SDK. Der Web-Client benötigt eine aktuelle Node.js-/npm-Installation.
+SDK. Gradle richtet die Kotlin/JS- und Node.js-Werkzeuge für den Web-Build ein.
 
 ## Bauen und testen
 
@@ -16,6 +16,9 @@ SDK. Der Web-Client benötigt eine aktuelle Node.js-/npm-Installation.
 
 # Android-Debug-APK
 ./gradlew :apps:android:assembleDebug
+
+# APK und direkt hochladbare itch.io-ZIP gemeinsam erzeugen
+./gradlew releaseArtifacts
 
 # einzelne Server- und Simulationstests
 ./gradlew :apps:server:test
@@ -40,14 +43,18 @@ unter `/api/v1/games`.
 ## Web-Client starten
 
 ```bash
-cd apps/web
-npm ci
-npm run build
-npm start
+./gradlew :apps:web:jsBrowserDevelopmentRun
 ```
 
-Die API-Basis-URL kann im Browserformular geändert werden und wird lokal im
-Browser gespeichert.
+Der Browserclient führt die gemeinsame Kotlin-Spielengine lokal aus. Er benötigt
+keinen Server, speichert Partien im Browser und unterstützt JSON-Import und
+-Export. Die direkt auf itch.io hochladbare ZIP entsteht mit:
+
+```bash
+./gradlew :apps:web:itchZip
+```
+
+Details stehen in [`docs/ITCH_RELEASE.md`](docs/ITCH_RELEASE.md).
 
 ## Simulation und Trainingsdatenexport
 

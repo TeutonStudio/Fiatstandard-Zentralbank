@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#252a2e" />
+    <title>Fiatreich</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Der Fiatstandard</p>
+        <h1>Fiatreich</h1>
+      </div>
+      <div class="header-actions">
+        <button id="save-game" type="button">Speichern</button>
+        <button id="undo" type="button">Rückgängig</button>
+        <button id="redo" type="button">Wiederholen</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel setup-panel">
+        <h2>Partie</h2>
+        <label>
+          Spielernamen, durch Kommas getrennt
+          <input id="player-names" value="Anna, Bert, Carla" autocomplete="off" />
+        </label>
+        <label>
+          Seed
+          <input id="seed" type="number" value="42" step="1" />
+        </label>
+        <div class="button-row">
+          <button id="new-game" class="primary" type="button">Neues Spiel</button>
+          <select id="saved-games" aria-label="Gespeicherte Spiele"></select>
+          <button id="load-game" type="button">Laden</button>
+          <button id="delete-game" class="danger" type="button">Löschen</button>
+        </div>
+      </section>
+
+      <section id="message" class="message" aria-live="polite">Noch keine Partie geladen.</section>
+
+      <section class="game-grid">
+        <article class="panel state-panel">
+          <div id="game-summary"></div>
+          <div id="players" class="player-grid"></div>
+        </article>
+
+        <article class="panel action-panel">
+          <h2>Erlaubte Aktionen</h2>
+          <select id="actions" size="12" aria-label="Erlaubte Aktionen"></select>
+          <button id="execute-action" class="primary" type="button">Aktion ausführen</button>
+          <p class="hint">Die Liste wird direkt vom gemeinsamen Kotlin-Regelkern erzeugt.</p>
+        </article>
+
+        <article class="panel map-panel">
+          <div class="panel-heading">
+            <h2>Karte</h2>
+            <span id="map-caption"></span>
+          </div>
+          <div id="map" class="map-canvas"></div>
+        </article>
+
+        <article class="panel transfer-panel">
+          <h2>Spielstand übertragen</h2>
+          <textarea id="transfer" spellcheck="false" placeholder="JSON-Spielstand"></textarea>
+          <div class="button-row">
+            <button id="export-game" type="button">Exportieren</button>
+            <button id="import-game" type="button">Importieren</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <noscript>Fiatreich benötigt JavaScript. Die Menschheit hat offenbar doch noch nicht alles serverseitig gelöst.</noscript>
+    <script src="fiatstandard.js"></script>
+  </body>
+</html>

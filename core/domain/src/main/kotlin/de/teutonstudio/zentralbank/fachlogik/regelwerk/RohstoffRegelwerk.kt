@@ -53,7 +53,7 @@ internal object RohstoffRegelwerk {
         return SpielerRegelwerk.aendereSpieler(zustand, spieler) { bestand ->
             val neueRohstoffe = bestand.rohstoffe.toMutableMap()
             mengen.forEach { (rohstoff, menge) ->
-                val neuerWert = neueRohstoffe.getOrDefault(rohstoff, 0) + menge * faktor
+                val neuerWert = (neueRohstoffe[rohstoff] ?: 0) + menge * faktor
                 require(neuerWert >= 0) {
                     "${bestand.name} hat nicht genug ${rohstoff.name}."
                 }

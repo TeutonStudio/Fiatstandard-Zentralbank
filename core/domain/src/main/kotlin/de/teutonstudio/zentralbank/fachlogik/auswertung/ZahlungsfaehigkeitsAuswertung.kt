@@ -34,7 +34,7 @@ object ZahlungsfaehigkeitsAuswertung {
                     it.id !in zug.prozug.versorgteStandorte
             }
         val rohstoffeDirekt = hauptbahnhof == null || hauptbahnhof.bedarf.all { (rohstoff, menge) ->
-            spieler.rohstoffe.getOrDefault(rohstoff, 0) >= menge
+            (spieler.rohstoffe[rohstoff] ?: 0) >= menge
         }
         val offeneVerbindlichkeiten = if (zug?.spieler == spielerId) {
             zug.prozug.verbindlichkeiten.filter { it.id !in zug.prozug.beglicheneVerbindlichkeiten }
@@ -51,13 +51,13 @@ object ZahlungsfaehigkeitsAuswertung {
         )
         val fehlkosten = hauptbahnhof?.bedarf.orEmpty().entries.fold(Geld.NULL) {
                 summe, (rohstoff, menge) ->
-            val fehlt = (menge - spieler.rohstoffe.getOrDefault(rohstoff, 0)).coerceAtLeast(0)
-            summe + zustand.marktpreise.getOrDefault(rohstoff, Geld.NULL) * fehlt
+            val fehlt = (menge - (spieler.rohstoffe[rohstoff] ?: 0)).coerceAtLeast(0)
+            summe + (zustand.marktpreise[rohstoff] ?: Geld.NULL) * fehlt
         }
         val verkaufswert = spieler.rohstoffe.entries.fold(Geld.NULL) { summe, (rohstoff, menge) ->
-            val pflicht = hauptbahnhof?.bedarf?.getOrDefault(rohstoff, 0) ?: 0
+            val pflicht = hauptbahnhof?.bedarf?.get(rohstoff) ?: 0
             val ueberschuss = (menge - pflicht).coerceAtLeast(0)
-            summe + zustand.marktpreise.getOrDefault(rohstoff, Geld.NULL) * ueberschuss
+            summe + (zustand.marktpreise[rohstoff] ?: Geld.NULL) * ueberschuss
         }
         val gesamtGeldbedarf = verbindlichkeitenBetrag + fehlkosten
         val nachMarkt = direkt || marktZugang &&

@@ -246,7 +246,7 @@ object AktionsAuswertung {
         val bestand = zustand.spieler.single { it.id == spieler }
         Rohstoff.entries.forEach { rohstoff ->
             val preis = zustand.marktpreise[rohstoff]?.takeIf { it > Geld.NULL } ?: return@forEach
-            if (bestand.rohstoffe.getOrDefault(rohstoff, 0) > 0) {
+            if ((bestand.rohstoffe[rohstoff] ?: 0) > 0) {
                 add(
                     SpielAktion.MitAuslandHandeln(
                         spieler,
@@ -533,18 +533,18 @@ object AktionsAuswertung {
         val kanten = felder.flatMap { it.kanten() }.distinct().sortedMitKanten()
         val rest = zustand.rundeNullRestbestand?.get(spieler).orEmpty()
         return buildList {
-            if (rest.getOrDefault(BauteilTyp.HAUPTBAHNHOF, 0) > 0 || rest.isEmpty()) {
+            if ((rest[BauteilTyp.HAUPTBAHNHOF] ?: 0) > 0 || rest.isEmpty()) {
                 ecken.forEach { add(SpielAktion.HauptbahnhofPlatzieren(spieler, it)) }
             }
             mapOf(
                 BauteilTyp.BAHNHOF to EckGebaeudeTyp.BAHNHOF,
                 BauteilTyp.HAFEN to EckGebaeudeTyp.HAFEN,
             ).forEach { (bauteil, typ) ->
-                if (rest.getOrDefault(bauteil, 0) > 0) {
+                if ((rest[bauteil] ?: 0) > 0) {
                     ecken.forEach { add(SpielAktion.EckGebaeudeBauen(spieler, it, typ)) }
                 }
             }
-            if (rest.getOrDefault(BauteilTyp.EISENBAHNLINIE, 0) > 0) {
+            if ((rest[BauteilTyp.EISENBAHNLINIE] ?: 0) > 0) {
                 kanten.forEach { add(SpielAktion.SchieneBauen(spieler, it)) }
             }
             rest.entries.filter { (typ, menge) ->

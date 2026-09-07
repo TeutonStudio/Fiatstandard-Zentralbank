@@ -6,7 +6,6 @@ import de.teutonstudio.zentralbank.fachlogik.engine.SpielSchrittErgebnis
 import de.teutonstudio.zentralbank.fachlogik.engine.StandardSpielEngine
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielZustand
 import de.teutonstudio.zentralbank.fachlogik.modell.SpielerId
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -15,7 +14,8 @@ class SpielDienst(
     private val spielAblage: SpielAblage,
     private val engine: SpielEngine = StandardSpielEngine(),
 ) {
-    private val spielSperren = ConcurrentHashMap<Long, Mutex>()
+    private val sperrenMutex = Mutex()
+    private val spielSperren = mutableMapOf<Long, Mutex>()
 
     suspend fun spielErstellen(
         id: Long,
@@ -59,6 +59,8 @@ class SpielDienst(
         }
     }
 
-    private suspend fun <T> mitSpielsperre(id: Long, block: suspend () -> T): T =
-        spielSperren.computeIfAbsent(id) { Mutex() }.withLock { block() }
+    private suspend fun <T> mitSpielsperre(id: Long, block: suspend () -> T): T {
+        val spielSperre = sperrenMutex.withLock { spielSperren.getOrPut(id) { Mutex() } }
+        return spielSperre.withLock { block() }
+    }
 }

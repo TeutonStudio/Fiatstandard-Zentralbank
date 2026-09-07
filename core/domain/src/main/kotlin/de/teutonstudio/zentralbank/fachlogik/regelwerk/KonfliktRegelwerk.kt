@@ -1,5 +1,8 @@
 package de.teutonstudio.zentralbank.fachlogik.regelwerk
 
+import de.teutonstudio.zentralbank.fachlogik.technik.bodenDivision
+import de.teutonstudio.zentralbank.fachlogik.technik.multipliziereExakt
+
 import de.teutonstudio.zentralbank.fachlogik.auswertung.AnleihenAuswertung
 import de.teutonstudio.zentralbank.fachlogik.auswertung.MarktAuswertung
 import de.teutonstudio.zentralbank.fachlogik.ereignis.SpielEreignis
@@ -395,7 +398,7 @@ internal object KonfliktRegelwerk {
             .groupingBy { it.first.emittent }
             .eachCount()
         val schuldenstrichDanach = vertrag.verlierer.filterTo(mutableSetOf()) { verlierer ->
-            externeNeueJeVerlierer.getOrDefault(verlierer, 0) >
+            (externeNeueJeVerlierer[verlierer] ?: 0) >
                 AnleihenAuswertung.freieGeschaeftsbankPlaetze(zustand, verlierer)
         }
         return neuZustand to vertrag.copy(
@@ -422,7 +425,7 @@ internal object KonfliktRegelwerk {
         val summe = marktwerte.values.sumOf { maxOf(0L, it.cent) }
         val basis = marktwerte.mapValues { (_, wert) ->
             if (summe == 0L) schuldCent / verlierer.size
-            else Math.floorDiv(Math.multiplyExact(schuldCent, maxOf(0L, wert.cent)), summe)
+            else bodenDivision(multipliziereExakt(schuldCent, maxOf(0L, wert.cent)), summe)
         }.toMutableMap()
         var rest = schuldCent - basis.values.sum()
         val rundungsReste = marktwerte.keys.associateWith { 0L }.toMutableMap()

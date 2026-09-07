@@ -1,5 +1,8 @@
 package de.teutonstudio.zentralbank.fachlogik.modell
 
+import de.teutonstudio.zentralbank.fachlogik.technik.multipliziereExakt
+import de.teutonstudio.zentralbank.fachlogik.technik.subtrahiereExakt
+
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -177,7 +180,7 @@ fun KriegsEinheitTyp.bewegungsKosten(kanten: Int): Map<Rohstoff, Int> {
 fun gruppenBewegungsKosten(anzahl: Int, grundkosten: Int): Int {
     require(anzahl > 0) { "Eine Bewegungsgruppe braucht mindestens eine Einheit." }
     require(grundkosten > 0) { "Bewegungsgrundkosten müssen positiv sein." }
-    return Math.subtractExact(Math.multiplyExact(anzahl, grundkosten), anzahl - 1)
+    return subtrahiereExakt(multipliziereExakt(anzahl, grundkosten), anzahl - 1)
 }
 
 @Serializable

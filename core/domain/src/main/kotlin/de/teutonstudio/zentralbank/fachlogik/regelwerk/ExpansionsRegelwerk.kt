@@ -17,7 +17,7 @@ internal object ExpansionsRegelwerk {
         return SpielerRegelwerk.aendereSpieler(nachKosten, ereignis.spieler) { spieler ->
             spieler.copy(
                 bauteile = spieler.bauteile + (
-                    ereignis.bauteil to (spieler.bauteile.getOrDefault(ereignis.bauteil, 0) + 1)
+                    ereignis.bauteil to ((spieler.bauteile[ereignis.bauteil] ?: 0) + 1)
                 ),
             )
         }

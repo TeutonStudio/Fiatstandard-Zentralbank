@@ -104,9 +104,12 @@ object ErreichbarkeitsAuswertung {
             }
         }
         if (jeLinie.any { it.isEmpty() }) return emptyMap()
-        return jeLinie.flatten().groupingBy { it.besitzer }.eachCount().toSortedMap(
-            compareBy { it.wert },
-        )
+        return jeLinie.flatten()
+            .groupingBy { it.besitzer }
+            .eachCount()
+            .entries
+            .sortedBy { it.key.wert }
+            .associate { it.toPair() }
     }
 
     fun istVollstaendigFeindlichBlockiert(

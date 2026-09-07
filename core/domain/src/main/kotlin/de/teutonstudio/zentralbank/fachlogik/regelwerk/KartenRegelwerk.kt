@@ -945,7 +945,7 @@ internal object KartenRegelwerk {
         val restbestand = requireNotNull(zustand.rundeNullRestbestand) {
             "Dieser Spielstand besitzt keinen individuellen Runde-0-Bestand."
         }
-        require((restbestand[spieler]?.getOrDefault(bauteil, 0) ?: 0) > 0) {
+        require((restbestand[spieler]?.get(bauteil) ?: 0) > 0) {
             "Für ${bauteil.name.lowercase().replace('_', ' ')} ist keine weitere Startplatzierung vorgesehen."
         }
     }
@@ -1023,7 +1023,7 @@ internal object KartenRegelwerk {
             zustand
         }
         return SpielerRegelwerk.aendereSpieler(nachKosten, spieler) { bestand ->
-            val bisher = bestand.bauteile.getOrDefault(bauteil, 0)
+            val bisher = (bestand.bauteile[bauteil] ?: 0)
             val neu = bisher + delta
             require(neu >= 0) {
                 "Der Bauteilbestand ${bauteil.name.lowercase().replace('_', ' ')} darf nicht negativ werden."

@@ -1,19 +1,21 @@
 package de.teutonstudio.zentralbank.fachlogik.modell
 
-import java.util.ArrayDeque
+import de.teutonstudio.zentralbank.fachlogik.technik.addiereExakt
+import de.teutonstudio.zentralbank.fachlogik.technik.bodenDivision
+import de.teutonstudio.zentralbank.fachlogik.technik.multipliziereExakt
 
 /** Ganzzahlige Topologie des Dreiecksgitters; unabhängig von der 3D-Darstellung. */
 fun KartenFeld.ecken(): List<KartenEcke> {
-    val links = Math.addExact(zeile, Math.multiplyExact(spalte, 2))
-    val oben = Math.multiplyExact(zeile, 2)
+    val links = addiereExakt(zeile, multipliziereExakt(spalte, 2))
+    val oben = multipliziereExakt(zeile, 2)
     val a = KartenEcke(links, oben)
-    val b = KartenEcke(Math.addExact(links, 2), oben)
-    val c = KartenEcke(Math.addExact(links, 1), Math.addExact(oben, 2))
+    val b = KartenEcke(addiereExakt(links, 2), oben)
+    val c = KartenEcke(addiereExakt(links, 1), addiereExakt(oben, 2))
     return when (haelfte) {
         DreieckHaelfte.UNTEN -> listOf(a, b, c)
         DreieckHaelfte.OBEN -> listOf(
             b,
-            KartenEcke(Math.addExact(links, 3), Math.addExact(oben, 2)),
+            KartenEcke(addiereExakt(links, 3), addiereExakt(oben, 2)),
             c,
         )
     }
@@ -47,9 +49,9 @@ fun KartenHexagon.benoetigterRadius(position: KartenFeld): Int {
     val relativX = x - 3L * zentrum.x
     val relativY = y - 3L * zentrum.y
     return maxOf(
-        Math.floorDiv(kotlin.math.abs(relativY), 6L) + 1L,
-        Math.floorDiv(kotlin.math.abs(2L * relativX + relativY), 12L) + 1L,
-        Math.floorDiv(kotlin.math.abs(2L * relativX - relativY), 12L) + 1L,
+        bodenDivision(kotlin.math.abs(relativY), 6L) + 1L,
+        bodenDivision(kotlin.math.abs(2L * relativX + relativY), 12L) + 1L,
+        bodenDivision(kotlin.math.abs(2L * relativX - relativY), 12L) + 1L,
     ).also { radius ->
         require(radius <= Int.MAX_VALUE) { "Das Dreieck liegt außerhalb des Radius-Zahlenraums." }
     }.toInt()
@@ -57,8 +59,8 @@ fun KartenHexagon.benoetigterRadius(position: KartenFeld): Int {
 
 /** Liefert die genau 6 * radius² Dreiecksfelder des Hexagons in stabiler Reihenfolge. */
 fun KartenHexagon.felder(): List<KartenFeld> {
-    val mittelZeile = Math.floorDiv(zentrum.y, 2)
-    val ungefaehreMittelSpalte = Math.floorDiv(zentrum.x - mittelZeile, 2)
+    val mittelZeile = bodenDivision(zentrum.y, 2)
+    val ungefaehreMittelSpalte = bodenDivision(zentrum.x - mittelZeile, 2)
     val zeilen = (mittelZeile - radius)..(mittelZeile + radius)
     val spalten = (ungefaehreMittelSpalte - radius * 2)..
         (ungefaehreMittelSpalte + radius * 2)
@@ -80,10 +82,10 @@ fun KartenHexagon.felder(): List<KartenFeld> {
 
 /** Liefert die geometrisch möglichen Nachbarfelder; Positionen außerhalb sind Wasser. */
 fun angrenzendeFelder(ecke: KartenEcke): List<KartenFeld> {
-    val ungefaehreZeile = Math.floorDiv(ecke.y, 2)
+    val ungefaehreZeile = bodenDivision(ecke.y, 2)
     return buildList {
         for (zeile in (ungefaehreZeile - 1)..(ungefaehreZeile + 1)) {
-            val ungefaehreSpalte = Math.floorDiv(ecke.x - zeile, 2)
+            val ungefaehreSpalte = bodenDivision(ecke.x - zeile, 2)
             for (spalte in (ungefaehreSpalte - 2)..(ungefaehreSpalte + 2)) {
                 DreieckHaelfte.entries.forEach { haelfte ->
                     val feld = KartenFeld(zeile, spalte, haelfte)

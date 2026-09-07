@@ -252,17 +252,17 @@ internal object ProzugRegelwerk {
         bruttoErtrag: Map<Rohstoff, Int>,
     ): VerwaltungsVerpflichtung {
         val eigenversorgung = bedarf.mapNotNull { (rohstoff, menge) ->
-            minOf(menge, bruttoErtrag.getOrDefault(rohstoff, 0))
+            minOf(menge, (bruttoErtrag[rohstoff] ?: 0))
                 .takeIf { gedeckt -> gedeckt > 0 }
                 ?.let { gedeckt -> rohstoff to gedeckt }
         }.toMap()
         val restbedarf = bedarf.mapNotNull { (rohstoff, menge) ->
-            (menge - eigenversorgung.getOrDefault(rohstoff, 0))
+            (menge - (eigenversorgung[rohstoff] ?: 0))
                 .takeIf { rest -> rest > 0 }
                 ?.let { rest -> rohstoff to rest }
         }.toMap()
         val auszahlbarerErtrag = bruttoErtrag.mapNotNull { (rohstoff, menge) ->
-            (menge - eigenversorgung.getOrDefault(rohstoff, 0))
+            (menge - (eigenversorgung[rohstoff] ?: 0))
                 .takeIf { rest -> rest > 0 }
                 ?.let { rest -> rohstoff to rest }
         }.toMap()
